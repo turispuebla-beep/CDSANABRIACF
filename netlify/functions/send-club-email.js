@@ -1,0 +1,91 @@
+'use strict';
+
+const { getEmailConfig } = require('./lib/club-email');
+const { sendMemberRegistrationEmail, sendMemberPaymentConfirmedEmail } = require('./lib/member-email');
+const { memberExistsForEmail } = require('./lib/firestore-admin');
+
+const CORS_BASE = {
+  'Access-Control-Allow-Headers': 'Content-Type',
+  'Access-Control-Allow-Methods': 'POST, OPTIONS'
+};
+
+function corsHeaders(origin) {
+  const allowed = String(process.env.ALLOWED_ORIGINS || '')
+    .split(',')
+    .map((o) => o.trim())
+    .filter(Boolean);
+  const site = String(process.env.SITE_URL || '').replace(/\/$/, '');
+  const list = allowed.length ? allowed : site ? [site] : [];
+  const ok = !list.length || list.includes(origin);
+  return {
+    ...CORS_BASE,
+    'Access-Control-Allow-Origin': ok ? origin || list[0] || '*' : 'null'
+  };
+}
+
+function json(statusCode, body, origin) {
+  return {
+    statusCode,
+    headers: { ...corsHeaders(origin), 'Content-Type': 'application/json' },
+    body: JSON.stringify(body)
+  };
+}
+
+exports.handler = async (event) => {
+  const origin = (event.headers && (event.headers.origin || event.headers.Origin)) || '';
+
+  if (event.httpMethod === 'OPTIONS') {
+    return { statusCode: 204, headers: corsHeaders(origin), body: '' };
+  }
+  if (event.httpMethod !== 'POST') {
+    return json(405, { ok: false, error: 'Method not allowed' }, origin);
+  }
+
+  const cfg = getEmailConfig();
+  if (!cfg.ok) {
+    return json(503, { ok: false, error: 'Correo no configurado en el servidor' }, origin);
+  }
+
+  try {
+    const body = JSON.parse(event.body || '{}');
+    const type = String(body.type || '').trim();
+
+    const email = String(body.email || '').trim().toLowerCase();
+    if (!email || !email.includes('@')) {
+      return json(400, { ok: false, error: 'email inválido' }, origin);
+    }
+
+    const exists = await memberExistsForEmail(email, body.memberId);
+    if (!exists) {
+      return json(404, { ok: false, error: 'Socio no encontrado' }, origin);
+    }
+
+    if (type === 'member_registered') {
+      const nextStep = body.nextStep === 'card' ? 'card' : 'transfer';
+      const result = await sendMemberRegistrationEmail({
+        email,
+        nombre: body.nombre || body.name,
+        apellidos: body.apellidos || body.surname,
+        numeroSocio: body.numeroSocio || body.memberNumber,
+        cuota: body.cuota,
+        nextStep
+      });
+      return json(200, { ok: true, sent: result.sent }, origin);
+    }
+
+    if (type === 'member_validated_manual') {
+      const result = await sendMemberPaymentConfirmedEmail({
+        email,
+        nombre: body.nombre || body.name,
+        apellidos: body.apellidos || body.surname,
+        numeroSocio: body.numeroSocio || body.memberNumber
+      });
+      return json(200, { ok: true, sent: result.sent }, origin);
+    }
+
+    return json(400, { ok: false, error: 'type no válido' }, origin);
+  } catch (err) {
+    console.error('send-club-email:', err);
+    return json(500, { ok: false, error: err.message || 'Error interno' }, origin);
+  }
+};

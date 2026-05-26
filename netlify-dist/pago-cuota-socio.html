@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pagar cuota de socio — CD Sanabria CF</title>
+    <style>
+        :root { --primary: #1e3a8a; --green: #059669; }
+        body {
+            font-family: system-ui, -apple-system, sans-serif;
+            max-width: 480px;
+            margin: 0 auto;
+            padding: 24px 20px 40px;
+            background: #f1f5f9;
+            color: #1e293b;
+        }
+        .card {
+            background: #fff;
+            border-radius: 12px;
+            padding: 24px;
+            box-shadow: 0 4px 20px rgba(0,0,0,.08);
+        }
+        h1 { font-size: 1.35rem; color: var(--primary); margin: 0 0 8px; }
+        .sub { color: #64748b; font-size: 0.95rem; margin-bottom: 20px; }
+        label { display: block; font-weight: 600; margin-bottom: 6px; font-size: 0.9rem; }
+        input[type="email"] {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid #cbd5e1;
+            border-radius: 8px;
+            font-size: 1rem;
+            box-sizing: border-box;
+        }
+        .cuota-box {
+            background: #ecfdf5;
+            border: 2px solid var(--green);
+            border-radius: 10px;
+            padding: 16px;
+            margin: 20px 0;
+            text-align: center;
+        }
+        .cuota-box .amount { font-size: 2rem; font-weight: 800; color: var(--green); }
+        .btn-pay {
+            display: block;
+            width: 100%;
+            padding: 14px;
+            background: linear-gradient(180deg, #10b981 0%, #059669 100%);
+            color: #fff;
+            border: none;
+            border-radius: 10px;
+            font-size: 1.05rem;
+            font-weight: 700;
+            cursor: pointer;
+            box-shadow: 0 4px 14px rgba(5, 150, 105, 0.28);
+            transition: transform 0.15s ease, box-shadow 0.15s ease;
+        }
+        .btn-pay:hover:not(:disabled) {
+            transform: translateY(-1px);
+            box-shadow: 0 6px 18px rgba(5, 150, 105, 0.35);
+        }
+        .btn-pay:disabled { background: #9ca3af; cursor: not-allowed; box-shadow: none; transform: none; }
+        .btn-pay--bizum {
+            background: linear-gradient(180deg, #0bb5d6 0%, #0596b8 100%);
+            box-shadow: 0 4px 14px rgba(5, 150, 168, 0.28);
+            margin-top: 10px;
+        }
+        .btn-pay--bizum:hover:not(:disabled) {
+            box-shadow: 0 6px 18px rgba(5, 150, 168, 0.35);
+        }
+        .btn-pay--bizum.is-disabled {
+            background: #cbd5e1;
+            color: #64748b;
+            box-shadow: none;
+        }
+        .pay-methods { margin-top: 4px; }
+        .pay-hint { font-size: 0.82rem; color: #64748b; margin: 8px 0 0; text-align: center; }
+        .btn-link {
+            display: block;
+            text-align: center;
+            margin-top: 16px;
+            color: var(--primary);
+            font-size: 0.9rem;
+        }
+        .note { font-size: 0.85rem; color: #64748b; margin-top: 16px; line-height: 1.45; }
+        .err { color: #dc2626; font-size: 0.9rem; margin-top: 10px; }
+        .bank {
+            background: #fef2f2;
+            border: 1px solid #fecaca;
+            border-radius: 8px;
+            padding: 12px;
+            margin-top: 16px;
+            font-size: 0.85rem;
+            color: #991b1b;
+        }
+    </style>
+    <script src="js/club-accounting.js"></script>
+    <script src="js/redsys-payments.js"></script>
+</head>
+<body>
+    <div class="card">
+        <h1>💳 Pagar cuota de socio/a</h1>
+        <p class="sub">TPV seguro del banco (Caja Rural · Redsys): tarjeta o Bizum. Necesitas haberte registrado antes en la web del club.</p>
+
+        <label for="payEmail">Correo con el que te registraste</label>
+        <input type="email" id="payEmail" placeholder="tu@email.com" autocomplete="email">
+
+        <div id="memberInfo" style="display:none;">
+            <div class="cuota-box">
+                <div>Socio/a: <strong id="memberName">—</strong></div>
+                <div style="margin-top:8px;">Nº socio: <span id="memberNum">—</span></div>
+                <div class="amount" id="cuotaAmount">— €</div>
+            </div>
+            <div class="pay-methods">
+                <button type="button" class="btn-pay" id="btnPayCard">Pagar con tarjeta</button>
+                <button type="button" class="btn-pay btn-pay--bizum" id="btnPayBizum">Pagar con Bizum</button>
+            </div>
+            <p id="payError" class="err" style="display:none;"></p>
+        </div>
+
+        <p id="lookupHint" class="note">Introduce tu email y pulsa «Buscar mi cuota».</p>
+        <button type="button" class="btn-pay" id="btnLookup" style="background:#1e3a8a; margin-top:12px;">Buscar mi cuota</button>
+
+        <div class="bank">
+            <strong>🏦 Transferencia o efectivo:</strong> no uses esta página; tienes 7 días para ingresar y un administrador validará el pago. Consultas: cdsanabriafc@gmail.com
+        </div>
+
+        <a class="btn-link" href="index.html">← Volver a la web del club</a>
+    </div>
+
+    <script>
+        let selectedMember = null;
+        let pendingCuota = 0;
+
+        function setPayButtonsForMember(cuota, pagado) {
+            const btnCard = document.getElementById('btnPayCard');
+            const btnBizum = document.getElementById('btnPayBizum');
+            pendingCuota = cuota;
+            if (pagado) {
+                btnCard.disabled = true;
+                btnCard.textContent = 'Cuota ya registrada como pagada';
+                btnBizum.disabled = true;
+                btnBizum.textContent = 'Cuota ya registrada como pagada';
+                return;
+            }
+            btnCard.disabled = false;
+            btnCard.textContent = 'Pagar ' + cuota.toFixed(2) + ' € con tarjeta';
+            btnBizum.disabled = false;
+            btnBizum.textContent = 'Pagar ' + cuota.toFixed(2) + ' € con Bizum';
+        }
+
+        function getCuotaPricing() {
+            if (typeof ClubAccounting !== 'undefined' && ClubAccounting.readMembershipPricing) {
+                return ClubAccounting.readMembershipPricing();
+            }
+            return { cuotaMenor: 10, cuotaMayor: 20, edadMaxMenor: 17 };
+        }
+
+        function resolveCuota(member) {
+            const birth = member.birthDate || member.fechaNacimiento;
+            if (birth && typeof ClubAccounting !== 'undefined' && ClubAccounting.cuotaDesdeFechaNacimiento) {
+                return ClubAccounting.cuotaDesdeFechaNacimiento(birth);
+            }
+            const c = Number(member.cuota);
+            if (Number.isFinite(c) && c > 0) return c;
+            const p = getCuotaPricing();
+            return p.cuotaMayor;
+        }
+
+        function findMemberByEmail(email) {
+            const norm = String(email || '').trim().toLowerCase();
+            const keys = ['clubMembers', 'members', 'socios'];
+            for (let i = 0; i < keys.length; i++) {
+                try {
+                    const list = JSON.parse(localStorage.getItem(keys[i]) || '[]');
+                    const found = list.find((m) => String(m.email || '').toLowerCase() === norm);
+                    if (found) return found;
+                } catch (_) {}
+            }
+            return null;
+        }
+
+        function showMember(member) {
+            selectedMember = member;
+            const cuota = resolveCuota(member);
+            const nombre = [member.name || member.nombre, member.surname || member.apellidos].filter(Boolean).join(' ') || 'Socio/a';
+            document.getElementById('memberName').textContent = nombre;
+            document.getElementById('memberNum').textContent = member.numeroSocio || member.memberNumber || '—';
+            document.getElementById('cuotaAmount').textContent = cuota.toFixed(2) + ' €';
+            document.getElementById('memberInfo').style.display = 'block';
+            document.getElementById('lookupHint').style.display = 'none';
+            document.getElementById('btnLookup').style.display = 'none';
+
+            const pagado = member.pagado === true || member.paymentStatus === 'paid';
+            setPayButtonsForMember(cuota, pagado);
+        }
+
+        async function lookup() {
+            const email = document.getElementById('payEmail').value.trim();
+            const errEl = document.getElementById('payError');
+            errEl.style.display = 'none';
+            if (!email) {
+                alert('Introduce tu correo electrónico.');
+                return;
+            }
+            let member = findMemberByEmail(email);
+            if (!member && typeof window.getDocuments === 'function') {
+                try {
+                    const all = await window.getDocuments('members');
+                    member = (all || []).find((m) => String(m.email || '').toLowerCase() === email.toLowerCase());
+                } catch (e) {
+                    console.warn(e);
+                }
+            }
+            if (!member) {
+                alert('No encontramos un socio con ese email. Regístrate primero o comprueba el correo.');
+                return;
+            }
+            showMember(member);
+        }
+
+        async function pay(payMethod) {
+            if (!selectedMember) return;
+            const errEl = document.getElementById('payError');
+            errEl.style.display = 'none';
+            const cuota = pendingCuota || resolveCuota(selectedMember);
+            const email = String(selectedMember.email || document.getElementById('payEmail').value).trim();
+            const memberId = selectedMember.id;
+            const method = payMethod === 'bizum' ? 'bizum' : 'card';
+
+            if (!window.CdsanRedsys) {
+                errEl.textContent = 'Pasarela de pago no cargada. Recarga la página o usa transferencia (cdsanabriafc@gmail.com).';
+                errEl.style.display = 'block';
+                return;
+            }
+
+            const btnCard = document.getElementById('btnPayCard');
+            const btnBizum = document.getElementById('btnPayBizum');
+            try {
+                btnCard.disabled = true;
+                btnBizum.disabled = true;
+                await window.CdsanRedsys.payMembership({
+                    payMethod: method,
+                    amountEur: cuota,
+                    email: email,
+                    memberId: memberId,
+                    description: 'Cuota socio CD Sanabria CF — ' + (selectedMember.numeroSocio || selectedMember.memberNumber || '')
+                });
+            } catch (e) {
+                btnCard.disabled = false;
+                btnBizum.disabled = false;
+                errEl.textContent = e.message || String(e);
+                errEl.style.display = 'block';
+            }
+        }
+
+        document.getElementById('btnLookup').addEventListener('click', lookup);
+        document.getElementById('btnPayCard').addEventListener('click', function () { pay('card'); });
+        document.getElementById('btnPayBizum').addEventListener('click', function () { pay('bizum'); });
+        document.getElementById('payEmail').addEventListener('keydown', function (ev) {
+            if (ev.key === 'Enter') { ev.preventDefault(); lookup(); }
+        });
+
+        (function init() {
+            const params = new URLSearchParams(location.search);
+            const emailParam = params.get('email');
+            let email = emailParam ? decodeURIComponent(emailParam) : '';
+            if (!email) {
+                try {
+                    const s = JSON.parse(localStorage.getItem('currentSocio') || 'null');
+                    if (s && s.email) email = s.email;
+                } catch (_) {}
+            }
+            if (email) {
+                document.getElementById('payEmail').value = email;
+                lookup();
+            }
+        })();
+    </script>
+    <script type="module" src="js/firebase-config.js"></script>
+</body>
+</html>

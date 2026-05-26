@@ -1,0 +1,389 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test de Persistencia - CDSANABRIACF</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .test-section {
+            margin: 20px 0;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+        .success { background-color: #d4edda; border-color: #c3e6cb; }
+        .error { background-color: #f8d7da; border-color: #f5c6cb; }
+        .info { background-color: #d1ecf1; border-color: #bee5eb; }
+        button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover { background: #0056b3; }
+        .results {
+            margin-top: 10px;
+            padding: 10px;
+            background: #f8f9fa;
+            border-radius: 5px;
+            font-family: monospace;
+            white-space: pre-wrap;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🧪 Test de Persistencia de Datos - CDSANABRIACF</h1>
+        
+        <div class="test-section info">
+            <h3>📊 Estado del Sistema</h3>
+            <div id="systemStatus">Cargando...</div>
+        </div>
+
+        <div class="test-section">
+            <h3>👥 Test de Socios</h3>
+            <button onclick="testAddMember()">Agregar Socio de Prueba</button>
+            <button onclick="testGetMembers()">Obtener Socios</button>
+            <button onclick="testUpdateMember()">Actualizar Socio</button>
+            <div id="membersResults" class="results"></div>
+        </div>
+
+        <div class="test-section">
+            <h3>⚽ Test de Jugadores</h3>
+            <button onclick="testAddPlayer()">Agregar Jugador de Prueba</button>
+            <button onclick="testGetPlayers()">Obtener Jugadores</button>
+            <button onclick="testUpdatePlayer()">Actualizar Jugador</button>
+            <div id="playersResults" class="results"></div>
+        </div>
+
+        <div class="test-section">
+            <h3>🤝 Test de Amigos del Club</h3>
+            <button onclick="testAddFriend()">Agregar Amigo de Prueba</button>
+            <button onclick="testGetFriends()">Obtener Amigos</button>
+            <div id="friendsResults" class="results"></div>
+        </div>
+
+        <div class="test-section">
+            <h3>🔄 Test de Sincronización</h3>
+            <button onclick="testSync()">Forzar Sincronización</button>
+            <button onclick="testStats()">Ver Estadísticas</button>
+            <div id="syncResults" class="results"></div>
+        </div>
+
+        <div class="test-section">
+            <h3>🧹 Limpieza</h3>
+            <button onclick="clearTestData()" style="background: #dc3545;">Limpiar Datos de Prueba</button>
+            <button onclick="clearAllData()" style="background: #dc3545;">Limpiar Todo (Solo Super Admin)</button>
+            <div id="cleanupResults" class="results"></div>
+        </div>
+    </div>
+
+    <!-- Cargar scripts necesarios -->
+    <script src="js/persistencemanager.js"></script>
+    <script src="js/datamanager-enhanced.js"></script>
+    <script src="js/firebase-config.js"></script>
+
+    <script>
+        let testMemberId = null;
+        let testPlayerId = null;
+        let testFriendId = null;
+
+        // Inicializar cuando se carga la página
+        document.addEventListener('DOMContentLoaded', async () => {
+            await updateSystemStatus();
+        });
+
+        // Actualizar estado del sistema
+        async function updateSystemStatus() {
+            const statusDiv = document.getElementById('systemStatus');
+            
+            try {
+                const stats = await window.dataManager.getSystemStats();
+                statusDiv.innerHTML = `
+                    <strong>Estado:</strong> ✅ Sistema funcionando<br>
+                    <strong>Usuario:</strong> ${stats.currentUser}<br>
+                    <strong>Rol:</strong> ${stats.userRole}<br>
+                    <strong>Total registros:</strong> ${stats.totalRecords}<br>
+                    <strong>Sincronizados:</strong> ${stats.syncedRecords}<br>
+                    <strong>Pendientes:</strong> ${stats.unsyncedRecords}<br>
+                    <strong>Última sincronización:</strong> ${new Date(stats.lastSync).toLocaleString()}
+                `;
+                statusDiv.parentElement.className = 'test-section success';
+            } catch (error) {
+                statusDiv.innerHTML = `❌ Error: ${error.message}`;
+                statusDiv.parentElement.className = 'test-section error';
+            }
+        }
+
+        // Test de socios
+        async function testAddMember() {
+            const resultsDiv = document.getElementById('membersResults');
+            
+            try {
+                const memberData = {
+                    name: 'Socio de Prueba',
+                    email: 'socio.test@example.com',
+                    phone: '123456789',
+                    address: 'Dirección de prueba',
+                    birthDate: '1990-01-01',
+                    membershipType: 'individual',
+                    paymentStatus: 'paid'
+                };
+
+                const result = await window.dataManager.addMember(memberData);
+                testMemberId = result.id;
+                
+                resultsDiv.textContent = `✅ Socio agregado correctamente:\n${JSON.stringify(result, null, 2)}`;
+                resultsDiv.parentElement.className = 'test-section success';
+                
+                await updateSystemStatus();
+            } catch (error) {
+                resultsDiv.textContent = `❌ Error agregando socio: ${error.message}`;
+                resultsDiv.parentElement.className = 'test-section error';
+            }
+        }
+
+        async function testGetMembers() {
+            const resultsDiv = document.getElementById('membersResults');
+            
+            try {
+                const members = await window.dataManager.getMembers();
+                
+                resultsDiv.textContent = `✅ Socios obtenidos (${members.length}):\n${JSON.stringify(members, null, 2)}`;
+                resultsDiv.parentElement.className = 'test-section success';
+            } catch (error) {
+                resultsDiv.textContent = `❌ Error obteniendo socios: ${error.message}`;
+                resultsDiv.parentElement.className = 'test-section error';
+            }
+        }
+
+        async function testUpdateMember() {
+            const resultsDiv = document.getElementById('membersResults');
+            
+            if (!testMemberId) {
+                resultsDiv.textContent = '❌ Primero agrega un socio de prueba';
+                resultsDiv.parentElement.className = 'test-section error';
+                return;
+            }
+            
+            try {
+                const updates = {
+                    name: 'Socio Actualizado',
+                    paymentStatus: 'pending'
+                };
+
+                const result = await window.dataManager.updateMember(testMemberId, updates);
+                
+                resultsDiv.textContent = `✅ Socio actualizado correctamente:\n${JSON.stringify(result, null, 2)}`;
+                resultsDiv.parentElement.className = 'test-section success';
+                
+                await updateSystemStatus();
+            } catch (error) {
+                resultsDiv.textContent = `❌ Error actualizando socio: ${error.message}`;
+                resultsDiv.parentElement.className = 'test-section error';
+            }
+        }
+
+        // Test de jugadores
+        async function testAddPlayer() {
+            const resultsDiv = document.getElementById('playersResults');
+            
+            try {
+                const playerData = {
+                    name: 'Jugador de Prueba',
+                    email: 'jugador.test@example.com',
+                    phone: '987654321',
+                    position: 'Delantero',
+                    team: 'Juvenil A',
+                    birthDate: '2005-01-01',
+                    licenseNumber: 'LIC-001'
+                };
+
+                const result = await window.dataManager.addPlayer(playerData);
+                testPlayerId = result.id;
+                
+                resultsDiv.textContent = `✅ Jugador agregado correctamente:\n${JSON.stringify(result, null, 2)}`;
+                resultsDiv.parentElement.className = 'test-section success';
+                
+                await updateSystemStatus();
+            } catch (error) {
+                resultsDiv.textContent = `❌ Error agregando jugador: ${error.message}`;
+                resultsDiv.parentElement.className = 'test-section error';
+            }
+        }
+
+        async function testGetPlayers() {
+            const resultsDiv = document.getElementById('playersResults');
+            
+            try {
+                const players = await window.dataManager.getPlayers();
+                
+                resultsDiv.textContent = `✅ Jugadores obtenidos (${players.length}):\n${JSON.stringify(players, null, 2)}`;
+                resultsDiv.parentElement.className = 'test-section success';
+            } catch (error) {
+                resultsDiv.textContent = `❌ Error obteniendo jugadores: ${error.message}`;
+                resultsDiv.parentElement.className = 'test-section error';
+            }
+        }
+
+        async function testUpdatePlayer() {
+            const resultsDiv = document.getElementById('playersResults');
+            
+            if (!testPlayerId) {
+                resultsDiv.textContent = '❌ Primero agrega un jugador de prueba';
+                resultsDiv.parentElement.className = 'test-section error';
+                return;
+            }
+            
+            try {
+                const updates = {
+                    name: 'Jugador Actualizado',
+                    position: 'Mediocampista'
+                };
+
+                const result = await window.dataManager.updatePlayer(testPlayerId, updates);
+                
+                resultsDiv.textContent = `✅ Jugador actualizado correctamente:\n${JSON.stringify(result, null, 2)}`;
+                resultsDiv.parentElement.className = 'test-section success';
+                
+                await updateSystemStatus();
+            } catch (error) {
+                resultsDiv.textContent = `❌ Error actualizando jugador: ${error.message}`;
+                resultsDiv.parentElement.className = 'test-section error';
+            }
+        }
+
+        // Test de amigos
+        async function testAddFriend() {
+            const resultsDiv = document.getElementById('friendsResults');
+            
+            try {
+                const friendData = {
+                    name: 'Amigo de Prueba',
+                    email: 'amigo.test@example.com',
+                    phone: '555555555',
+                    relationship: 'Padre de jugador',
+                    notes: 'Amigo del club desde 2020'
+                };
+
+                const result = await window.dataManager.addFriend(friendData);
+                testFriendId = result.id;
+                
+                resultsDiv.textContent = `✅ Amigo agregado correctamente:\n${JSON.stringify(result, null, 2)}`;
+                resultsDiv.parentElement.className = 'test-section success';
+                
+                await updateSystemStatus();
+            } catch (error) {
+                resultsDiv.textContent = `❌ Error agregando amigo: ${error.message}`;
+                resultsDiv.parentElement.className = 'test-section error';
+            }
+        }
+
+        async function testGetFriends() {
+            const resultsDiv = document.getElementById('friendsResults');
+            
+            try {
+                const friends = await window.dataManager.getFriends();
+                
+                resultsDiv.textContent = `✅ Amigos obtenidos (${friends.length}):\n${JSON.stringify(friends, null, 2)}`;
+                resultsDiv.parentElement.className = 'test-section success';
+            } catch (error) {
+                resultsDiv.textContent = `❌ Error obteniendo amigos: ${error.message}`;
+                resultsDiv.parentElement.className = 'test-section error';
+            }
+        }
+
+        // Test de sincronización
+        async function testSync() {
+            const resultsDiv = document.getElementById('syncResults');
+            
+            try {
+                await window.dataManager.forceSync();
+                
+                resultsDiv.textContent = '✅ Sincronización forzada completada';
+                resultsDiv.parentElement.className = 'test-section success';
+                
+                await updateSystemStatus();
+            } catch (error) {
+                resultsDiv.textContent = `❌ Error en sincronización: ${error.message}`;
+                resultsDiv.parentElement.className = 'test-section error';
+            }
+        }
+
+        async function testStats() {
+            const resultsDiv = document.getElementById('syncResults');
+            
+            try {
+                const stats = await window.dataManager.getSystemStats();
+                
+                resultsDiv.textContent = `📊 Estadísticas del Sistema:\n${JSON.stringify(stats, null, 2)}`;
+                resultsDiv.parentElement.className = 'test-section success';
+            } catch (error) {
+                resultsDiv.textContent = `❌ Error obteniendo estadísticas: ${error.message}`;
+                resultsDiv.parentElement.className = 'test-section error';
+            }
+        }
+
+        // Limpieza de datos
+        async function clearTestData() {
+            const resultsDiv = document.getElementById('cleanupResults');
+            
+            try {
+                // Limpiar datos de prueba específicos
+                if (testMemberId) {
+                    await window.dataManager.deleteMember(testMemberId);
+                    testMemberId = null;
+                }
+                if (testPlayerId) {
+                    await window.dataManager.deletePlayer(testPlayerId);
+                    testPlayerId = null;
+                }
+                if (testFriendId) {
+                    // Los amigos no tienen función delete específica, se puede implementar
+                    testFriendId = null;
+                }
+                
+                resultsDiv.textContent = '✅ Datos de prueba eliminados';
+                resultsDiv.parentElement.className = 'test-section success';
+                
+                await updateSystemStatus();
+            } catch (error) {
+                resultsDiv.textContent = `❌ Error limpiando datos: ${error.message}`;
+                resultsDiv.parentElement.className = 'test-section error';
+            }
+        }
+
+        async function clearAllData() {
+            const resultsDiv = document.getElementById('cleanupResults');
+            
+            try {
+                await window.dataManager.clearAllData();
+                
+                resultsDiv.textContent = '✅ Todos los datos eliminados (requiere super admin)';
+                resultsDiv.parentElement.className = 'test-section success';
+                
+                await updateSystemStatus();
+            } catch (error) {
+                resultsDiv.textContent = `❌ Error limpiando todos los datos: ${error.message}`;
+                resultsDiv.parentElement.className = 'test-section error';
+            }
+        }
+    </script>
+</body>
+</html>

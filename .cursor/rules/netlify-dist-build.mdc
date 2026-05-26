@@ -1,0 +1,20 @@
+---
+description: Deploy manual Netlify CDSANABRIACF — build netlify-dist
+globs:
+  - "**/*"
+alwaysApply: true
+---
+
+# Deploy Netlify (CDSANABRIACF)
+
+Cuando el usuario vaya a **subir**, **deploy**, **Netlify** o **producción**, o tras cambiar `index.html`, `admin-panel.html`, `js/`, `sw.js`, `manifest.json`:
+
+1. Ejecutar desde la raíz del repo **CDSANABRIACF1**:
+   `powershell -NoProfile -ExecutionPolicy Bypass -File ".\build-netlify-dist.ps1"`
+2. Comprobar código de salida **0** y que existan en `netlify-dist/`:
+   - `_redirects`
+   - `.netlifyignore`
+   - `404.html`
+3. Indicar subir el **contenido** de `netlify-dist/` (no Railway; Firebase `cdsanabriacf2026`).
+
+Plantillas canónicas: `scripts/netlify-deploy/` (no borrar).

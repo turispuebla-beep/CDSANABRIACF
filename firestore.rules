@@ -1,0 +1,318 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function adminDoc() {
+      return get(/databases/$(database)/documents/sanabria_admins/$(request.auth.uid));
+    }
+
+    function isAdmin() {
+      return isSignedIn()
+        && exists(/databases/$(database)/documents/sanabria_admins/$(request.auth.uid))
+        && (
+          adminDoc().data.isAdmin == true
+          || adminDoc().data.isSuperAdmin == true
+          || adminDoc().data.role == 'admin'
+          || adminDoc().data.role == 'super_admin'
+        );
+    }
+
+    function hasScope() {
+      return resource.data.appScope == 'cdsanabriacf';
+    }
+
+    function hasRequestedScope() {
+      return request.resource.data.appScope == 'cdsanabriacf';
+    }
+
+    function hasNoPlainPassword() {
+      return !('password' in request.resource.data)
+        && !('pass' in request.resource.data)
+        && !('plainPassword' in request.resource.data);
+    }
+
+    function hasMemberRequiredFields() {
+      return ('nombre' in request.resource.data)
+        && ('apellidos' in request.resource.data)
+        && ('email' in request.resource.data)
+        && ('dni' in request.resource.data)
+        && ('telefono' in request.resource.data);
+    }
+
+    function hasFriendRequiredFields() {
+      return ('nombre' in request.resource.data)
+        && ('apellidos' in request.resource.data)
+        && ('email' in request.resource.data)
+        && ('dni' in request.resource.data);
+    }
+
+    function memberFieldTypesAreValid() {
+      return request.resource.data.nombre is string
+        && request.resource.data.apellidos is string
+        && request.resource.data.email is string
+        && request.resource.data.dni is string
+        && request.resource.data.telefono is string
+        && request.resource.data.appScope is string;
+    }
+
+    function friendFieldTypesAreValid() {
+      return request.resource.data.nombre is string
+        && request.resource.data.apellidos is string
+        && request.resource.data.email is string
+        && request.resource.data.dni is string
+        && request.resource.data.appScope is string;
+    }
+
+    function emailLooksValid() {
+      return request.resource.data.email.matches('^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$');
+    }
+
+    function dniLooksValid() {
+      return request.resource.data.dni.size() >= 6
+        && request.resource.data.dni.size() <= 20;
+    }
+
+    function authEmailLower() {
+      return request.auth != null && request.auth.token.email != null
+        ? request.auth.token.email.lower()
+        : '';
+    }
+
+    function isOwnIdentityDoc() {
+      return isSignedIn() && (
+        resource.data.authUid == request.auth.uid
+        || resource.data.uid == request.auth.uid
+        || (
+          resource.data.email is string
+          && authEmailLower() != ''
+          && resource.data.email.lower() == authEmailLower()
+        )
+      );
+    }
+
+    function createLinksAuthUid() {
+      return isSignedIn()
+        && request.resource.data.authUid == request.auth.uid
+        && request.resource.data.uid == request.auth.uid;
+    }
+
+    function onlyEventRegistrationFieldsChanged() {
+      return request.resource.data.diff(resource.data).affectedKeys()
+        .hasOnly(['participants', 'registeredMembers', 'updatedAt']);
+    }
+
+    // Competiciones internas (torneos/ligas del panel): lectura pública con scope; escritura solo admin.
+    function competitionPayloadValid() {
+      return request.resource.data.appScope == 'cdsanabriacf'
+        && (
+          (request.resource.data.name is string && request.resource.data.name.size() > 0)
+          || (request.resource.data.title is string && request.resource.data.title.size() > 0)
+        )
+        && (
+          !('type' in request.resource.data)
+          || request.resource.data.type in ['torneo', 'liga', 'amistoso', 'entrenamiento']
+        )
+        && (
+          !('excludeFromOfficialPlayerStats' in request.resource.data)
+          || request.resource.data.excludeFromOfficialPlayerStats is bool
+        )
+        && (
+          !('teams' in request.resource.data)
+          || request.resource.data.teams is list
+        )
+        && (
+          !('matches' in request.resource.data)
+          || request.resource.data.matches is list
+        );
+    }
+
+    // Socios: lectura propia o admin; alta autenticada; edicion propia/admin.
+    match /sanabria_members/{docId} {
+      allow read: if hasScope() && (isAdmin() || isOwnIdentityDoc());
+      allow create: if isSignedIn()
+        && hasRequestedScope()
+        && createLinksAuthUid()
+        && hasNoPlainPassword()
+        && hasMemberRequiredFields()
+        && memberFieldTypesAreValid()
+        && emailLooksValid()
+        && dniLooksValid();
+      allow update: if hasScope()
+        && (isAdmin() || isOwnIdentityDoc())
+        && hasRequestedScope()
+        && hasNoPlainPassword()
+        && memberFieldTypesAreValid()
+        && emailLooksValid()
+        && dniLooksValid();
+      allow delete: if hasScope() && isAdmin();
+    }
+
+    // Amigos: lectura propia o admin; alta autenticada; edicion propia/admin.
+    match /sanabria_friends/{docId} {
+      allow read: if hasScope() && (isAdmin() || isOwnIdentityDoc());
+      allow create: if isSignedIn()
+        && hasRequestedScope()
+        && createLinksAuthUid()
+        && hasNoPlainPassword()
+        && hasFriendRequiredFields()
+        && friendFieldTypesAreValid()
+        && emailLooksValid()
+        && dniLooksValid();
+      allow update: if hasScope()
+        && (isAdmin() || isOwnIdentityDoc())
+        && hasRequestedScope()
+        && hasNoPlainPassword()
+        && friendFieldTypesAreValid()
+        && emailLooksValid()
+        && dniLooksValid();
+      allow delete: if hasScope() && isAdmin();
+    }
+
+    // Lectura publica de contenido del club (con appScope correcto en cada documento).
+    match /sanabria_events/{docId} {
+      allow read: if hasScope();
+      allow create, delete: if isAdmin() && hasRequestedScope();
+      allow update: if hasScope()
+        && hasRequestedScope()
+        && (
+          isAdmin()
+          || (isSignedIn() && onlyEventRegistrationFieldsChanged())
+        );
+    }
+    match /sanabria_news/{docId} {
+      allow read: if hasScope();
+      allow create, update, delete: if isAdmin() && hasRequestedScope();
+    }
+    match /sanabria_documents/{docId} {
+      allow read: if hasScope();
+      allow create, update, delete: if isAdmin() && hasRequestedScope();
+    }
+    match /sanabria_media/{docId} {
+      allow read: if hasScope();
+      allow create, update, delete: if isAdmin() && hasRequestedScope();
+    }
+    match /sanabria_ads/{docId} {
+      allow read: if hasScope();
+      allow create, update, delete: if isAdmin() && hasRequestedScope();
+    }
+
+    // Encuentros / partidos (cliente web y panel).
+    match /sanabria_matches/{docId} {
+      allow read: if hasScope();
+      allow create, update, delete: if hasRequestedScope() && isAdmin();
+    }
+
+    // Calendario interno (entrenamientos, actividades).
+    match /sanabria_calendar_events/{docId} {
+      allow read: if hasScope();
+      allow create, update, delete: if hasRequestedScope() && isAdmin();
+    }
+
+    // Resto de colecciones del proyecto: solo admins, siempre con scope.
+    match /sanabria_users/{docId} {
+      allow read: if hasScope() && (isAdmin() || (isSignedIn() && request.auth.uid == docId));
+      allow create, update, delete: if hasRequestedScope() && (isAdmin() || (isSignedIn() && request.auth.uid == docId));
+    }
+    match /sanabria_admins/{docId} {
+      allow read: if hasScope() && (isAdmin() || (isSignedIn() && request.auth.uid == docId));
+      allow create, update, delete: if hasRequestedScope() && isAdmin();
+    }
+    match /sanabria_players/{docId} {
+      allow read: if hasScope();
+      allow create, update, delete: if hasRequestedScope() && isAdmin();
+    }
+    match /sanabria_coaches/{docId} {
+      allow read: if hasScope();
+      allow create, update, delete: if hasRequestedScope() && isAdmin();
+    }
+    match /sanabria_teams/{docId} {
+      allow read: if hasScope();
+      allow create, update, delete: if hasRequestedScope() && isAdmin();
+    }
+    match /sanabria_competitions/{docId} {
+      allow read: if hasScope();
+      allow create: if isAdmin()
+        && hasRequestedScope()
+        && competitionPayloadValid();
+      allow update: if isAdmin()
+        && hasScope()
+        && hasRequestedScope()
+        && competitionPayloadValid();
+      allow delete: if hasScope() && isAdmin();
+    }
+    match /sanabria_notifications/{docId} {
+      allow read: if hasScope() && isSignedIn();
+      allow create, update, delete: if hasRequestedScope() && isAdmin();
+    }
+    match /sanabria_fcm_tokens/{docId} {
+      allow read: if hasScope() && isAdmin();
+      allow create, update: if hasRequestedScope() && isSignedIn();
+      allow delete: if hasScope() && isAdmin();
+    }
+    match /sanabria_audit_logs/{docId} {
+      allow read: if hasScope() && isAdmin();
+      allow create: if hasRequestedScope() && isSignedIn();
+      allow update, delete: if hasRequestedScope() && isAdmin();
+    }
+    match /sanabria_config/{docId} {
+      allow read: if hasScope();
+      allow create, update, delete: if hasRequestedScope() && isAdmin();
+    }
+    match /sanabria_statistics/{docId} {
+      allow read: if hasScope() && isAdmin();
+      allow create, update, delete: if hasRequestedScope() && isAdmin();
+    }
+
+    match /sanabria_board/{docId} {
+      allow read: if hasScope();
+      allow create, update, delete: if hasRequestedScope() && isAdmin();
+    }
+
+    // Libro contable: creacion (admin o inscripcion evento). Edicion y borrado solo administradores del club.
+    match /sanabria_accounting_ledger/{docId} {
+      allow read: if hasScope() && isAdmin();
+      allow create: if hasRequestedScope()
+        && request.resource.data.appScope == 'cdsanabriacf'
+        && request.resource.data.bucket in ['A', 'B']
+        && request.resource.data.signedAmount is number
+        && request.resource.data.category is string
+        && request.resource.data.concept is string
+        && (
+          isAdmin()
+          || (
+            isSignedIn()
+            && request.resource.data.category in ['evento', 'evento_reversion']
+            && request.resource.data.refType == 'event'
+          )
+        );
+      allow update: if hasScope() && isAdmin()
+        && hasRequestedScope()
+        && request.resource.data.bucket in ['A', 'B']
+        && request.resource.data.signedAmount is number
+        && request.resource.data.category is string
+        && request.resource.data.concept is string;
+      allow delete: if hasScope() && isAdmin();
+    }
+
+    // Pagos TPV (Redsys / Caja Rural): solo lectura propia o admin; escritura solo backend (Admin SDK).
+    match /sanabria_payments/{orderId} {
+      allow read: if hasScope()
+        && (
+          isAdmin()
+          || (
+            isSignedIn()
+            && resource.data.customerEmail == request.auth.token.email
+          )
+        );
+      allow create, update, delete: if false;
+    }
+
+    // Bloquear todo lo no declarado explicitamente arriba.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

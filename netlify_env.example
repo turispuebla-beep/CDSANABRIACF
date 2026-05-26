@@ -1,0 +1,21 @@
+# Copiar a Netlify → Site configuration → Environment variables
+# Proyecto: CDSANABRIACF (cdsanabriacf2026)
+
+REDSYS_MERCHANT_CODE=
+REDSYS_TERMINAL=001
+REDSYS_SECRET_KEY=
+REDSYS_ENV=test
+# Bizum en el mismo TPV (pedir activación a Caja Rural). Poner true cuando confirmen:
+REDSYS_BIZUM_ENABLED=false
+SITE_URL=https://tu-sitio.netlify.app
+
+# Firebase Admin: cuenta de servicio (JSON en una sola línea)
+FIREBASE_SERVICE_ACCOUNT_JSON=
+
+# Correo socios (SendGrid) — remitente del club
+SENDGRID_API_KEY=
+SENDGRID_FROM_EMAIL=cdsanabriafc@gmail.com
+SENDGRID_FROM_NAME=CD Sanabria CF
+CLUB_REPLY_EMAIL=cdsanabriafc@gmail.com
+CLUB_NOTIFY_EMAIL=cdsanabriafc@gmail.com
+ALLOWED_ORIGINS=https://tu-sitio.netlify.app

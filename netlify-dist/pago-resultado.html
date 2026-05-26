@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Resultado del pago — CD Sanabria CF</title>
+    <style>
+        body { font-family: system-ui, sans-serif; max-width: 520px; margin: 48px auto; padding: 24px; text-align: center; }
+        .ok { color: #059669; }
+        .ko { color: #dc2626; }
+        a { color: #1e3a8a; }
+    </style>
+</head>
+<body>
+    <h1 id="title">Procesando pago…</h1>
+    <p id="msg">Comprobando el estado con el banco.</p>
+    <p><a href="index.html">Volver a la web del club</a></p>
+    <script>
+        (async function () {
+            const params = new URLSearchParams(location.search);
+            const result = params.get('result');
+            const order = params.get('order');
+            const title = document.getElementById('title');
+            const msg = document.getElementById('msg');
+
+            if (result === 'ok') {
+                title.textContent = 'Pago enviado correctamente';
+                title.className = 'ok';
+                msg.textContent = 'El banco ha aceptado la operación. En unos segundos activaremos tu alta como socio/a en el club.';
+            } else {
+                title.textContent = 'Pago no completado';
+                title.className = 'ko';
+                msg.textContent = 'La operación fue cancelada o rechazada. Puedes intentarlo de nuevo desde la web.';
+            }
+
+            if (order && window.CdsanRedsys) {
+                try {
+                    const st = await CdsanRedsys.getPaymentStatus(order);
+                    if (st.ok && st.status === 'paid') {
+                        if (st.type === 'membership_fee') {
+                            msg.textContent = '✅ Cuota pagada. Tu alta como socio/a está activa. Ya puedes iniciar sesión en la web del club.';
+                        } else if (st.type === 'event_registration') {
+                            msg.textContent = '✅ Pago del evento confirmado. Tu inscripción (e invitados del carrito) quedará registrada en unos segundos.';
+                            try {
+                                const pendingKeys = Object.keys(localStorage).filter((k) => k.startsWith('cdsan_pending_event_cart_'));
+                                pendingKeys.forEach((k) => localStorage.removeItem(k));
+                            } catch (_) {}
+                        } else if (st.type === 'player_inscription') {
+                            msg.textContent = '✅ Pago confirmado. Tu inscripción pasa a PAGADA y ACTIVA. Si incluiste cuota de socio, se vinculará por DNI sin duplicar el alta.';
+                            if (window.PlayerInscription && window.PlayerInscription.finalizeFromPendingOrder) {
+                                try {
+                                    await window.PlayerInscription.finalizeFromPendingOrder(order);
+                                } catch (_) {}
+                            }
+                        } else {
+                            msg.textContent += ' Estado confirmado: pagado.';
+                        }
+                    } else if (st.ok && st.status === 'pending') {
+                        msg.textContent += ' Aún procesando; si acabas de pagar, espera un momento y recarga.';
+                    }
+                } catch (e) { /* ignore */ }
+            }
+        })();
+    </script>
+    <script src="js/club-inscription-config.js"></script>
+    <script src="js/club-member-numbers.js"></script>
+    <script src="js/club-role-links.js"></script>
+    <script type="module" src="js/firebase-config.js"></script>
+    <script src="js/redsys-payments.js"></script>
+    <script src="js/player-inscription.js"></script>
+</body>
+</html>

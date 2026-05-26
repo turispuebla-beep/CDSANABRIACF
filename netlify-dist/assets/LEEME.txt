@@ -1,0 +1,22 @@
+Carpeta de imágenes del club — CD Sanabria CF
+================================================
+
+Coloca aquí el escudo del club (PNG). Si pegas un archivo nuevo (p. ej. ESTE.png),
+ejecuta desde la raíz del proyecto:
+
+  powershell -NoProfile -ExecutionPolicy Bypass -File ".\scripts\process-club-escudo.ps1"
+
+Eso genera automáticamente los tamaños siguientes (fondo blanco exterior → transparente).
+
+Archivos generados / esperados (nombres exactos):
+
+  escudo-cdsanabriacf.png   → Escudo principal (cabecera web, admin)
+  escudo-192.png            → Icono 192×192 (favicon, carnet socio, PWA)
+  escudo-512.png            → Icono 512×512 (PWA / instalación)
+  escudo-180.png            → Apple touch icon (iPhone / iPad)
+
+Tras añadir o cambiar imágenes, ejecuta el build de deploy:
+
+  powershell -NoProfile -ExecutionPolicy Bypass -File ".\build-netlify-dist.ps1"
+
+La carpeta assets/ se copia a netlify-dist/assets/ para subir a Netlify.

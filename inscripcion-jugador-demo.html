@@ -1,0 +1,327 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>[DEMO] Inscripción jugador/a — CD Sanabria CF</title>
+    <meta name="description" content="Maqueta de aprobación. No guarda datos en el club.">
+    <style>
+        :root { --primary: #1e3a8a; --green: #059669; --bg: #f1f5f9; }
+        * { box-sizing: border-box; }
+        body { font-family: system-ui, -apple-system, sans-serif; margin: 0; background: var(--bg); color: #1e293b; line-height: 1.45; }
+        .demo-banner {
+            position: sticky; top: 0; z-index: 10000;
+            background: linear-gradient(90deg, #b45309, #d97706);
+            color: #fff; padding: 10px 14px; text-align: center;
+            font-size: 0.85rem; font-weight: 600;
+            box-shadow: 0 2px 10px rgba(0,0,0,.15);
+        }
+        .wrap { max-width: 720px; margin: 0 auto; padding: 16px 16px 48px; }
+        .card { background: #fff; border-radius: 12px; padding: 22px; margin-bottom: 16px; box-shadow: 0 4px 18px rgba(0,0,0,.06); }
+        h1 { color: var(--primary); font-size: 1.45rem; margin: 0 0 6px; }
+        .sub { color: #64748b; font-size: 0.95rem; margin-bottom: 16px; }
+        h2 { font-size: 1.05rem; color: var(--primary); margin: 0 0 12px; border-bottom: 2px solid #e2e8f0; padding-bottom: 6px; }
+        label { display: block; font-weight: 600; font-size: 0.88rem; margin-bottom: 4px; }
+        input, select { width: 100%; padding: 10px; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 1rem; margin-bottom: 12px; }
+        .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+        .grid3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; }
+        @media (max-width: 600px) { .grid2, .grid3 { grid-template-columns: 1fr; } }
+        .kit-row { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; padding: 10px 0; border-bottom: 1px solid #f1f5f9; }
+        .kit-size { max-width: 120px; margin-bottom: 0; }
+        .fee-line { display: flex; align-items: flex-start; gap: 10px; margin-bottom: 10px; font-weight: 500; }
+        .cart-line { display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px dashed #e2e8f0; }
+        .cart-total { font-size: 1.35rem; font-weight: 800; color: var(--green); text-align: right; margin-top: 12px; }
+        .btn { display: block; width: 100%; padding: 14px; border: none; border-radius: 10px; font-size: 1rem; font-weight: 700; cursor: pointer; margin-top: 8px; }
+        .btn-card { background: linear-gradient(180deg, #3b82f6, #1d4ed8); color: #fff; }
+        .btn-bizum { background: linear-gradient(180deg, #0bb5d6, #0596b8); color: #fff; }
+        .btn-transfer { background: #475569; color: #fff; }
+        .btn-share { background: #25d366; color: #fff; }
+        .btn-outline { background: #fff; color: var(--primary); border: 2px solid var(--primary); }
+        .muted { color: #64748b; font-size: 0.9rem; }
+        #guardianBlock { background: #fffbeb; border: 1px solid #fcd34d; border-radius: 10px; padding: 16px; margin-bottom: 12px; }
+        #insPhotoBox img { max-width: 160px; border-radius: 8px; }
+        .logo-top { text-align: center; margin-bottom: 12px; }
+        .logo-top img {
+            width: 96px; height: 96px; object-fit: contain;
+            display: block; margin: 0 auto 6px;
+        }
+        .logo-club-name { font-weight: 800; color: var(--primary); font-size: 1.1rem; }
+    </style>
+</head>
+<body>
+    <div class="demo-banner">MAQUETA — No guarda datos.</div>
+
+    <div class="wrap">
+        <div class="logo-top">
+            <img src="assets/escudo-cdsanabriacf.png" alt="Escudo CD Sanabria CF" width="96" height="96">
+            <div class="logo-club-name">CD Sanabria CF</div>
+        </div>
+        <div class="card">
+            <h1>Inscripción jugador/a</h1>
+            <p class="sub">Temporada <strong>2026-2027</strong> — CD Sanabria CF</p>
+            <p class="muted" style="background:#eff6ff;padding:10px;border-radius:8px;">
+                Misma pantalla que verán las familias en la web oficial. Los importes de ejemplo sirven solo para la demo; en producción los configura la directiva en el panel.
+            </p>
+
+            <section class="card" style="box-shadow:none;padding:0;margin:0;">
+                <h2>Datos personales</h2>
+                <div class="grid2">
+                    <div><label for="insName">Nombre *</label><input id="insName" placeholder="Ejemplo"></div>
+                    <div><label for="insSurname">Apellidos *</label><input id="insSurname" placeholder="Ejemplo"></div>
+                </div>
+                <div class="grid2">
+                    <div><label for="insDni">DNI <span class="muted" id="insDniHint">(obligatorio si eres mayor de edad)</span></label><input id="insDni"></div>
+                    <div><label for="insEmail">Email *</label><input id="insEmail" type="email"></div>
+                </div>
+                <div class="grid2">
+                    <div><label for="insPhone">Teléfono *</label><input id="insPhone" type="tel"></div>
+                    <div><label for="insBirth">Fecha de nacimiento *</label><input id="insBirth" type="date"></div>
+                </div>
+                <p class="muted">Edad: <span id="insAge">—</span></p>
+                <label for="insAddress">Dirección</label>
+                <input id="insAddress">
+                <div class="grid3">
+                    <div><label for="insCategory">Categoría</label><select id="insCategory"></select></div>
+                    <div><label for="insWeight">Peso (kg)</label><input id="insWeight" type="number" min="20" max="200" step="0.1"></div>
+                    <div><label for="insHeight">Altura (cm)</label><input id="insHeight" type="number" min="100" max="230"></div>
+                </div>
+                <div class="grid3">
+                    <div><label for="insPosition">Posición</label>
+                        <select id="insPosition">
+                            <option value="">—</option>
+                            <option value="portero">Portero/a</option>
+                            <option value="defensa">Defensa</option>
+                            <option value="centrocampista">Centrocampista</option>
+                            <option value="delantero">Delantero/a</option>
+                            <option value="versatil">Versátil</option>
+                        </select>
+                    </div>
+                </div>
+                <p class="muted" style="margin-top:-4px;">El dorsal y el número de licencia federativa los asignará el club (no se piden en la inscripción web).</p>
+                <label for="insPhoto">Foto (opcional)</label>
+                <input id="insPhoto" type="file" accept="image/*">
+                <div id="insPhotoBox" style="display:none;margin-bottom:12px;"><img id="insPhotoPreview" alt="Vista previa"></div>
+            </section>
+
+            <div id="guardianBlock" style="display:none;">
+                <h2>Tutor/a (menor de edad)</h2>
+                <div class="grid2">
+                    <div><label for="insGuardianName">Nombre tutor/a *</label><input id="insGuardianName"></div>
+                    <div><label for="insGuardianDni">DNI tutor/a *</label><input id="insGuardianDni"></div>
+                </div>
+                <div class="grid2">
+                    <div><label for="insGuardianPhone">Teléfono *</label><input id="insGuardianPhone" type="tel"></div>
+                    <div><label for="insGuardianEmail">Email *</label><input id="insGuardianEmail" type="email"></div>
+                </div>
+                <label for="insGuardianAddress">Dirección tutor/a</label>
+                <input id="insGuardianAddress">
+            </div>
+
+            <section class="card">
+                <h2>Equipación — tallas</h2>
+                <p class="muted">Tallas: 4, 6, 8, 10, 12, 14, XS, S, M, L, XL, XXL, XXXL</p>
+                <div id="kitGarmentsWrap"></div>
+            </section>
+
+            <section class="card">
+                <h2>Cuotas de la temporada</h2>
+                <p class="muted">Marca lo que deseas pagar (ejemplo en esta demo):</p>
+                <div id="feeCheckboxes"></div>
+            </section>
+
+            <section class="card">
+                <h2>Consentimientos</h2>
+                <label class="fee-line"><input type="checkbox" id="insPlayerConsent"> Consentimiento para ser jugador/a del CD Sanabria CF *</label>
+                <label class="fee-line"><input type="checkbox" id="insPhotoConsent"> Consentimiento para aparecer en fotos y vídeos del club *</label>
+            </section>
+
+            <section class="card">
+                <h2>Resumen y pago</h2>
+                <div id="cartLines"></div>
+                <div class="cart-total">Total: <span id="cartTotal">0,00 €</span></div>
+                <button type="button" class="btn btn-card" id="btnPayCard">💳 Pagar con tarjeta</button>
+                <button type="button" class="btn btn-bizum" id="btnPayBizum">📱 Pagar con Bizum</button>
+                <button type="button" class="btn btn-transfer" id="btnPayTransfer">🏦 Solicitar inscripción por transferencia o efectivo</button>
+                <p class="muted" style="margin-top:12px;">En la web real: pago Redsys o validación admin. Aquí los botones solo muestran un aviso de demo.</p>
+            </section>
+        </div>
+    </div>
+
+<script>
+(function () {
+  'use strict';
+  var DEMO_MSG = 'Esta es una MAQUETA de aprobación.\n\nNo se guarda nada en Firebase ni en el panel del club.\n\nLa inscripción real será en la web publicada del club.';
+
+  var CATEGORIES = [
+    { id: 'prebenjamin', label: 'Prebenjamín (6-8 años)' },
+    { id: 'benjamin', label: 'Benjamín (8-10 años)' },
+    { id: 'alevin', label: 'Alevín (10-12 años)' },
+    { id: 'infantil', label: 'Infantil (12-14 años)' },
+    { id: 'cadete', label: 'Cadete (14-16 años)' },
+    { id: 'juvenil', label: 'Juvenil (16-18 años)' },
+    { id: 'aficionado', label: 'Aficionado (18+ años)' }
+  ];
+  var ALL_SIZES = ['4','6','8','10','12','14','XS','S','M','L','XL','XXL','XXXL'];
+  var SETTINGS = {
+    season: '2026-2027',
+    chargeFicha: true,
+    chargeSocio: true,
+    kitMode: 'per_garment',
+    categoryFees: {
+      ficha: { prebenjamin: 45, benjamin: 45, alevin: 50, infantil: 50, cadete: 55, juvenil: 55, aficionado: 60 },
+      socio: { prebenjamin: 25, benjamin: 25, alevin: 30, infantil: 30, cadete: 35, juvenil: 35, aficionado: 40 }
+    },
+    garments: {
+      match_shirt: { label: 'Camiseta de partido', price: 18, enabled: true },
+      match_shorts: { label: 'Pantalón corto de partido', price: 12, enabled: true },
+      tracksuit: { label: 'Chándal', price: 35, enabled: true },
+      train_shirt: { label: 'Camiseta de entreno', price: 14, enabled: true },
+      train_shorts: { label: 'Pantalón de entreno', price: 12, enabled: true },
+      train_jacket: { label: 'Chaqueta / basquera', price: 28, enabled: true }
+    }
+  };
+
+  function $(id) { return document.getElementById(id); }
+  function formatEur(n) { return Number(n || 0).toFixed(2).replace('.', ',') + ' €'; }
+  function calculateAge(bd) {
+    if (!bd) return null;
+    var b = new Date(bd);
+    if (isNaN(b.getTime())) return null;
+    var t = new Date();
+    var a = t.getFullYear() - b.getFullYear();
+    var md = t.getMonth() - b.getMonth();
+    if (md < 0 || (md === 0 && t.getDate() < b.getDate())) a--;
+    return a;
+  }
+  function suggestCat(bd) {
+    var age = calculateAge(bd);
+    if (age == null) return '';
+    if (age <= 8) return 'prebenjamin';
+    if (age <= 10) return 'benjamin';
+    if (age <= 12) return 'alevin';
+    if (age <= 14) return 'infantil';
+    if (age <= 16) return 'cadete';
+    if (age <= 18) return 'juvenil';
+    return 'aficionado';
+  }
+  function getEnabledGarments() {
+    return Object.keys(SETTINGS.garments).filter(function (id) {
+      return SETTINGS.garments[id].enabled !== false;
+    }).map(function (id) {
+      return { id: id, label: SETTINGS.garments[id].label, price: Number(SETTINGS.garments[id].price || 0) };
+    });
+  }
+  function getCategoryFee(cat, type) {
+    var b = SETTINGS.categoryFees[type === 'socio' ? 'socio' : 'ficha'];
+    return Number(b[cat] || 0);
+  }
+  function computeCart(cat, kitItems, payFicha, paySocio) {
+    var kitTotal = 0;
+    kitItems.forEach(function (it) { kitTotal += Number(it.price || 0); });
+    var ficha = payFicha && SETTINGS.chargeFicha ? getCategoryFee(cat, 'ficha') : 0;
+    var socio = paySocio && SETTINGS.chargeSocio ? getCategoryFee(cat, 'socio') : 0;
+    return { kitTotal: kitTotal, fichaFee: ficha, socioFee: socio, total: Math.round((kitTotal + ficha + socio) * 100) / 100 };
+  }
+
+  function renderKit() {
+    var wrap = $('kitGarmentsWrap');
+    var garments = getEnabledGarments();
+    var per = SETTINGS.kitMode === 'per_garment';
+    var sizes = ALL_SIZES.map(function (s) { return '<option value="' + s + '">' + s + '</option>'; }).join('');
+    wrap.innerHTML = '';
+    garments.forEach(function (g) {
+      var row = document.createElement('div');
+      row.className = 'kit-row';
+      row.innerHTML = (per
+        ? '<label><input type="checkbox" data-kit-id="' + g.id + '"> ' + g.label + ' (' + formatEur(g.price) + ')</label>'
+        : '<span>' + g.label + ' (' + formatEur(g.price) + ')</span>') +
+        '<select data-kit-size="' + g.id + '" class="kit-size"' + (per ? ' disabled' : '') + '><option value="">Talla</option>' + sizes + '</select>';
+      wrap.appendChild(row);
+      var cb = row.querySelector('[data-kit-id]');
+      var sel = row.querySelector('[data-kit-size]');
+      if (cb) cb.onchange = function () { sel.disabled = !cb.checked; if (!cb.checked) sel.value = ''; refreshCart(); };
+      else if (sel) sel.disabled = false;
+      if (sel) sel.onchange = refreshCart;
+    });
+  }
+
+  function renderFees() {
+    $('feeCheckboxes').innerHTML =
+      '<label class="fee-line"><input type="checkbox" id="payFichaCb" checked> Cuota de ficha / inscripción federativa</label>' +
+      '<label class="fee-line"><input type="checkbox" id="paySocioCb"> Cuota de socio/a del club</label>';
+    $('payFichaCb').onchange = refreshCart;
+    $('paySocioCb').onchange = refreshCart;
+  }
+
+  function collectKit() {
+    var items = [];
+    var per = SETTINGS.kitMode === 'per_garment';
+    getEnabledGarments().forEach(function (g) {
+      var cb = document.querySelector('[data-kit-id="' + g.id + '"]');
+      var sel = document.querySelector('[data-kit-size="' + g.id + '"]');
+      if (per && (!cb || !cb.checked)) return;
+      if (!sel || !sel.value) return;
+      items.push({ id: g.id, label: g.label, size: sel.value, price: g.price });
+    });
+    return items;
+  }
+
+  function refreshCart() {
+    var cat = ($('insCategory') && $('insCategory').value) || suggestCat($('insBirth') && $('insBirth').value);
+    var kit = collectKit();
+    var payF = !$('payFichaCb') || $('payFichaCb').checked;
+    var payS = $('paySocioCb') && $('paySocioCb').checked;
+    var cart = computeCart(cat, kit, payF, payS);
+    var html = '';
+    kit.forEach(function (it) {
+      html += '<div class="cart-line"><span>' + it.label + ' — talla ' + it.size + '</span><span>' + formatEur(it.price) + '</span></div>';
+    });
+    if (cart.fichaFee > 0) html += '<div class="cart-line"><span>Cuota ficha</span><span>' + formatEur(cart.fichaFee) + '</span></div>';
+    if (cart.socioFee > 0) html += '<div class="cart-line"><span>Cuota socio/a</span><span>' + formatEur(cart.socioFee) + '</span></div>';
+    if (!html) html = '<p class="muted">Selecciona equipación y/o cuotas.</p>';
+    $('cartLines').innerHTML = html;
+    $('cartTotal').textContent = formatEur(cart.total);
+  }
+
+  function onBirth() {
+    var bd = $('insBirth').value;
+    var age = calculateAge(bd);
+    $('insAge').textContent = age != null ? age : '—';
+    var cat = suggestCat(bd);
+    if (cat && $('insCategory')) $('insCategory').value = cat;
+    var hint = $('insDniHint');
+    if (hint) hint.textContent = age != null && age < 18 ? '(opcional; DNI tutor abajo)' : '(obligatorio si eres mayor de edad)';
+    $('guardianBlock').style.display = age != null && age < 18 ? 'block' : 'none';
+    refreshCart();
+  }
+
+  function demoAlert() { alert(DEMO_MSG); }
+
+  $('insCategory').innerHTML = '<option value="">Automática</option>' +
+    CATEGORIES.map(function (c) { return '<option value="' + c.id + '">' + c.label + '</option>'; }).join('');
+  renderKit();
+  renderFees();
+  refreshCart();
+  $('insBirth').addEventListener('change', onBirth);
+  ['insName','insSurname','insCategory'].forEach(function (id) {
+    var el = $(id);
+    if (el) el.addEventListener('input', refreshCart);
+    if (el && el.tagName === 'SELECT') el.addEventListener('change', refreshCart);
+  });
+  $('insPhoto').addEventListener('change', function (e) {
+    var f = e.target.files[0];
+    if (!f) return;
+    var r = new FileReader();
+    r.onload = function () {
+      $('insPhotoPreview').src = r.result;
+      $('insPhotoBox').style.display = 'block';
+    };
+    r.readAsDataURL(f);
+  });
+  ['btnPayCard','btnPayBizum','btnPayTransfer'].forEach(function (id) {
+    $(id).addEventListener('click', demoAlert);
+  });
+})();
+</script>
+</body>
+</html>

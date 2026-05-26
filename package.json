@@ -1,0 +1,8 @@
+{
+  "name": "cdsanabriacf",
+  "private": true,
+  "description": "Dependencias funciones Netlify — TPV Redsys (Caja Rural)",
+  "dependencies": {
+    "firebase-admin": "^12.7.0"
+  }
+}

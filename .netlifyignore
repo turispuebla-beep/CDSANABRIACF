@@ -1,0 +1,14 @@
+# Ignorar al desplegar desde la raíz del repo (publish = netlify-dist)
+# Ver también netlify-dist/.netlifyignore
+
+netlify-dist/*.md
+netlify-dist/database.js
+netlify-dist/firestore.rules
+netlify-dist/*railway*
+netlify-dist/*RAILWAY*
+netlify-dist/probar-*
+netlify-dist/test-*
+netlify-dist/verificar-*
+netlify-dist/limpiar-*
+netlify-dist/demo-*
+netlify-dist/realtime-sync.js

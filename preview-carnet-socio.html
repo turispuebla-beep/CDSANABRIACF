@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Vista previa — Carnet de socio CD Sanabria CF</title>
+    <style>
+        * { box-sizing: border-box; }
+        body {
+            margin: 0;
+            min-height: 100vh;
+            font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
+            background: linear-gradient(135deg, #1e3a8a 0%, #dc2626 100%);
+            padding: 24px 16px 40px;
+            color: #1e293b;
+        }
+        h1 {
+            text-align: center;
+            color: #fff;
+            font-size: 1.35rem;
+            margin: 0 0 8px;
+            text-shadow: 0 2px 8px rgba(0,0,0,.25);
+        }
+        .sub {
+            text-align: center;
+            color: rgba(255,255,255,.9);
+            font-size: 0.9rem;
+            margin-bottom: 28px;
+        }
+        .grid {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 28px;
+            justify-content: center;
+            align-items: flex-start;
+            max-width: 1000px;
+            margin: 0 auto;
+        }
+        .sample {
+            background: rgba(255,255,255,.12);
+            border-radius: 16px;
+            padding: 16px;
+            backdrop-filter: blur(6px);
+        }
+        .sample h2 {
+            color: #fff;
+            font-size: 0.85rem;
+            text-align: center;
+            margin: 0 0 12px;
+            font-weight: 600;
+        }
+        .note {
+            max-width: 520px;
+            margin: 28px auto 0;
+            background: #fff;
+            border-radius: 12px;
+            padding: 14px 18px;
+            font-size: 0.88rem;
+            line-height: 1.5;
+            color: #475569;
+            text-align: center;
+        }
+        .note a { color: #dc2626; font-weight: 600; }
+    </style>
+</head>
+<body>
+    <h1>🎫 Vista previa del carnet de socio</h1>
+    <p class="sub">CD Sanabria CF — mismo diseño y prefijos (D. / Dña.) que en la web</p>
+
+    <div class="grid">
+        <div class="sample">
+            <h2>Socio/a regular — mujer (N.º SOC. 000051)</h2>
+            <div id="preview-card-regular"></div>
+        </div>
+        <div class="sample">
+            <h2>Socio/a de honor — hombre (N.º SOC. 000003)</h2>
+            <div id="preview-card-honor"></div>
+        </div>
+    </div>
+
+    <p class="note">
+        Abre este archivo desde <code>CDSANABRIACF1/preview-carnet-socio.html</code> (no copies el HTML a otra carpeta).<br>
+        Si el escudo no carga, usa un servidor local: en esta carpeta ejecuta <code>npx --yes serve -l 3456</code> y abre <code>http://localhost:3456/preview-carnet-socio.html</code>.<br>
+        Los nombres usan <strong>Dña.</strong> (mujer) y <strong>D.</strong> (hombre), igual que el carnet en producción.<br>
+        <a href="index.html">Ir a la web del club</a>
+    </p>
+
+    <script src="js/club-member-numbers.js"></script>
+    <script src="js/club-member-card.js"></script>
+    <script>
+        (function () {
+            if (!window.memberCardGenerator) return;
+
+            memberCardGenerator.renderPreviewCard('preview-card-regular', {
+                nombre: 'María',
+                apellidos: 'García López',
+                sexo: 'mujer',
+                dni: '12345678A',
+                numeroSocio: 51,
+                status: 'active',
+                estado: 'activo'
+            }, 'cdsanPreviewRegular');
+
+            memberCardGenerator.renderPreviewCard('preview-card-honor', {
+                nombre: 'José',
+                apellidos: 'Sanabria',
+                sexo: 'hombre',
+                dni: '98765432B',
+                socioDeHonor: true,
+                numeroSocioHonor: 3,
+                status: 'active',
+                estado: 'activo'
+            }, 'cdsanPreviewHonor');
+        })();
+    </script>
+</body>
+</html>
