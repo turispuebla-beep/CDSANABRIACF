@@ -1,0 +1,15 @@
+# Secretos / local
+.env
+.env.*
+**/config-local.js
+netlify_env
+
+# Artefactos locales
+node_modules/
+*.log
+.DS_Store
+Thumbs.db
+
+# ZIPs de deploy manual (copias de respaldo)
+ZIP/
+zip valido/
