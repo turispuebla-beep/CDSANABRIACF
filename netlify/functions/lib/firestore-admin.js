@@ -33,6 +33,10 @@ function playersRef() {
   return initAdmin().collection('sanabria_players');
 }
 
+function applicationsRef() {
+  return initAdmin().collection('sanabria_player_applications');
+}
+
 function normalizeDni(v) {
   return String(v || '')
     .trim()
@@ -320,6 +324,164 @@ async function completePlayerInscription(payment) {
   }
 }
 
+async function findApplicationByDniSeason(dni, email, season) {
+  const s = String(season || '').trim();
+  const n = normalizeDni(dni);
+  const em = String(email || '').trim().toLowerCase();
+  if (n) {
+    const q = await applicationsRef()
+      .where('appScope', '==', APP_SCOPE)
+      .where('season', '==', s)
+      .where('dni', '==', n)
+      .limit(1)
+      .get();
+    if (!q.empty) return { id: q.docs[0].id, ...q.docs[0].data() };
+  }
+  if (em) {
+    const q2 = await applicationsRef()
+      .where('appScope', '==', APP_SCOPE)
+      .where('season', '==', s)
+      .where('email', '==', em)
+      .limit(1)
+      .get();
+    if (!q2.empty) return { id: q2.docs[0].id, ...q2.docs[0].data() };
+  }
+  return null;
+}
+
+async function createPlayerApplication(data) {
+  const now = new Date().toISOString();
+  const ref = applicationsRef().doc();
+  const doc = {
+    ...data,
+    appScope: APP_SCOPE,
+    status: data.status || 'pending_review',
+    submittedAt: now,
+    updatedAt: now
+  };
+  await ref.set(doc);
+  return { id: ref.id, ...doc };
+}
+
+async function approvePlayerApplication(applicationId, adminMeta) {
+  const ref = applicationsRef().doc(String(applicationId));
+  const snap = await ref.get();
+  if (!snap.exists) throw new Error('Solicitud no encontrada');
+  const app = snap.data();
+  if (app.status === 'approved') {
+    return { application: { id: snap.id, ...app }, playerId: app.playerId };
+  }
+
+  const now = new Date().toISOString();
+  const season = app.season;
+  const dni = normalizeDni(app.dni);
+
+  let playerId = app.playerId || null;
+  let playerRef = null;
+  if (playerId) {
+    playerRef = playersRef().doc(playerId);
+    const ps = await playerRef.get();
+    if (!ps.exists) playerRef = null;
+  }
+  if (!playerRef && dni) {
+    const pq = await playersRef()
+      .where('appScope', '==', APP_SCOPE)
+      .where('dni', '==', dni)
+      .where('inscriptionSeason', '==', season)
+      .limit(1)
+      .get();
+    if (!pq.empty) {
+      playerRef = pq.docs[0].ref;
+      playerId = pq.docs[0].id;
+    }
+  }
+  if (!playerRef) {
+    playerRef = playersRef().doc();
+    playerId = playerRef.id;
+  }
+
+  const playerPatch = {
+    appScope: APP_SCOPE,
+    name: app.name,
+    nombre: app.name,
+    surname: app.surname,
+    apellidos: app.surname,
+    dni: dni,
+    email: String(app.email || '').toLowerCase(),
+    phone: app.phone,
+    telefono: app.phone,
+    address: app.address || '',
+    direccion: app.address || '',
+    birthDate: app.birthDate,
+    fechaNacimiento: app.birthDate,
+    category: app.category || '',
+    categoria: app.category || '',
+    guardianName: app.guardianName || '',
+    guardianDNI: app.guardianDni || '',
+    guardianPhone: app.guardianPhone || '',
+    guardianEmail: app.guardianEmail || '',
+    guardianAddress: app.guardianAddress || '',
+    inscriptionSeason: season,
+    temporada: season,
+    inscriptionStatus: 'approved_for_inscription',
+    status: 'pending_validation',
+    estado: 'pendiente',
+    paymentStatus: 'pending',
+    inscriptionPaid: false,
+    registrationSource: 'player_application',
+    applicationId: snap.id,
+    playerConsent: true,
+    photoConsent: true,
+    clubRulesAcceptedAt: now,
+    approvedAt: now,
+    approvedBy: adminMeta?.validatedBy || 'admin',
+    updatedAt: now
+  };
+
+  await playerRef.set(
+    {
+      ...playerPatch,
+      id: playerId,
+      createdAt: playerPatch.createdAt || now
+    },
+    { merge: true }
+  );
+
+  await ref.set(
+    {
+      status: 'approved',
+      playerId: playerId,
+      reviewedAt: now,
+      reviewedBy: adminMeta?.validatedBy || 'admin',
+      updatedAt: now
+    },
+    { merge: true }
+  );
+
+  return {
+    application: { id: snap.id, ...app, status: 'approved', playerId },
+    playerId
+  };
+}
+
+async function rejectPlayerApplication(applicationId, adminMeta) {
+  const ref = applicationsRef().doc(String(applicationId));
+  const snap = await ref.get();
+  if (!snap.exists) throw new Error('Solicitud no encontrada');
+  const now = new Date().toISOString();
+  await ref.set(
+    {
+      status: 'rejected',
+      reviewedAt: now,
+      reviewedBy: adminMeta?.validatedBy || 'admin',
+      rejectReason: String(adminMeta?.reason || '').trim(),
+      updatedAt: now
+    },
+    { merge: true }
+  );
+  return { id: snap.id, ...snap.data(), status: 'rejected' };
+}
+
 module.exports = {
   savePendingPayment,
   getPayment,
@@ -327,5 +489,11 @@ module.exports = {
   completeMembershipPayment,
   completeEventPayment,
   completePlayerInscription,
-  memberExistsForEmail
+  memberExistsForEmail,
+  applicationsRef,
+  normalizeDni,
+  findApplicationByDniSeason,
+  createPlayerApplication,
+  approvePlayerApplication,
+  rejectPlayerApplication
 };

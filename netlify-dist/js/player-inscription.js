@@ -53,6 +53,38 @@
     return null;
   }
 
+  function findApprovedForInscription(dni, season) {
+    const p = findPlayerForSeason(dni, season);
+    if (!p) return null;
+    const ins = String(p.inscriptionStatus || '').toLowerCase();
+    if (ins === 'approved_for_inscription') return p;
+    return null;
+  }
+
+  function findPlayerForContinueLookup(dni, name, surname, season) {
+    const n = normalizeDni(dni);
+    const s = String(season || '');
+    const players = readPlayers();
+    if (n) {
+      const byDni = players.find(function (p) {
+        return normalizeDni(p.dni) === n && String(p.inscriptionSeason || '') === s;
+      });
+      if (byDni) return byDni;
+    }
+    const nm = String(name || '').trim().toLowerCase();
+    const sn = String(surname || '').trim().toLowerCase();
+    if (nm && sn) {
+      return (
+        players.find(function (p) {
+          const pn = String(p.name || p.nombre || '').trim().toLowerCase();
+          const ps = String(p.surname || p.apellidos || '').trim().toLowerCase();
+          return pn === nm && ps === sn && String(p.inscriptionSeason || '') === s;
+        }) || null
+      );
+    }
+    return null;
+  }
+
   function getDisplayStatus(player) {
     const ins = String(player.inscriptionStatus || '').toLowerCase();
     if (player.inscriptionPaid || ins === 'paid' || player.paymentStatus === 'paid') {
@@ -524,6 +556,8 @@
     normalizeDni: normalizeDni,
     findPlayerForSeason: findPlayerForSeason,
     findPaidPlayerForSeason: findPaidPlayerForSeason,
+    findApprovedForInscription: findApprovedForInscription,
+    findPlayerForContinueLookup: findPlayerForContinueLookup,
     findMemberByDni: findMemberByDni,
     computeCart: computeCart,
     buildPlayerRecord: buildPlayerRecord,

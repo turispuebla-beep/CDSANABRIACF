@@ -10,7 +10,7 @@
     tracksuit: 'Chándal',
     train_shirt: 'Camiseta entreno',
     train_shorts: 'Pantalón entreno',
-    train_jacket: 'Chaqueta / basquera'
+    train_jacket: 'Chubasquero'
   };
 
   const CATEGORY_LABELS = {

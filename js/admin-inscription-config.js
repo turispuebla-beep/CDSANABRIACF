@@ -64,7 +64,14 @@
   function loadInscriptionAdminForm() {
     if (!global.ClubInscriptionConfig) return;
     const s = global.ClubInscriptionConfig.read();
-    if (el('inscSeason')) el('inscSeason').value = s.season || '2026-2027';
+    if (el('inscSeason')) {
+      const auto =
+        global.ClubSeason && global.ClubSeason.getActiveSeason
+          ? global.ClubSeason.getActiveSeason()
+          : '2026-2027';
+      el('inscSeason').value = s.season || auto;
+      el('inscSeason').placeholder = auto;
+    }
     if (el('inscOpen')) el('inscOpen').checked = !!s.registrationsOpen;
     if (el('inscOpenFrom')) el('inscOpenFrom').value = s.openFrom ? s.openFrom.slice(0, 16) : '';
     if (el('inscOpenUntil')) el('inscOpenUntil').value = s.openUntil ? s.openUntil.slice(0, 16) : '';

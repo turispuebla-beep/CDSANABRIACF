@@ -100,7 +100,20 @@
                 <p id="inscClosedMsg">Las inscripciones no están abiertas.</p>
             </div>
             <div id="inscFormWrap">
-                <section class="card" style="box-shadow:none;padding:0;margin:0;">
+                <section id="insLookupBlock" class="card" style="display:none;">
+                    <h2>Identificación</h2>
+                    <p class="muted">Si el club ya aceptó tu solicitud, introduce tu DNI (o nombre y apellidos) para continuar con equipación y pago.</p>
+                    <div class="grid2">
+                        <div><label for="insLookupDni">DNI</label><input id="insLookupDni" autocomplete="off"></div>
+                        <div><label for="insLookupName">Nombre</label><input id="insLookupName"></div>
+                    </div>
+                    <div class="grid2">
+                        <div><label for="insLookupSurname">Apellidos</label><input id="insLookupSurname"></div>
+                        <div style="display:flex;align-items:flex-end;"><button type="button" class="btn btn-primary" id="insLookupBtn" style="margin:0;">Buscar mi ficha</button></div>
+                    </div>
+                    <p id="insLookupMsg" class="muted" style="margin-top:8px;"></p>
+                </section>
+                <section id="insPersonalSection" class="card" style="box-shadow:none;padding:0;margin:0;">
                     <h2>Datos personales</h2>
                     <div class="grid2">
                         <div><label for="insName">Nombre *</label><input id="insName" required autocomplete="given-name"></div>
@@ -166,8 +179,9 @@
                     <div id="feeCheckboxes"></div>
                 </section>
 
-                <section class="card">
+                <section class="card" id="insConsentSection">
                     <h2>Consentimientos</h2>
+                    <label class="fee-line" id="insClubRulesLine" style="display:none;"><input type="checkbox" id="insClubRules"> He leído y acepto las normas y el compromiso deportivo del CD Sanabria CF *</label>
                     <label class="fee-line"><input type="checkbox" id="insPlayerConsent"> Consentimiento para ser jugador/a del CD Sanabria CF *</label>
                     <label class="fee-line"><input type="checkbox" id="insPhotoConsent"> Consentimiento para aparecer en fotos y vídeos del club *</label>
                 </section>
@@ -184,7 +198,9 @@
             </div>
         </div>
     </div>
+    <script src="js/club-season.js"></script>
     <script src="js/club-inscription-config.js"></script>
+    <script src="js/player-application.js"></script>
     <script src="js/club-member-numbers.js"></script>
     <script src="js/club-role-links.js"></script>
     <script type="module" src="js/firebase-config.js"></script>

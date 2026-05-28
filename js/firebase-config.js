@@ -109,6 +109,7 @@ const DB_COLLECTIONS = {
   // Datos del club CD SANABRIA CF
   MEMBERS: 'sanabria_members',        // Socios del club
   PLAYERS: 'sanabria_players',        // Jugadores
+  PLAYER_APPLICATIONS: 'sanabria_player_applications', // Solicitudes nuevo jugador
   COACHES: 'sanabria_coaches',        // Entrenadores
   BOARD: 'sanabria_board',            // Directiva
   TEAMS: 'sanabria_teams',            // Equipos
@@ -144,6 +145,8 @@ function normalizeCollectionName(rawName) {
     members: DB_COLLECTIONS.MEMBERS,
     friends: DB_COLLECTIONS.FRIENDS,
     players: DB_COLLECTIONS.PLAYERS,
+    player_applications: DB_COLLECTIONS.PLAYER_APPLICATIONS,
+    clubPlayerApplications: DB_COLLECTIONS.PLAYER_APPLICATIONS,
     coaches: DB_COLLECTIONS.COACHES,
     board: DB_COLLECTIONS.BOARD,
     directiva: DB_COLLECTIONS.BOARD,
@@ -1258,6 +1261,20 @@ async function setupRealtimeSync() {
         try { window.updateDatabaseStats(); } catch (_) {}
       }
     });
+
+    const applicationsListener = onSnapshot(collection(db, DB_COLLECTIONS.PLAYER_APPLICATIONS), (snapshot) => {
+      const applications = [];
+      snapshot.forEach((docSnap) => {
+        applications.push({ id: docSnap.id, ...docSnap.data() });
+      });
+      localStorage.setItem('clubPlayerApplications', JSON.stringify(applications));
+      if (window.renderPlayerApplicationsAdmin) {
+        try {
+          window.renderPlayerApplicationsAdmin(applications);
+        } catch (_) {}
+      }
+      window.dispatchEvent(new CustomEvent('playerApplicationsUpdated', { detail: applications }));
+    }, (err) => console.warn('Listener solicitudes jugador:', err && err.message ? err.message : err));
     
     // Listener para equipos (teams) - SANABRIA
     const teamsListener = onSnapshot(collection(db, 'sanabria_teams'), (snapshot) => {

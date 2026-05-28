@@ -4,7 +4,13 @@
 (function (global) {
   'use strict';
 
-  const state = { settings: null, kitSelections: {}, photoData: null };
+  const state = {
+    settings: null,
+    kitSelections: {},
+    photoData: null,
+    flowContinue: false,
+    continuePlayer: null
+  };
 
   function $(id) {
     return document.getElementById(id);
@@ -24,6 +30,136 @@
     return global.ClubInscriptionConfig.ALL_SIZES.map(function (s) {
       return '<option value="' + s + '">' + s + '</option>';
     }).join('');
+  }
+
+  function setPersonalReadonly(readonly) {
+    [
+      'insName',
+      'insSurname',
+      'insDni',
+      'insEmail',
+      'insPhone',
+      'insBirth',
+      'insAddress',
+      'insCategory',
+      'insWeight',
+      'insHeight',
+      'insPosition',
+      'insGuardianName',
+      'insGuardianDni',
+      'insGuardianPhone',
+      'insGuardianEmail',
+      'insGuardianAddress'
+    ].forEach(function (id) {
+      const el = $(id);
+      if (el) el.disabled = !!readonly;
+    });
+    if ($('insPhoto')) $('insPhoto').disabled = !!readonly;
+  }
+
+  function prefillFromPlayer(p) {
+    if (!p) return;
+    if ($('insName')) $('insName').value = p.name || p.nombre || '';
+    if ($('insSurname')) $('insSurname').value = p.surname || p.apellidos || '';
+    if ($('insDni')) $('insDni').value = p.dni || '';
+    if ($('insEmail')) $('insEmail').value = p.email || '';
+    if ($('insPhone')) $('insPhone').value = p.phone || p.telefono || '';
+    if ($('insBirth')) $('insBirth').value = p.birthDate || p.fechaNacimiento || '';
+    if ($('insAddress')) $('insAddress').value = p.address || p.direccion || '';
+    if ($('insCategory') && p.category) $('insCategory').value = p.category || p.categoria || '';
+    if ($('insWeight') && p.weightKg != null) $('insWeight').value = p.weightKg;
+    if ($('insHeight') && p.heightCm != null) $('insHeight').value = p.heightCm;
+    if ($('insPosition') && p.position) $('insPosition').value = p.position || p.posicion || '';
+    if ($('insGuardianName')) $('insGuardianName').value = p.guardianName || '';
+    if ($('insGuardianDni')) $('insGuardianDni').value = p.guardianDNI || p.guardianDni || '';
+    if ($('insGuardianPhone')) $('insGuardianPhone').value = p.guardianPhone || '';
+    if ($('insGuardianEmail')) $('insGuardianEmail').value = p.guardianEmail || '';
+    if ($('insGuardianAddress')) $('insGuardianAddress').value = p.guardianAddress || '';
+    onBirthChange();
+  }
+
+  function enterContinueMode(player) {
+    state.continuePlayer = player;
+    show($('insLookupBlock'), false);
+    show($('insPersonalSection'), true);
+    setPersonalReadonly(true);
+    show($('insClubRulesLine'), true);
+    if ($('insPlayerConsent')) $('insPlayerConsent').checked = true;
+    if ($('insPhotoConsent')) $('insPhotoConsent').checked = true;
+    document.querySelectorAll('#inscFormWrap section.card, #inscFormWrap #guardianBlock').forEach(function (el) {
+      if (el.id === 'insLookupBlock') el.style.display = 'none';
+      else el.style.display = '';
+    });
+    const msg = $('insLookupMsg');
+    if (msg) {
+      msg.style.color = '#059669';
+      msg.textContent =
+        'Ficha encontrada. Completa equipación y pago para la temporada ' + (state.settings.season || '') + '.';
+    }
+    refreshCart();
+  }
+
+  function runLookup() {
+    const dni = ($('insLookupDni') && $('insLookupDni').value.trim()) || '';
+    const name = ($('insLookupName') && $('insLookupName').value.trim()) || '';
+    const surname = ($('insLookupSurname') && $('insLookupSurname').value.trim()) || '';
+    const msg = $('insLookupMsg');
+    const season = state.settings.season;
+
+    if (!dni && (!name || !surname)) {
+      if (msg) msg.textContent = 'Introduce tu DNI o nombre y apellidos.';
+      return;
+    }
+
+    const paid = dni
+      ? global.PlayerInscription.findPaidPlayerForSeason(dni, season)
+      : null;
+    if (paid) {
+      if (msg) {
+        msg.style.color = '#dc2626';
+        msg.textContent = 'Ya tienes la inscripción de esta temporada completada y pagada.';
+      }
+      return;
+    }
+
+    let player = dni
+      ? global.PlayerInscription.findApprovedForInscription(dni, season)
+      : null;
+    if (!player) {
+      player = global.PlayerInscription.findPlayerForContinueLookup(dni, name, surname, season);
+    }
+
+    if (player && String(player.inscriptionStatus || '').toLowerCase() === 'approved_for_inscription') {
+      prefillFromPlayer(player);
+      enterContinueMode(player);
+      return;
+    }
+
+    if (player && global.PlayerInscription.findPaidPlayerForSeason(player.dni, season)) {
+      if (msg) {
+        msg.style.color = '#dc2626';
+        msg.textContent = 'Inscripción ya completada para esta temporada.';
+      }
+      return;
+    }
+
+    if (global.PlayerApplication && dni) {
+      const pending = global.PlayerApplication.findPendingByDni(dni, season);
+      if (pending) {
+        if (msg) {
+          msg.style.color = '#d97706';
+          msg.textContent =
+            'Tu solicitud está pendiente de revisión por el club. Te avisaremos cuando puedas continuar aquí.';
+        }
+        return;
+      }
+    }
+
+    if (msg) {
+      msg.style.color = '#dc2626';
+      msg.textContent =
+        'No encontramos una ficha aprobada para esta temporada. Si eres nuevo/a, solicita el alta desde «¿Quieres Jugar?» en la página principal.';
+    }
   }
 
   function renderKitSection() {
@@ -134,11 +270,13 @@
       guardianAddress: ($('insGuardianAddress') && $('insGuardianAddress').value.trim()) || '',
       playerConsent: $('insPlayerConsent') && $('insPlayerConsent').checked,
       photoConsent: $('insPhotoConsent') && $('insPhotoConsent').checked,
+      clubRulesAccepted: $('insClubRules') && $('insClubRules').checked,
       photoData: state.photoData
     };
   }
 
   function refreshCart() {
+    if (state.flowContinue && !state.continuePlayer) return;
     const form = getFormData();
     const category = form.category || global.ClubInscriptionConfig.suggestCategoryFromBirthDate(form.birthDate);
     const kitItems = collectKitItems();
@@ -165,6 +303,7 @@
   }
 
   function toggleGuardian() {
+    if (state.continuePlayer) return;
     const bd = $('insBirth') && $('insBirth').value;
     const age = global.ClubInscriptionConfig.calculateAge(bd);
     const sec = $('guardianBlock');
@@ -174,7 +313,7 @@
   function onBirthChange() {
     const bd = $('insBirth') && $('insBirth').value;
     const cat = global.ClubInscriptionConfig.suggestCategoryFromBirthDate(bd);
-    if ($('insCategory') && cat) $('insCategory').value = cat;
+    if ($('insCategory') && cat && !state.continuePlayer) $('insCategory').value = cat;
     if ($('insAge')) $('insAge').textContent = global.ClubInscriptionConfig.calculateAge(bd) ?? '—';
     const hint = $('insDniHint');
     const age = global.ClubInscriptionConfig.calculateAge(bd);
@@ -190,29 +329,40 @@
 
   function validateForm() {
     const f = getFormData();
-    if (!f.name || !f.surname || !f.email || !f.phone || !f.birthDate) {
-      return 'Completa nombre, apellidos, email, teléfono y fecha de nacimiento.';
-    }
-    const age = global.ClubInscriptionConfig.calculateAge(f.birthDate);
-    if (age != null && age >= 18 && !f.dni) {
-      return 'El DNI es obligatorio para mayores de edad.';
-    }
-    if (!f.playerConsent || !f.photoConsent) {
-      return 'Debes aceptar los consentimientos obligatorios.';
-    }
-    if (age != null && age < 18) {
-      if (!f.guardianName || !f.guardianDNI || !f.guardianPhone || !f.guardianEmail) {
-        return 'Para menores, los datos del tutor/a son obligatorios.';
+    if (!state.continuePlayer) {
+      if (!f.name || !f.surname || !f.email || !f.phone || !f.birthDate) {
+        return 'Completa nombre, apellidos, email, teléfono y fecha de nacimiento.';
+      }
+      const age = global.ClubInscriptionConfig.calculateAge(f.birthDate);
+      if (age != null && age >= 18 && !f.dni) {
+        return 'El DNI es obligatorio para mayores de edad.';
+      }
+      if (!f.playerConsent || !f.photoConsent) {
+        return 'Debes aceptar los consentimientos obligatorios.';
+      }
+      if (age != null && age < 18) {
+        if (!f.guardianName || !f.guardianDNI || !f.guardianPhone || !f.guardianEmail) {
+          return 'Para menores, los datos del tutor/a son obligatorios.';
+        }
+      }
+    } else {
+      if (!f.clubRulesAccepted) {
+        return 'Debes aceptar las normas y el compromiso deportivo del club.';
+      }
+      if (!f.playerConsent || !f.photoConsent) {
+        return 'Debes aceptar los consentimientos obligatorios.';
       }
     }
+
     const season = state.settings.season;
-    const dniCheck = f.dni || (age != null && age < 18 ? f.guardianDNI : '');
+    const dniCheck = f.dni || f.guardianDNI;
     if (dniCheck) {
       const paid = global.PlayerInscription.findPaidPlayerForSeason(dniCheck, season);
-      if (paid) {
+      if (paid && (!state.continuePlayer || paid.id !== state.continuePlayer.id)) {
         return 'Ya existe una inscripción pagada para esta temporada con este DNI.';
       }
     }
+
     const kitItems = collectKitItems();
     const garments = global.ClubInscriptionConfig.getEnabledGarments(state.settings);
     if (garments.length && !kitItems.length) {
@@ -232,7 +382,7 @@
   }
 
   async function handlePhoto(file) {
-    if (!file) return;
+    if (!file || state.continuePlayer) return;
     if (file.size > 2 * 1024 * 1024) {
       alert('La foto no puede superar 2 MB');
       return;
@@ -257,8 +407,13 @@
     const paySocio = $('paySocioCb') && $('paySocioCb').checked;
     const cart = global.PlayerInscription.computeCart(state.settings, f.category, kitItems, payFicha, paySocio);
     const player = global.PlayerInscription.buildPlayerRecord(f, { kitItems: kitItems, ...cart }, state.settings);
+    if (state.continuePlayer && state.continuePlayer.id) {
+      player.id = state.continuePlayer.id;
+      player.applicationId = state.continuePlayer.applicationId || player.applicationId;
+    }
     const member = global.PlayerInscription.findMemberByDni(f.dni);
     if (member && member.id) player.linkedMemberId = member.id;
+    if (f.clubRulesAccepted) player.clubRulesAcceptedAt = new Date().toISOString();
     return player;
   }
 
@@ -270,8 +425,6 @@
     }
     try {
       const reg = buildRegistration();
-      const btn = $('btnSubmit');
-      if (btn) btn.disabled = true;
       const result = await global.PlayerInscription.submitCheckout(reg, method);
       if (result.free) {
         alert('✅ Inscripción completada (importe 0 €). Tu ficha queda activa.');
@@ -282,12 +435,10 @@
         );
         global.location.href = 'index.html';
       } else if (result.redirect) {
-        /* Redirige a la pasarela; la ficha ya está guardada como pendiente de pago */
+        /* Redirige a la pasarela */
       }
     } catch (e) {
       alert('❌ ' + (e.message || e));
-      const btn = $('btnSubmit');
-      if (btn) btn.disabled = false;
     }
   }
 
@@ -309,21 +460,9 @@
     show($('payCardBlock'), !!pm.card);
     show($('payBizumBlock'), !!pm.bizum);
     show($('payTransferBlock'), !!pm.transfer);
-    if ($('btnPayCard')) {
-      $('btnPayCard').onclick = function () {
-        submit('card');
-      };
-    }
-    if ($('btnPayBizum')) {
-      $('btnPayBizum').onclick = function () {
-        submit('bizum');
-      };
-    }
-    if ($('btnPayTransfer')) {
-      $('btnPayTransfer').onclick = function () {
-        submit('transfer');
-      };
-    }
+    if ($('btnPayCard')) $('btnPayCard').onclick = function () { submit('card'); };
+    if ($('btnPayBizum')) $('btnPayBizum').onclick = function () { submit('bizum'); };
+    if ($('btnPayTransfer')) $('btnPayTransfer').onclick = function () { submit('transfer'); };
     if (global.CdsanRedsys && global.CdsanRedsys.loadConfig) {
       global.CdsanRedsys.loadConfig().then(function () {
         if ($('btnPayBizum') && !global.CdsanRedsys.isBizumEnabled()) {
@@ -334,12 +473,28 @@
     }
   }
 
+  function setupContinueFlow() {
+    show($('insLookupBlock'), true);
+    show($('insPersonalSection'), false);
+    show($('guardianBlock'), false);
+    document.querySelectorAll('#inscFormWrap section.card').forEach(function (sec) {
+      if (sec.id !== 'insLookupBlock') sec.style.display = 'none';
+    });
+    if ($('insLookupBtn')) $('insLookupBtn').addEventListener('click', runLookup);
+  }
+
   function init() {
     if (!global.ClubInscriptionConfig || !global.PlayerInscription) {
       $('inscClosedMsg').textContent = 'Error cargando módulos de inscripción.';
       return;
     }
+    const params = new URLSearchParams(global.location.search);
+    state.flowContinue = params.get('flow') === 'continue';
+
     state.settings = global.ClubInscriptionConfig.read();
+    if (global.ClubSeason && global.ClubSeason.getActiveSeason) {
+      state.settings.season = global.ClubSeason.getActiveSeason();
+    }
     const open = global.ClubInscriptionConfig.isOpenNow(state.settings);
     if ($('inscSeasonLabel')) $('inscSeasonLabel').textContent = state.settings.season;
     if (!open.ok) {
@@ -354,12 +509,20 @@
     renderKitSection();
     renderFeeCheckboxes();
     initPaymentButtons();
-    refreshCart();
 
+    if (state.flowContinue) {
+      setupContinueFlow();
+    } else {
+      show($('insLookupBlock'), false);
+    }
+
+    refreshCart();
     if ($('insBirth')) $('insBirth').addEventListener('change', onBirthChange);
-    if ($('insPhoto')) $('insPhoto').addEventListener('change', function (e) {
-      handlePhoto(e.target.files[0]);
-    });
+    if ($('insPhoto')) {
+      $('insPhoto').addEventListener('change', function (e) {
+        handlePhoto(e.target.files[0]);
+      });
+    }
     ['insName', 'insSurname', 'insDni'].forEach(function (id) {
       const node = $(id);
       if (node) node.addEventListener('blur', refreshCart);

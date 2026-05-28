@@ -224,6 +224,11 @@ service cloud.firestore {
       allow read: if hasScope();
       allow create, update, delete: if hasRequestedScope() && isAdmin();
     }
+    match /sanabria_player_applications/{docId} {
+      allow read: if hasScope() && isAdmin();
+      allow create: if false;
+      allow update, delete: if hasScope() && isAdmin() && hasRequestedScope();
+    }
     match /sanabria_coaches/{docId} {
       allow read: if hasScope();
       allow create, update, delete: if hasRequestedScope() && isAdmin();

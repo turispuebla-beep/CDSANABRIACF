@@ -36,7 +36,7 @@
     tracksuit: { label: 'Chándal', price: 0, enabled: true },
     train_shirt: { label: 'Camiseta de entreno', price: 0, enabled: true },
     train_shorts: { label: 'Pantalón de entreno', price: 0, enabled: true },
-    train_jacket: { label: 'Chaqueta / basquera', price: 0, enabled: true }
+    train_jacket: { label: 'Chubasquero', price: 0, enabled: true }
   };
 
   function defaultCategoryFees() {
@@ -49,9 +49,17 @@
     return { ficha, socio };
   }
 
+  function resolveSeason(raw) {
+    if (raw && String(raw).trim()) return String(raw).trim();
+    if (global.ClubSeason && global.ClubSeason.getActiveSeason) {
+      return global.ClubSeason.getActiveSeason();
+    }
+    return '2026-2027';
+  }
+
   function getDefaultSettings() {
     return {
-      season: '2026-2027',
+      season: resolveSeason(''),
       registrationsOpen: true,
       openFrom: '',
       openUntil: '',
@@ -70,6 +78,7 @@
     const base = getDefaultSettings();
     if (!raw || typeof raw !== 'object') return base;
     const merged = { ...base, ...raw };
+    merged.season = resolveSeason(merged.season);
     merged.categoryFees = merged.categoryFees || base.categoryFees;
     merged.categoryFees.ficha = { ...base.categoryFees.ficha, ...(merged.categoryFees.ficha || {}) };
     merged.categoryFees.socio = { ...base.categoryFees.socio, ...(merged.categoryFees.socio || {}) };
@@ -80,6 +89,10 @@
         ...(merged.garments[id] || {})
       };
     });
+    const jacketLabel = String(merged?.garments?.train_jacket?.label || '').trim().toLowerCase();
+    if (jacketLabel === 'chaqueta / basquera' || jacketLabel === 'chaqueta/basquera') {
+      merged.garments.train_jacket.label = 'Chubasquero';
+    }
     merged.paymentMethods = { ...base.paymentMethods, ...(merged.paymentMethods || {}) };
     merged.registrationsOpen = raw?.registrationsOpen !== false;
     return merged;

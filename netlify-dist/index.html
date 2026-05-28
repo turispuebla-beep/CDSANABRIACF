@@ -18,7 +18,9 @@
     <script src="js/club-role-links.js"></script>
     <script src="js/redsys-payments.js"></script>
     <script src="js/event-cart.js"></script>
+    <script src="js/club-season.js"></script>
     <script src="js/club-inscription-config.js"></script>
+    <script src="js/player-application.js"></script>
     <script src="js/club-social-share.js"></script>
     <script src="js/club-email-notify.js"></script>
     <!-- Configuración Firebase CDSANABRIACF -->
@@ -83,6 +85,80 @@
             text-align: center;
             color: white;
             margin-bottom: 40px;
+            position: relative;
+        }
+
+        .header-top-bar {
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            gap: 12px;
+            margin-bottom: 16px;
+            flex-wrap: wrap;
+        }
+
+        .header-unete-btn {
+            background: linear-gradient(135deg, #059669 0%, #10b981 100%);
+            color: #fff;
+            border: none;
+            padding: 12px 20px;
+            border-radius: 25px;
+            font-size: 1rem;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.25);
+            white-space: nowrap;
+        }
+
+        .header-unete-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.35);
+        }
+
+        .header-left-group {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            align-items: center;
+        }
+
+        .header-acceso-btn {
+            background: linear-gradient(135deg, #1e3a8a 0%, #3b82f6 100%);
+            color: #fff;
+            border: none;
+            padding: 12px 20px;
+            border-radius: 25px;
+            font-size: 1rem;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.25);
+            white-space: nowrap;
+        }
+
+        .header-acceso-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.35);
+        }
+
+        .header-top-actions {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            justify-content: flex-end;
+            margin-left: auto;
+        }
+
+        @media (max-width: 600px) {
+            .header-top-bar {
+                flex-direction: column;
+                align-items: stretch;
+            }
+            .header-top-actions {
+                margin-left: 0;
+                justify-content: center;
+            }
         }
 
         h1 {
@@ -1104,24 +1180,26 @@
     
     <div class="container">
         <header>
+            <div class="header-top-bar">
+                <div class="header-left-group">
+                    <button type="button" class="header-unete-btn" onclick="openUneteClubModal()" aria-haspopup="dialog">
+                        Únete al Club
+                    </button>
+                    <button type="button" class="header-acceso-btn" onclick="openAccesoClubModal()" aria-haspopup="dialog">
+                        Acceso
+                    </button>
+                </div>
+                <div class="header-top-actions">
+                    <button type="button" class="access-btn" onclick="abrirTiendaOnline()" style="background: linear-gradient(135deg, #dc2626, #3b82f6); color: white; border: none; padding: 12px 24px; border-radius: 25px; font-size: 1rem; cursor: pointer; transition: all 0.3s ease; box-shadow: 0 4px 15px rgba(0,0,0,0.2);">
+                        🏪 TIENDA
+                    </button>
+                    <button type="button" id="quieresJugarHeaderWrap" class="access-btn" style="display: none; background: linear-gradient(180deg, #10b981 0%, #059669 100%); color: white; border: none; padding: 12px 24px; border-radius: 25px; font-size: 1rem; cursor: pointer; transition: all 0.3s ease; box-shadow: 0 4px 15px rgba(5,150,105,0.35); font-weight: 600;" onclick="openQuieresJugarModal()">
+                        ¿Quieres Jugar?
+                    </button>
+                </div>
+            </div>
             <h1>⚽ CDSANABRIACF</h1>
             <p class="subtitle">Club Deportivo Sanabriacf - Pasión por el Fútbol</p>
-            
-            <!-- Botones de acceso en la parte superior -->
-            <div class="access-buttons" style="margin-top: 20px; display: flex; justify-content: center; gap: 15px; flex-wrap: wrap;">
-                <button class="access-btn" onclick="showLoginModal(createSocioLoginForm())" style="background: var(--primary-color); color: white; border: none; padding: 12px 24px; border-radius: 25px; font-size: 1rem; cursor: pointer; transition: all 0.3s ease; box-shadow: 0 4px 15px rgba(0,0,0,0.2);">
-                    👨‍👩‍👧‍👦 Socios/as
-                </button>
-                <button class="access-btn" onclick="abrirTiendaOnline()" style="background: linear-gradient(135deg, #dc2626, #3b82f6); color: white; border: none; padding: 12px 24px; border-radius: 25px; font-size: 1rem; cursor: pointer; transition: all 0.3s ease; box-shadow: 0 4px 15px rgba(0,0,0,0.2);">
-                    🏪 TIENDA
-                </button>
-                <button class="access-btn" onclick="showLoginModal(createAmigoLoginForm())" style="background: var(--secondary-color); color: white; border: none; padding: 12px 24px; border-radius: 25px; font-size: 1rem; cursor: pointer; transition: all 0.3s ease; box-shadow: 0 4px 15px rgba(0,0,0,0.2);">
-                    🤝 Amigos/as del Club
-                </button>
-                <a href="inscripcion-jugador.html" id="inscripcionesHeaderWrap" class="access-btn" style="display: none; background: linear-gradient(180deg, #10b981 0%, #059669 100%); color: white; border: none; padding: 12px 24px; border-radius: 25px; font-size: 1rem; cursor: pointer; transition: all 0.3s ease; box-shadow: 0 4px 15px rgba(5,150,105,0.35); text-decoration: none; font-weight: 600;">
-                    📝 Inscripciones
-                </a>
-        </div>
         </header>
 
         <!-- Carrusel de Publicidad -->
@@ -1266,17 +1344,11 @@
             <p>Accede a todas las funcionalidades de gestión futbolística</p>
             
             <div class="download-section">
-                <button class="cta-button" onclick="document.getElementById('sociosModal').style.display = 'block'">
-                    👨‍👩‍👧‍👦 Hacerse Socio/a
+                <button type="button" class="cta-button" onclick="openUneteClubModal()" style="background: linear-gradient(135deg, #059669 0%, #10b981 100%);">
+                    Únete al Club
                 </button>
-                <button class="cta-button" onclick="document.getElementById('amigosModal').style.display = 'block'">
-                    🤝 Ser Amigo/a del Club
-                </button>
-                <button class="cta-button" onclick="showLoginModal(createSocioLoginForm())" style="background: #059669;">
-                    🔐 Acceso Socios
-                </button>
-                <button class="cta-button" onclick="showLoginModal(createAmigoLoginForm())" style="background: #3b82f6;">
-                    🔐 Acceso Amigos
+                <button type="button" class="cta-button" onclick="openAccesoClubModal()" style="background: linear-gradient(135deg, #1e3a8a 0%, #3b82f6 100%);">
+                    Acceso
                 </button>
             </div>
             
@@ -1301,6 +1373,103 @@
             <h2>📢 Publicidad del Club</h2>
             <div id="publicidadGallery" class="multimedia-gallery">
                 <p>Cargando publicidad...</p>
+            </div>
+        </div>
+
+        <!-- ¿Quieres Jugar? -->
+        <div id="quieresJugarModal" class="modal" style="display: none;" role="dialog" aria-modal="true">
+            <div class="modal-content" style="max-width: 480px;">
+                <span class="close" onclick="closeQuieresJugarModal()" aria-label="Cerrar">&times;</span>
+                <h2>¿Quieres Jugar?</h2>
+                <p style="color:#64748b;margin-bottom:20px;">Temporada <strong id="qjSeasonLabel">2026-2027</strong></p>
+                <div style="display:flex;flex-direction:column;gap:12px;">
+                    <button type="button" class="cta-button" style="margin:0;background:#1e3a8a;" onclick="goYaSoyJugadorInscripcion()">Ya soy jugador/a</button>
+                    <button type="button" class="cta-button" style="margin:0;background:#059669;" onclick="openNuevoJugadorIntroModal()">Nuevo jugador</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Nuevo jugador — solicitud (solo datos básicos, sin ropa ni cuota) -->
+        <div id="nuevoJugadorIntroModal" class="modal" style="display: none;" role="dialog" aria-modal="true">
+            <div class="modal-content" style="max-width: 560px; max-height: 90vh; overflow-y: auto;">
+                <span class="close" onclick="closeNuevoJugadorIntroModal()" aria-label="Cerrar">&times;</span>
+                <h2>Nuevo jugador/a</h2>
+                <p style="color:#64748b;">Si quieres ser jugador o jugadora del club, rellena el formulario con tus datos. Al enviarlo confirmas que has leído y aceptas la política interna del club y adquieres el compromiso de representar al CD Sanabria CF en las competiciones y actividades en las que el club te inscriba.</p>
+                <p><button type="button" class="btn-secondary" onclick="openCompromisoLegalModal()">📄 Ver compromiso deportivo completo</button></p>
+                <form id="nuevoJugadorForm" onsubmit="submitNuevoJugadorApplication(event)">
+                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+                        <div><label>Nombre *</label><input type="text" id="appName" required></div>
+                        <div><label>Apellidos *</label><input type="text" id="appSurname" required></div>
+                        <div><label>DNI <span id="appDniHint" style="font-weight:normal;color:#64748b;">(mayores de edad)</span></label><input type="text" id="appDni"></div>
+                        <div><label>Email *</label><input type="email" id="appEmail" required></div>
+                        <div><label>Teléfono *</label><input type="tel" id="appPhone" required></div>
+                        <div><label>Fecha nacimiento *</label><input type="date" id="appBirth" required onchange="onAppBirthChange()"></div>
+                    </div>
+                    <label>Dirección</label><input type="text" id="appAddress">
+                    <div id="appGuardianBlock" style="display:none;background:#fffbeb;border:1px solid #fcd34d;border-radius:8px;padding:12px;margin:12px 0;">
+                        <h3 style="margin:0 0 10px;font-size:1rem;">Tutor/a (menor de edad) *</h3>
+                        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+                            <div><label>Nombre tutor/a</label><input type="text" id="appGuardianName"></div>
+                            <div><label>DNI tutor/a</label><input type="text" id="appGuardianDni"></div>
+                            <div><label>Teléfono tutor/a</label><input type="tel" id="appGuardianPhone"></div>
+                            <div><label>Email tutor/a</label><input type="email" id="appGuardianEmail"></div>
+                        </div>
+                        <label>Dirección tutor/a</label><input type="text" id="appGuardianAddress">
+                    </div>
+                    <label style="display:flex;gap:8px;align-items:flex-start;margin:10px 0;"><input type="checkbox" id="appCommitment" required style="margin-top:4px;"><span>Acepto la política interna del club y el compromiso de representar al CD Sanabria CF *</span></label>
+                    <label style="display:flex;gap:8px;align-items:flex-start;margin:10px 0;"><input type="checkbox" id="appClubRules" required style="margin-top:4px;"><span>He leído y acepto el <a href="#" onclick="openCompromisoLegalModal();return false;">compromiso deportivo</a> *</span></label>
+                    <button type="submit" class="btn-primary">Enviar solicitud</button>
+                </form>
+            </div>
+        </div>
+
+        <!-- Compromiso deportivo (texto legal) -->
+        <div id="compromisoLegalModal" class="modal" style="display: none;" role="dialog" aria-modal="true">
+            <div class="modal-content" style="max-width: 640px; max-height: 90vh; overflow-y: auto;">
+                <span class="close" onclick="closeCompromisoLegalModal()" aria-label="Cerrar">&times;</span>
+                <h2>Compromiso deportivo</h2>
+                <div style="font-size:0.92rem;line-height:1.55;color:#334155;">
+                    <p><strong>Primero. Objeto.</strong><br>El Jugador se compromete a formar parte del CD SANABRIA CF y a participar en entrenamientos, convocatorias, partidos y actividades oficiales del Club durante la temporada <span id="legalSeasonLabel">2026-2027</span>, salvo causa justificada.</p>
+                    <p><strong>Segundo. Obligaciones del Jugador.</strong><br>El Jugador se obliga a:<br>a) Cumplir las normas internas, disciplinarias y de convivencia del Club.<br>b) Mantener una conducta deportiva y respetuosa.<br>c) Acatar las decisiones técnicas y organizativas adoptadas por el cuerpo técnico y órganos competentes del Club.</p>
+                    <p><strong>Tercero. Régimen aplicable.</strong><br>El presente compromiso tiene carácter deportivo y se regirá por la normativa del Club y, en su caso, por la normativa federativa que resulte de aplicación.</p>
+                    <p><strong>Cuarto. Aceptación y Vigencia.</strong><br>Tu solicitud será evaluada para su aceptación como jugador/a. Si es aceptada por la Directiva y Cuerpo Técnico, el compromiso tendrá vigencia desde su ENVÍO hasta la finalización de la temporada <span id="legalSeasonLabel2">2026-2027</span> y siguientes, según se estipule en su ficha, salvo resolución anticipada por mutuo acuerdo o por incumplimiento grave de las obligaciones asumidas.</p>
+                </div>
+                <button type="button" class="btn-primary" style="margin-top:16px;" onclick="closeCompromisoLegalModal()">Cerrar</button>
+            </div>
+        </div>
+
+        <!-- Modal Únete al Club (elige socio o amigo; abre los mismos formularios de siempre) -->
+        <div id="uneteClubModal" class="modal" style="display: none;" role="dialog" aria-labelledby="uneteClubTitle" aria-modal="true">
+            <div class="modal-content" style="max-width: 480px;">
+                <span class="close" onclick="closeUneteClubModal()" aria-label="Cerrar">&times;</span>
+                <h2 id="uneteClubTitle">Únete al Club</h2>
+                <p style="color: #64748b; margin-bottom: 20px;">Elige cómo quieres formar parte del CD Sanabria CF:</p>
+                <div style="display: flex; flex-direction: column; gap: 12px;">
+                    <button type="button" class="cta-button" onclick="openSocioRegistroFromUnete()" style="margin: 0; background: var(--primary-color);">
+                        👨‍👩‍👧‍👦 Hacerse Socio/a
+                    </button>
+                    <button type="button" class="cta-button" onclick="openAmigoRegistroFromUnete()" style="margin: 0; background: var(--secondary-color);">
+                        🤝 Ser Amigo/a del Club
+                    </button>
+                </div>
+                <p style="margin-top: 20px; font-size: 0.9rem; color: #6b7280; text-align: center;">¿Ya tienes cuenta? Pulsa <strong>Acceso</strong> arriba a la izquierda.</p>
+            </div>
+        </div>
+
+        <!-- Modal Acceso (socios / amigos — mismos login de siempre) -->
+        <div id="accesoClubModal" class="modal" style="display: none;" role="dialog" aria-labelledby="accesoClubTitle" aria-modal="true">
+            <div class="modal-content" style="max-width: 480px;">
+                <span class="close" onclick="closeAccesoClubModal()" aria-label="Cerrar">&times;</span>
+                <h2 id="accesoClubTitle">Acceso</h2>
+                <p style="color: #64748b; margin-bottom: 20px;">Entra con tu cuenta de socio/a o de amigo/a del club:</p>
+                <div style="display: flex; flex-direction: column; gap: 12px;">
+                    <button type="button" class="cta-button" onclick="openSocioAccesoFromModal()" style="margin: 0; background: var(--primary-color);">
+                        👨‍👩‍👧‍👦 Socios/as
+                    </button>
+                    <button type="button" class="cta-button" onclick="openAmigoAccesoFromModal()" style="margin: 0; background: var(--secondary-color);">
+                        🤝 Amigos/as del Club
+                    </button>
+                </div>
             </div>
         </div>
 
@@ -2411,19 +2580,97 @@
                 console.log('✅ Mensaje del logo cargado:', messageText);
             }
             updateInscripcionesHomeButton();
+            if (window.ClubSeason && window.ClubSeason.getActiveSeason) {
+                const s = window.ClubSeason.getActiveSeason();
+                ['qjSeasonLabel', 'legalSeasonLabel', 'legalSeasonLabel2'].forEach(function (id) {
+                    const el = document.getElementById(id);
+                    if (el) el.textContent = s;
+                });
+            }
         }
 
         function updateInscripcionesHomeButton() {
-            const btn = document.getElementById('inscripcionesHeaderWrap');
+            const btn = document.getElementById('quieresJugarHeaderWrap');
             if (!btn || typeof window.ClubInscriptionConfig === 'undefined') return;
             const st = window.ClubInscriptionConfig.isOpenNow();
+            const season =
+                (st.settings && st.settings.season) ||
+                (window.ClubSeason && window.ClubSeason.getActiveSeason ? window.ClubSeason.getActiveSeason() : '');
             if (st.ok) {
                 btn.style.display = 'inline-block';
-                if (st.settings && st.settings.season) {
-                    btn.title = 'Inscripciones abiertas — temporada ' + st.settings.season;
-                }
+                if (season) btn.title = '¿Quieres Jugar? — temporada ' + season;
             } else {
                 btn.style.display = 'none';
+            }
+        }
+
+        function openQuieresJugarModal() {
+            const m = document.getElementById('quieresJugarModal');
+            if (m) m.style.display = 'block';
+        }
+        function closeQuieresJugarModal() {
+            const m = document.getElementById('quieresJugarModal');
+            if (m) m.style.display = 'none';
+        }
+        function openNuevoJugadorIntroModal() {
+            closeQuieresJugarModal();
+            const m = document.getElementById('nuevoJugadorIntroModal');
+            if (m) m.style.display = 'block';
+        }
+        function closeNuevoJugadorIntroModal() {
+            const m = document.getElementById('nuevoJugadorIntroModal');
+            if (m) m.style.display = 'none';
+        }
+        function openCompromisoLegalModal() {
+            const m = document.getElementById('compromisoLegalModal');
+            if (m) m.style.display = 'block';
+        }
+        function closeCompromisoLegalModal() {
+            const m = document.getElementById('compromisoLegalModal');
+            if (m) m.style.display = 'none';
+        }
+        function goYaSoyJugadorInscripcion() {
+            closeQuieresJugarModal();
+            window.location.href = 'inscripcion-jugador.html?flow=continue';
+        }
+        function onAppBirthChange() {
+            const bd = document.getElementById('appBirth');
+            const block = document.getElementById('appGuardianBlock');
+            if (!bd || !block || !window.ClubInscriptionConfig) return;
+            const age = window.ClubInscriptionConfig.calculateAge(bd.value);
+            block.style.display = age != null && age < 18 ? 'block' : 'none';
+        }
+        async function submitNuevoJugadorApplication(ev) {
+            if (ev) ev.preventDefault();
+            if (!window.PlayerApplication) {
+                alert('Error: módulo de solicitudes no cargado.');
+                return;
+            }
+            const data = {
+                name: document.getElementById('appName').value.trim(),
+                surname: document.getElementById('appSurname').value.trim(),
+                dni: document.getElementById('appDni').value.trim(),
+                email: document.getElementById('appEmail').value.trim(),
+                phone: document.getElementById('appPhone').value.trim(),
+                address: document.getElementById('appAddress').value.trim(),
+                birthDate: document.getElementById('appBirth').value,
+                guardianName: document.getElementById('appGuardianName').value.trim(),
+                guardianDni: document.getElementById('appGuardianDni').value.trim(),
+                guardianPhone: document.getElementById('appGuardianPhone').value.trim(),
+                guardianEmail: document.getElementById('appGuardianEmail').value.trim(),
+                guardianAddress: document.getElementById('appGuardianAddress').value.trim(),
+                commitmentAccepted: document.getElementById('appCommitment').checked,
+                clubRulesAccepted: document.getElementById('appClubRules').checked
+            };
+            try {
+                await window.PlayerApplication.submitApplication(data);
+                closeNuevoJugadorIntroModal();
+                document.getElementById('nuevoJugadorForm').reset();
+                alert(
+                    '✅ Solicitud enviada correctamente.\n\nEl club la revisará. Cuando sea aceptada, podrás entrar en «Ya soy jugador/a» para elegir la ropa y pagar la ficha.'
+                );
+            } catch (e) {
+                alert('❌ ' + (e.message || e));
             }
         }
 
@@ -2658,6 +2905,48 @@
                     </form>
                 </div>
             `;
+        }
+
+        function openUneteClubModal() {
+            const modal = document.getElementById('uneteClubModal');
+            if (modal) modal.style.display = 'block';
+        }
+
+        function closeUneteClubModal() {
+            const modal = document.getElementById('uneteClubModal');
+            if (modal) modal.style.display = 'none';
+        }
+
+        function openSocioRegistroFromUnete() {
+            closeUneteClubModal();
+            const modal = document.getElementById('sociosModal');
+            if (modal) modal.style.display = 'block';
+        }
+
+        function openAmigoRegistroFromUnete() {
+            closeUneteClubModal();
+            const modal = document.getElementById('amigosModal');
+            if (modal) modal.style.display = 'block';
+        }
+
+        function openAccesoClubModal() {
+            const modal = document.getElementById('accesoClubModal');
+            if (modal) modal.style.display = 'block';
+        }
+
+        function closeAccesoClubModal() {
+            const modal = document.getElementById('accesoClubModal');
+            if (modal) modal.style.display = 'none';
+        }
+
+        function openSocioAccesoFromModal() {
+            closeAccesoClubModal();
+            showLoginModal(createSocioLoginForm());
+        }
+
+        function openAmigoAccesoFromModal() {
+            closeAccesoClubModal();
+            showLoginModal(createAmigoLoginForm());
         }
 
         // Función para cerrar modal de amigos

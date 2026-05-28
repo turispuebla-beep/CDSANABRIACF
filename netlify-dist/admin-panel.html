@@ -35,7 +35,10 @@
     <script src="js/club-member-card.js"></script>
     <script src="js/club-role-links.js"></script>
     <script src="js/club-inscription-config.js"></script>
+    <script src="js/club-season.js"></script>
     <script src="js/admin-inscription-config.js"></script>
+    <script src="js/player-application.js"></script>
+    <script src="js/admin-player-applications.js"></script>
     <script src="js/player-inscription.js"></script>
     <script src="js/club-player-export-config.js"></script>
     <script src="js/player-export.js"></script>
@@ -620,6 +623,12 @@
                     </div>
                     <button class="btn btn-success" type="button" onclick="saveInscriptionAdminSettings()">💾 Guardar configuración inscripciones</button>
                     <a href="inscripcion-jugador.html" target="_blank" rel="noopener" style="margin-left:12px;">Ver formulario público ↗</a>
+                </div>
+
+                <div class="section" style="background:#eff6ff;border:2px solid #2563eb;border-radius:12px;padding:20px;margin-bottom:24px;">
+                    <h3 style="margin:0 0 12px;color:#1e3a8a;">⚽ Solicitudes «Nuevo jugador» (sin ropa ni cuota)</h3>
+                    <p style="color:#64748b;font-size:0.9rem;margin-top:0;">Revisa las solicitudes enviadas desde la web. Al aceptar, el jugador podrá usar «Ya soy jugador/a» para equipación y pago.</p>
+                    <div id="playerApplicationsList"><p style="color:#64748b;">Cargando solicitudes…</p></div>
                 </div>
                 
                 <div class="section">
