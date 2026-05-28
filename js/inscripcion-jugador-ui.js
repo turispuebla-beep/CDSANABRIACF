@@ -9,7 +9,8 @@
     kitSelections: {},
     photoData: null,
     flowContinue: false,
-    continuePlayer: null
+    continuePlayer: null,
+    continueEditable: false
   };
 
   function $(id) {
@@ -78,25 +79,71 @@
     onBirthChange();
   }
 
+  function showAllFormSections() {
+    document.querySelectorAll('#inscFormWrap section.card, #inscFormWrap #guardianBlock').forEach(function (el) {
+      if (el.id === 'insLookupBlock') return;
+      el.style.display = '';
+    });
+    show($('insPersonalSection'), true);
+    onBirthChange();
+  }
+
   function enterContinueMode(player) {
     state.continuePlayer = player;
-    show($('insLookupBlock'), false);
-    show($('insPersonalSection'), true);
+    state.continueEditable = false;
+    prefillFromPlayer(player);
     setPersonalReadonly(true);
     show($('insClubRulesLine'), true);
     if ($('insPlayerConsent')) $('insPlayerConsent').checked = true;
     if ($('insPhotoConsent')) $('insPhotoConsent').checked = true;
-    document.querySelectorAll('#inscFormWrap section.card, #inscFormWrap #guardianBlock').forEach(function (el) {
-      if (el.id === 'insLookupBlock') el.style.display = 'none';
-      else el.style.display = '';
-    });
+    showAllFormSections();
+    setLookupPanelOpen(false);
     const msg = $('insLookupMsg');
     if (msg) {
       msg.style.color = '#059669';
       msg.textContent =
-        'Ficha encontrada. Completa equipación y pago para la temporada ' + (state.settings.season || '') + '.';
+        'Solicitud aceptada. Revisa equipación y pago para la temporada ' + (state.settings.season || '') + '.';
     }
     refreshCart();
+    const personal = $('insPersonalSection');
+    if (personal && personal.scrollIntoView) personal.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+
+  function prefillReturningPlayer(player) {
+    state.continuePlayer = player;
+    state.continueEditable = true;
+    prefillFromPlayer(player);
+    setPersonalReadonly(false);
+    show($('insClubRulesLine'), true);
+    showAllFormSections();
+    setLookupPanelOpen(false);
+    const msg = $('insLookupMsg');
+    if (msg) {
+      msg.style.color = '#059669';
+      msg.textContent =
+        'Ficha encontrada. Revisa tus datos, elige equipación y paga la inscripción de la temporada ' +
+        (state.settings.season || '') +
+        '.';
+    }
+    refreshCart();
+    const personal = $('insPersonalSection');
+    if (personal && personal.scrollIntoView) personal.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+
+  function setLookupPanelOpen(open) {
+    const block = $('insLookupBlock');
+    const btn = $('insToggleLookupBtn');
+    show(block, !!open);
+    if (btn) {
+      btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+      btn.textContent = open ? '✕ Cerrar búsqueda' : '🔍 Buscar mi ficha';
+    }
+  }
+
+  function toggleLookupPanel() {
+    const block = $('insLookupBlock');
+    const isOpen = block && block.style.display !== 'none';
+    setLookupPanelOpen(!isOpen);
   }
 
   function runLookup() {
@@ -128,11 +175,8 @@
     if (!player) {
       player = global.PlayerInscription.findPlayerForContinueLookup(dni, name, surname, season);
     }
-
-    if (player && String(player.inscriptionStatus || '').toLowerCase() === 'approved_for_inscription') {
-      prefillFromPlayer(player);
-      enterContinueMode(player);
-      return;
+    if (!player && global.PlayerInscription.findReturningPlayerForInscription) {
+      player = global.PlayerInscription.findReturningPlayerForInscription(dni, name, surname, season);
     }
 
     if (player && global.PlayerInscription.findPaidPlayerForSeason(player.dni, season)) {
@@ -140,6 +184,20 @@
         msg.style.color = '#dc2626';
         msg.textContent = 'Inscripción ya completada para esta temporada.';
       }
+      return;
+    }
+
+    if (
+      player &&
+      String(player.inscriptionStatus || '').toLowerCase() === 'approved_for_inscription' &&
+      String(player.inscriptionSeason || '') === String(season)
+    ) {
+      enterContinueMode(player);
+      return;
+    }
+
+    if (player) {
+      prefillReturningPlayer(player);
       return;
     }
 
@@ -156,10 +214,11 @@
     }
 
     if (msg) {
-      msg.style.color = '#dc2626';
+      msg.style.color = '#b45309';
       msg.textContent =
-        'No encontramos una ficha aprobada para esta temporada. Si eres nuevo/a, solicita el alta desde «¿Quieres Jugar?» en la página principal.';
+        'No encontramos tu ficha. Puedes rellenar el formulario de abajo igualmente. Si eres nuevo/a en el club, también puedes solicitar alta desde «¿Quieres Jugar?» en la página principal.';
     }
+    showAllFormSections();
   }
 
   function renderKitSection() {
@@ -276,7 +335,6 @@
   }
 
   function refreshCart() {
-    if (state.flowContinue && !state.continuePlayer) return;
     const form = getFormData();
     const category = form.category || global.ClubInscriptionConfig.suggestCategoryFromBirthDate(form.birthDate);
     const kitItems = collectKitItems();
@@ -303,7 +361,7 @@
   }
 
   function toggleGuardian() {
-    if (state.continuePlayer) return;
+    if (state.continuePlayer && !state.continueEditable) return;
     const bd = $('insBirth') && $('insBirth').value;
     const age = global.ClubInscriptionConfig.calculateAge(bd);
     const sec = $('guardianBlock');
@@ -313,7 +371,9 @@
   function onBirthChange() {
     const bd = $('insBirth') && $('insBirth').value;
     const cat = global.ClubInscriptionConfig.suggestCategoryFromBirthDate(bd);
-    if ($('insCategory') && cat && !state.continuePlayer) $('insCategory').value = cat;
+    if ($('insCategory') && cat && (!state.continuePlayer || state.continueEditable)) {
+      $('insCategory').value = cat;
+    }
     if ($('insAge')) $('insAge').textContent = global.ClubInscriptionConfig.calculateAge(bd) ?? '—';
     const hint = $('insDniHint');
     const age = global.ClubInscriptionConfig.calculateAge(bd);
@@ -329,7 +389,10 @@
 
   function validateForm() {
     const f = getFormData();
-    if (!state.continuePlayer) {
+    const approvedOnly =
+      state.continuePlayer && !state.continueEditable;
+
+    if (!approvedOnly) {
       if (!f.name || !f.surname || !f.email || !f.phone || !f.birthDate) {
         return 'Completa nombre, apellidos, email, teléfono y fecha de nacimiento.';
       }
@@ -337,21 +400,18 @@
       if (age != null && age >= 18 && !f.dni) {
         return 'El DNI es obligatorio para mayores de edad.';
       }
-      if (!f.playerConsent || !f.photoConsent) {
-        return 'Debes aceptar los consentimientos obligatorios.';
-      }
       if (age != null && age < 18) {
         if (!f.guardianName || !f.guardianDNI || !f.guardianPhone || !f.guardianEmail) {
           return 'Para menores, los datos del tutor/a son obligatorios.';
         }
       }
-    } else {
-      if (!f.clubRulesAccepted) {
-        return 'Debes aceptar las normas y el compromiso deportivo del club.';
-      }
-      if (!f.playerConsent || !f.photoConsent) {
-        return 'Debes aceptar los consentimientos obligatorios.';
-      }
+    }
+
+    if (state.flowContinue && !f.clubRulesAccepted) {
+      return 'Debes aceptar las normas y el compromiso deportivo del club.';
+    }
+    if (!f.playerConsent || !f.photoConsent) {
+      return 'Debes aceptar los consentimientos obligatorios.';
     }
 
     const season = state.settings.season;
@@ -382,7 +442,7 @@
   }
 
   async function handlePhoto(file) {
-    if (!file || state.continuePlayer) return;
+    if (!file || (state.continuePlayer && !state.continueEditable)) return;
     if (file.size > 2 * 1024 * 1024) {
       alert('La foto no puede superar 2 MB');
       return;
@@ -473,14 +533,20 @@
     }
   }
 
-  function setupContinueFlow() {
-    show($('insLookupBlock'), true);
-    show($('insPersonalSection'), false);
-    show($('guardianBlock'), false);
-    document.querySelectorAll('#inscFormWrap section.card').forEach(function (sec) {
-      if (sec.id !== 'insLookupBlock') sec.style.display = 'none';
-    });
-    if ($('insLookupBtn')) $('insLookupBtn').addEventListener('click', runLookup);
+  function setupYaSoyJugadorFlow() {
+    show($('inscYaSoyIntro'), true);
+    show($('insToggleLookupBtn'), true);
+    show($('insClubRulesLine'), true);
+    setLookupPanelOpen(false);
+    showAllFormSections();
+    if ($('insLookupBtn') && !$('insLookupBtn').dataset.bound) {
+      $('insLookupBtn').dataset.bound = '1';
+      $('insLookupBtn').addEventListener('click', runLookup);
+    }
+    if ($('insToggleLookupBtn') && !$('insToggleLookupBtn').dataset.bound) {
+      $('insToggleLookupBtn').dataset.bound = '1';
+      $('insToggleLookupBtn').addEventListener('click', toggleLookupPanel);
+    }
   }
 
   function init() {
@@ -511,8 +577,10 @@
     initPaymentButtons();
 
     if (state.flowContinue) {
-      setupContinueFlow();
+      setupYaSoyJugadorFlow();
     } else {
+      show($('inscYaSoyIntro'), false);
+      show($('insToggleLookupBtn'), false);
       show($('insLookupBlock'), false);
     }
 

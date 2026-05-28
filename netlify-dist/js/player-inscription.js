@@ -85,6 +85,66 @@
     return null;
   }
 
+  /** Jugador/a que ya figura en el club (cualquier temporada) y aún no ha completado inscripción web de la temporada actual. */
+  function findReturningPlayerForInscription(dni, name, surname, season) {
+    const s = String(season || '');
+    const players = readPlayers();
+    const n = normalizeDni(dni);
+
+    function isPaidThisSeason(p) {
+      const pdni = normalizeDni(p && p.dni);
+      if (!pdni) return false;
+      return !!findPaidPlayerForSeason(pdni, s);
+    }
+
+    function sortRecent(list) {
+      return list.slice().sort(function (a, b) {
+        return String(b.updatedAt || b.registrationDate || '').localeCompare(
+          String(a.updatedAt || a.registrationDate || '')
+        );
+      });
+    }
+
+    if (n) {
+      const matches = players.filter(function (p) {
+        return normalizeDni(p.dni) === n;
+      });
+      if (matches.length) {
+        const sorted = sortRecent(matches);
+        const sameSeason = sorted.find(function (p) {
+          return String(p.inscriptionSeason || '') === s && !isPaidThisSeason(p);
+        });
+        if (sameSeason) return sameSeason;
+        const open = sorted.find(function (p) {
+          return !isPaidThisSeason(p);
+        });
+        if (open) return open;
+      }
+    }
+
+    const nm = String(name || '').trim().toLowerCase();
+    const sn = String(surname || '').trim().toLowerCase();
+    if (nm && sn) {
+      const matches = players.filter(function (p) {
+        const pn = String(p.name || p.nombre || '').trim().toLowerCase();
+        const ps = String(p.surname || p.apellidos || '').trim().toLowerCase();
+        return pn === nm && ps === sn;
+      });
+      if (matches.length) {
+        const sorted = sortRecent(matches);
+        const sameSeason = sorted.find(function (p) {
+          return String(p.inscriptionSeason || '') === s && !isPaidThisSeason(p);
+        });
+        if (sameSeason) return sameSeason;
+        const open = sorted.find(function (p) {
+          return !isPaidThisSeason(p);
+        });
+        if (open) return open;
+      }
+    }
+    return null;
+  }
+
   function getDisplayStatus(player) {
     const ins = String(player.inscriptionStatus || '').toLowerCase();
     if (player.inscriptionPaid || ins === 'paid' || player.paymentStatus === 'paid') {
@@ -558,6 +618,8 @@
     findPaidPlayerForSeason: findPaidPlayerForSeason,
     findApprovedForInscription: findApprovedForInscription,
     findPlayerForContinueLookup: findPlayerForContinueLookup,
+    findReturningPlayerForInscription: findReturningPlayerForInscription,
+    findPlayerByDni: findPlayerByDni,
     findMemberByDni: findMemberByDni,
     computeCart: computeCart,
     buildPlayerRecord: buildPlayerRecord,

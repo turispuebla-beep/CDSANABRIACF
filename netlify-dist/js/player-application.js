@@ -56,8 +56,14 @@
       return 'El DNI es obligatorio para mayores de edad.';
     }
     if (age != null && age < 18) {
-      if (!data.guardianName || !data.guardianDni || !data.guardianPhone || !data.guardianEmail) {
-        return 'Para menores, los datos del tutor/a son obligatorios.';
+      if (
+        !data.guardianName ||
+        !data.guardianSurname ||
+        !data.guardianDni ||
+        !data.guardianPhone ||
+        !data.guardianEmail
+      ) {
+        return 'Para menores, indica nombre, apellidos, DNI, teléfono y email del tutor/a.';
       }
     }
     if (!data.commitmentAccepted) {
@@ -89,6 +95,7 @@
           ? global.ClubInscriptionConfig.suggestCategoryFromBirthDate(formData.birthDate)
           : ''),
       guardianName: (formData.guardianName || '').trim(),
+      guardianSurname: (formData.guardianSurname || '').trim(),
       guardianDni: formData.guardianDni ? normalizeDni(formData.guardianDni) : '',
       guardianPhone: (formData.guardianPhone || '').trim(),
       guardianEmail: (formData.guardianEmail || '').trim(),

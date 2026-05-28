@@ -88,13 +88,13 @@
             position: relative;
         }
 
-        .header-top-bar {
+        .header-actions-bar {
             display: flex;
-            align-items: flex-start;
-            justify-content: space-between;
-            gap: 12px;
-            margin-bottom: 16px;
             flex-wrap: wrap;
+            gap: 10px;
+            justify-content: center;
+            align-items: center;
+            margin-top: 22px;
         }
 
         .header-unete-btn {
@@ -116,13 +116,6 @@
             box-shadow: 0 6px 20px rgba(0, 0, 0, 0.35);
         }
 
-        .header-left-group {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 10px;
-            align-items: center;
-        }
-
         .header-acceso-btn {
             background: linear-gradient(135deg, #1e3a8a 0%, #3b82f6 100%);
             color: #fff;
@@ -142,22 +135,51 @@
             box-shadow: 0 6px 20px rgba(0, 0, 0, 0.35);
         }
 
-        .header-top-actions {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 10px;
-            justify-content: flex-end;
-            margin-left: auto;
+        .header-tienda-btn {
+            background: linear-gradient(135deg, #dc2626, #3b82f6);
+            color: #fff;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 25px;
+            font-size: 1rem;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+            white-space: nowrap;
+        }
+
+        .header-tienda-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
+        }
+
+        .header-quieres-jugar-btn {
+            background: linear-gradient(180deg, #10b981 0%, #059669 100%);
+            color: #fff;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 25px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(5, 150, 105, 0.35);
+            white-space: nowrap;
+        }
+
+        .header-quieres-jugar-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(5, 150, 105, 0.45);
         }
 
         @media (max-width: 600px) {
-            .header-top-bar {
+            .header-actions-bar {
                 flex-direction: column;
                 align-items: stretch;
             }
-            .header-top-actions {
-                margin-left: 0;
-                justify-content: center;
+            .header-actions-bar button {
+                width: 100%;
             }
         }
 
@@ -338,14 +360,30 @@
             background: var(--button-hover-color);
         }
 
-        /* Sección de Encuentros */
-        .encuentros-section {
+        /* Sección de Encuentros y Galería Multimedia */
+        .encuentros-section,
+        .galeria-multimedia-section {
             background: white;
             padding: 40px;
             border-radius: 15px;
             box-shadow: 0 10px 30px rgba(0,0,0,0.1);
             margin-bottom: 30px;
             display: none;
+        }
+
+        .galeria-social-block {
+            text-align: center;
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            border-radius: 12px;
+            padding: 22px;
+            margin: 20px 0 28px;
+        }
+
+        .galeria-social-block h3 {
+            color: #1e3a8a;
+            margin: 0 0 14px;
+            font-size: 1.15rem;
         }
 
         .encuentros-grid {
@@ -939,6 +977,91 @@
             color: var(--text-color);
         }
 
+        /* Formulario solicitud «Nuevo jugador» */
+        #nuevoJugadorIntroModal .modal-content {
+            color: #1e293b;
+        }
+        #nuevoJugadorIntroModal h2 {
+            color: #1e3a8a !important;
+        }
+        #nuevoJugadorIntroModal .nj-intro-text {
+            color: #334155 !important;
+        }
+        .nuevo-jugador-form label {
+            display: block;
+            margin-bottom: 4px;
+            font-weight: 600;
+            color: #1e3a8a;
+            font-size: 0.95rem;
+        }
+        .nuevo-jugador-form input[type="text"],
+        .nuevo-jugador-form input[type="email"],
+        .nuevo-jugador-form input[type="tel"],
+        .nuevo-jugador-form input[type="date"] {
+            width: 100%;
+            padding: 10px 12px;
+            margin-bottom: 8px;
+            border: 1px solid #cbd5e1;
+            border-radius: 8px;
+            font-size: 1rem;
+            color: #0f172a;
+            background: #fff;
+        }
+        .nuevo-jugador-form .nj-consent-label {
+            display: flex;
+            gap: 10px;
+            align-items: flex-start;
+            margin: 14px 0;
+            cursor: pointer;
+        }
+        .nuevo-jugador-form .nj-consent-label span {
+            color: #1e40af !important;
+            font-weight: 600;
+            font-size: 0.95rem;
+            line-height: 1.45;
+        }
+        .nuevo-jugador-form .nj-consent-label a {
+            color: #2563eb !important;
+            font-weight: 700;
+            text-decoration: underline;
+        }
+        .nuevo-jugador-form .nj-consent-label input[type="checkbox"] {
+            margin-top: 4px;
+            width: 18px;
+            height: 18px;
+            flex-shrink: 0;
+            accent-color: #2563eb;
+        }
+        .nuevo-jugador-form .nj-guardian-block {
+            display: none;
+            background: #eff6ff;
+            border: 2px solid #3b82f6;
+            border-radius: 10px;
+            padding: 14px;
+            margin: 14px 0;
+        }
+        .nuevo-jugador-form .nj-guardian-block h3 {
+            margin: 0 0 8px;
+            font-size: 1.05rem;
+            color: #1e3a8a !important;
+        }
+        .nuevo-jugador-form .nj-guardian-hint {
+            margin: 0 0 12px;
+            font-size: 0.9rem;
+            color: #1e40af !important;
+            line-height: 1.4;
+        }
+        .nuevo-jugador-form .nj-field-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+        }
+        @media (max-width: 520px) {
+            .nuevo-jugador-form .nj-field-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
         .form-group input[type="text"],
         .form-group input[type="email"],
         .form-group input[type="tel"],
@@ -1180,26 +1303,22 @@
     
     <div class="container">
         <header>
-            <div class="header-top-bar">
-                <div class="header-left-group">
-                    <button type="button" class="header-unete-btn" onclick="openUneteClubModal()" aria-haspopup="dialog">
-                        Únete al Club
-                    </button>
-                    <button type="button" class="header-acceso-btn" onclick="openAccesoClubModal()" aria-haspopup="dialog">
-                        Acceso
-                    </button>
-                </div>
-                <div class="header-top-actions">
-                    <button type="button" class="access-btn" onclick="abrirTiendaOnline()" style="background: linear-gradient(135deg, #dc2626, #3b82f6); color: white; border: none; padding: 12px 24px; border-radius: 25px; font-size: 1rem; cursor: pointer; transition: all 0.3s ease; box-shadow: 0 4px 15px rgba(0,0,0,0.2);">
-                        🏪 TIENDA
-                    </button>
-                    <button type="button" id="quieresJugarHeaderWrap" class="access-btn" style="display: none; background: linear-gradient(180deg, #10b981 0%, #059669 100%); color: white; border: none; padding: 12px 24px; border-radius: 25px; font-size: 1rem; cursor: pointer; transition: all 0.3s ease; box-shadow: 0 4px 15px rgba(5,150,105,0.35); font-weight: 600;" onclick="openQuieresJugarModal()">
-                        ¿Quieres Jugar?
-                    </button>
-                </div>
-            </div>
             <h1>⚽ CDSANABRIACF</h1>
             <p class="subtitle">Club Deportivo Sanabriacf - Pasión por el Fútbol</p>
+            <nav class="header-actions-bar" aria-label="Acciones principales del club">
+                <button type="button" class="header-unete-btn" onclick="openUneteClubModal()" aria-haspopup="dialog">
+                    Únete al Club
+                </button>
+                <button type="button" class="header-acceso-btn" onclick="openAccesoClubModal()" aria-haspopup="dialog">
+                    Acceso
+                </button>
+                <button type="button" class="header-tienda-btn" onclick="abrirTiendaOnline()">
+                    🏪 TIENDA
+                </button>
+                <button type="button" id="quieresJugarHeaderWrap" class="header-quieres-jugar-btn" style="display: none;" onclick="openQuieresJugarModal()">
+                    ¿Quieres Jugar?
+                </button>
+            </nav>
         </header>
 
         <!-- Carrusel de Publicidad -->
@@ -1284,8 +1403,8 @@
                 <div class="feature-icon">📸</div>
                 <h3 class="feature-title">Galería Multimedia</h3>
                 <p class="feature-description">
-                    Fotos, videos y documentos del club. 
-                    Revive los mejores momentos del equipo.
+                    Fotos, vídeos y documentos del club, y enlaces a nuestras redes sociales.
+                    Abierto para todos.
                 </p>
                 <button class="feature-btn" style="background: var(--primary-color); color: white; border: none; padding: 8px 16px; border-radius: 20px; margin-top: 15px; cursor: pointer;">Ver Galería</button>
     </div>
@@ -1339,34 +1458,34 @@
             </div>
         </div>
 
-        <div class="cta-section">
-            <h2>¡Únete a CDSANABRIACF!</h2>
-            <p>Accede a todas las funcionalidades de gestión futbolística</p>
-            
-            <div class="download-section">
-                <button type="button" class="cta-button" onclick="openUneteClubModal()" style="background: linear-gradient(135deg, #059669 0%, #10b981 100%);">
-                    Únete al Club
-                </button>
-                <button type="button" class="cta-button" onclick="openAccesoClubModal()" style="background: linear-gradient(135deg, #1e3a8a 0%, #3b82f6 100%);">
-                    Acceso
-                </button>
-            </div>
-            
-            <!-- Botones de Redes Sociales -->
-            <div class="social-media-section" style="margin-top: 20px; text-align: center;">
-                <h3 style="color: white; margin-bottom: 15px; font-size: 1.2rem;">Síguenos en Redes Sociales</h3>
-                <div style="display: flex; justify-content: center; gap: 15px; flex-wrap: wrap;">
-                    <button class="cta-button" onclick="openFacebook()" style="background: #1877f2; border: none; padding: 12px 24px; border-radius: 25px; color: white; cursor: pointer; font-size: 1rem; font-weight: bold; box-shadow: 0 4px 15px rgba(0,0,0,0.2); transition: all 0.3s ease; min-width: 140px;">
+        <!-- Galería Multimedia (abierta para todos) -->
+        <div id="galeriaMultimedia" class="galeria-multimedia-section">
+            <h2>📸 Galería Multimedia</h2>
+            <p style="color:#64748b;margin-bottom:8px;">Fotos, vídeos y documentos del CD Sanabria CF</p>
+
+            <div class="galeria-social-block">
+                <h3>Síguenos en Redes Sociales</h3>
+                <div style="display:flex;justify-content:center;gap:15px;flex-wrap:wrap;">
+                    <button type="button" class="cta-button" onclick="openFacebook()" style="background:#1877f2;border:none;padding:12px 24px;border-radius:25px;color:#fff;cursor:pointer;font-size:1rem;font-weight:bold;box-shadow:0 4px 15px rgba(0,0,0,0.2);min-width:140px;">
                         📘 Facebook
                     </button>
-                    <button class="cta-button" onclick="openInstagram()" style="background: linear-gradient(45deg, #f09433 0%,#e6683c 25%,#dc2743 50%,#cc2366 75%,#bc1888 100%); border: none; padding: 12px 24px; border-radius: 25px; color: white; cursor: pointer; font-size: 1rem; font-weight: bold; box-shadow: 0 4px 15px rgba(0,0,0,0.2); transition: all 0.3s ease; min-width: 140px;">
+                    <button type="button" class="cta-button" onclick="openInstagram()" style="background:linear-gradient(45deg,#f09433 0%,#e6683c 25%,#dc2743 50%,#cc2366 75%,#bc1888 100%);border:none;padding:12px 24px;border-radius:25px;color:#fff;cursor:pointer;font-size:1rem;font-weight:bold;box-shadow:0 4px 15px rgba(0,0,0,0.2);min-width:140px;">
                         📷 Instagram
                     </button>
                 </div>
             </div>
-            
 
+            <div id="multimediaGallery" class="multimedia-gallery">
+                <p>Cargando galería...</p>
+            </div>
+
+            <div style="text-align:center;margin-top:30px;">
+                <button type="button" onclick="cerrarGaleriaMultimedia()" class="cta-button">← Volver</button>
+            </div>
         </div>
+
+        <!-- Bienvenida socio/a, amigo/a o entrenador/a (solo con sesión iniciada) -->
+        <div id="memberWelcomeSection" class="cta-section" style="display: none;"></div>
 
         <!-- Sección de Publicidad -->
         <div class="multimedia-section">
@@ -1394,30 +1513,38 @@
             <div class="modal-content" style="max-width: 560px; max-height: 90vh; overflow-y: auto;">
                 <span class="close" onclick="closeNuevoJugadorIntroModal()" aria-label="Cerrar">&times;</span>
                 <h2>Nuevo jugador/a</h2>
-                <p style="color:#64748b;">Si quieres ser jugador o jugadora del club, rellena el formulario con tus datos. Al enviarlo confirmas que has leído y aceptas la política interna del club y adquieres el compromiso de representar al CD Sanabria CF en las competiciones y actividades en las que el club te inscriba.</p>
+                <p class="nj-intro-text">Si quieres ser jugador o jugadora del club, rellena el formulario con tus datos. Al enviarlo confirmas que has leído y aceptas la política interna del club y adquieres el compromiso de representar al CD Sanabria CF en las competiciones y actividades en las que el club te inscriba.</p>
                 <p><button type="button" class="btn-secondary" onclick="openCompromisoLegalModal()">📄 Ver compromiso deportivo completo</button></p>
-                <form id="nuevoJugadorForm" onsubmit="submitNuevoJugadorApplication(event)">
-                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
-                        <div><label>Nombre *</label><input type="text" id="appName" required></div>
-                        <div><label>Apellidos *</label><input type="text" id="appSurname" required></div>
-                        <div><label>DNI <span id="appDniHint" style="font-weight:normal;color:#64748b;">(mayores de edad)</span></label><input type="text" id="appDni"></div>
-                        <div><label>Email *</label><input type="email" id="appEmail" required></div>
-                        <div><label>Teléfono *</label><input type="tel" id="appPhone" required></div>
-                        <div><label>Fecha nacimiento *</label><input type="date" id="appBirth" required onchange="onAppBirthChange()"></div>
+                <form id="nuevoJugadorForm" class="nuevo-jugador-form" onsubmit="submitNuevoJugadorApplication(event)">
+                    <div class="nj-field-grid">
+                        <div><label for="appName">Nombre *</label><input type="text" id="appName" name="appName" autocomplete="given-name" required></div>
+                        <div><label for="appSurname">Apellidos *</label><input type="text" id="appSurname" name="appSurname" autocomplete="family-name" required></div>
+                        <div><label for="appDni">DNI <span id="appDniHint" style="font-weight:normal;color:#64748b;">(mayores de edad)</span></label><input type="text" id="appDni" name="appDni" autocomplete="off"></div>
+                        <div><label for="appEmail">Email *</label><input type="email" id="appEmail" name="appEmail" autocomplete="email" required></div>
+                        <div><label for="appPhone">Teléfono *</label><input type="tel" id="appPhone" name="appPhone" autocomplete="tel" required></div>
+                        <div><label for="appBirth">Fecha nacimiento *</label><input type="date" id="appBirth" name="appBirth" required onchange="onAppBirthChange()" oninput="onAppBirthChange()"></div>
                     </div>
-                    <label>Dirección</label><input type="text" id="appAddress">
-                    <div id="appGuardianBlock" style="display:none;background:#fffbeb;border:1px solid #fcd34d;border-radius:8px;padding:12px;margin:12px 0;">
-                        <h3 style="margin:0 0 10px;font-size:1rem;">Tutor/a (menor de edad) *</h3>
-                        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
-                            <div><label>Nombre tutor/a</label><input type="text" id="appGuardianName"></div>
-                            <div><label>DNI tutor/a</label><input type="text" id="appGuardianDni"></div>
-                            <div><label>Teléfono tutor/a</label><input type="tel" id="appGuardianPhone"></div>
-                            <div><label>Email tutor/a</label><input type="email" id="appGuardianEmail"></div>
+                    <label for="appAddress">Dirección</label><input type="text" id="appAddress" name="appAddress" autocomplete="street-address">
+                    <div id="appGuardianBlock" class="nj-guardian-block" aria-live="polite">
+                        <h3>Datos del tutor/a legal (menor de edad) *</h3>
+                        <p class="nj-guardian-hint">Si el jugador o jugadora es menor de 18 años, indica los datos de la madre, el padre o tutor/a legal que autoriza la inscripción.</p>
+                        <div class="nj-field-grid">
+                            <div><label for="appGuardianName">Nombre tutor/a *</label><input type="text" id="appGuardianName" name="appGuardianName" autocomplete="given-name"></div>
+                            <div><label for="appGuardianSurname">Apellidos tutor/a *</label><input type="text" id="appGuardianSurname" name="appGuardianSurname" autocomplete="family-name"></div>
+                            <div><label for="appGuardianDni">DNI tutor/a *</label><input type="text" id="appGuardianDni" name="appGuardianDni"></div>
+                            <div><label for="appGuardianPhone">Teléfono tutor/a *</label><input type="tel" id="appGuardianPhone" name="appGuardianPhone" autocomplete="tel"></div>
+                            <div><label for="appGuardianEmail">Email tutor/a *</label><input type="email" id="appGuardianEmail" name="appGuardianEmail" autocomplete="email"></div>
                         </div>
-                        <label>Dirección tutor/a</label><input type="text" id="appGuardianAddress">
+                        <label for="appGuardianAddress">Dirección tutor/a</label><input type="text" id="appGuardianAddress" name="appGuardianAddress" autocomplete="street-address">
                     </div>
-                    <label style="display:flex;gap:8px;align-items:flex-start;margin:10px 0;"><input type="checkbox" id="appCommitment" required style="margin-top:4px;"><span>Acepto la política interna del club y el compromiso de representar al CD Sanabria CF *</span></label>
-                    <label style="display:flex;gap:8px;align-items:flex-start;margin:10px 0;"><input type="checkbox" id="appClubRules" required style="margin-top:4px;"><span>He leído y acepto el <a href="#" onclick="openCompromisoLegalModal();return false;">compromiso deportivo</a> *</span></label>
+                    <label class="nj-consent-label" for="appCommitment">
+                        <input type="checkbox" id="appCommitment" required>
+                        <span>Acepto la política interna del club y el compromiso de representar al CD Sanabria CF *</span>
+                    </label>
+                    <label class="nj-consent-label" for="appClubRules">
+                        <input type="checkbox" id="appClubRules" required>
+                        <span>He leído y acepto el <a href="#" onclick="openCompromisoLegalModal();return false;">compromiso deportivo del club</a> *</span>
+                    </label>
                     <button type="submit" class="btn-primary">Enviar solicitud</button>
                 </form>
             </div>
@@ -1452,7 +1579,7 @@
                         🤝 Ser Amigo/a del Club
                     </button>
                 </div>
-                <p style="margin-top: 20px; font-size: 0.9rem; color: #6b7280; text-align: center;">¿Ya tienes cuenta? Pulsa <strong>Acceso</strong> arriba a la izquierda.</p>
+                <p style="margin-top: 20px; font-size: 0.9rem; color: #6b7280; text-align: center;">¿Ya tienes cuenta? Pulsa <strong>Acceso</strong> debajo del nombre del club.</p>
             </div>
         </div>
 
@@ -2436,9 +2563,10 @@
 
         // Función para aplicar color blanco al texto CDSANABRIACF
         function applyCDSANABRIACFWhiteColor() {
-            // Buscar todos los elementos que contengan "CDSANABRIACF"
-            const elements = document.querySelectorAll('h1, h2, h3, h4, h5, h6, p, span, div, strong, b');
+            // Solo cabecera (no modales ni formularios)
+            const elements = document.querySelectorAll('header h1, header h2, header h3, header p, header span, header strong, header b');
             elements.forEach(element => {
+                if (element.closest('.modal')) return;
                 if (element.textContent.includes('CDSANABRIACF')) {
                     element.style.color = '#ffffff';
                 }
@@ -2616,6 +2744,7 @@
             closeQuieresJugarModal();
             const m = document.getElementById('nuevoJugadorIntroModal');
             if (m) m.style.display = 'block';
+            if (typeof onAppBirthChange === 'function') onAppBirthChange();
         }
         function closeNuevoJugadorIntroModal() {
             const m = document.getElementById('nuevoJugadorIntroModal');
@@ -2636,9 +2765,29 @@
         function onAppBirthChange() {
             const bd = document.getElementById('appBirth');
             const block = document.getElementById('appGuardianBlock');
-            if (!bd || !block || !window.ClubInscriptionConfig) return;
-            const age = window.ClubInscriptionConfig.calculateAge(bd.value);
-            block.style.display = age != null && age < 18 ? 'block' : 'none';
+            if (!bd || !block) return;
+            let age = null;
+            if (window.ClubInscriptionConfig && window.ClubInscriptionConfig.calculateAge) {
+                age = window.ClubInscriptionConfig.calculateAge(bd.value);
+            } else if (bd.value) {
+                const b = new Date(bd.value);
+                if (!isNaN(b.getTime())) {
+                    const t = new Date();
+                    age = t.getFullYear() - b.getFullYear();
+                    const md = t.getMonth() - b.getMonth();
+                    if (md < 0 || (md === 0 && t.getDate() < b.getDate())) age--;
+                }
+            }
+            const isMinor = age != null && age < 18;
+            block.style.display = isMinor ? 'block' : 'none';
+            const dni = document.getElementById('appDni');
+            const hint = document.getElementById('appDniHint');
+            if (dni) dni.required = age != null && age >= 18;
+            if (hint) hint.textContent = isMinor ? '(no obligatorio en menores)' : '(mayores de edad)';
+            ['appGuardianName', 'appGuardianSurname', 'appGuardianDni', 'appGuardianPhone', 'appGuardianEmail'].forEach(function (id) {
+                const el = document.getElementById(id);
+                if (el) el.required = isMinor;
+            });
         }
         async function submitNuevoJugadorApplication(ev) {
             if (ev) ev.preventDefault();
@@ -2655,6 +2804,7 @@
                 address: document.getElementById('appAddress').value.trim(),
                 birthDate: document.getElementById('appBirth').value,
                 guardianName: document.getElementById('appGuardianName').value.trim(),
+                guardianSurname: document.getElementById('appGuardianSurname').value.trim(),
                 guardianDni: document.getElementById('appGuardianDni').value.trim(),
                 guardianPhone: document.getElementById('appGuardianPhone').value.trim(),
                 guardianEmail: document.getElementById('appGuardianEmail').value.trim(),
@@ -2666,6 +2816,7 @@
                 await window.PlayerApplication.submitApplication(data);
                 closeNuevoJugadorIntroModal();
                 document.getElementById('nuevoJugadorForm').reset();
+                if (typeof onAppBirthChange === 'function') onAppBirthChange();
                 alert(
                     '✅ Solicitud enviada correctamente.\n\nEl club la revisará. Cuando sea aceptada, podrás entrar en «Ya soy jugador/a» para elegir la ropa y pagar la ficha.'
                 );
@@ -3039,9 +3190,10 @@
             }
             
             // Actualizar los botones de registro para mostrar opciones de logout
-            const ctaSection = document.querySelector('.cta-section');
+            const ctaSection = document.getElementById('memberWelcomeSection');
             if (ctaSection) {
                 if (userStatus === 'socio') {
+                    ctaSection.style.display = 'block';
                     ctaSection.innerHTML = `
                         <h2>¡Bienvenido/a, ${currentSocio.nombre}!</h2>
                         <p>🏷️ ${window.ClubMemberNumbers && currentSocio.numeroSocio && !String(currentSocio.numeroSocio).startsWith('SOC') ? window.ClubMemberNumbers.formatMemberBadge(currentSocio) : (currentSocio.numeroSocio ? 'N.º SOC. ' + String(currentSocio.numeroSocio).padStart(6,'0') : 'Socio/a')} — Acceso completo al club</p>
@@ -3058,23 +3210,12 @@
                             </button>
                         </div>
                         <div id="socioCarnetBanner" style="margin-top: 20px;"></div>
-                        
-                        <div class="social-media-section" style="margin-top: 20px; text-align: center;">
-                            <h3 style="color: white; margin-bottom: 15px; font-size: 1.2rem;">Síguenos en Redes Sociales</h3>
-                            <div style="display: flex; justify-content: center; gap: 15px; flex-wrap: wrap;">
-                                <button class="cta-button" onclick="openFacebook()" style="background: #1877f2; border: none; padding: 12px 24px; border-radius: 25px; color: white; cursor: pointer; font-size: 1rem; font-weight: bold; box-shadow: 0 4px 15px rgba(0,0,0,0.2); transition: all 0.3s ease; min-width: 140px;">
-                                    📘 Facebook
-                                </button>
-                                <button class="cta-button" onclick="openInstagram()" style="background: linear-gradient(45deg, #f09433 0%,#e6683c 25%,#dc2743 50%,#cc2366 75%,#bc1888 100%); border: none; padding: 12px 24px; border-radius: 25px; color: white; cursor: pointer; font-size: 1rem; font-weight: bold; box-shadow: 0 4px 15px rgba(0,0,0,0.2); transition: all 0.3s ease; min-width: 140px;">
-                                    📷 Instagram
-                                </button>
-                            </div>
-                        </div>
                     `;
                     if (typeof refreshSocioCarnetBanner === 'function') {
                         refreshSocioCarnetBanner();
                     }
                 } else if (userStatus === 'amigo') {
+                    ctaSection.style.display = 'block';
                     ctaSection.innerHTML = `
                         <h2>¡Bienvenido/a, ${currentAmigo.nombre}!</h2>
                         <p>🤝 Amigo del club - Acceso a competiciones y encuentros</p>
@@ -3087,20 +3228,9 @@
                                 👤 Mi Perfil
                             </button>
                         </div>
-                        
-                        <div class="social-media-section" style="margin-top: 20px; text-align: center;">
-                            <h3 style="color: white; margin-bottom: 15px; font-size: 1.2rem;">Síguenos en Redes Sociales</h3>
-                            <div style="display: flex; justify-content: center; gap: 15px; flex-wrap: wrap;">
-                                <button class="cta-button" onclick="openFacebook()" style="background: #1877f2; border: none; padding: 12px 24px; border-radius: 25px; color: white; cursor: pointer; font-size: 1rem; font-weight: bold; box-shadow: 0 4px 15px rgba(0,0,0,0.2); transition: all 0.3s ease; min-width: 140px;">
-                                    📘 Facebook
-                                </button>
-                                <button class="cta-button" onclick="openInstagram()" style="background: linear-gradient(45deg, #f09433 0%,#e6683c 25%,#dc2743 50%,#cc2366 75%,#bc1888 100%); border: none; padding: 12px 24px; border-radius: 25px; color: white; cursor: pointer; font-size: 1rem; font-weight: bold; box-shadow: 0 4px 15px rgba(0,0,0,0.2); transition: all 0.3s ease; min-width: 140px;">
-                                    📷 Instagram
-                                </button>
-                            </div>
-                        </div>
                     `;
                 } else if (userStatus === 'entrenador') {
+                    ctaSection.style.display = 'block';
                     ctaSection.innerHTML = `
                         <h2>¡Bienvenido/a, ${currentCoach.name || currentCoach.nombre || 'Entrenador/a'}!</h2>
                         <p>👨‍🏫 Acceso de entrenador · ⚽ Equipo: ${currentCoach.team || 'Sin equipo asignado'}</p>
@@ -3109,6 +3239,9 @@
                             <button class="cta-button" onclick="showCoachPanel()" style="background: #059669;">👨‍🏫 Abrir Panel de Entrenador</button>
                         </div>
                     `;
+                } else {
+                    ctaSection.style.display = 'none';
+                    ctaSection.innerHTML = '';
                 }
             }
         }
@@ -3498,7 +3631,6 @@
                 'calendario': ['socio', 'entrenador'],        // Solo socios y entrenadores
                 'eventos': ['socio', 'entrenador'],           // Solo socios y entrenadores
                 'competiciones': ['socio', 'amigo'], // Solo socios y amigos
-                'multimedia': ['socio', 'entrenador'],        // Solo socios y entrenadores
                 'encuentros': ['socio', 'amigo', 'entrenador'], // Socios, amigos y entrenadores
                 'documentos': ['socio', 'entrenador']         // Solo socios y entrenadores
             };
@@ -3553,7 +3685,6 @@
                             <ul style="text-align: left; color: #666; line-height: 1.8;">
                                 <li>✅ Información detallada de equipos y jugadores/as</li>
                                 <li>✅ Calendario completo de eventos y partidos</li>
-                                <li>✅ Galería multimedia exclusiva</li>
                                 <li>✅ Documentos oficiales del club</li>
                                 <li>✅ Participación en eventos especiales</li>
                             </ul>
@@ -3583,7 +3714,6 @@
                                 <li>✅ Acceso completo a todos los contenidos del club</li>
                                 <li>✅ Información detallada de equipos y jugadores/as</li>
                                 <li>✅ Calendario completo de eventos y partidos</li>
-                                <li>✅ Galería multimedia exclusiva</li>
                                 <li>✅ Documentos oficiales del club</li>
                                 <li>✅ Participación en eventos especiales</li>
                             </ul>
@@ -3712,7 +3842,7 @@
                     showCompetitionsInfo();
                     break;
                 case 'multimedia':
-                    showMultimediaInfo();
+                    mostrarGaleriaMultimedia();
                     break;
                 case 'encuentros':
                     mostrarEncuentros();
@@ -4637,19 +4767,8 @@
             showModal('Competiciones del Club', html, 'competiciones');
         }
 
-        // Mostrar información multimedia
         function showMultimediaInfo() {
-            const photos = JSON.parse(localStorage.getItem('clubPhotos') || '[]');
-            const videos = JSON.parse(localStorage.getItem('clubVideos') || '[]');
-            const documents = JSON.parse(localStorage.getItem('clubDocuments') || '[]');
-
-            let html = '<h3>📸 Galería Multimedia del Club</h3>';
-            html += `<p><strong>Fotos:</strong> ${photos.length} archivos</p>`;
-            html += `<p><strong>Videos:</strong> ${videos.length} archivos</p>`;
-            html += `<p><strong>Documentos:</strong> ${documents.length} archivos</p>`;
-            html += '<p>Para ver la galería completa, haz clic en "Ver Galería" en la sección multimedia de abajo.</p>';
-
-            showModal('Galería Multimedia', html, 'multimedia');
+            mostrarGaleriaMultimedia();
         }
 
         // Mostrar información de documentos
@@ -7110,18 +7229,50 @@
         function mostrarEncuentros() {
             // Ocultar todas las secciones principales correctamente
             const features = document.querySelector('.features');
-            const ctaSection = document.querySelector('.cta-section');
-            const multimediaSection = document.querySelector('.multimedia-section');
+            const memberWelcome = document.getElementById('memberWelcomeSection');
+            const publicidadSection = document.querySelector('.multimedia-section');
+            const galeriaSection = document.getElementById('galeriaMultimedia');
             
             if (features) features.style.display = 'none';
-            if (ctaSection) ctaSection.style.display = 'none';
-            if (multimediaSection) multimediaSection.style.display = 'none';
+            if (memberWelcome) memberWelcome.style.display = 'none';
+            if (publicidadSection) publicidadSection.style.display = 'none';
+            if (galeriaSection) galeriaSection.style.display = 'none';
             
             // Mostrar la sección de encuentros
             document.getElementById('encuentros').style.display = 'block';
             
             // Cargar encuentros
             cargarEncuentros();
+        }
+
+        function mostrarGaleriaMultimedia() {
+            const features = document.querySelector('.features');
+            const memberWelcome = document.getElementById('memberWelcomeSection');
+            const publicidadSection = document.querySelector('.multimedia-section');
+            const encuentrosSection = document.getElementById('encuentros');
+            const galeriaSection = document.getElementById('galeriaMultimedia');
+
+            if (features) features.style.display = 'none';
+            if (memberWelcome) memberWelcome.style.display = 'none';
+            if (publicidadSection) publicidadSection.style.display = 'none';
+            if (encuentrosSection) encuentrosSection.style.display = 'none';
+            if (galeriaSection) {
+                galeriaSection.style.display = 'block';
+                loadMultimediaGallery();
+                galeriaSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }
+        }
+
+        function cerrarGaleriaMultimedia() {
+            const galeriaSection = document.getElementById('galeriaMultimedia');
+            const features = document.querySelector('.features');
+            const publicidadSection = document.querySelector('.multimedia-section');
+
+            if (galeriaSection) galeriaSection.style.display = 'none';
+            if (features) features.style.display = 'grid';
+            if (publicidadSection) publicidadSection.style.display = 'block';
+            if (typeof updateUserInterface === 'function') updateUserInterface();
+            window.scrollTo({ top: 0, behavior: 'smooth' });
         }
 
         // Función para cerrar encuentros
@@ -7131,12 +7282,12 @@
             
             // Mostrar todas las secciones principales correctamente
             const features = document.querySelector('.features');
-            const ctaSection = document.querySelector('.cta-section');
-            const multimediaSection = document.querySelector('.multimedia-section');
+            const memberWelcome = document.getElementById('memberWelcomeSection');
+            const publicidadSection = document.querySelector('.multimedia-section');
             
             if (features) features.style.display = 'grid';
-            if (ctaSection) ctaSection.style.display = 'block';
-            if (multimediaSection) multimediaSection.style.display = 'block';
+            if (publicidadSection) publicidadSection.style.display = 'block';
+            if (typeof updateUserInterface === 'function') updateUserInterface();
             
             // Scroll al inicio
             window.scrollTo({
@@ -8400,8 +8551,7 @@
         }
 
         function showMultimedia() {
-            // Galería multimedia - funcionalidad en desarrollo - sin alerta
-            console.log('Galería multimedia - funcionalidad en desarrollo');
+            mostrarGaleriaMultimedia();
         }
 
         function showDocumentos() {

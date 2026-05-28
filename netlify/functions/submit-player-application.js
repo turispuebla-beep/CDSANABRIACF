@@ -54,7 +54,7 @@ function buildNotifyEmail(app) {
     `Nacimiento: ${app.birthDate || '—'}`,
     `Categoría sugerida: ${app.category || '—'}`,
     app.isMinor
-      ? `Tutor/a: ${app.guardianName} — DNI ${app.guardianDni} — ${app.guardianPhone} — ${app.guardianEmail}`
+      ? `Tutor/a: ${app.guardianName} ${app.guardianSurname || ''} — DNI ${app.guardianDni} — ${app.guardianPhone} — ${app.guardianEmail}`
       : '',
     `Estado: pendiente de revisión en el panel de administración.`
   ].filter(Boolean);
@@ -122,6 +122,7 @@ exports.handler = async (event) => {
       birthDate,
       category: String(body.category || '').trim(),
       guardianName: String(body.guardianName || '').trim(),
+      guardianSurname: String(body.guardianSurname || '').trim(),
       guardianDni: normalizeDni(body.guardianDni),
       guardianPhone: String(body.guardianPhone || '').trim(),
       guardianEmail: String(body.guardianEmail || '').trim(),
