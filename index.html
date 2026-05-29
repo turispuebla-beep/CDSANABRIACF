@@ -1403,8 +1403,7 @@
                 <div class="feature-icon">📸</div>
                 <h3 class="feature-title">Galería Multimedia</h3>
                 <p class="feature-description">
-                    Fotos, vídeos y documentos del club, y enlaces a nuestras redes sociales.
-                    Abierto para todos.
+                    Fotos y vídeos del CD Sanabria CF en las redes sociales. Abierto para todos.
                 </p>
                 <button class="feature-btn" style="background: var(--primary-color); color: white; border: none; padding: 8px 16px; border-radius: 20px; margin-top: 15px; cursor: pointer;">Ver Galería</button>
     </div>
@@ -1461,7 +1460,7 @@
         <!-- Galería Multimedia (abierta para todos) -->
         <div id="galeriaMultimedia" class="galeria-multimedia-section">
             <h2>📸 Galería Multimedia</h2>
-            <p style="color:#64748b;margin-bottom:8px;">Fotos, vídeos y documentos del CD Sanabria CF</p>
+            <p style="color:#64748b;margin-bottom:16px;">Fotos y vídeos del CD Sanabria CF en las redes sociales</p>
 
             <div class="galeria-social-block">
                 <h3>Síguenos en Redes Sociales</h3>
@@ -1475,9 +1474,7 @@
                 </div>
             </div>
 
-            <div id="multimediaGallery" class="multimedia-gallery">
-                <p>Cargando galería...</p>
-            </div>
+            <div id="multimediaGallery" class="multimedia-gallery" style="display:none;"></div>
 
             <div style="text-align:center;margin-top:30px;">
                 <button type="button" onclick="cerrarGaleriaMultimedia()" class="cta-button">← Volver</button>
@@ -2062,12 +2059,6 @@
                         <strong>LOPDGDD</strong> (Ley Orgánica 3/2018) | 
                         <strong>LSSI-CE</strong> (Ley 34/2002)
                     </p>
-                </div>
-                
-                <!-- Redes Sociales y Contacto -->
-                <div style="display: flex; justify-content: center; gap: 15px; margin-bottom: 20px;">
-                    <a href="#" style="color: white; font-size: 1.5rem; text-decoration: none;">📧</a>
-                    <a href="#" style="color: white; font-size: 1.5rem; text-decoration: none;">📱</a>
                 </div>
                 
                 <!-- Copyright -->
@@ -5679,9 +5670,12 @@
             const allFiles = [...photos, ...videos, ...documents].sort((a, b) => new Date(b.date) - new Date(a.date));
             
             if (allFiles.length === 0) {
-                gallery.innerHTML = '<p>No hay archivos multimedia disponibles</p>';
+                gallery.innerHTML = '';
+                gallery.style.display = 'none';
                 return;
             }
+
+            gallery.style.display = '';
 
             let html = '';
             allFiles.forEach(file => {
@@ -6105,6 +6099,15 @@
             updateLoginStatus();
             updateUserInterface();
             refreshSocioCarnetBanner();
+
+            let returnUrl = '';
+            try {
+                returnUrl = sessionStorage.getItem('postLoginReturnUrl') || '';
+                if (returnUrl) sessionStorage.removeItem('postLoginReturnUrl');
+            } catch (_) {}
+            if (returnUrl && /^inscripcion-jugador\.html/i.test(returnUrl)) {
+                window.location.href = returnUrl;
+            }
         }
 
         function openMiCarnetSocio() {
@@ -10481,6 +10484,16 @@
             mostrarBannerInstalacion();
             refrescarDatosAlAbrir('domcontentloaded');
             setTimeout(mostrarBannerCookies, 1500);
+            try {
+                const params = new URLSearchParams(window.location.search);
+                const ret = params.get('return');
+                if (ret && /^inscripcion-jugador\.html/i.test(ret)) {
+                    sessionStorage.setItem('postLoginReturnUrl', ret);
+                }
+                if (params.get('openAcceso') === '1' && typeof openAccesoClubModal === 'function') {
+                    setTimeout(openAccesoClubModal, 400);
+                }
+            } catch (_) {}
         });
 
     </script>

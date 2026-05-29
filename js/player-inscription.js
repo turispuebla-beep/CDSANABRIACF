@@ -61,6 +61,33 @@
     return null;
   }
 
+  function isApprovedForInscription(player, season) {
+    if (!player) return false;
+    return (
+      String(player.inscriptionStatus || '').toLowerCase() === 'approved_for_inscription' &&
+      String(player.inscriptionSeason || '') === String(season || '')
+    );
+  }
+
+  function findApprovedForInscriptionByIdentity(dni, name, surname, season) {
+    const s = String(season || '');
+    if (dni) {
+      const byDni = findApprovedForInscription(dni, s);
+      if (byDni) return byDni;
+    }
+    const nm = String(name || '').trim().toLowerCase();
+    const sn = String(surname || '').trim().toLowerCase();
+    if (!nm || !sn) return null;
+    return (
+      readPlayers().find(function (p) {
+        if (!isApprovedForInscription(p, s)) return false;
+        const pn = String(p.name || p.nombre || '').trim().toLowerCase();
+        const ps = String(p.surname || p.apellidos || '').trim().toLowerCase();
+        return pn === nm && ps === sn;
+      }) || null
+    );
+  }
+
   function findPlayerForContinueLookup(dni, name, surname, season) {
     const n = normalizeDni(dni);
     const s = String(season || '');
@@ -342,17 +369,29 @@
   }
 
   function upsertMemberSocioJugador(player, paySocio, paymentMeta) {
-    if (!paySocio) return null;
     const members = readMembers();
-    const dni = normalizeDni(player.dni);
-    let member = members.find((m) => normalizeDni(m.dni) === dni);
+    const playerDni = normalizeDni(player.dni);
     const now = new Date().toISOString();
+    let member = null;
+
+    if (playerDni) {
+      member = members.find((m) => normalizeDni(m.dni) === playerDni);
+    }
+    if (!member && player.email) {
+      const em = String(player.email).trim().toLowerCase();
+      member = members.find((m) => String(m.email || '').trim().toLowerCase() === em);
+    }
+    if (!member && player.guardianEmail) {
+      const gem = String(player.guardianEmail).trim().toLowerCase();
+      member = members.find((m) => String(m.email || '').trim().toLowerCase() === gem);
+    }
 
     if (member) {
       member.isJugador = true;
       member.socioJugador = true;
       member.playerId = player.id;
       member.playerCategory = player.category;
+      member.categoriaJugador = player.category;
       member.nombre = member.nombre || player.nombre;
       member.name = member.name || player.name;
       member.apellidos = member.apellidos || player.apellidos;
@@ -360,6 +399,17 @@
       member.telefono = member.telefono || player.telefono;
       member.phone = member.phone || player.phone;
       member.email = member.email || player.email;
+      member.address = member.address || player.address;
+      member.direccion = member.direccion || player.direccion;
+      member.birthDate = member.birthDate || player.birthDate;
+      member.fechaNacimiento = member.fechaNacimiento || player.fechaNacimiento;
+      if (!member.dni && playerDni) member.dni = playerDni;
+      if (player.guardianName) member.guardianName = player.guardianName;
+      if (player.guardianDNI) member.guardianDNI = player.guardianDNI;
+      if (player.guardianPhone) member.guardianPhone = player.guardianPhone;
+      if (player.guardianEmail) member.guardianEmail = player.guardianEmail;
+      if (player.guardianAddress) member.guardianAddress = player.guardianAddress;
+      member.inscriptionSeasonJugador = player.inscriptionSeason;
       member.lastModified = now;
       if (paymentMeta && paymentMeta.paid) {
         member.pagado = true;
@@ -372,20 +422,27 @@
         global.applyClubRoleFlagsToMember(member);
       }
     } else {
+      const memberDni = playerDni || normalizeDni(player.guardianDNI) || '';
+      const memberEmail = player.email || player.guardianEmail || '';
       member = {
         id: 'MEMBER_' + Date.now() + '_' + Math.random().toString(36).slice(2, 9),
         name: player.name,
         nombre: player.name,
         surname: player.surname,
         apellidos: player.surname,
-        dni: dni,
-        phone: player.phone,
-        telefono: player.phone,
-        email: player.email,
-        address: player.address,
-        direccion: player.address,
+        dni: memberDni,
+        phone: player.phone || player.guardianPhone || '',
+        telefono: player.phone || player.guardianPhone || '',
+        email: memberEmail,
+        address: player.address || player.guardianAddress || '',
+        direccion: player.address || player.guardianAddress || '',
         birthDate: player.birthDate,
         fechaNacimiento: player.birthDate,
+        guardianName: player.guardianName || '',
+        guardianDNI: player.guardianDNI || '',
+        guardianPhone: player.guardianPhone || '',
+        guardianEmail: player.guardianEmail || '',
+        guardianAddress: player.guardianAddress || '',
         numeroSocio: generarNumeroSocioProvisional(),
         memberNumber: null,
         status: paymentMeta && paymentMeta.paid ? 'active' : 'pending_validation',
@@ -397,8 +454,11 @@
         isJugador: true,
         playerId: player.id,
         playerCategory: player.category,
+        categoriaJugador: player.category,
         inscriptionSeasonSocio: player.inscriptionSeason,
-        registrationSource: 'web_inscription_socio_jugador'
+        inscriptionSeasonJugador: player.inscriptionSeason,
+        registrationSource: 'web_inscription_socio_jugador',
+        cuotaSocioEnInscripcion: !!paySocio
       };
       if (typeof global.applyClubRoleFlagsToMember === 'function') {
         global.applyClubRoleFlagsToMember(member);
@@ -507,9 +567,23 @@
     const saved = upsertPlayerLocal(player);
     await persistPlayerFirebase(saved);
 
-    if (player.paySocioSelected) {
-      const member = upsertMemberSocioJugador(saved, true, { paid: paid, orderId: paymentMeta?.orderId });
-      if (member) await persistMemberFirebase(member);
+    const member = upsertMemberSocioJugador(saved, !!player.paySocioSelected, {
+      paid: paid,
+      orderId: paymentMeta?.orderId
+    });
+    if (member) {
+      saved.linkedMemberId = member.id;
+      const players = readPlayers();
+      const pix = players.findIndex((p) => p.id === saved.id);
+      if (pix >= 0) {
+        players[pix].linkedMemberId = member.id;
+        global.localStorage.setItem('clubPlayers', JSON.stringify(players));
+      }
+      await persistMemberFirebase(member);
+      await persistPlayerFirebase(saved);
+      if (typeof global.refreshMembersRoleFlagsForIdentity === 'function') {
+        await refreshMemberRoles(saved.dni, saved.name, saved.surname);
+      }
     } else if (paid) {
       await refreshMemberRoles(player.dni, player.name, player.surname);
     }
@@ -617,6 +691,8 @@
     findPlayerForSeason: findPlayerForSeason,
     findPaidPlayerForSeason: findPaidPlayerForSeason,
     findApprovedForInscription: findApprovedForInscription,
+    isApprovedForInscription: isApprovedForInscription,
+    findApprovedForInscriptionByIdentity: findApprovedForInscriptionByIdentity,
     findPlayerForContinueLookup: findPlayerForContinueLookup,
     findReturningPlayerForInscription: findReturningPlayerForInscription,
     findPlayerByDni: findPlayerByDni,

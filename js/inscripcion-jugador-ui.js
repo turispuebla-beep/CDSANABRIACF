@@ -26,6 +26,140 @@
     return Number(n || 0).toFixed(2).replace('.', ',') + ' €';
   }
 
+  function normalizeDniAuth(v) {
+    if (global.PlayerInscription && global.PlayerInscription.normalizeDni) {
+      return global.PlayerInscription.normalizeDni(v);
+    }
+    return String(v || '')
+      .trim()
+      .toUpperCase()
+      .replace(/[^0-9A-Z]/g, '');
+  }
+
+  function getInscriptionSession() {
+    try {
+      const socio = JSON.parse(global.localStorage.getItem('currentSocio') || 'null');
+      if (socio && socio.email) {
+        return {
+          type: 'socio',
+          email: String(socio.email).trim().toLowerCase(),
+          dni: normalizeDniAuth(socio.dni),
+          nombre: String(socio.nombre || '').trim().toLowerCase(),
+          apellidos: String(socio.apellidos || '').trim().toLowerCase(),
+          playerId: socio.playerId || null
+        };
+      }
+    } catch (_) {}
+    try {
+      const member = JSON.parse(global.localStorage.getItem('currentMember') || 'null');
+      if (member && member.email) {
+        return {
+          type: 'socio',
+          email: String(member.email).trim().toLowerCase(),
+          dni: normalizeDniAuth(member.dni),
+          nombre: String(member.name || member.nombre || '').trim().toLowerCase(),
+          apellidos: String(member.surname || member.apellidos || '').trim().toLowerCase(),
+          playerId: member.playerId || null
+        };
+      }
+    } catch (_) {}
+    return null;
+  }
+
+  function isInscriptionUserLoggedIn() {
+    return !!getInscriptionSession();
+  }
+
+  function isPlayerClubApproved(player, season) {
+    if (global.PlayerInscription && global.PlayerInscription.isApprovedForInscription) {
+      return global.PlayerInscription.isApprovedForInscription(player, season);
+    }
+    return (
+      player &&
+      String(player.inscriptionStatus || '').toLowerCase() === 'approved_for_inscription' &&
+      String(player.inscriptionSeason || '') === String(season || '')
+    );
+  }
+
+  function canLookupPlayerRecord(session, player, season) {
+    if (!player) return false;
+    if (isPlayerClubApproved(player, season)) return true;
+    if (session && canAccessPlayerRecord(session, player)) return true;
+    return false;
+  }
+
+  function canAccessPlayerRecord(session, player) {
+    if (!session || !player) return false;
+    const playerDni = normalizeDniAuth(player.dni);
+    const playerEmail = String(player.email || '').trim().toLowerCase();
+    const gDni = normalizeDniAuth(player.guardianDNI || player.guardianDni);
+    const gEmail = String(player.guardianEmail || '').trim().toLowerCase();
+    const pName = String(player.name || player.nombre || '').trim().toLowerCase();
+    const pSurname = String(player.surname || player.apellidos || '').trim().toLowerCase();
+
+    if (session.playerId && player.id && String(session.playerId) === String(player.id)) return true;
+    if (session.dni && playerDni && session.dni === playerDni) return true;
+    if (session.email && playerEmail && session.email === playerEmail) return true;
+    if (session.dni && gDni && session.dni === gDni) return true;
+    if (session.email && gEmail && session.email === gEmail) return true;
+    if (
+      session.nombre &&
+      session.apellidos &&
+      pName === session.nombre &&
+      pSurname === session.apellidos
+    ) {
+      return true;
+    }
+    return false;
+  }
+
+  function getLoginReturnUrl() {
+    const path = 'inscripcion-jugador.html';
+    const q = state.flowContinue ? '?flow=continue' : '';
+    return path + q;
+  }
+
+  function promptLoginForLookup() {
+    const ret = encodeURIComponent(getLoginReturnUrl());
+    const go = global.confirm(
+      'Por protección de datos, debes iniciar sesión como socio/a del club para buscar una ficha de jugador/a.\n\n¿Ir a la página de acceso ahora?'
+    );
+    if (go) {
+      global.location.href = 'index.html?openAcceso=1&return=' + ret;
+    }
+  }
+
+  function updateLookupAuthUI() {
+    const logged = isInscriptionUserLoggedIn();
+    const session = getInscriptionSession();
+    const warn = $('insLookupLoginWarn');
+    const fields = $('insLookupFieldsWrap');
+    const btn = $('insLookupBtn');
+    if (warn) {
+      warn.style.display = 'block';
+      if (logged) {
+        warn.style.background = '#ecfdf5';
+        warn.style.border = '1px solid #6ee7b7';
+        warn.style.color = '#065f46';
+        warn.innerHTML =
+          'Sesión: <strong>' +
+          (session.email || 'socio/a') +
+          '</strong>. Puedes buscar fichas vinculadas a tu cuenta o las que el club ya haya admitido como jugador/a.';
+      } else {
+        warn.style.background = '#eff6ff';
+        warn.style.border = '1px solid #93c5fd';
+        warn.style.color = '#1e3a8a';
+        warn.innerHTML =
+          'Si el club <strong>ya te admitió</strong> como jugador/a esta temporada, busca con tu DNI (o nombre y apellidos) <strong>sin iniciar sesión</strong>. ' +
+          'Si ya eres socio/a con acceso, también puedes <a href="index.html?openAcceso=1&amp;return=' +
+          encodeURIComponent(getLoginReturnUrl()) +
+          '" style="color:#1d4ed8;font-weight:700;">iniciar sesión</a> para otras fichas (p. ej. menores a tu cargo).';
+      }
+    }
+    if (fields) fields.style.display = '';
+    if (btn) btn.style.display = '';
+  }
+
   function sizeOptionsHtml() {
     if (!global.ClubInscriptionConfig) return '';
     return global.ClubInscriptionConfig.ALL_SIZES.map(function (s) {
@@ -144,9 +278,11 @@
     const block = $('insLookupBlock');
     const isOpen = block && block.style.display !== 'none';
     setLookupPanelOpen(!isOpen);
+    if (!isOpen) updateLookupAuthUI();
   }
 
   function runLookup() {
+    const session = getInscriptionSession();
     const dni = ($('insLookupDni') && $('insLookupDni').value.trim()) || '';
     const name = ($('insLookupName') && $('insLookupName').value.trim()) || '';
     const surname = ($('insLookupSurname') && $('insLookupSurname').value.trim()) || '';
@@ -169,9 +305,13 @@
       return;
     }
 
-    let player = dni
-      ? global.PlayerInscription.findApprovedForInscription(dni, season)
-      : null;
+    let player = null;
+    if (global.PlayerInscription.findApprovedForInscriptionByIdentity) {
+      player = global.PlayerInscription.findApprovedForInscriptionByIdentity(dni, name, surname, season);
+    } else if (dni) {
+      player = global.PlayerInscription.findApprovedForInscription(dni, season);
+    }
+
     if (!player) {
       player = global.PlayerInscription.findPlayerForContinueLookup(dni, name, surname, season);
     }
@@ -187,17 +327,32 @@
       return;
     }
 
-    if (
-      player &&
-      String(player.inscriptionStatus || '').toLowerCase() === 'approved_for_inscription' &&
-      String(player.inscriptionSeason || '') === String(season)
-    ) {
+    if (player && !canLookupPlayerRecord(session, player, season)) {
+      if (msg) {
+        msg.style.color = '#dc2626';
+        msg.textContent = session
+          ? 'No puedes consultar esta ficha. Solo datos vinculados a tu sesión o admitidos por el club como jugador/a.'
+          : 'No encontramos una admisión del club para estos datos. Si el club ya te aceptó, usa el mismo DNI o nombre de la solicitud. Si ya eres socio/a, inicia sesión. Si no, rellena el formulario de abajo.';
+      }
+      return;
+    }
+
+    if (player && isPlayerClubApproved(player, season)) {
       enterContinueMode(player);
       return;
     }
 
-    if (player) {
+    if (player && session) {
       prefillReturningPlayer(player);
+      return;
+    }
+
+    if (player && !session) {
+      if (msg) {
+        msg.style.color = '#b45309';
+        msg.textContent =
+          'Ficha encontrada, pero necesitas iniciar sesión como socio/a para ver estos datos, o que el club te admita primero como jugador/a desde «¿Quieres Jugar?».';
+      }
       return;
     }
 
@@ -539,6 +694,7 @@
     show($('insClubRulesLine'), true);
     setLookupPanelOpen(false);
     showAllFormSections();
+    updateLookupAuthUI();
     if ($('insLookupBtn') && !$('insLookupBtn').dataset.bound) {
       $('insLookupBtn').dataset.bound = '1';
       $('insLookupBtn').addEventListener('click', runLookup);

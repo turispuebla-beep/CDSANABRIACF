@@ -124,22 +124,25 @@
                 <button type="button" class="btn btn-lookup-toggle" id="insToggleLookupBtn" style="display:none;" aria-expanded="false" aria-controls="insLookupBlock">🔍 Buscar mi ficha</button>
             </div>
             <p id="inscYaSoyIntro" class="muted" style="display:none;margin-bottom:14px;">
-                Si ya has jugado en el club, puedes <strong>buscar tu ficha</strong> para cargar tus datos o rellenar el formulario directamente con equipación y pago.
+                Puedes rellenar el formulario con equipación y pago. Si el club <strong>ya te admitió</strong> como jugador/a, usa <strong>Buscar mi ficha</strong> con tu DNI (sin necesidad de ser socio/a). Si ya tienes cuenta de socio/a, también puedes iniciar sesión. Al pagar, tu ficha se vincula al club como socio-jugador/a.
             </p>
             <div id="inscClosedWrap" class="closed" style="display:none;">
                 <p id="inscClosedMsg">Las inscripciones no están abiertas.</p>
             </div>
             <div id="inscFormWrap">
                 <section id="insLookupBlock" class="card" style="display:none;">
-                    <h2>Identificación</h2>
-                    <p class="muted">Si ya tienes ficha en el club (temporadas anteriores o solicitud aceptada), introduce tu DNI o nombre y apellidos para cargar tus datos. Si no aparece, rellena el formulario de abajo.</p>
-                    <div class="grid2">
-                        <div><label for="insLookupDni">DNI</label><input id="insLookupDni" autocomplete="off"></div>
-                        <div><label for="insLookupName">Nombre</label><input id="insLookupName"></div>
-                    </div>
-                    <div class="grid2">
-                        <div><label for="insLookupSurname">Apellidos</label><input id="insLookupSurname"></div>
-                        <div style="display:flex;align-items:flex-end;"><button type="button" class="btn btn-primary" id="insLookupBtn" style="margin:0;">Buscar mi ficha</button></div>
+                    <h2>Identificación (acceso protegido)</h2>
+                    <div id="insLookupLoginWarn" class="muted" style="display:none;margin:12px 0;padding:12px;border-radius:8px;font-size:0.9rem;"></div>
+                    <div id="insLookupFieldsWrap">
+                        <p class="muted">Introduce el DNI del jugador/a o nombre y apellidos. Solo verás datos vinculados a tu cuenta de socio/a.</p>
+                        <div class="grid2">
+                            <div><label for="insLookupDni">DNI</label><input id="insLookupDni" autocomplete="off"></div>
+                            <div><label for="insLookupName">Nombre</label><input id="insLookupName"></div>
+                        </div>
+                        <div class="grid2">
+                            <div><label for="insLookupSurname">Apellidos</label><input id="insLookupSurname"></div>
+                            <div style="display:flex;align-items:flex-end;"><button type="button" class="btn btn-primary" id="insLookupBtn" style="margin:0;">Buscar mi ficha</button></div>
+                        </div>
                     </div>
                     <p id="insLookupMsg" class="muted" style="margin-top:8px;"></p>
                 </section>
