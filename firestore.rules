@@ -104,6 +104,25 @@ service cloud.firestore {
         .hasOnly(['participants', 'registeredMembers', 'updatedAt']);
     }
 
+    // Modo actualización (sanabria_config/sitePublicMode): bloquea altas públicas si actionsDisabled == true.
+    function publicRegistrationsOpen() {
+      return !exists(/databases/$(database)/documents/sanabria_config/sitePublicMode)
+        || get(/databases/$(database)/documents/sanabria_config/sitePublicMode).data.actionsDisabled != true;
+    }
+
+    function torneoPreinscripcionValid() {
+      return hasRequestedScope()
+        && request.resource.data.teamName is string
+        && request.resource.data.teamName.size() > 0
+        && request.resource.data.contactName is string
+        && request.resource.data.contactEmail is string
+        && request.resource.data.contactEmail.matches('^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$')
+        && request.resource.data.contactPhone is string
+        && request.resource.data.town is string
+        && request.resource.data.playerCount is number
+        && request.resource.data.categories is list;
+    }
+
     // Competiciones internas (torneos/ligas del panel): lectura pública con scope; escritura solo admin.
     function competitionPayloadValid() {
       return request.resource.data.appScope == 'cdsanabriacf'
@@ -132,7 +151,8 @@ service cloud.firestore {
     // Socios: lectura propia o admin; alta autenticada; edicion propia/admin.
     match /sanabria_members/{docId} {
       allow read: if hasScope() && (isAdmin() || isOwnIdentityDoc());
-      allow create: if isSignedIn()
+      allow create: if publicRegistrationsOpen()
+        && isSignedIn()
         && hasRequestedScope()
         && createLinksAuthUid()
         && hasNoPlainPassword()
@@ -153,7 +173,8 @@ service cloud.firestore {
     // Amigos: lectura propia o admin; alta autenticada; edicion propia/admin.
     match /sanabria_friends/{docId} {
       allow read: if hasScope() && (isAdmin() || isOwnIdentityDoc());
-      allow create: if isSignedIn()
+      allow create: if publicRegistrationsOpen()
+        && isSignedIn()
         && hasRequestedScope()
         && createLinksAuthUid()
         && hasNoPlainPassword()
@@ -218,7 +239,8 @@ service cloud.firestore {
     }
     match /sanabria_admins/{docId} {
       allow read: if hasScope() && (isAdmin() || (isSignedIn() && request.auth.uid == docId));
-      allow create, update, delete: if hasRequestedScope() && isAdmin();
+      allow create, update: if hasRequestedScope() && isAdmin() && hasNoPlainPassword();
+      allow delete: if hasRequestedScope() && isAdmin();
     }
     match /sanabria_players/{docId} {
       allow read: if hasScope();
@@ -227,6 +249,14 @@ service cloud.firestore {
     match /sanabria_player_applications/{docId} {
       allow read: if hasScope() && isAdmin();
       allow create: if false;
+      allow update, delete: if hasScope() && isAdmin() && hasRequestedScope();
+    }
+    match /sanabria_player_portal_resets/{docId} {
+      allow read, write: if false;
+    }
+    match /sanabria_torneo_preinscripciones/{docId} {
+      allow read: if hasScope() && isAdmin();
+      allow create: if publicRegistrationsOpen() && torneoPreinscripcionValid();
       allow update, delete: if hasScope() && isAdmin() && hasRequestedScope();
     }
     match /sanabria_coaches/{docId} {

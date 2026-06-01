@@ -79,6 +79,8 @@
     const ins = String(p.inscriptionStatus || '').toLowerCase();
     if (p.inscriptionPaid || ins === 'paid') return 'Pagado / Activo';
     if (ins === 'pending_transfer') return 'Pendiente transferencia';
+    if (ins === 'pending_cash') return 'Pendiente efectivo';
+    if (ins === 'pending_tpv') return 'Pendiente TPV';
     if (ins === 'pending_payment') return 'Pendiente de pago';
     if (p.status === 'active') return 'Activo';
     if (p.status === 'pending_validation') return 'Pendiente validación';
@@ -143,7 +145,16 @@
       temporada: p.inscriptionSeason || p.temporada || '',
       email: p.email || '',
       telefono: p.phone || p.telefono || '',
-      direccion: p.address || p.direccion || '',
+      direccion:
+        (global.PlayerInscription && global.PlayerInscription.composeAddress
+          ? global.PlayerInscription.composeAddress(p)
+          : '') ||
+        p.address ||
+        p.direccion ||
+        '',
+      domicilio: p.domicilio || '',
+      localidad: p.localidad || p.town || '',
+      provincia: p.provincia || p.province || '',
       fecha_nacimiento: formatExportDate(p.birthDate || p.fechaNacimiento),
       edad: p.age != null ? p.age : p.edad != null ? p.edad : '',
       categoria: categoryLabel(cat),
@@ -228,7 +239,14 @@
         const ins = String(p.inscriptionStatus || '').toLowerCase();
         if (o.payment === 'paid') return paid || ins === 'paid' || p.status === 'active';
         if (o.payment === 'pending') {
-          return !paid && (ins === 'pending_payment' || ins === 'pending_transfer' || p.status === 'pending_validation');
+          return (
+            !paid &&
+            (ins === 'pending_payment' ||
+              ins === 'pending_transfer' ||
+              ins === 'pending_cash' ||
+              ins === 'pending_tpv' ||
+              p.status === 'pending_validation')
+          );
         }
         return true;
       });

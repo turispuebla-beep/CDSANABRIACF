@@ -110,6 +110,7 @@ const DB_COLLECTIONS = {
   MEMBERS: 'sanabria_members',        // Socios del club
   PLAYERS: 'sanabria_players',        // Jugadores
   PLAYER_APPLICATIONS: 'sanabria_player_applications', // Solicitudes nuevo jugador
+  TORNEO_PREINSCRIPTIONS: 'sanabria_torneo_preinscripciones', // Preinscripciones torneo F7
   COACHES: 'sanabria_coaches',        // Entrenadores
   BOARD: 'sanabria_board',            // Directiva
   TEAMS: 'sanabria_teams',            // Equipos
@@ -147,6 +148,8 @@ function normalizeCollectionName(rawName) {
     players: DB_COLLECTIONS.PLAYERS,
     player_applications: DB_COLLECTIONS.PLAYER_APPLICATIONS,
     clubPlayerApplications: DB_COLLECTIONS.PLAYER_APPLICATIONS,
+    torneo_preinscripciones: DB_COLLECTIONS.TORNEO_PREINSCRIPTIONS,
+    clubTorneoPreinscripciones: DB_COLLECTIONS.TORNEO_PREINSCRIPTIONS,
     coaches: DB_COLLECTIONS.COACHES,
     board: DB_COLLECTIONS.BOARD,
     directiva: DB_COLLECTIONS.BOARD,
@@ -501,6 +504,8 @@ const LOCAL_KEY_TO_COLLECTION = {
   clubPlayers: DB_COLLECTIONS.PLAYERS,
   players: DB_COLLECTIONS.PLAYERS,
   jugadores: DB_COLLECTIONS.PLAYERS,
+  clubPlayerApplications: DB_COLLECTIONS.PLAYER_APPLICATIONS,
+  player_applications: DB_COLLECTIONS.PLAYER_APPLICATIONS,
   clubCoaches: DB_COLLECTIONS.COACHES,
   coaches: DB_COLLECTIONS.COACHES,
   entrenadores: DB_COLLECTIONS.COACHES,
@@ -543,6 +548,7 @@ const LOCAL_KEY_TO_COLLECTION = {
   clubMembershipPricing: DB_COLLECTIONS.SETTINGS,
   clubPlayerInscriptionSettings: DB_COLLECTIONS.SETTINGS,
   clubPlayerExportSettings: DB_COLLECTIONS.SETTINGS,
+  clubColaboradorFormConfig: DB_COLLECTIONS.SETTINGS,
   clubAccountingLedger: DB_COLLECTIONS.LEDGER
 };
 
@@ -627,7 +633,8 @@ const LOCAL_OBJECT_BLOB_KEYS = new Set([
   'statistics',
   'clubMembershipPricing',
   'clubPlayerInscriptionSettings',
-  'clubPlayerExportSettings'
+  'clubPlayerExportSettings',
+  'clubColaboradorFormConfig'
 ]);
 
 /**
@@ -1251,6 +1258,7 @@ async function setupRealtimeSync() {
       
       localStorage.setItem('clubPlayers', JSON.stringify(players));
       localStorage.setItem('players', JSON.stringify(players));
+      localStorage.setItem('jugadores', JSON.stringify(players));
       
       console.log('ðŸ”„ Jugadores actualizados en tiempo real:', players.length);
       
@@ -1865,4 +1873,8 @@ window.cdsanabriacfFirebase = {
 };
 
 console.log('ðŸ”¥ ConfiguraciÃ³n Firebase cargada - Sistema integrado con persistencia local');
+
+if (typeof window !== 'undefined') {
+  window.dispatchEvent(new CustomEvent('firebaseReady'));
+}
 

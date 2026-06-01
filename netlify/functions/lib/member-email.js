@@ -3,7 +3,15 @@
 const { escapeHtml, getEmailConfig, sendViaSendGrid } = require('./club-email');
 
 const CLUB_NAME = 'CD Sanabria CF';
-const CLUB_CONTACT = 'cdsanabriafc@gmail.com';
+
+function clubContactEmail() {
+  return (
+    String(process.env.CLUB_REPLY_EMAIL || '').trim() ||
+    String(process.env.SMTP_FROM_EMAIL || '').trim() ||
+    String(process.env.SENDGRID_FROM_EMAIL || '').trim() ||
+    'cdsanabriafc@gmail.com'
+  );
+}
 
 function memberDisplayName(data) {
   const n = [data.nombre || data.name, data.apellidos || data.surname].filter(Boolean).join(' ').trim();
@@ -55,7 +63,7 @@ function buildRegistrationContent(data) {
       </table>
       ${pasosHtml}
       <p>Ya puedes iniciar sesión en la web del club con el correo y la contraseña que elegiste.</p>
-      <p style="font-size:0.9rem;color:#64748b">Consultas: <a href="mailto:${CLUB_CONTACT}">${CLUB_CONTACT}</a></p>
+      <p style="font-size:0.9rem;color:#64748b">Consultas: <a href="mailto:${escapeHtml(clubContactEmail())}">${escapeHtml(clubContactEmail())}</a></p>
       <p style="font-size:0.85rem;color:#94a3b8">Este mensaje se envía automáticamente. No respondas a este correo si no es necesario.</p>
     </div>`;
   const text =
@@ -64,7 +72,7 @@ function buildRegistrationContent(data) {
     `${formatSocNum(data.numeroSocio || data.memberNumber)}\n` +
     `Cuota: ${cuotaTxt}\n\n` +
     `${pasosText}\n\n` +
-    `Consultas: ${CLUB_CONTACT}\n`;
+    `Consultas: ${clubContactEmail()}\n`;
 
   return { subject, html, text };
 }
@@ -83,13 +91,13 @@ function buildPaymentConfirmedContent(data) {
         <tr><td><strong>Estado:</strong></td><td>Activo/a</td></tr>
       </table>
       <p>Puedes iniciar sesión en la web del club cuando quieras.</p>
-      <p style="font-size:0.9rem;color:#64748b">Consultas: <a href="mailto:${CLUB_CONTACT}">${CLUB_CONTACT}</a></p>
+      <p style="font-size:0.9rem;color:#64748b">Consultas: <a href="mailto:${escapeHtml(clubContactEmail())}">${escapeHtml(clubContactEmail())}</a></p>
     </div>`;
   const text =
     `Hola, ${memberDisplayName(data)}.\n\n` +
     `Tu cuota ha sido pagada correctamente. Tu alta en ${CLUB_NAME} está ACTIVA.\n` +
     `${formatSocNum(data.numeroSocio || data.memberNumber)}\n\n` +
-    `Consultas: ${CLUB_CONTACT}\n`;
+    `Consultas: ${clubContactEmail()}\n`;
 
   return { subject, html, text };
 }
@@ -111,6 +119,52 @@ async function sendMemberRegistrationEmail(data) {
   return { sent: true };
 }
 
+function buildPlayerApplicationApprovedContent(data) {
+  const nombre = escapeHtml(memberDisplayName(data));
+  const season = escapeHtml(String(data.season || '').trim() || '—');
+  const siteUrl = String(process.env.SITE_URL || '').replace(/\/$/, '');
+  const inscripcionUrl = siteUrl
+    ? `${escapeHtml(siteUrl)}/inscripcion-jugador.html?flow=finalize`
+    : '';
+  const contact = escapeHtml(clubContactEmail());
+
+  const subject = `Solicitud aceptada — puedes completar la inscripción — ${CLUB_NAME}`;
+  const linkBlock = inscripcionUrl
+    ? `<p><a href="${inscripcionUrl}" style="font-weight:700;color:#1d4ed8;">Completar inscripción (ropa y pago)</a></p>`
+    : '<p>Entra en la web del club → <strong>Inscripción jugador/a</strong> → <strong>Ya soy jugador/a</strong>.</p>';
+  const html = `
+    <div style="font-family:system-ui,sans-serif;max-width:560px;color:#1e293b;line-height:1.5">
+      <h2 style="color:#059669;margin:0 0 12px">✅ Solicitud aceptada</h2>
+      <p>Hola, <strong>${nombre}</strong>:</p>
+      <p>El <strong>${CLUB_NAME}</strong> ha revisado tu solicitud para la temporada <strong>${season}</strong> y puedes continuar con la inscripción oficial.</p>
+      ${linkBlock}
+      <p>Allí completarás tallas de ropa, cuotas y forma de pago. La primera vez deberás <strong>crear una contraseña de acceso</strong> a tu ficha (DNI + contraseña; recuperación por email si la olvidas).</p>
+      <p style="font-size:0.9rem;color:#64748b">Consultas: <a href="mailto:${contact}">${contact}</a></p>
+    </div>`;
+  const text =
+    `Hola, ${memberDisplayName(data)}.\n\n` +
+    `Tu solicitud en ${CLUB_NAME} (temporada ${data.season || ''}) ha sido ACEPTADA.\n` +
+    `Completa la inscripción en la web: Inscripción jugador/a → Ya soy jugador/a.\n` +
+    (siteUrl ? `${siteUrl}/inscripcion-jugador.html?flow=finalize\n\n` : '') +
+    `Consultas: ${clubContactEmail()}\n`;
+  return { subject, html, text };
+}
+
+async function sendPlayerApplicationApprovedEmail(data) {
+  const cfg = getEmailConfig();
+  if (!cfg.ok) return { sent: false, reason: cfg.error };
+  const email = String(data.email || '').trim().toLowerCase();
+  if (!email) return { sent: false, reason: 'email vacío' };
+  const content = buildPlayerApplicationApprovedContent(data);
+  await sendViaSendGrid({
+    to: email,
+    subject: content.subject,
+    html: content.html,
+    text: content.text
+  });
+  return { sent: true };
+}
+
 async function sendMemberPaymentConfirmedEmail(data) {
   const cfg = getEmailConfig();
   if (!cfg.ok) return { sent: false, reason: cfg.error };
@@ -126,7 +180,55 @@ async function sendMemberPaymentConfirmedEmail(data) {
   return { sent: true };
 }
 
+function buildPlayerPortalResetContent(data) {
+  const nombre = escapeHtml(memberDisplayName(data));
+  const siteUrl = String(process.env.SITE_URL || '').replace(/\/$/, '');
+  const token = encodeURIComponent(String(data.token || ''));
+  const resetUrl = siteUrl
+    ? `${escapeHtml(siteUrl)}/inscripcion-jugador.html?flow=finalize&portalReset=${token}`
+    : '';
+  const contact = escapeHtml(clubContactEmail());
+  const subject = `Restablecer contraseña de ficha — ${CLUB_NAME}`;
+  const html = `
+    <div style="font-family:system-ui,sans-serif;max-width:560px;color:#1e293b;line-height:1.5">
+      <h2 style="color:#1e3a8a;margin:0 0 12px">🔑 Restablecer contraseña</h2>
+      <p>Hola, <strong>${nombre}</strong>:</p>
+      <p>Has solicitado restablecer la contraseña de acceso a tu ficha de jugador/a en <strong>${CLUB_NAME}</strong>.</p>
+      ${
+        resetUrl
+          ? `<p><a href="${resetUrl}" style="font-weight:700;color:#1d4ed8;">Elegir nueva contraseña</a></p>
+             <p style="font-size:0.9rem;color:#64748b">El enlace caduca en aproximadamente 1 hora. Si no has sido tú, ignora este mensaje.</p>`
+          : '<p>Entra en la web del club → Nuevo jugador/a → Finalizar ficha → Recuperar contraseña.</p>'
+      }
+      <p style="font-size:0.9rem;color:#64748b">Consultas: <a href="mailto:${contact}">${contact}</a></p>
+    </div>`;
+  const text =
+    `Hola, ${memberDisplayName(data)}.\n\n` +
+    `Restablece la contraseña de tu ficha en ${CLUB_NAME}.\n` +
+    (siteUrl ? `${siteUrl}/inscripcion-jugador.html?flow=finalize&portalReset=${data.token}\n\n` : '') +
+    `El enlace caduca en aproximadamente 1 hora.\n` +
+    `Consultas: ${clubContactEmail()}\n`;
+  return { subject, html, text };
+}
+
+async function sendPlayerPortalResetEmail(data) {
+  const cfg = getEmailConfig();
+  if (!cfg.ok) return { sent: false, reason: cfg.error };
+  const email = String(data.email || '').trim().toLowerCase();
+  if (!email) return { sent: false, reason: 'email vacío' };
+  const content = buildPlayerPortalResetContent(data);
+  await sendViaSendGrid({
+    to: email,
+    subject: content.subject,
+    html: content.html,
+    text: content.text
+  });
+  return { sent: true };
+}
+
 module.exports = {
   sendMemberRegistrationEmail,
-  sendMemberPaymentConfirmedEmail
+  sendMemberPaymentConfirmedEmail,
+  sendPlayerApplicationApprovedEmail,
+  sendPlayerPortalResetEmail
 };

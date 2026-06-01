@@ -32,6 +32,49 @@
     });
   };
 
+  /** Espera al primer estado de Auth (sesión restaurada o ausente). Evita falsos «caducada» al abrir el panel. */
+  window.waitForFirebaseAuthUser = function waitForFirebaseAuthUser(maxMs) {
+    const limit = typeof maxMs === 'number' ? maxMs : 12000;
+    return new Promise(function (resolve) {
+      if (!window.firebaseAuth || window.firebaseAuth.isSimulation) {
+        resolve(null);
+        return;
+      }
+      if (window.firebaseAuth.currentUser) {
+        resolve(window.firebaseAuth.currentUser);
+        return;
+      }
+      let settled = false;
+      let unsub = function () {};
+      const timer = setTimeout(function () {
+        if (settled) return;
+        settled = true;
+        try {
+          unsub();
+        } catch (_) {}
+        resolve(window.firebaseAuth.currentUser || null);
+      }, limit);
+      import('https://www.gstatic.com/firebasejs/10.12.3/firebase-auth.js')
+        .then(function (mod) {
+          unsub = mod.onAuthStateChanged(window.firebaseAuth, function (user) {
+            if (settled) return;
+            settled = true;
+            clearTimeout(timer);
+            try {
+              unsub();
+            } catch (_) {}
+            resolve(user);
+          });
+        })
+        .catch(function () {
+          if (settled) return;
+          settled = true;
+          clearTimeout(timer);
+          resolve(window.firebaseAuth.currentUser || null);
+        });
+    });
+  };
+
   const runSanitize = function () {
     if (typeof window.sanitizeClubLocalCredentials === 'function') {
       window.sanitizeClubLocalCredentials().catch(function () {});

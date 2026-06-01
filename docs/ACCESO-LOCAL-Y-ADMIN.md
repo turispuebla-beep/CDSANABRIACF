@@ -22,8 +22,47 @@ Para pruebas en tu PC, opcionalmente puedes usar `scripts/serve-local.ps1` en es
 | Email | Rol | Cómo entra en la web |
 |-------|-----|----------------------|
 | **amco@gmx.es** | **Super administrador** del club | «Acceso administrador» → panel completo + funciones solo super admin |
-| **alarico1963@gmail.com** | **Usuario normal** (socio / amigo / jugador, según su ficha) | **No** usar «Acceso administrador». Login de socio o amigo en la página principal |
-| cdsanabriafc@gmail.com | Cuenta del club (opcional) | Solo admin si creas documento en `sanabria_admins` con `isAdmin` (no super admin salvo que lo indiques) |
+| **alarico1963@gmail.com** | **Usuario normal** (socio / amigo / jugador) | **No** panel admin. **No** crear `sanabria_admins/3YvmxvrvPfOhSPmwSxirdgrnCeB2` |
+| **cdsanabriafc@gmail.com** | Administrador del club | Panel admin si existe documento `sanabria_admins/H15Is5zg6iegMX3Nnj8xMnKsjII2` |
+
+### Aviso Firebase «Dynamic Links»
+
+La web usa **email + contraseña** (`signInWithEmailAndPassword`), **no** enlace mágico por correo. El aviso de Firebase sobre Dynamic Links **no afecta** a este login.
+
+### Dónde entrar en la web
+
+- **Acceso** (cabecera) → Socios / Amigos / **Administración del club**
+- O botón flotante **🔧 Admin**
+
+---
+
+## Administrador del club: cdsanabriafc@gmail.com
+
+| Campo | Valor |
+|-------|--------|
+| Colección | `sanabria_admins` |
+| **ID del documento** | `H15Is5zg6iegMX3Nnj8xMnKsjII2` |
+
+```json
+{
+  "appScope": "cdsanabriacf",
+  "isAdmin": true,
+  "isSuperAdmin": false,
+  "role": "admin",
+  "email": "cdsanabriafc@gmail.com",
+  "name": "CD Sanabria CF"
+}
+```
+
+En Authentication el usuario debe tener **contraseña** definida (restablecer si hace falta). Esa contraseña **no** va en el código ni en Firestore: solo en Firebase Console → Authentication.
+
+---
+
+## Seguridad: contraseñas de admin
+
+- El repositorio y la web **no contienen** las contraseñas de `amco@gmx.es` ni `cdsanabriafc@gmail.com`.
+- El login admin envía la contraseña **solo a Firebase** (`signInWithEmailAndPassword`); no se guarda en `localStorage`.
+- Ver también: `docs/SEGURIDAD-CREDENCIALES.md`
 
 ---
 

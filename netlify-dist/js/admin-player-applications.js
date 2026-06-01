@@ -29,6 +29,25 @@
     return { text: 'Pendiente revisión', color: '#d97706' };
   }
 
+  function offerPlayerApprovedMailto(app) {
+    if (!app || !global.PlayerApplication || !global.PlayerApplication.buildPlayerApprovedMailto) {
+      return false;
+    }
+    const url = global.PlayerApplication.buildPlayerApprovedMailto(app);
+    if (!url) return false;
+    const dest = String(app.email || app.guardianEmail || '').trim();
+    if (
+      !confirm(
+        '¿Abrir tu programa de correo para avisar a ' +
+          (dest || 'el jugador/a') +
+          ' de que puede completar la inscripción (Finalizar ficha)?'
+      )
+    ) {
+      return false;
+    }
+    return global.PlayerApplication.openMailto(url);
+  }
+
   async function approveApplication(applicationId) {
     const apps = readApplications();
     const ix = apps.findIndex(function (a) {
@@ -72,9 +91,10 @@
       fechaNacimiento: app.birthDate,
       category: app.category || '',
       categoria: app.category || '',
-      guardianName: [app.guardianName, app.guardianSurname].filter(Boolean).join(' ').trim(),
-      guardianSurname: app.guardianSurname || '',
-      guardianDNI: app.guardianDni || '',
+      guardianName: (app.guardianName || '').trim(),
+      guardianSurname: (app.guardianSurname || '').trim(),
+      guardianDNI: String(app.guardianDni || app.guardianDNI || '').trim(),
+      guardianDni: String(app.guardianDni || app.guardianDNI || '').trim(),
       guardianPhone: app.guardianPhone || '',
       guardianEmail: app.guardianEmail || '',
       guardianAddress: app.guardianAddress || '',
@@ -94,6 +114,10 @@
       updatedAt: now,
       appScope: 'cdsanabriacf'
     };
+    if (app.portalPasswordHash) {
+      playerPatch.portalPasswordHash = app.portalPasswordHash;
+      playerPatch.portalPasswordSetAt = app.portalPasswordSetAt || app.submittedAt || now;
+    }
 
     if (player) {
       Object.assign(player, playerPatch);
@@ -107,15 +131,60 @@
     }
 
     global.localStorage.setItem('clubPlayers', JSON.stringify(players));
-    if (typeof global.persistRecordToFirebase === 'function') {
-      await global.persistRecordToFirebase('clubPlayers', 'players', player);
-    } else if (typeof global.updateDocument === 'function') {
-      if (String(player.id).startsWith('PLAYER_')) {
-        const newId = await global.createDocument('players', player);
-        if (newId) player.id = newId;
-      } else {
-        await global.updateDocument('players', player.id, player);
+    let firebaseOk = false;
+    try {
+      const res = await fetch('/.netlify/functions/approve-player-application', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          applicationId: applicationId,
+          validatedBy: adminUser
+        })
+      });
+      const json = await res.json().catch(function () {
+        return {};
+      });
+      if (res.ok && json.ok && json.playerId) {
+        player.id = json.playerId;
+        const pIx = players.findIndex(function (p) {
+          return (
+            global.PlayerInscription.normalizeDni(p.dni) === dni &&
+            String(p.inscriptionSeason || '') === String(season)
+          );
+        });
+        if (pIx >= 0) {
+          players[pIx].id = json.playerId;
+          global.localStorage.setItem('clubPlayers', JSON.stringify(players));
+          player = players[pIx];
+        }
+        if (json.application) {
+          apps[ix] = { ...apps[ix], ...json.application, status: 'approved', playerId: json.playerId };
+          writeApplications(apps);
+        }
+        firebaseOk = true;
       }
+    } catch (_) {}
+
+    if (!firebaseOk) {
+      if (typeof global.persistRecordToFirebase === 'function') {
+        const saved = await global.persistRecordToFirebase('clubPlayers', 'players', player);
+        if (saved && saved.id) player.id = saved.id;
+        firebaseOk = true;
+      } else if (typeof global.updateDocument === 'function') {
+        if (String(player.id).startsWith('PLAYER_')) {
+          const newId = await global.createDocument('players', player);
+          if (newId) player.id = newId;
+        } else {
+          await global.updateDocument('players', player.id, player);
+        }
+        firebaseOk = true;
+      }
+    }
+
+    if (!firebaseOk) {
+      throw new Error(
+        'No se pudo guardar la ficha en Firebase. Comprueba que tienes sesión de administrador en la nube.'
+      );
     }
 
     apps[ix] = {
@@ -136,7 +205,8 @@
       }
     }
 
-    return { application: apps[ix], player: player };
+    const mailtoOpened = offerPlayerApprovedMailto(apps[ix]);
+    return { application: apps[ix], player: player, mailtoOpened: mailtoOpened };
   }
 
   async function rejectApplication(applicationId, reason) {
@@ -232,8 +302,16 @@
   global.approvePlayerApplicationAdmin = async function (id) {
     if (!confirm('¿Aceptar esta solicitud? El jugador podrá completar ropa y pago en la web.')) return;
     try {
-      await approveApplication(id);
-      alert('✅ Solicitud aceptada. El jugador/a puede usar «Ya soy jugador/a» en la web.');
+      const result = await approveApplication(id);
+      let msg =
+        '✅ Solicitud aceptada. El jugador/a puede usar «Nuevo jugador/a» → «Finalizar ficha» (solo admitidos).';
+      if (result.mailtoOpened) {
+        msg += '\n\n📧 Se ha abierto el correo para avisar al jugador/a (pulsa Enviar en tu programa de correo).';
+      } else {
+        msg +=
+          '\n\nPuedes avisar al jugador/a manualmente o volver a aceptar y elegir abrir el correo.';
+      }
+      alert(msg);
       renderPlayerApplicationsAdmin();
       if (typeof global.loadPlayers === 'function') global.loadPlayers();
     } catch (e) {

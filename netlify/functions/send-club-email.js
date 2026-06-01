@@ -1,8 +1,15 @@
 'use strict';
 
 const { getEmailConfig } = require('./lib/club-email');
-const { sendMemberRegistrationEmail, sendMemberPaymentConfirmedEmail } = require('./lib/member-email');
+const {
+  sendMemberRegistrationEmail,
+  sendMemberPaymentConfirmedEmail,
+  sendPlayerApplicationApprovedEmail
+} = require('./lib/member-email');
+const { sendClubAdminNotification } = require('./lib/club-admin-notify-email');
 const { memberExistsForEmail } = require('./lib/firestore-admin');
+
+const MEMBER_TYPES = new Set(['member_registered', 'member_validated_manual']);
 
 const CORS_BASE = {
   'Access-Control-Allow-Headers': 'Content-Type',
@@ -50,14 +57,43 @@ exports.handler = async (event) => {
     const body = JSON.parse(event.body || '{}');
     const type = String(body.type || '').trim();
 
-    const email = String(body.email || '').trim().toLowerCase();
+    const email = String(body.requesterEmail || body.email || '').trim().toLowerCase();
+
+    if (type === 'club_admin_notify') {
+      if (!email || !email.includes('@')) {
+        return json(400, { ok: false, error: 'email del solicitante inválido' }, origin);
+      }
+      const result = await sendClubAdminNotification({
+        kind: body.kind,
+        title: body.title,
+        subject: body.subject,
+        paymentChannel: body.paymentChannel || body.paymentMethod,
+        paymentMethod: body.paymentMethod || body.paymentChannel,
+        fields: body.fields,
+        requesterEmail: email
+      });
+      return json(200, { ok: true, sent: result.sent }, origin);
+    }
+
     if (!email || !email.includes('@')) {
       return json(400, { ok: false, error: 'email inválido' }, origin);
     }
 
-    const exists = await memberExistsForEmail(email, body.memberId);
-    if (!exists) {
-      return json(404, { ok: false, error: 'Socio no encontrado' }, origin);
+    if (MEMBER_TYPES.has(type)) {
+      const exists = await memberExistsForEmail(email, body.memberId);
+      if (!exists) {
+        return json(404, { ok: false, error: 'Socio no encontrado' }, origin);
+      }
+    }
+
+    if (type === 'player_application_approved') {
+      const result = await sendPlayerApplicationApprovedEmail({
+        email,
+        nombre: body.nombre || body.name,
+        apellidos: body.apellidos || body.surname,
+        season: body.season
+      });
+      return json(200, { ok: true, sent: result.sent }, origin);
     }
 
     if (type === 'member_registered') {

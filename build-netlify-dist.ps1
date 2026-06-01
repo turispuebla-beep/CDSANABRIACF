@@ -48,6 +48,25 @@ if (Test-Path $jsSrc) {
 
 # Escudos e imágenes del club (carpeta assets/)
 $assetsSrc = Join-Path $root 'assets'
+if (-not (Test-Path $assetsSrc)) { New-Item -ItemType Directory -Path $assetsSrc | Out-Null }
+# Escudos en raíz → assets/ (la web usa assets/escudo-*.png)
+@('escudo-180.png', 'escudo-192.png', 'escudo-512.png', 'escudo-cdsanabriacf.png') | ForEach-Object {
+    $fromRoot = Join-Path $root $_
+    $toAssets = Join-Path $assetsSrc $_
+    if ((Test-Path $fromRoot) -and -not (Test-Path $toAssets)) {
+        Copy-Item $fromRoot $toAssets -Force
+        Write-Host "      + assets/$_ (desde raiz)" -ForegroundColor Gray
+    }
+}
+$mainEscudo = Join-Path $assetsSrc 'escudo-cdsanabriacf.png'
+if (-not (Test-Path $mainEscudo)) {
+    $fallback = Join-Path $assetsSrc 'escudo-512.png'
+    if (-not (Test-Path $fallback)) { $fallback = Join-Path $root 'escudo-512.png' }
+    if (Test-Path $fallback) {
+        Copy-Item $fallback $mainEscudo -Force
+        Write-Host '      + assets/escudo-cdsanabriacf.png (desde escudo-512)' -ForegroundColor Gray
+    }
+}
 $assetsDest = Join-Path $dist 'assets'
 if (Test-Path $assetsSrc) {
     if (-not (Test-Path $assetsDest)) { New-Item -ItemType Directory -Path $assetsDest | Out-Null }
@@ -114,13 +133,47 @@ foreach ($pat in $removePatterns) {
 }
 Write-Host "      Eliminados (aprox.): $removed archivos" -ForegroundColor Gray
 
+# Raíz de netlify-dist: solo lo publicable (evita basura de subidas anteriores)
+$keepRoot = @(
+    'index.html', 'admin-panel.html', 'pago-resultado.html', 'pago-cuota-socio.html',
+    'inscripcion-jugador.html', 'inscripcion-jugador-demo.html',
+    'sw.js', 'manifest.json', 'favicon.ico',
+    '_redirects', '.netlifyignore', '404.html', 'deploy-version.json'
+)
+Get-ChildItem $dist -File -ErrorAction SilentlyContinue | ForEach-Object {
+    if ($keepRoot -notcontains $_.Name) {
+        Remove-Item $_.FullName -Force -ErrorAction SilentlyContinue
+        $removed++
+    }
+}
+Get-ChildItem $dist -Directory -ErrorAction SilentlyContinue | Where-Object {
+    $_.Name -notin @('js', 'assets')
+} | ForEach-Object {
+    Remove-Item $_.FullName -Recurse -Force -ErrorAction SilentlyContinue
+    $removed++
+}
+
 # Version para comprobar deploy
+$builtAt = (Get-Date).ToString('yyyyMMdd-HHmm')
 $version = @{
     builtAt = (Get-Date).ToString('o')
     project = 'cdsanabriacf2026'
     appScope = 'cdsanabriacf'
+    cacheVersion = "cdsanabriacf-v$builtAt"
 } | ConvertTo-Json
 Set-Content (Join-Path $dist 'deploy-version.json') $version -Encoding UTF8
+
+# --- 3b. Actualizar version de cache en sw.js (deploy) ---
+$swPath = Join-Path $dist 'sw.js'
+if (Test-Path $swPath) {
+    $cacheVer = "cdsanabriacf-v$builtAt"
+    $sw = Get-Content $swPath -Raw -Encoding UTF8
+    $sw = $sw -replace "const CACHE_NAME = '[^']+'", "const CACHE_NAME = '$cacheVer'"
+    $sw = $sw -replace "const STATIC_CACHE = '[^']+'", "const STATIC_CACHE = '$cacheVer-static'"
+    $sw = $sw -replace "const DYNAMIC_CACHE = '[^']+'", "const DYNAMIC_CACHE = '$cacheVer-dynamic'"
+    Set-Content $swPath $sw -Encoding UTF8 -NoNewline
+    Write-Host "      OK sw.js cache -> $cacheVer" -ForegroundColor Green
+}
 
 # --- 4. Verificacion ---
 Write-Host '[4/4] Verificacion...' -ForegroundColor Cyan
@@ -138,6 +191,20 @@ foreach ($name in @('index.html', 'admin-panel.html', 'sw.js', 'manifest.json'))
         $ok = $false
     }
 }
+foreach ($name in @('escudo-192.png', 'escudo-512.png', 'escudo-cdsanabriacf.png', 'torneo-futbol-7-2026.jpeg')) {
+    $p = Join-Path $dist "assets\$name"
+    if (-not (Test-Path $p)) {
+        Write-Host "      FALTA: assets/$name" -ForegroundColor Red
+        $ok = $false
+    }
+}
+foreach ($name in @('admin-session.js', 'club-contact-defaults.js', 'torneo-preinscripcion.js', 'admin-torneo-preinscripciones.js', 'player-application.js', 'protocol-guard.js', 'club-password-hash.js', 'colaborador-solicitud.js', 'site-update-mode.js')) {
+    $p = Join-Path $dist "js\$name"
+    if (-not (Test-Path $p)) {
+        Write-Host "      FALTA: js/$name" -ForegroundColor Red
+        $ok = $false
+    }
+}
 if (-not $ok) {
     Write-Host ''
     Write-Host 'Build INCOMPLETO.' -ForegroundColor Red
@@ -148,4 +215,10 @@ Write-Host ''
 Write-Host 'Listo. Sube el CONTENIDO de:' -ForegroundColor Green
 Write-Host "  $dist" -ForegroundColor White
 Write-Host 'Incluye siempre: _redirects, .netlifyignore, 404.html' -ForegroundColor DarkGray
+Write-Host ''
+Write-Host 'AVISO correo / Redsys / Firebase:' -ForegroundColor Yellow
+Write-Host '  El ZIP de netlify-dist NO incluye funciones serverless.' -ForegroundColor Yellow
+Write-Host '  Para SendGrid, Redsys y solicitudes jugador despliega el REPO completo' -ForegroundColor Yellow
+Write-Host '  (Git + netlify.toml) o: netlify deploy --prod desde la raiz.' -ForegroundColor Yellow
+Write-Host '  Variables: netlify_env.example  |  Guia email: docs/EMAIL-SOCIOS.md' -ForegroundColor DarkGray
 Write-Host ''

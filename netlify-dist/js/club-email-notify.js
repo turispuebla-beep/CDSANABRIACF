@@ -40,7 +40,22 @@
     });
   }
 
+  /** Aviso estructurado al club (transferencia, efectivo, pago pasarela, etc.). */
+  function sendClubAdminNotify(opts) {
+    return post({
+      type: 'club_admin_notify',
+      kind: opts.kind,
+      title: opts.title,
+      subject: opts.subject,
+      paymentChannel: opts.paymentChannel,
+      paymentMethod: opts.paymentMethod,
+      fields: opts.fields,
+      requesterEmail: opts.requesterEmail
+    });
+  }
+
   global.CdsanClubEmail = {
-    sendMemberRegistered
+    sendMemberRegistered: sendMemberRegistered,
+    sendClubAdminNotify: sendClubAdminNotify
   };
 })(typeof window !== 'undefined' ? window : globalThis);

@@ -4,11 +4,35 @@
 **/config-local.js
 netlify_env
 
+# Enlace local Netlify CLI (cada PC; no secretos)
+.netlify/
+
 # Artefactos locales
 node_modules/
 *.log
 .DS_Store
 Thumbs.db
+
+# Build Netlify (generar siempre con build-netlify-dist.ps1)
+netlify-dist/
+
+# Documentos Word locales (no versionar)
+*.docx
+*.doc
+
+# Legacy archivado (proyectos mezclados, pruebas antiguas)
+archive/
+
+# Pruebas HTML sueltas en raíz
+test-*.html
+demo-*.html
+*-test.html
+sync-test-*.html
+
+# Railway (ya no se usa; solo Firebase + Netlify)
+**/railway*
+**/RAILWAY*
+twa-apk/
 
 # ZIPs de deploy manual (copias de respaldo)
 ZIP/

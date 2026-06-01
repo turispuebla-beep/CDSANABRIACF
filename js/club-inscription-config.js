@@ -7,45 +7,48 @@
 
   const STORAGE_KEY = 'clubPlayerInscriptionSettings';
 
-  const CATEGORIES = [
-    { id: 'prebenjamin', label: 'Prebenjamín (6-8 años)' },
-    { id: 'benjamin', label: 'Benjamín (8-10 años)' },
-    { id: 'alevin', label: 'Alevín (10-12 años)' },
-    { id: 'infantil', label: 'Infantil (12-14 años)' },
-    { id: 'cadete', label: 'Cadete (14-16 años)' },
-    { id: 'juvenil', label: 'Juvenil (16-18 años)' },
-    { id: 'aficionado', label: 'Aficionado (18+ años)' }
+  /** Tabla pública inscripción — cuotas ficha + socio por categoría */
+  const INSCRIPTION_CATEGORY_ROWS = [
+    { id: 'prebenjamin', label: 'P. BENJAMIN', years: '(2018/2019)', ficha: 50, socio: 10 },
+    { id: 'benjamin', label: 'BENJAMIN', years: '(2016/2017)', ficha: 50, socio: 10 },
+    { id: 'alevin', label: 'ALEVIN', years: '(2014/2015)', ficha: 50, socio: 10 },
+    { id: 'infantil', label: 'INFANTIL', years: '(2012/2013)', ficha: 50, socio: 10 },
+    { id: 'cadete', label: 'CADETE', years: '(2010/2011)', ficha: 50, socio: 10 },
+    { id: 'juvenil', label: 'JUVENIL', years: '(2007/2008/2009)', ficha: 170, socio: 25 },
+    { id: 'senior', label: 'SENIOR', years: '', ficha: 170, socio: 25 }
   ];
+
+  const CATEGORIES = INSCRIPTION_CATEGORY_ROWS.map(function (r) {
+    const yrs = r.years ? ' ' + r.years : '';
+    return { id: r.id, label: r.label + yrs };
+  });
 
   const CHILD_SIZES = ['4', '6', '8', '10', '12', '14'];
   const ADULT_SIZES = ['XS', 'S', 'M', 'L', 'XL', 'XXL', 'XXXL'];
   const ALL_SIZES = CHILD_SIZES.concat(ADULT_SIZES);
+  /** Tallas ropa entreno — formulario público */
+  const INSCRIPTION_KIT_SIZES = ['6/8', '10/12', 'S', 'M', 'L', 'XL'];
 
-  const GARMENT_IDS = [
-    'match_shirt',
-    'match_shorts',
-    'tracksuit',
-    'train_shirt',
-    'train_shorts',
-    'train_jacket'
-  ];
+  const GARMENT_IDS = ['train_shirt', 'train_shorts', 'tracksuit', 'train_jacket'];
 
   const DEFAULT_GARMENTS = {
-    match_shirt: { label: 'Camiseta de partido', price: 0, enabled: true },
-    match_shorts: { label: 'Pantalón corto de partido', price: 0, enabled: true },
-    tracksuit: { label: 'Chándal', price: 0, enabled: true },
-    train_shirt: { label: 'Camiseta de entreno', price: 0, enabled: true },
-    train_shorts: { label: 'Pantalón de entreno', price: 0, enabled: true },
+    train_shirt: { label: 'Camiseta corta', price: 0, enabled: true },
+    train_shorts: { label: 'Pantalón corto', price: 0, enabled: true },
+    tracksuit: { label: 'Sudadera', price: 0, enabled: true },
     train_jacket: { label: 'Chubasquero', price: 0, enabled: true }
   };
+
+  const LEGACY_GARMENT_IDS = ['match_shirt', 'match_shorts'];
 
   function defaultCategoryFees() {
     const ficha = {};
     const socio = {};
-    CATEGORIES.forEach((c) => {
-      ficha[c.id] = 0;
-      socio[c.id] = 0;
+    INSCRIPTION_CATEGORY_ROWS.forEach(function (r) {
+      ficha[r.id] = r.ficha;
+      socio[r.id] = r.socio;
     });
+    ficha.aficionado = 170;
+    socio.aficionado = 25;
     return { ficha, socio };
   }
 
@@ -89,9 +92,16 @@
         ...(merged.garments[id] || {})
       };
     });
+    LEGACY_GARMENT_IDS.forEach(function (lid) {
+      if (merged.garments[lid]) merged.garments[lid].enabled = false;
+    });
     const jacketLabel = String(merged?.garments?.train_jacket?.label || '').trim().toLowerCase();
     if (jacketLabel === 'chaqueta / basquera' || jacketLabel === 'chaqueta/basquera') {
       merged.garments.train_jacket.label = 'Chubasquero';
+    }
+    const tracksuitLabel = String(merged?.garments?.tracksuit?.label || '').trim().toLowerCase();
+    if (tracksuitLabel === 'chándal' || tracksuitLabel === 'chandal') {
+      merged.garments.tracksuit.label = 'Sudadera';
     }
     merged.paymentMethods = { ...base.paymentMethods, ...(merged.paymentMethods || {}) };
     merged.registrationsOpen = raw?.registrationsOpen !== false;
@@ -109,7 +119,7 @@
           global.localStorage.setItem('cdsan_insc_default_open_v1', '1');
         }
       } catch (_) {}
-      return merged;
+      return applyDefaultFeesIfEmpty(merged);
     } catch (_) {
       return getDefaultSettings();
     }
@@ -148,7 +158,8 @@
     const s = settings || read();
     const fees = s.categoryFees || defaultCategoryFees();
     const bucket = type === 'socio' ? fees.socio : fees.ficha;
-    return Number(bucket[categoryId] || 0);
+    const id = categoryId === 'aficionado' ? 'senior' : categoryId;
+    return Number(bucket[id] || bucket[categoryId] || 0);
   }
 
   function getEnabledGarments(settings) {
@@ -180,19 +191,39 @@
     if (age <= 14) return 'infantil';
     if (age <= 16) return 'cadete';
     if (age <= 18) return 'juvenil';
-    return 'aficionado';
+    return 'senior';
+  }
+
+  function applyDefaultFeesIfEmpty(settings) {
+    const s = settings || read();
+    const defs = defaultCategoryFees();
+    let changed = false;
+    INSCRIPTION_CATEGORY_ROWS.forEach(function (r) {
+      if (!Number(s.categoryFees.ficha[r.id])) {
+        s.categoryFees.ficha[r.id] = r.ficha;
+        changed = true;
+      }
+      if (!Number(s.categoryFees.socio[r.id])) {
+        s.categoryFees.socio[r.id] = r.socio;
+        changed = true;
+      }
+    });
+    return changed ? s : settings;
   }
 
   global.ClubInscriptionConfig = {
     STORAGE_KEY: STORAGE_KEY,
+    INSCRIPTION_CATEGORY_ROWS: INSCRIPTION_CATEGORY_ROWS,
     CATEGORIES: CATEGORIES,
     CHILD_SIZES: CHILD_SIZES,
     ADULT_SIZES: ADULT_SIZES,
     ALL_SIZES: ALL_SIZES,
+    INSCRIPTION_KIT_SIZES: INSCRIPTION_KIT_SIZES,
     GARMENT_IDS: GARMENT_IDS,
     getDefaultSettings: getDefaultSettings,
     read: read,
     write: write,
+    applyDefaultFeesIfEmpty: applyDefaultFeesIfEmpty,
     isOpenNow: isOpenNow,
     getCategoryFee: getCategoryFee,
     getEnabledGarments: getEnabledGarments,

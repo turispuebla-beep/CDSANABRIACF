@@ -21,6 +21,5 @@
 /sw.js                    /sw.js                    200
 /manifest.json            /manifest.json            200
 /js/*                     /js/:splat                200
-/.netlify/functions/*     /.netlify/functions/:splat  200
 
 /*                        /index.html               200

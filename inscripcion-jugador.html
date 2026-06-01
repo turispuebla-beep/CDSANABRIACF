@@ -47,8 +47,101 @@
         }
         .kit-size { max-width: 120px; margin-bottom: 0; }
         .fee-line { display: flex; align-items: flex-start; gap: 10px; margin-bottom: 10px; font-weight: 500; }
-        .cart-line { display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px dashed #e2e8f0; }
-        .cart-total { font-size: 1.35rem; font-weight: 800; color: var(--green); text-align: right; margin-top: 12px; }
+        .cart-line { display: flex; justify-content: space-between; gap: 12px; padding: 6px 0; border-bottom: 1px dashed #e2e8f0; font-size: 0.92rem; }
+        .cart-line span:first-child { flex: 1; }
+        .cart-subtotal {
+            display: flex;
+            justify-content: space-between;
+            padding: 8px 0 4px;
+            margin-top: 6px;
+            font-weight: 700;
+            color: #334155;
+            border-top: 2px solid #e2e8f0;
+        }
+        .cart-total { font-size: 1.35rem; font-weight: 800; color: var(--green); text-align: right; margin-top: 8px; }
+        .cart-summary-title { font-size: 0.95rem; font-weight: 700; color: var(--primary); margin: 0 0 8px; }
+        .ins-legal-link { color: #1d4ed8; font-weight: 600; text-decoration: underline; cursor: pointer; }
+        .ins-legal-link:hover { color: #1e3a8a; }
+        .ins-modal-overlay {
+            display: none;
+            position: fixed;
+            inset: 0;
+            z-index: 10060;
+            background: rgba(15, 23, 42, 0.55);
+            align-items: center;
+            justify-content: center;
+            padding: 16px;
+        }
+        .ins-modal-panel {
+            background: #fff;
+            border-radius: 12px;
+            max-width: 640px;
+            width: 100%;
+            max-height: 90vh;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            box-shadow: 0 20px 50px rgba(0,0,0,.2);
+        }
+        .ins-modal-brand {
+            text-align: center;
+            padding: 20px 18px 8px;
+            border-bottom: 1px solid #e2e8f0;
+        }
+        .ins-modal-brand img {
+            width: 96px;
+            height: auto;
+            display: block;
+            margin: 0 auto 8px;
+        }
+        .ins-modal-head {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 12px 18px 16px;
+            border-bottom: 1px solid #e2e8f0;
+        }
+        .ins-club-rules-text { display: block; line-height: 1.45; }
+        .ins-club-rules-ver {
+            display: inline-block;
+            margin-top: 6px;
+            font-size: 0.88rem;
+        }
+        .insc-portal-pwd-block {
+            margin-top: 14px;
+            padding: 12px 14px;
+            background: #eff6ff;
+            border: 1px solid #93c5fd;
+            border-radius: 10px;
+        }
+        .insc-portal-pwd-block h3 {
+            margin: 0 0 8px;
+            font-size: 1rem;
+            color: #1e3a8a;
+        }
+        .insc-portal-pwd-block .muted { margin: 0 0 10px; font-size: 0.88rem; line-height: 1.45; }
+        .field-hint-email-socio { font-size: 0.78rem; color: #64748b; margin: 6px 0 12px; line-height: 1.4; }
+        .insc-portal-pwd-block input { margin-bottom: 0; }
+        .ins-modal-head h2 { margin: 0; font-size: 1.1rem; color: var(--primary); }
+        .ins-modal-close {
+            border: none;
+            background: #f1f5f9;
+            width: 36px;
+            height: 36px;
+            border-radius: 8px;
+            font-size: 1.4rem;
+            line-height: 1;
+            cursor: pointer;
+            color: #64748b;
+        }
+        .ins-modal-body {
+            padding: 16px 18px;
+            overflow-y: auto;
+            font-size: 0.88rem;
+            line-height: 1.55;
+            color: #334155;
+        }
+        .ins-modal-foot { padding: 12px 18px 18px; border-top: 1px solid #e2e8f0; }
         .btn {
             display: block;
             width: 100%;
@@ -110,6 +203,51 @@
             border: 2px solid #93c5fd;
             background: #f8fafc;
         }
+        .insc-cat-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.82rem;
+            margin: 12px 0;
+        }
+        .insc-cat-table th,
+        .insc-cat-table td {
+            border: 1px solid #e2e8f0;
+            padding: 8px 6px;
+            text-align: left;
+        }
+        .insc-cat-table th {
+            background: #1e3a8a;
+            color: #fff;
+            font-size: 0.78rem;
+        }
+        .insc-cat-table td.insc-cat-pick { width: 36px; text-align: center; vertical-align: middle; }
+        .insc-cat-table tr:has(input:checked) { background: #ecfdf5; }
+        .insc-size-guide {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.8rem;
+            margin: 0 0 14px;
+        }
+        .insc-size-guide th,
+        .insc-size-guide td {
+            border: 1px solid #e2e8f0;
+            padding: 8px 6px;
+            text-align: center;
+        }
+        .insc-size-guide th { background: #f1f5f9; font-weight: 700; }
+        .kit-label { font-weight: 600; min-width: 140px; }
+        .insc-medical-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+        @media (max-width: 600px) { .insc-medical-grid { grid-template-columns: 1fr; } }
+        .insc-locked-banner {
+            background: #eff6ff;
+            border: 1px solid #93c5fd;
+            color: #1e3a8a;
+            border-radius: 10px;
+            padding: 12px 14px;
+            margin-bottom: 14px;
+            font-size: 0.9rem;
+            line-height: 1.45;
+        }
     </style>
 </head>
 <body>
@@ -118,14 +256,18 @@
         <div class="card">
             <div class="insc-header-row">
                 <div>
-                    <h1>Inscripción jugador/a</h1>
+                    <h1 id="inscPageTitle">Inscripción jugador/a</h1>
                     <p class="sub">Temporada <strong id="inscSeasonLabel">2026-2027</strong> — CD Sanabria CF</p>
                 </div>
-                <button type="button" class="btn btn-lookup-toggle" id="insToggleLookupBtn" style="display:none;" aria-expanded="false" aria-controls="insLookupBlock">🔍 Buscar mi ficha</button>
             </div>
-            <p id="inscYaSoyIntro" class="muted" style="display:none;margin-bottom:14px;">
-                Puedes rellenar el formulario con equipación y pago. Si el club <strong>ya te admitió</strong> como jugador/a, usa <strong>Buscar mi ficha</strong> con tu DNI (sin necesidad de ser socio/a). Si ya tienes cuenta de socio/a, también puedes iniciar sesión. Al pagar, tu ficha se vincula al club como socio-jugador/a.
+            <p id="inscYaSoyIntro" style="display:none;margin:0 0 14px;text-align:center;">
+                <strong style="display:block;font-size:0.88rem;text-transform:uppercase;letter-spacing:0.03em;color:#1e3a8a;">Jugué en la temporada 2025-2026</strong>
             </p>
+            <p id="inscFinalizeIntro" class="muted" style="display:none;margin:0 0 14px;text-align:center;font-size:0.9rem;line-height:1.45;">
+                <strong style="display:block;color:#1e3a8a;margin-bottom:6px;">Finalizar ficha — Solo admitidos</strong>
+                Identifícate con tu DNI y contraseña. Si el club te ha admitido, podrás completar categoría, ropa y pago.
+            </p>
+            <div id="inscPasswordOnlyBanner" class="insc-locked-banner" style="display:none;" role="status"></div>
             <div id="inscClosedWrap" class="closed" style="display:none;">
                 <p id="inscClosedMsg">Las inscripciones no están abiertas.</p>
             </div>
@@ -134,18 +276,70 @@
                     <h2>Identificación (acceso protegido)</h2>
                     <div id="insLookupLoginWarn" class="muted" style="display:none;margin:12px 0;padding:12px;border-radius:8px;font-size:0.9rem;"></div>
                     <div id="insLookupFieldsWrap">
-                        <p class="muted">Introduce el DNI del jugador/a o nombre y apellidos. Solo verás datos vinculados a tu cuenta de socio/a.</p>
+                        <p class="muted">Introduce tus datos y la <strong>contraseña de acceso</strong> (la misma que elegiste al solicitar el alta como jugador/a). Así protegemos tus datos personales.</p>
                         <div class="grid2">
                             <div><label for="insLookupDni">DNI</label><input id="insLookupDni" autocomplete="off"></div>
                             <div><label for="insLookupName">Nombre</label><input id="insLookupName"></div>
                         </div>
                         <div class="grid2">
                             <div><label for="insLookupSurname">Apellidos</label><input id="insLookupSurname"></div>
-                            <div style="display:flex;align-items:flex-end;"><button type="button" class="btn btn-primary" id="insLookupBtn" style="margin:0;">Buscar mi ficha</button></div>
+                            <div><label for="insPortalPassword">Contraseña de acceso *</label><input type="password" id="insPortalPassword" autocomplete="current-password"></div>
+                        </div>
+                        <p class="muted" style="font-size:0.88rem;margin:8px 0 12px;">
+                            <a href="#" id="insPortalForgotLink" style="color:#1d4ed8;font-weight:600;">¿Olvidaste tu contraseña?</a> — escribe al club y te la restablecerán.
+                        </p>
+                        <button type="button" class="btn btn-primary" id="insLookupBtn" style="margin:0;">Acceder y continuar inscripción</button>
+                    </div>
+                    <div id="insLookupAuthWrap" style="display:none;margin-top:14px;padding-top:14px;border-top:1px solid #e2e8f0;">
+                        <p id="insLookupAuthHint" class="muted" style="margin-bottom:10px;"></p>
+                        <div id="insPortalLoginBlock" style="display:none;"></div>
+                        <div id="insPortalSetupBlock" style="display:none;">
+                            <p class="muted" style="font-size:0.9rem;margin-bottom:10px;">Primera vez: confirma el email de la ficha y elige una contraseña (mín. 6 caracteres). Si no se puede guardar, el club la asignará desde el panel de administración.</p>
+                            <label for="insPortalSetupEmail">Email de la ficha *</label>
+                            <input type="email" id="insPortalSetupEmail" autocomplete="email" style="margin-bottom:8px;">
+                            <label for="insPortalSetupPwd">Nueva contraseña *</label>
+                            <input type="password" id="insPortalSetupPwd" autocomplete="new-password" style="margin-bottom:8px;">
+                            <label for="insPortalSetupPwd2">Repetir contraseña *</label>
+                            <input type="password" id="insPortalSetupPwd2" autocomplete="new-password" style="margin-bottom:8px;">
+                            <button type="button" class="btn btn-primary" id="insPortalSetupBtn" style="margin:0 0 8px;">Crear contraseña y continuar</button>
+                            <p class="muted" style="font-size:0.88rem;margin:0;"><a href="#" id="insPortalBackLink2" style="color:#64748b;">Volver</a></p>
+                        </div>
+                        <div id="insPortalResetBlock" style="display:none;">
+                            <p class="muted" style="font-size:0.9rem;margin-bottom:10px;">Si no recuerdas la contraseña, escribe al club con tu DNI y email. Te la restablecerán desde el panel de administración (no hace falta contraseña de Gmail del club).</p>
+                            <label for="insPortalResetEmail">Tu email (opcional, para el mensaje)</label>
+                            <input type="email" id="insPortalResetEmail" autocomplete="email" style="margin-bottom:8px;">
+                            <button type="button" class="btn btn-primary" id="insPortalResetMailtoBtn" style="margin:0 0 8px;">📧 Escribir al club para recuperar acceso</button>
+                            <button type="button" class="btn" id="insPortalResetBtn" style="margin:0 0 8px;display:none;">Enviar enlace automático</button>
+                            <p class="muted" style="font-size:0.82rem;margin:0;">El enlace automático solo funciona si el servidor de correo está configurado en Netlify.</p>
+                            <p class="muted" style="font-size:0.88rem;margin:8px 0 0;"><a href="#" id="insPortalBackLink3" style="color:#64748b;">Volver</a></p>
+                        </div>
+                        <div id="insPortalResetTokenBlock" style="display:none;">
+                            <p class="muted" style="font-size:0.9rem;margin-bottom:10px;">Elige tu nueva contraseña de acceso a la ficha.</p>
+                            <label for="insPortalResetTokenPwd">Nueva contraseña *</label>
+                            <input type="password" id="insPortalResetTokenPwd" autocomplete="new-password" style="margin-bottom:8px;">
+                            <label for="insPortalResetTokenPwd2">Repetir contraseña *</label>
+                            <input type="password" id="insPortalResetTokenPwd2" autocomplete="new-password" style="margin-bottom:8px;">
+                            <button type="button" class="btn btn-primary" id="insPortalResetTokenBtn" style="margin:0;">Guardar contraseña</button>
                         </div>
                     </div>
                     <p id="insLookupMsg" class="muted" style="margin-top:8px;"></p>
                 </section>
+                <section id="insCategorySection" class="card" style="box-shadow:none;padding:0;margin:0 0 16px;">
+                    <h2>Categorías y cuota de inscripción</h2>
+                    <p class="muted" style="margin-top:0;">Marca la categoría a la que perteneces esta temporada:</p>
+                    <input type="hidden" id="insCategory" value="">
+                    <table class="insc-cat-table" aria-label="Cuotas por categoría">
+                        <thead>
+                            <tr>
+                                <th scope="col" style="width:36px;"></th>
+                                <th scope="col">Categoría</th>
+                                <th scope="col">Cuota inscripción</th>
+                            </tr>
+                        </thead>
+                        <tbody id="insCategoryFeesBody"></tbody>
+                    </table>
+                </section>
+
                 <section id="insPersonalSection" class="card" style="box-shadow:none;padding:0;margin:0;">
                     <h2>Datos personales</h2>
                     <div class="grid2">
@@ -156,20 +350,37 @@
                         <div><label for="insDni">DNI <span class="muted" id="insDniHint">(obligatorio si eres mayor de edad)</span></label><input id="insDni"></div>
                         <div><label for="insEmail">Email *</label><input id="insEmail" type="email" required autocomplete="email"></div>
                     </div>
+                    <p id="insEmailSocioHint" class="field-hint-email-socio">El menor no puede compartir el mismo correo que su padre o tutor/a como socios.</p>
                     <div class="grid2">
                         <div><label for="insPhone">Teléfono *</label><input id="insPhone" type="tel" required></div>
                         <div><label for="insBirth">Fecha de nacimiento *</label><input id="insBirth" type="date" required></div>
                     </div>
                     <p class="muted">Edad: <span id="insAge">—</span></p>
-                    <label for="insAddress">Dirección</label>
-                    <input id="insAddress" autocomplete="street-address">
-                    <div class="grid3">
-                        <div><label for="insCategory">Categoría</label><select id="insCategory"></select></div>
-                        <div><label for="insWeight">Peso (kg)</label><input id="insWeight" type="number" min="20" max="200" step="0.1"></div>
-                        <div><label for="insHeight">Altura (cm)</label><input id="insHeight" type="number" min="100" max="230" step="1"></div>
+                    <label for="insDomicilio">Domicilio</label>
+                    <input id="insDomicilio" autocomplete="street-address">
+                    <div class="grid2">
+                        <div><label for="insLocalidad">Localidad</label><input id="insLocalidad" autocomplete="address-level2"></div>
+                        <div><label for="insProvincia">Provincia</label><input id="insProvincia" value="Zamora" autocomplete="address-level1"></div>
                     </div>
-                    <div class="grid3">
-                        <div><label for="insPosition">Posición</label>
+                    <div id="insPortalPwdBlock" class="insc-portal-pwd-block">
+                        <h3>🔒 Contraseña de acceso a tu ficha</h3>
+                        <p class="muted">La usarás en <strong>Acceso</strong> cuando hayas completado la inscripción.</p>
+                        <p id="insPortalPwdExistingHint" class="muted" style="display:none;">Ya tienes contraseña del alta. Déjala en blanco para mantenerla o escribe una nueva.</p>
+                        <div class="grid2">
+                            <div>
+                                <label for="insPortalPasswordNew" id="insPortalPasswordNewLabel">Contraseña *</label>
+                                <input type="password" id="insPortalPasswordNew" autocomplete="new-password" minlength="6">
+                            </div>
+                            <div>
+                                <label for="insPortalPasswordNew2" id="insPortalPasswordNew2Label">Repetir contraseña *</label>
+                                <input type="password" id="insPortalPasswordNew2" autocomplete="new-password" minlength="6">
+                            </div>
+                        </div>
+                    </div>
+                    <h2 style="margin-top:18px;border:none;padding:0;font-size:1rem;">Datos deportivos y médicos</h2>
+                    <div class="insc-medical-grid">
+                        <div>
+                            <label for="insPosition">Posición en el campo</label>
                             <select id="insPosition">
                                 <option value="">—</option>
                                 <option value="portero">Portero/a</option>
@@ -179,7 +390,16 @@
                                 <option value="versatil">Versátil</option>
                             </select>
                         </div>
+                        <div><label for="insBloodGroup">Grupo sanguíneo</label><input id="insBloodGroup" placeholder="Ej. A+"></div>
+                        <div><label for="insHeight">Estatura (cm)</label><input id="insHeight" type="number" min="100" max="230" step="1"></div>
+                        <div><label for="insWeight">Peso (kg)</label><input id="insWeight" type="number" min="20" max="200" step="0.1"></div>
                     </div>
+                    <label for="insInjuries">Lesiones y año en que se produjeron</label>
+                    <textarea id="insInjuries" rows="2" placeholder="Ej. Esguince tobillo — 2024"></textarea>
+                    <label for="insAllergy">Alergia o enfermedad</label>
+                    <textarea id="insAllergy" rows="2" placeholder="Indica alergias o enfermedades relevantes"></textarea>
+                    <label for="insObservations">Observaciones / anotaciones</label>
+                    <textarea id="insObservations" rows="3" placeholder="Cualquier información adicional para el club"></textarea>
                     <p class="muted" style="margin-top:-4px;">El dorsal y el número de licencia federativa los asignará el club cuando corresponda (no se solicitan en esta inscripción).</p>
                     <label for="insPhoto">Foto (opcional, máx. 2 MB)</label>
                     <input id="insPhoto" type="file" accept="image/*">
@@ -201,36 +421,70 @@
                 </div>
 
                 <section class="card">
-                    <h2>Equipación — tallas</h2>
-                    <p class="muted">Tallas disponibles: 4, 6, 8, 10, 12, 14, XS, S, M, L, XL, XXL, XXXL</p>
+                    <h2>Ropa entreno</h2>
+                    <table class="insc-size-guide" aria-label="Guía de tallas">
+                        <thead>
+                            <tr>
+                                <th scope="col">Guía tallas</th>
+                                <th scope="col">6/8</th>
+                                <th scope="col">10/12</th>
+                                <th scope="col">S</th>
+                                <th scope="col">M</th>
+                                <th scope="col">L</th>
+                                <th scope="col">XL</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr><td colspan="7" class="muted" style="font-size:0.78rem;">Indica la talla de cada prenda que necesites</td></tr>
+                        </tbody>
+                    </table>
                     <div id="kitGarmentsWrap"></div>
-                </section>
-
-                <section class="card">
-                    <h2>Cuotas de la temporada</h2>
-                    <p class="muted">Marca lo que deseas pagar ahora (según configuración del club):</p>
-                    <div id="feeCheckboxes"></div>
                 </section>
 
                 <section class="card" id="insConsentSection">
                     <h2>Consentimientos</h2>
-                    <label class="fee-line" id="insClubRulesLine" style="display:none;"><input type="checkbox" id="insClubRules"> He leído y acepto las normas y el compromiso deportivo del CD Sanabria CF *</label>
+                    <label class="fee-line" id="insClubRulesLine" style="display:none;align-items:flex-start;">
+                        <input type="checkbox" id="insClubRules" style="margin-top:4px;">
+                        <span>
+                            <span class="ins-club-rules-text">He leído y acepto las Normas y condiciones de inscripción del CD Sanabria CF *</span>
+                            <button type="button" class="ins-legal-link ins-club-rules-ver" id="insOpenCompromisoBtn">Ver aquí</button>
+                        </span>
+                    </label>
                     <label class="fee-line"><input type="checkbox" id="insPlayerConsent"> Consentimiento para ser jugador/a del CD Sanabria CF *</label>
                     <label class="fee-line"><input type="checkbox" id="insPhotoConsent"> Consentimiento para aparecer en fotos y vídeos del club *</label>
                 </section>
 
                 <section class="card">
-                    <h2>Resumen y pago</h2>
+                    <h2>Resumen del pago</h2>
                     <div id="cartLines"></div>
-                    <div class="cart-total">Total: <span id="cartTotal">0,00 €</span></div>
-                    <div id="payCardBlock"><button type="button" class="btn btn-card" id="btnPayCard">💳 Pagar con tarjeta</button></div>
+                    <div class="cart-total">Total a pagar: <span id="cartTotal">0,00 €</span></div>
+                    <div id="payCardBlock"><button type="button" class="btn btn-card" id="btnPayCard">💳 Pagar con tarjeta o Bizum</button></div>
                     <div id="payBizumBlock"><button type="button" class="btn btn-bizum" id="btnPayBizum">📱 Pagar con Bizum</button></div>
-                    <div id="payTransferBlock"><button type="button" class="btn btn-transfer" id="btnPayTransfer">🏦 Solicitar inscripción por transferencia o efectivo</button></div>
-                    <p class="muted" style="margin-top:12px;">Si ya eres socio/a, al marcar cuota de socio se vincula tu ficha por DNI sin crear un alta duplicada.</p>
+                    <div id="payTransferBlock"><button type="button" class="btn btn-transfer" id="btnPayTransfer">🏦 Solicitar inscripción por transferencia, efectivo o TPV</button></div>
                 </section>
             </div>
         </div>
     </div>
+    <div id="insCompromisoModal" class="ins-modal-overlay" role="dialog" aria-modal="true" aria-labelledby="insCompromisoTitle" style="display:none;">
+        <div class="ins-modal-panel">
+            <div class="ins-modal-brand">
+                <img src="assets/escudo-cdsanabriacf.png" alt="Escudo CD Sanabria CF" width="96" height="96" onerror="this.onerror=null;this.src='assets/escudo-192.png';">
+            </div>
+            <div class="ins-modal-head">
+                <h2 id="insCompromisoTitle">Normas y condiciones de inscripción</h2>
+                <button type="button" class="ins-modal-close" data-ins-compromiso-close aria-label="Cerrar">&times;</button>
+            </div>
+            <div class="ins-modal-body" id="insCompromisoLegalBody"></div>
+            <div class="ins-modal-foot">
+                <button type="button" class="btn btn-primary" data-ins-compromiso-close style="margin:0;">Cerrar</button>
+            </div>
+        </div>
+    </div>
+    <div id="siteUpdateBanner" class="site-update-banner" role="status" aria-live="polite" hidden style="background:#fef3c7;color:#92400e;border-bottom:1px solid #f59e0b;padding:12px 16px;text-align:center;font-size:0.92rem;line-height:1.45;">
+        <span id="siteUpdateBannerText"></span>
+    </div>
+    <script src="js/admin-session.js"></script>
+    <script src="js/site-update-mode.js"></script>
     <script src="js/club-season.js"></script>
     <script src="js/club-inscription-config.js"></script>
     <script src="js/player-application.js"></script>
@@ -239,7 +493,14 @@
     <script type="module" src="js/firebase-config.js"></script>
     <script src="js/redsys-payments.js"></script>
     <script src="js/club-social-share.js"></script>
+    <script src="js/club-contact-defaults.js"></script>
+    <script src="js/club-mailto.js"></script>
+    <script src="js/club-email-notify.js"></script>
+    <script src="js/payment-method-picker.js"></script>
+    <script src="js/club-password-hash.js"></script>
+    <script src="js/player-portal-auth.js"></script>
     <script src="js/player-inscription.js"></script>
+    <script src="js/club-inscription-legal.js"></script>
     <script src="js/inscripcion-jugador-ui.js"></script>
 </body>
 </html>

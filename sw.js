@@ -3,9 +3,9 @@
  * Compatible con iOS, Android, HarmonyOS y notificaciones push
  */
 
-const CACHE_NAME = 'cdsanabriacf-v2.0.9';
-const STATIC_CACHE = 'cdsanabriacf-static-v2.0.9';
-const DYNAMIC_CACHE = 'cdsanabriacf-dynamic-v2.0.9';
+const CACHE_NAME = 'cdsanabriacf-v2.1.0';
+const STATIC_CACHE = 'cdsanabriacf-static-v2.1.0';
+const DYNAMIC_CACHE = 'cdsanabriacf-dynamic-v2.1.0';
 
 // Archivos críticos para cache (solo rutas que existen en el despliegue)
 const STATIC_ASSETS = [
@@ -13,14 +13,20 @@ const STATIC_ASSETS = [
   '/index.html',
   '/admin-panel.html',
   '/js/firebase-config.js',
+  '/js/site-update-mode.js',
+  '/js/admin-session.js',
+  '/js/club-contact-defaults.js',
+  '/js/torneo-preinscripcion.js',
+  '/js/player-application.js',
+  '/js/protocol-guard.js',
   '/js/notification-system.js',
   '/js/club-accounting.js',
   '/js/support-mode.js',
   '/js/permissionmanager.js',
-  '/database.js',
   '/manifest.json',
   '/assets/escudo-cdsanabriacf.png',
-  '/test-persistencia.html'
+  '/assets/escudo-192.png',
+  '/assets/torneo-futbol-7-2026.jpeg'
 ];
 
 // URLs dinámicas para cache

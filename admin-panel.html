@@ -31,13 +31,19 @@
     <!-- Misma capa Firebase que la web: sincroniza socios (sanabria_members → localStorage) para el panel -->
     <script src="js/club-password-hash.js"></script>
     <script src="js/protocol-guard.js"></script>
+    <script src="js/admin-session.js"></script>
     <script src="js/club-member-numbers.js"></script>
     <script src="js/club-member-card.js"></script>
     <script src="js/club-role-links.js"></script>
     <script src="js/club-inscription-config.js"></script>
     <script src="js/club-season.js"></script>
+    <script src="js/club-contact-defaults.js"></script>
+    <script src="js/club-mailto.js"></script>
+    <script src="js/site-update-mode.js"></script>
     <script src="js/admin-inscription-config.js"></script>
     <script src="js/player-application.js"></script>
+    <script src="js/colaborador-solicitud.js"></script>
+    <script src="js/admin-torneo-preinscripciones.js"></script>
     <script src="js/admin-player-applications.js"></script>
     <script src="js/player-inscription.js"></script>
     <script src="js/club-player-export-config.js"></script>
@@ -205,6 +211,36 @@
             outline-offset: 2px;
         }
 
+        .site-update-admin-wrap {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            align-items: center;
+        }
+
+        .site-update-admin-btn {
+            background: #475569;
+            color: #fff;
+            border: none;
+            padding: 10px 18px;
+            border-radius: 8px;
+            font-size: 0.9rem;
+            font-weight: 600;
+            cursor: pointer;
+        }
+
+        .site-update-admin-btn:hover {
+            opacity: 0.92;
+        }
+
+        .site-update-admin-btn.is-on {
+            background: #b45309;
+        }
+
+        .site-update-admin-btn--edit {
+            background: #1e3a8a;
+        }
+
         .section {
             margin-bottom: 40px;
             padding: 25px;
@@ -328,9 +364,87 @@
             background: #fee2e2;
             color: #991b1b;
         }
+
+        .admin-session-gate {
+            display: none;
+            position: fixed;
+            inset: 0;
+            z-index: 99999;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+            background: linear-gradient(135deg, #1e3a8a 0%, #3b82f6 100%);
+        }
+
+        .admin-session-gate.is-visible {
+            display: flex;
+        }
+
+        body.admin-access-denied .admin-container {
+            display: none !important;
+        }
+
+        .admin-session-gate-card {
+            max-width: 440px;
+            width: 100%;
+            background: #fff;
+            border-radius: 14px;
+            padding: 28px 24px;
+            box-shadow: 0 16px 40px rgba(0, 0, 0, 0.25);
+            text-align: center;
+        }
+
+        .admin-session-gate-card h2 {
+            margin: 0 0 12px;
+            color: #1e3a8a;
+            font-size: 1.25rem;
+        }
+
+        .admin-session-gate-card p {
+            margin: 0 0 20px;
+            color: #475569;
+            line-height: 1.5;
+            font-size: 0.95rem;
+        }
+
+        .admin-session-gate-actions {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .admin-session-gate-actions button {
+            padding: 12px 16px;
+            border: none;
+            border-radius: 8px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+        }
+
+        .admin-session-gate-primary {
+            background: #059669;
+            color: #fff;
+        }
+
+        .admin-session-gate-secondary {
+            background: #e2e8f0;
+            color: #334155;
+        }
     </style>
 </head>
 <body>
+    <div id="adminSessionGate" class="admin-session-gate" role="alertdialog" aria-modal="true" aria-labelledby="adminSessionGateTitle">
+        <div class="admin-session-gate-card">
+            <h2 id="adminSessionGateTitle">🔒 Acceso al panel</h2>
+            <p id="adminSessionGateMsg">Inicia sesión de administrador desde la página principal del club.</p>
+            <div class="admin-session-gate-actions">
+                <button type="button" class="admin-session-gate-primary" onclick="goToMainAdminLogin()">Iniciar sesión en la web principal</button>
+                <button type="button" class="admin-session-gate-secondary" onclick="closeAdminPanelWindow()">Cerrar panel</button>
+            </div>
+        </div>
+    </div>
+
     <div class="admin-container">
         <!-- Header -->
         <div class="admin-header">
@@ -398,6 +512,18 @@
                 </div>
                 
                 <h2>📊 Panel de Control</h2>
+
+                <div class="section" style="background:#fffbeb;padding:20px;border-radius:12px;border:2px solid #fcd34d;margin-bottom:24px;">
+                    <h3 style="margin-top:0;">🛠️ Modo actualización (web pública)</h3>
+                    <p style="color:#64748b;font-size:0.92rem;margin:0 0 12px;line-height:1.5;">
+                        Activa o desactiva el bloqueo de registros e inscripciones en la página principal. Los visitantes siguen viendo la web, la tienda y el torneo. El estado se guarda en Firestore y se aplica en todos los dispositivos.
+                    </p>
+                    <p id="siteUpdateAdminStatus" style="font-size:0.88rem;margin:0 0 14px;color:#92400e;display:none;"></p>
+                    <span id="siteUpdateAdminWrap" class="site-update-admin-wrap">
+                        <button type="button" id="siteUpdateToggleBtn" class="site-update-admin-btn" aria-pressed="false">Actualización: OFF</button>
+                        <button type="button" id="siteUpdateEditMsgBtn" class="site-update-admin-btn site-update-admin-btn--edit" hidden>Editar aviso visitantes</button>
+                    </span>
+                </div>
                 
                 <div class="dashboard-cards">
                     <div class="dashboard-card dashboard-card--clickable" role="button" tabindex="0" onclick="showTab('equipos')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();showTab('equipos');}" title="Ir a gestión de equipos">
@@ -443,7 +569,7 @@
                         <li><strong>🎉 Eventos:</strong> Actividades y calendario; precios por perfil (incl. entrenadores/as) y exportación Excel/CSV/Word/PDF de inscritos para conciliar cobros.</li>
                         <li><strong>🏆 Competiciones:</strong> Crea y gestiona ligas, torneos y campeonatos</li>
                         <li><strong>👨‍👩‍👧‍👦 Socios:</strong> Administra la base de socios del club</li>
-                        <li><strong>💶 Cuotas y cobros (contabilidad operativa):</strong> pestaña Socios — altas, renovación de temporada, validación de ingresos <strong>una a una</strong> al comprobar el abono en cuenta. Los datos se guardan en el navegador y se sincronizan con Firebase cuando está configurado.</li>
+                        <li><strong>💶 Cuotas y cobros (contabilidad operativa):</strong> pestaña Socios — altas, renovación de temporada, validación de ingresos <strong>una a una</strong> al comprobar el abono en cuenta. Los datos se guardan en el navegador y se sincronizan con la nube cuando está activa.</li>
                         <li><strong>🏪 Tienda:</strong> pestaña Tienda — enlace al panel de ventas y URL externa si la usáis; pedidos y catálogo en los HTML dedicados de tienda.</li>
                         <li><strong>📸 Multimedia:</strong> Gestiona fotos y videos del club</li>
                     </ul>
@@ -457,14 +583,14 @@
 
                 <!-- Sección de Sincronización -->
                 <div class="section">
-                    <h2>🔄 Sincronización de Datos con Firebase</h2>
-                    <p><strong>✅ Plataforma Turisteam</strong> — datos del club en Firebase <code>cdsanabriacf2026</code> (sin Railway).</p>
+                    <h2>🔄 Sincronización de datos en la nube</h2>
+                    <p><strong>✅ CD Sanabria CF</strong> — los datos del club se guardan en la nube y están disponibles en web y móvil.</p>
                     
                     <div style="background: #d1ecf1; padding: 15px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #17a2b8;">
-                        <h4>🔥 Firebase del club (cdsanabriacf2026):</h4>
-                        <p>Los datos se sincronizan automáticamente entre web y móvil usando Firebase:</p>
+                        <h4>☁️ Nube del club:</h4>
+                        <p>Los datos se sincronizan automáticamente entre web y móvil:</p>
                         <ol style="margin: 10px 0; padding-left: 20px;">
-                            <li><strong>Crear socios en la web</strong> (se guardan en Firebase automáticamente)</li>
+                            <li><strong>Crear socios en la web</strong> (se guardan en la nube automáticamente)</li>
                             <li><strong>Los datos están disponibles en móvil</strong> (sincronización en tiempo real)</li>
                             <li><strong>Sincronización manual disponible</strong> usando los botones de abajo</li>
                         </ol>
@@ -472,16 +598,16 @@
 
                     <div style="display: flex; gap: 15px; flex-wrap: wrap; margin-top: 20px;">
                         <button class="btn" onclick="sincronizarSociosConBackend()" style="background: #28a745;">
-                            🔄 Subir socios a Firebase
+                            🔄 Subir socios a la nube
                         </button>
                         <button class="btn" onclick="obtenerSociosDelBackend()" style="background: #17a2b8;">
-                            📥 Descargar socios desde Firebase
+                            📥 Descargar socios desde la nube
                         </button>
                         <button class="btn" onclick="verificarEstadoFirebase()" style="background: #6c757d;">
-                            🔍 Verificar Estado Firebase
+                            🔍 Verificar estado de la nube
                         </button>
                         <button class="btn" onclick="auditarSincronizacionModulos()" style="background: #0ea5e9;">
-                            🧪 Auditoría Módulos (Firebase)
+                            🧪 Auditoría de módulos (nube)
                         </button>
                         <button class="btn" onclick="reconciliarModulosConFirebase()" style="background: #2563eb;">
                             🛠️ Reconciliar ahora
@@ -492,11 +618,11 @@
                     </div>
 
                     <div style="background: #d4edda; padding: 15px; border-radius: 8px; margin-top: 20px; border-left: 4px solid #28a745;">
-                        <h4>📋 Estado Actual:</h4>
-                        <p><strong>✅ Web:</strong> Netlify + Firebase <code>cdsanabriacf2026</code></p>
-                        <p><strong>✅ PWA / móvil:</strong> Misma Firebase (sin Railway)</p>
-                        <p><strong>✅ Sincronización:</strong> Firestore + Auth del club</p>
-                        <p><strong>🔥 Proyecto:</strong> cdsanabriacf2026 · appScope <code>cdsanabriacf</code></p>
+                        <h4>📋 Estado actual:</h4>
+                        <p><strong>✅ Web:</strong> Publicada en internet con copia en la nube</p>
+                        <p><strong>✅ PWA / móvil:</strong> Mismos datos en tiempo real</p>
+                        <p><strong>✅ Sincronización:</strong> Activa entre dispositivos</p>
+                        <p><strong>☁️ Respaldo:</strong> Datos del club en servidor en la nube</p>
                     </div>
                 </div>
             </div>
@@ -581,7 +707,7 @@
                         <h3 style="margin:0;color:#059669;">📝 Configuración inscripciones (web pública)</h3>
                         <span id="inscStatusBadge" style="color:#fff;padding:6px 14px;border-radius:20px;font-weight:700;font-size:0.85rem;">—</span>
                     </div>
-                    <p style="color:#64748b;font-size:0.9rem;margin-top:0;">Temporadas 2026-2027 y sucesivas. Los datos quedan en Firebase y en el panel (jugadores/socios).</p>
+                    <p style="color:#64748b;font-size:0.9rem;margin-top:0;">Temporadas 2026-2027 y sucesivas. Los datos quedan en la nube y en el panel (jugadores/socios).</p>
                     <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:12px;">
                         <div>
                             <label style="font-weight:bold;">Temporada</label>
@@ -1258,6 +1384,21 @@
                     <h3>📋 Lista de Eventos</h3>
                     <div id="eventsList">
                         <!-- Los eventos se cargarán aquí dinámicamente -->
+                    </div>
+                </div>
+
+                <!-- Preinscripciones torneo (Firestore) -->
+                <div class="section" style="background:#eff6ff;padding:20px;border-radius:12px;border:2px solid #93c5fd;margin-top:24px;">
+                    <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;margin-bottom:12px;">
+                        <div>
+                            <h3 style="margin:0;">🏆 Preinscripciones torneo</h3>
+                            <p style="color:#64748b;font-size:0.92rem;margin:6px 0 0;">Solicitudes del formulario público (Torneo Fútbol 7). Se guardan en Firestore al enviar; el correo sigue yendo por mailto.</p>
+                        </div>
+                        <button type="button" class="btn btn-success" onclick="loadTorneoPreinscripcionesAdmin()">🔄 Actualizar listado</button>
+                    </div>
+                    <p style="margin:0 0 12px;font-size:0.9rem;"><strong>Total:</strong> <span id="torneoPreinscripcionesAdminCount">0</span></p>
+                    <div id="torneoPreinscripcionesAdminList">
+                        <p style="color:#64748b;margin:0;">Pulsa «Actualizar listado» para cargar desde Firestore.</p>
                     </div>
                 </div>
             </div>
@@ -2080,6 +2221,37 @@
                     </div>
                 </div>
 
+                <!-- Formulario público colaboradores -->
+                <div class="section" style="background: #f0fdf4; padding: 20px; border-radius: 12px; border: 2px solid #86efac; margin-bottom: 24px;">
+                    <h3>🤝 Formulario público de colaboradores</h3>
+                    <p style="color:#64748b;font-size:0.92rem;margin:0 0 16px;">
+                        Configura las opciones del modal «Colabora» (cuadro «No hay publicidad activa»). Los visitantes envían la solicitud por correo al club.
+                    </p>
+                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px;">
+                        <div>
+                            <label style="display:block;font-weight:bold;margin-bottom:4px;">Título del modal</label>
+                            <input type="text" id="colabCfgModalTitle" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:4px;">
+                        </div>
+                        <div>
+                            <label style="display:block;font-weight:bold;margin-bottom:4px;">Texto introductorio</label>
+                            <input type="text" id="colabCfgModalIntro" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:4px;">
+                        </div>
+                    </div>
+                    <h4 style="margin:16px 0 8px;">Opciones de publicidad (checkbox + precio)</h4>
+                    <div id="colabCfgServicesList" style="display:flex;flex-direction:column;gap:8px;margin-bottom:12px;"></div>
+                    <button type="button" class="btn" onclick="addColaboradorFormConfigRow()" style="margin-right:8px;">➕ Añadir opción</button>
+                    <button type="button" class="btn btn-success" onclick="saveColaboradorFormConfigAdmin()">💾 Guardar formulario colaboradores</button>
+
+                    <div style="margin-top:20px;padding-top:16px;border-top:1px solid #86efac;">
+                        <h4 style="margin:0 0 8px;">Vista previa y diagnóstico local</h4>
+                        <p style="color:#64748b;font-size:0.88rem;margin:0 0 12px;">El listado de solicitudes solo existe en el navegador donde se envió (localStorage). La vista previa muestra el cuerpo del correo mailto con datos de ejemplo.</p>
+                        <button type="button" class="btn" onclick="previewColaboradorMailAdmin()" style="margin-right:8px;">👁 Vista previa del correo</button>
+                        <button type="button" class="btn" onclick="renderColaboradorSubmissionsAdmin()">📋 Actualizar solicitudes locales</button>
+                        <pre id="colabCfgMailPreview" style="display:none;margin-top:12px;padding:12px;background:#fff;border:1px solid #d1fae5;border-radius:8px;white-space:pre-wrap;font-size:0.82rem;max-height:320px;overflow:auto;"></pre>
+                        <div id="colabCfgSubmissionsList" style="margin-top:12px;"></div>
+                    </div>
+                </div>
+
                 <!-- Estadísticas de publicidad -->
                 <div class="section">
                     <h3>📊 Estadísticas de Publicidad</h3>
@@ -2673,7 +2845,7 @@
                     
                     <div id="dbFirebaseStatus" style="text-align: center; margin: 20px 0; padding: 15px; background: #dbeafe; border-radius: 8px; color: #1e3a8a;">
                         <span style="display: inline-block; width: 12px; height: 12px; background: #2563eb; border-radius: 50%; margin-right: 8px;"></span>
-                        <strong>Sincronizado con Firebase (misma fuente que Socios, Amigos y el resto de pestañas)</strong>
+                        <strong>Sincronizado con la nube (misma fuente que Socios, Amigos y el resto de pestañas)</strong>
                     </div>
                     <p style="text-align:center;color:#64748b;font-size:0.9rem;margin:-8px 0 16px 0;">
                         Una misma persona puede contar en varias casillas (p. ej. socio + jugador + entrenador + directiva). Los totales no son excluyentes entre sí.
@@ -2734,8 +2906,8 @@
 
                         <div style="background: white; padding: 20px; border-radius: 10px; border-left: 4px solid #dc2626; box-shadow: 0 4px 12px rgba(0,0,0,0.1);">
                             <h4 style="color: #dc2626; margin-bottom: 15px;">🗑️ Limpiar Base de Datos</h4>
-                            <p style="margin-bottom: 15px;">⚠️ <strong>PELIGROSO:</strong> Elimina todos los datos de la base de datos.</p>
-                            <button class="btn" style="background: #dc2626; margin-right: 10px;" onclick="limpiarBaseDeDatos()">🗑️ Limpiar Todo</button>
+                            <p style="margin-bottom: 15px;">⚠️ <strong>PELIGROSO:</strong> Deja a cero socios, jugadores y solicitudes en Firebase y en este dispositivo.</p>
+                            <button class="btn" style="background: #dc2626; margin-right: 10px;" onclick="limpiarBaseDeDatos()">🗑️ Reset socios y jugadores</button>
                             <button class="btn" style="background: #f59e0b; margin-right: 10px;" onclick="limpiarSocios()">👥 Limpiar Solo Socios</button>
                             <button class="btn btn-secondary" onclick="mostrarEstadisticasDuplicados()">📊 Ver Duplicados</button>
                             <div id="dbCleanStatus"></div>
@@ -3078,7 +3250,7 @@
                         <div style="margin-bottom: 15px;">
                             <label style="display: block; margin-bottom: 5px; font-weight: bold;">Contraseña *</label>
                             <input type="password" id="memberPassword" required style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
-                            <small style="color: #666;">Solo para alta inicial; no se guarda en el panel. El socio accede con Firebase Auth (correo + esta clave).</small>
+                            <small style="color: #666;">Solo para alta inicial; no se guarda en el panel. El socio accede con su cuenta del club (correo + esta clave).</small>
                         </div>
 
                         <!-- Flujo de validación (pago en cuenta) -->
@@ -3103,7 +3275,7 @@
                                 Tras el <strong>31 de agosto</strong>, el botón inferior <strong>marca como pendientes de pago</strong> a los socios <strong>activos</strong> (renovación). Ellos ingresan la cuota; tú <strong>validas uno a uno</strong> cuando veas el movimiento en el banco — igual que con las altas nuevas.
                             </p>
                             <p style="margin: 5px 0; font-size: 0.9em;">
-                                Cuota <strong>menor (10 €)</strong> / <strong>mayor (20 €)</strong> según edad en el <strong>31/08</strong> del año que indiques.
+                                Cuota <strong>menor (10 €)</strong> / <strong>mayor (25 €)</strong> según edad en el <strong>31/08</strong> del año que indiques.
                             </p>
                             <p style="margin: 5px 0; text-align: center;">
                                 <button type="button" class="btn" onclick="iniciarNuevaTemporadaCuotas()" style="background: #0284c7; color: white;">📆 Nueva temporada (marcar pendientes de pago)</button>
@@ -3159,7 +3331,7 @@
             <div id="multimedia" class="tab-content">
                 <h2>📸 Multimedia</h2>
                 <div class="section">
-                    <p><strong>Galería del club</strong> (sincronizada con Firebase, colección <code>sanabria_media</code>). Usa enlaces públicos (YouTube, Vimeo, o URL de imagen) para no sobrecargar Firestore.</p>
+                    <p><strong>Galería del club</strong> (sincronizada con la nube). Usa enlaces públicos (YouTube, Vimeo, o URL de imagen) para no sobrecargar el almacenamiento.</p>
                     <div style="background:#f8f9fa;padding:20px;border-radius:10px;border:2px solid #e9ecef;margin-bottom:20px;">
                         <div style="display:grid;grid-template-columns:1fr 1fr;gap:15px;margin-bottom:12px;">
                             <div>
@@ -3504,7 +3676,7 @@
 
                 <div class="section">
                     <h3>📒 Libro de asientos</h3>
-                    <p style="color:#64748b; margin-bottom:12px;">Ordenados del más reciente al más antiguo (máx. 500 en pantalla). Los cambios se guardan en este equipo y, si Firebase está activo, se sincronizan con la nube.</p>
+                    <p style="color:#64748b; margin-bottom:12px;">Ordenados del más reciente al más antiguo (máx. 500 en pantalla). Los cambios se guardan en este equipo y, si la nube está activa, se sincronizan automáticamente.</p>
                     <div style="overflow-x:auto; max-height:480px; border:1px solid #e2e8f0; border-radius:8px;">
                         <table style="width:100%; border-collapse:collapse; font-size:0.9rem;">
                             <thead style="background:#f1f5f9; position:sticky; top:0;">
@@ -3702,12 +3874,13 @@
                 <!-- Datos de Contacto -->
                 <div class="section">
                     <h3>📞 Datos de Contacto</h3>
-                    <p><strong>Información de contacto del club</strong></p>
+                    <p><strong>Información de contacto del club</strong> (se muestra en la web y en los avisos por correo de solicitudes de jugador).</p>
+                    <p style="font-size:0.9rem;color:#64748b;margin:0 0 12px;">Email por defecto del club: <strong>cdsanabriafc@gmail.com</strong>. Pulsa <strong>Guardar contacto</strong> para fijarlo en la nube.</p>
                     
                     <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin: 20px 0;">
                         <div>
                             <label style="display: block; margin-bottom: 5px; font-weight: bold;">📧 Email del Club</label>
-                            <input type="email" id="clubEmail" placeholder="club@cdsanabriacf.com" style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 8px;">
+                            <input type="email" id="clubEmail" placeholder="cdsanabriafc@gmail.com" value="cdsanabriafc@gmail.com" style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 8px;">
                         </div>
                         <div>
                             <label style="display: block; margin-bottom: 5px; font-weight: bold;">📱 Teléfono</label>
@@ -3797,7 +3970,7 @@
                         <div style="background: white; padding: 20px; border-radius: 10px; border-left: 4px solid #059669;">
                             <h4 style="color: #059669; margin-bottom: 15px;">🔄 Sincronización</h4>
                             <p><strong>Estado:</strong> <span id="estadoSincronizacion">⏳ Verificando...</span></p>
-                            <p><strong>Firebase (cliente):</strong> <span id="estadoFirebaseSync">⏳ Verificando...</span></p>
+                            <p><strong>Nube (conexión):</strong> <span id="estadoFirebaseSync">⏳ Verificando...</span></p>
                             <p><strong>Última actualización:</strong> <span id="ultimaActualizacion">--</span></p>
                         </div>
                         
@@ -3805,7 +3978,7 @@
                             <h4 style="color: #3b82f6; margin-bottom: 15px;">💾 Almacenamiento</h4>
                             <p><strong>localStorage:</strong> <span id="estadoLocalStorage">⏳ Verificando...</span></p>
                             <p><strong>IndexedDB:</strong> <span id="estadoPersistence">⏳ Verificando...</span></p>
-                            <p><strong>Módulo Firebase cargado:</strong> <span id="estadoFirebaseHealth">⏳ Verificando...</span></p>
+                            <p><strong>Servicio en la nube:</strong> <span id="estadoFirebaseHealth">⏳ Verificando...</span></p>
                         </div>
                     </div>
                 </div>
@@ -3900,27 +4073,67 @@
     </div>
 
         <script>
+        function showAdminSessionGate(message) {
+            document.body.classList.add('admin-access-denied');
+            const gate = document.getElementById('adminSessionGate');
+            const msgEl = document.getElementById('adminSessionGateMsg');
+            if (msgEl && message) msgEl.textContent = message;
+            if (gate) gate.classList.add('is-visible');
+        }
+
+        function goToMainAdminLogin() {
+            window.location.replace('index.html?adminLogin=1');
+        }
+
+        function closeAdminPanelWindow() {
+            try {
+                if (window.opener && !window.opener.closed) {
+                    window.close();
+                    return;
+                }
+            } catch (_) {}
+            window.location.replace('index.html');
+            setTimeout(function () {
+                try {
+                    window.close();
+                } catch (_) {}
+            }, 400);
+        }
+
         async function verifyFirebaseAdminSession() {
             if (window.__CDSAN_FILE_PROTOCOL__ || location.protocol === 'file:') {
-                alert('🔒 El panel de administración requiere la web publicada del club (HTTPS), no un archivo local.');
-                window.location.href = './index.html';
+                showAdminSessionGate('El panel de administración requiere la web publicada del club (HTTPS), no un archivo local.');
                 return false;
             }
             if (typeof window.waitForFirebaseReady === 'function') {
                 const ready = await window.waitForFirebaseReady(20000);
                 if (!ready.ok) {
-                    alert('🔒 Firebase no cargó. Abre index.html por http:// y vuelve a iniciar sesión como admin.');
-                    window.location.href = './index.html';
+                    showAdminSessionGate('No se pudo conectar con la nube. Abre la web del club, inicia sesión como administrador y vuelve a abrir el panel.');
                     return false;
                 }
             }
             if (!window.firebaseAuth || window.firebaseAuth.isSimulation) {
                 return true;
             }
-            const user = window.firebaseAuth.currentUser;
+
+            const waitAuth =
+                typeof window.waitForFirebaseAuthUser === 'function'
+                    ? window.waitForFirebaseAuthUser
+                    : function () {
+                          return Promise.resolve(window.firebaseAuth.currentUser || null);
+                      };
+            const user = await waitAuth(12000);
+
             if (!user) {
-                alert('🔒 Sesión Firebase caducada. Inicia sesión de administrador desde la página principal.');
-                window.location.href = './index.html';
+                if (window.AdminSession && window.AdminSession.clearStoredAdminSession) {
+                    window.AdminSession.clearStoredAdminSession();
+                } else {
+                    localStorage.removeItem('currentAdmin');
+                    localStorage.removeItem('adminUser');
+                }
+                showAdminSessionGate(
+                    'Sesión caducada o no iniciada. Vuelve a la página principal e inicia sesión como administrador.'
+                );
                 return false;
             }
             try {
@@ -3928,8 +4141,7 @@
                 const col = (window.DB_COLLECTIONS && window.DB_COLLECTIONS.ADMINS) || 'sanabria_admins';
                 const snap = await getDoc(doc(window.firebaseDb, col, user.uid));
                 if (!snap.exists()) {
-                    alert('🔒 Tu usuario no tiene permisos de administrador en Firebase.');
-                    window.location.href = './index.html';
+                    showAdminSessionGate('Tu usuario no tiene permisos de administrador en la nube del club.');
                     return false;
                 }
                 const d = snap.data() || {};
@@ -3937,8 +4149,7 @@
                     d.appScope === 'cdsanabriacf'
                     && (d.isAdmin === true || d.isSuperAdmin === true || d.role === 'admin' || d.role === 'super_admin');
                 if (!ok) {
-                    alert('🔒 Sin permisos de administrador en Firebase.');
-                    window.location.href = './index.html';
+                    showAdminSessionGate('Sin permisos de administrador en la nube del club.');
                     return false;
                 }
                 return true;
@@ -3976,19 +4187,12 @@
                 }, 500);
             }
 
-            // Reconciliación opcional al abrir para arrancar siempre consistente.
+            // Reconciliación al abrir: solo el resumen final (sin otros avisos previos).
             setTimeout(() => {
                 intentarReconciliacionAutomaticaAlAbrir().catch((err) => {
                     console.warn('No se pudo ejecutar reconciliación automática al abrir:', err);
                 });
             }, 1200);
-
-            // Paso de temporada opcional al abrir (independiente de reconciliación).
-            setTimeout(() => {
-                intentarPasoTemporadaAutomaticoAlAbrir().catch((err) => {
-                    console.warn('No se pudo ejecutar paso de temporada automático al abrir:', err);
-                });
-            }, 1800);
 
             // Copia de respaldo en archivo JSON como máximo una vez por día (misma lógica que «Backup Club»).
             setTimeout(() => {
@@ -4013,8 +4217,7 @@
                 const currentAdmin = JSON.parse(localStorage.getItem('currentAdmin') || '{}');
                 
                 if (!currentAdmin.email) {
-                    alert('🔒 Sesión de administrador no válida. Inicia sesión desde la web principal.');
-                    window.location.href = './index.html';
+                    showAdminSessionGate('Sesión de administrador no válida. Inicia sesión desde la web principal.');
                     return false;
                 }
                 
@@ -4039,8 +4242,7 @@
                 return true;
             } catch (error) {
                 console.error('❌ Error verificando sesión:', error);
-                alert('🔒 Error de sesión de administrador. Vuelve a iniciar sesión.');
-                window.location.href = './index.html';
+                showAdminSessionGate('Error de sesión de administrador. Vuelve a iniciar sesión en la web principal.');
                 return false;
             }
         }
@@ -4101,15 +4303,7 @@
             return names[tabName] || tabName;
         }
 
-        // Función para cerrar sesión
-        function logout() {
-            if (confirm('¿Estás seguro de que quieres cerrar sesión?')) {
-                localStorage.removeItem('currentAdmin');
-                console.log('👋 Sesión cerrada');
-                alert('✅ Sesión cerrada correctamente');
-                window.location.href = '../admin-panel.html';
-            }
-        }
+        // (logout definido al final del archivo)
 
         // Función para verificar permisos de administrador
         function checkAdminPermissions() {
@@ -4155,7 +4349,7 @@
             const element = document.getElementById(elementId);
             if (!element) return;
             element.textContent = '••••••••';
-            element.title = 'Las contraseñas no se muestran. Usa Firebase Authentication.';
+            element.title = 'Las contraseñas no se muestran. Usa la cuenta del club en la nube.';
         }
 
         // Funciones para gestión de administradores (solo para administrador principal)
@@ -4229,9 +4423,9 @@
                 alert(
                     '✅ Datos del administrador guardados (sin contraseña en este navegador).\n\n' +
                     '📧 ' + adminData.email + '\n\n' +
-                    '🔐 Crea el usuario en Firebase Authentication y el documento sanabria_admins/{UID} con appScope y isAdmin.\n' +
+                    '🔐 Crea la cuenta de administrador en la nube del club (contacto con soporte técnico si hace falta).\n' +
                     (adminPasswordField
-                        ? '\n⚠️ La contraseña escrita aquí no se almacena: configúrala en Firebase Console o con «Restablecer contraseña».'
+                        ? '\n⚠️ La contraseña escrita aquí no se almacena: configúrala con «Restablecer contraseña» o desde soporte técnico.'
                         : '')
                 );
                 document.getElementById('adminPassword').value = '';
@@ -4269,7 +4463,7 @@
                         <div>
                             <strong>👑 ${secondAdmin.name}</strong><br>
                             <small>📧 ${secondAdmin.email} | 🎯 Super Administrador</small><br>
-                            <small style="color: #059669; font-weight: bold;">🔐 Credenciales gestionadas en Firebase Authentication</small>
+                            <small style="color: #059669; font-weight: bold;">🔐 Credenciales gestionadas en la cuenta del club (nube)</small>
                         </div>
                         <div>
                             <span style="background: #3b82f6; color: white; padding: 4px 8px; border-radius: 12px; font-size: 0.8rem;">SECUNDARIO</span>
@@ -4289,7 +4483,7 @@
                                     <strong>👨‍💼 ${admin.name}</strong><br>
                                     <small>📧 ${admin.email} | 🎯 ${roleText}</small><br>
                                     <small style="color: #666;">Creado: ${new Date(admin.createdAt).toLocaleDateString()}</small><br>
-                                    <small style="color: #059669; font-weight: bold;">🔐 Credenciales gestionadas en Firebase Authentication</small>
+                                    <small style="color: #059669; font-weight: bold;">🔐 Credenciales gestionadas en la cuenta del club (nube)</small>
                                 </div>
                                 <div>
                                     <button class="btn btn-small" onclick="editAdmin('${admin.id}')" style="padding: 5px 10px; font-size: 0.8rem; margin-right: 5px;">✏️ Editar</button>
@@ -4641,7 +4835,7 @@
                         `✅ Paso de temporada completado (${seasonYear}).\n\n` +
                         `Jugadores actualizados: ${updatedCount}\n` +
                         `Sin fecha válida: ${skippedCount}\n` +
-                        `Errores de sincronización Firebase: ${firebaseErrors}\n` +
+                        `Errores de sincronización con la nube: ${firebaseErrors}\n` +
                         `${sampleChanges ? `Ejemplos: ${sampleChanges}${changes.length > 5 ? '...' : ''}` : ''}`
                     );
                 }
@@ -4810,6 +5004,7 @@
                             const needsPay = typeof window.PlayerInscription !== 'undefined' && window.PlayerInscription.needsPaymentValidation(player);
                             const isMinorIcon = player.age < 18 ? '👶' : '👤';
                             const seasonTag = player.inscriptionSeason ? ` · 🗓️ ${player.inscriptionSeason}` : '';
+                            const portalPwdSet = !!(player.portalPasswordHash && String(player.portalPasswordHash).trim());
                             
                             html += `
                                 <div style="display: flex; justify-content: space-between; align-items: center; padding: 15px; border-bottom: 1px solid #eee; background: #f8f9fa; margin-bottom: 10px; border-radius: 8px;">
@@ -4818,6 +5013,9 @@
                                             <strong style="font-size: 1.1em;">${isMinorIcon} ${player.name} ${player.surname}</strong>
                                             <span style="background: ${statusColor}; color: white; padding: 2px 8px; border-radius: 10px; font-size: 0.8rem; margin-left: 10px;">
                                                 ${statusText}
+                                            </span>
+                                            <span style="background: ${portalPwdSet ? '#059669' : '#94a3b8'}; color: white; padding: 2px 8px; border-radius: 10px; font-size: 0.75rem; margin-left: 8px;" title="Contraseña acceso ficha (Buscar mi ficha)">
+                                                ${portalPwdSet ? '🔒 Ficha protegida' : '🔓 Sin contraseña ficha'}
                                             </span>
                                         </div>
                                         <div style="font-size: 0.9em; color: #666;">
@@ -4834,6 +5032,7 @@
                                         <button onclick="updatePlayerStats('${player.id}')" style="padding: 5px 10px; font-size: 0.8rem; background: #f59e0b; color: white; border: none; border-radius: 4px; cursor: pointer;">📊 Stats</button>
                                         <button onclick="editPlayer('${player.id}')" style="padding: 5px 10px; font-size: 0.8rem; background: #1e3a8a; color: white; border: none; border-radius: 4px; cursor: pointer;">✏️ Editar</button>
                                         <button onclick="changePlayerCategoryManual('${player.id}')" style="padding: 5px 10px; font-size: 0.8rem; background: #2563eb; color: white; border: none; border-radius: 4px; cursor: pointer;">🏷️ Categoría</button>
+                                        <button onclick="setPlayerPortalPasswordAdmin('${player.id}')" style="padding: 5px 10px; font-size: 0.8rem; background: #7c3aed; color: white; border: none; border-radius: 4px; cursor: pointer;" title="Contraseña para Buscar mi ficha (inscripción web)">🔑 Contraseña ficha</button>
                                         ${needsPay ? `<button onclick="validatePlayerPayment('${player.id}')" style="padding: 5px 10px; font-size: 0.8rem; background: #059669; color: white; border: none; border-radius: 4px; cursor: pointer;" title="Confirmar pago por transferencia o efectivo">✅ Validar pago</button>` : ''}
                                         ${!needsPay && player.status === 'pending_validation' ? `<button onclick="validatePlayer('${player.id}')" style="padding: 5px 10px; font-size: 0.8rem; background: #059669; color: white; border: none; border-radius: 4px; cursor: pointer;">✅ Validar alta</button>` : ''}
                                         <button onclick="deletePlayer('${player.id}')" style="padding: 5px 10px; font-size: 0.8rem; background: #dc2626; color: white; border: none; border-radius: 4px; cursor: pointer;">🗑️ Eliminar</button>
@@ -4858,6 +5057,51 @@
         }
 
         // Función para filtrar jugadores por categoría
+        async function setPlayerPortalPasswordAdmin(playerId) {
+            try {
+                const players = JSON.parse(localStorage.getItem('clubPlayers') || '[]');
+                const ix = players.findIndex(function (p) { return String(p.id) === String(playerId); });
+                if (ix < 0) {
+                    alert('❌ Jugador/a no encontrado/a.');
+                    return;
+                }
+                const player = players[ix];
+                const label = (player.name || '') + ' ' + (player.surname || '');
+                const pwd = prompt(
+                    '🔑 Contraseña de acceso a ficha — ' + label.trim() + '\n\n' +
+                    'El jugador/a la usará en «Buscar mi ficha» (inscripción web).\n' +
+                    'Mínimo 6 caracteres. Comunícasela por teléfono, WhatsApp o en persona.\n\n' +
+                    'Nueva contraseña (vacío = cancelar):'
+                );
+                if (pwd == null) return;
+                const trimmed = String(pwd).trim();
+                if (!trimmed) return;
+                if (trimmed.length < 6) {
+                    alert('❌ Mínimo 6 caracteres.');
+                    return;
+                }
+                if (typeof window.hashClubAccessKey !== 'function') {
+                    alert('❌ Módulo de seguridad no cargado.');
+                    return;
+                }
+                const hash = await window.hashClubAccessKey(trimmed);
+                players[ix] = Object.assign({}, player, {
+                    portalPasswordHash: hash,
+                    portalPasswordSetAt: new Date().toISOString(),
+                    updatedAt: new Date().toISOString()
+                });
+                localStorage.setItem('clubPlayers', JSON.stringify(players));
+                if (typeof persistRecordToFirebase === 'function') {
+                    await persistRecordToFirebase('clubPlayers', 'players', players[ix]);
+                }
+                alert('✅ Contraseña de ficha guardada en Firebase.\n\nComunícala al jugador/a o tutor/a de forma privada.');
+                loadPlayersList();
+            } catch (e) {
+                console.error(e);
+                alert('❌ Error al guardar la contraseña: ' + (e.message || e));
+            }
+        }
+
         function filterPlayersByCategory() {
             const selectedCategory = document.getElementById('categoryFilter').value;
             const categorySections = document.querySelectorAll('.category-section');
@@ -5184,7 +5428,7 @@
                 if (document.getElementById('mediaTitle')) document.getElementById('mediaTitle').value = '';
                 if (document.getElementById('mediaUrl')) document.getElementById('mediaUrl').value = '';
                 renderMultimediaAdminList();
-                alert('✅ Elemento añadido y sincronizado con Firebase.');
+                alert('✅ Elemento añadido y sincronizado con la nube.');
             } catch (error) {
                 console.error('❌ Error añadiendo multimedia:', error);
                 alert('❌ No se pudo añadir el elemento.');
@@ -7872,7 +8116,7 @@
             });
             const incidents = JSON.parse(localStorage.getItem('competitionIncidents') || '[]').length;
             lines.push(`competitionIncidents: ${incidents} registros`);
-            alert(`🩺 Salud de sincronización (cache local)\n\n${lines.join('\n')}\n\nSi hay Firebase activo, cada guardado intenta sincronizar automáticamente.`);
+            alert(`🩺 Salud de sincronización (cache local)\n\n${lines.join('\n')}\n\nSi la nube está activa, cada guardado intenta sincronizar automáticamente.`);
         }
 
         function buildClubBackupPayload() {
@@ -12235,7 +12479,7 @@
         }
 
         function cuotaSegunEdad(edad) {
-            const p = typeof ClubAccounting !== 'undefined' ? ClubAccounting.getMembershipPricing() : { cuotaMenor: 10, cuotaMayor: 20, edadMaxMenor: 17 };
+            const p = typeof ClubAccounting !== 'undefined' ? ClubAccounting.getMembershipPricing() : { cuotaMenor: 10, cuotaMayor: 25, edadMaxMenor: 17 };
             if (edad == null || isNaN(edad)) return p.cuotaMayor;
             return edad <= p.edadMaxMenor ? p.cuotaMenor : p.cuotaMayor;
         }
@@ -12396,7 +12640,7 @@
             const id = String(memberId).trim();
             if (!id || id.startsWith('MEMBER_')) return;
             if (typeof window.deleteDocument !== 'function') {
-                throw new Error('Firebase no está listo: no se puede eliminar en el servidor');
+                throw new Error('La nube no está disponible: no se puede eliminar en el servidor');
             }
             await window.deleteDocument('members', id, 'admin');
         }
@@ -12444,7 +12688,7 @@
             const dryRun = !!opts.dryRun;
 
             if (typeof window.getDocuments !== 'function' || typeof window.updateDocument !== 'function') {
-                alert('❌ Firebase no está listo en este panel.');
+                alert('❌ La nube no está disponible en este panel.');
                 return { ok: false, error: 'firebase_not_ready' };
             }
 
@@ -12523,7 +12767,7 @@
 
         async function sincronizarPanelDesdeFirebase() {
             if (typeof window.getDocuments !== 'function') {
-                alert('❌ Firebase no está listo en este panel.');
+                alert('❌ La nube no está disponible en este panel.');
                 return { ok: false, error: 'firebase_not_ready' };
             }
             const [socios, amigos, jugadores, entrenadores, equipos, eventos, encuentros, directiva, competiciones] = await Promise.all([
@@ -12864,7 +13108,7 @@
             const id = String(friendId).trim();
             if (!id || id.startsWith('FRIEND_')) return;
             if (typeof window.deleteDocument !== 'function') {
-                throw new Error('Firebase no está listo: no se puede eliminar en el servidor');
+                throw new Error('La nube no está disponible: no se puede eliminar en el servidor');
             }
             await window.deleteDocument('friends', id, 'admin');
         }
@@ -13742,7 +13986,7 @@
                         firebaseSyncOk = true;
                     } catch (syncErr) {
                         console.warn('Validación guardada en local; error al sincronizar con Firebase:', syncErr);
-                        alert('⚠️ Validación guardada solo en este dispositivo.\n\nNo se pudo guardar en Firebase. Comprueba conexión, sesión de administrador y vuelve a intentarlo.');
+                        alert('⚠️ Validación guardada solo en este dispositivo.\n\nNo se pudo guardar en la nube. Comprueba conexión, sesión de administrador y vuelve a intentarlo.');
                     }
                     
                     loadMembersList();
@@ -13831,7 +14075,7 @@
                         await persistRecordToFirebase('clubAccountingLedger', 'ledger', accRes.row);
                     } catch (e) {
                         console.warn(e);
-                        alert('⚠️ Asiento guardado en este dispositivo; no se pudo sincronizar con Firebase. Reintenta con conexión y sesión de admin.');
+                        alert('⚠️ Asiento guardado en este dispositivo; no se pudo sincronizar con la nube. Reintenta con conexión y sesión de admin.');
                     }
                 }
                 try {
@@ -14009,7 +14253,7 @@
                             <div style="margin-bottom: 20px;">
                                 <label style="display: block; margin-bottom: 5px; font-weight: bold; color: #333;">Nueva contraseña de acceso web</label>
                                 <input type="password" id="editMemberPassword" placeholder="Dejar vacío para no cambiar — el administrador no ve la contraseña anterior" autocomplete="new-password" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
-                                <small style="color: #666; font-size: 0.8rem;">Solo rellenar si quieres asignar o cambiar la clave. Sin reglas en el panel; Firebase puede exigir un mínimo si hay cuenta de acceso web.</small>
+                                <small style="color: #666; font-size: 0.8rem;">Solo rellenar si quieres asignar o cambiar la clave. La cuenta en la nube puede exigir un mínimo de caracteres.</small>
                             </div>
                             
                             <div style="display: flex; gap: 10px; justify-content: flex-end;">
@@ -14097,7 +14341,7 @@
                 if (newPassword) {
                     alert(
                         'ℹ️ La contraseña no se guarda desde el panel.\n\n' +
-                        'El socio puede cambiarla en su perfil (web) o usa Firebase Console → Authentication → Restablecer contraseña.'
+                        'El socio puede cambiarla en su perfil (web) o solicitar «Restablecer contraseña» desde la web.'
                     );
                     document.getElementById('editMemberPassword').value = '';
                 }
@@ -14169,7 +14413,7 @@
                     await removeMemberFromCloudIfNeeded(memberToDelete.id);
                 } catch (syncErr) {
                     console.error('❌ Error eliminando socio en Firebase:', syncErr);
-                    alert('❌ No se pudo eliminar en el servidor (Firebase).\n\nLa lista se sincroniza en tiempo real: si no se borra en la nube, el socio volverá a aparecer.\n\nComprueba conexión, permisos de administrador y reglas de Firestore.\n\n' + (syncErr.message || String(syncErr)));
+                    alert('❌ No se pudo eliminar en el servidor (nube).\n\nLa lista se sincroniza en tiempo real: si no se borra en la nube, el socio volverá a aparecer.\n\nComprueba conexión, permisos de administrador y acceso a la nube.\n\n' + (syncErr.message || String(syncErr)));
                     return;
                 }
                 const updatedMembers = members.filter(m => String(m.id) !== String(memberId));
@@ -14194,7 +14438,7 @@
 
         /**
          * Tras el 31/08: marca socios activos como pendientes de renovación.
-         * La cuota (10/20 €) se recalcula según la edad el 31 de agosto del año indicado.
+         * La cuota (10/25 €) se recalcula según la edad el 31 de agosto del año indicado.
          */
         async function iniciarNuevaTemporadaCuotas() {
             const anioDef = (typeof ClubAccounting !== 'undefined' && ClubAccounting.getCuotaEdadReferenciaAnio)
@@ -14210,7 +14454,7 @@
                 alert('Año no válido.');
                 return;
             }
-            const _cp = typeof ClubAccounting !== 'undefined' ? ClubAccounting.getMembershipPricing() : { cuotaMenor: 10, cuotaMayor: 20 };
+            const _cp = typeof ClubAccounting !== 'undefined' ? ClubAccounting.getMembershipPricing() : { cuotaMenor: 10, cuotaMayor: 25 };
             if (!confirm(
                 `Se marcarán como PENDIENTES DE PAGO todos los socios ACTIVOS (renovación de temporada).\n` +
                 `Tú validarás UNO A UNO cuando veas cada ingreso en la cuenta — no hay validación masiva.\n\n` +
@@ -14256,7 +14500,7 @@
                 let msg = n === 0
                     ? 'ℹ️ No había socios activos para renovar.'
                     : `✅ ${n} socio(s) pasado(s) a pendiente de renovación (temporada ${temporada}).`;
-                if (syncFailed) msg += '\n\n⚠️ Algunos no se sincronizaron con Firebase.';
+                if (syncFailed) msg += '\n\n⚠️ Algunos no se sincronizaron con la nube.';
                 alert(msg);
                 markCuotaRenovacionMasivaHecha();
             } catch (e) {
@@ -14355,7 +14599,7 @@
                 updateDashboardCounts();
                 const ok = expiredMembers.length - failed.length;
                 if (failed.length > 0) {
-                    alert(`⚠️ Eliminados en el servidor: ${ok}.\nNo se pudieron borrar en Firebase: ${failed.length} (siguen en la lista hasta que funcione la conexión o permisos).`);
+                    alert(`⚠️ Eliminados en el servidor: ${ok}.\nNo se pudieron borrar en la nube: ${failed.length} (siguen en la lista hasta que funcione la conexión o permisos).`);
                 } else {
                     alert(`🗑️ ${expiredMembers.length} socios caducados eliminados correctamente (también en el servidor).`);
                 }
@@ -14721,12 +14965,12 @@
                 updateFriendCounts();
                 updateDashboardCounts();
 
-                alert(`✅ Amigo del club ${statusText === 'activar' ? 'activado' : 'desactivado'} correctamente (sincronizado con Firebase).`);
+                alert(`✅ Amigo del club ${statusText === 'activar' ? 'activado' : 'desactivado'} correctamente (sincronizado con la nube).`);
                 console.log(`🤝 Amigo del club actualizado:`, friend.name + ' ' + friend.surname, newStatus);
 
             } catch (error) {
                 console.error('❌ Error cambiando estado del amigo del club:', error);
-                alert('❌ No se pudo actualizar en Firebase.\n\n' + (error.message || String(error)));
+                alert('❌ No se pudo actualizar en la nube.\n\n' + (error.message || String(error)));
             }
         }
 
@@ -14743,7 +14987,7 @@
                     await removeFriendFromCloudIfNeeded(friend.id);
                 } catch (syncErr) {
                     console.error('❌ Error eliminando amigo en Firebase:', syncErr);
-                    alert('❌ No se pudo eliminar en el servidor (Firebase).\n\nSi no se borra en la nube, el amigo volverá a aparecer al sincronizar.\n\n' + (syncErr.message || String(syncErr)));
+                    alert('❌ No se pudo eliminar en el servidor (nube).\n\nSi no se borra en la nube, el amigo volverá a aparecer al sincronizar.\n\n' + (syncErr.message || String(syncErr)));
                     return;
                 }
                 const updatedFriends = friends.filter(f => String(f.id) !== String(friendId));
@@ -14881,7 +15125,7 @@
                     if (window.firebaseAuth && !window.firebaseAuth.isSimulation && cur.authUid) {
                         alert(
                             'ℹ️ No se puede cambiar la contraseña de otro usuario desde el panel.\n\n' +
-                            'El amigo puede cambiarla en su perfil o usa Firebase Console → Authentication → Restablecer contraseña.'
+                            'El amigo puede cambiarla en su perfil o solicitar «Restablecer contraseña» desde la web.'
                         );
                     } else if (typeof window.hashClubAccessKey === 'function') {
                         friends[ix].passwordHash = await window.hashClubAccessKey(newPwd);
@@ -14895,7 +15139,7 @@
                 loadFriendsList();
                 updateFriendCounts();
                 updateDashboardCounts();
-                alert('✅ Amigo actualizado correctamente (sincronizado con Firebase)');
+                alert('✅ Amigo actualizado correctamente (sincronizado con la nube)');
             } catch (e) {
                 console.error(e);
                 alert('❌ Error al guardar');
@@ -15242,7 +15486,7 @@
                                 <div><strong>Mensajes enviados:</strong> ${coach.pushNotifications.sentCount || 0}</div>
                                 <div style="grid-column: 1 / -1; background: #e8f5e8; padding: 8px; border-radius: 5px; margin-top: 10px;">
                                     <strong style="color: #059669;">🔐 Credenciales:</strong>
-                                    Gestionadas de forma segura en Firebase Authentication
+                                    Gestionadas de forma segura en la cuenta del club (nube)
                                 </div>
                             </div>
                         </div>
@@ -16961,7 +17205,7 @@ th,td{border:1px solid #ccc;padding:5px 7px;text-align:left;white-space:nowrap;}
             loadExistingLogo();
             loadLogoMessage();
             loadThemeSettings();
-            loadContactInfo();
+            loadContactInfo(true);
             loadSocialMediaConfig();
         });
 
@@ -17224,8 +17468,13 @@ th,td{border:1px solid #ccc;padding:5px 7px;text-align:left;white-space:nowrap;}
         
         function saveContactInfo() {
             try {
+                let email = document.getElementById('clubEmail').value.trim();
+                if (!email || !email.includes('@')) {
+                    email = 'cdsanabriafc@gmail.com';
+                    document.getElementById('clubEmail').value = email;
+                }
                 const contactInfo = {
-                    email: document.getElementById('clubEmail').value.trim(),
+                    email: email,
                     phone: document.getElementById('clubPhone').value.trim(),
                     address: document.getElementById('clubAddress').value.trim(),
                     website: document.getElementById('clubWebsite').value.trim(),
@@ -17237,7 +17486,7 @@ th,td{border:1px solid #ccc;padding:5px 7px;text-align:left;white-space:nowrap;}
                 
                 localStorage.setItem('clubContactInfo', JSON.stringify(contactInfo));
                 
-                alert('✅ Información de contacto guardada correctamente.');
+                alert('✅ Información de contacto guardada (web + avisos por correo a ' + contactInfo.email + ').');
                 console.log('📞 Información de contacto guardada:', contactInfo);
                 
             } catch (error) {
@@ -17246,24 +17495,32 @@ th,td{border:1px solid #ccc;padding:5px 7px;text-align:left;white-space:nowrap;}
             }
         }
 
-        function loadContactInfo() {
+        function loadContactInfo(silent) {
             try {
-                const contactInfo = JSON.parse(localStorage.getItem('clubContactInfo') || 'null');
-                if (contactInfo) {
-                    document.getElementById('clubEmail').value = contactInfo.email || '';
-                    document.getElementById('clubPhone').value = contactInfo.phone || '';
-                    document.getElementById('clubAddress').value = contactInfo.address || '';
-                    document.getElementById('clubWebsite').value = contactInfo.website || '';
-                    document.getElementById('clubWhatsApp').value = contactInfo.whatsapp || '';
-                    document.getElementById('clubHours').value = contactInfo.hours || '';
-                    
-                    alert('✅ Información de contacto cargada correctamente.');
+                let contactInfo = null;
+                if (window.ClubContactDefaults && window.ClubContactDefaults.applyToAdminForm) {
+                    contactInfo = window.ClubContactDefaults.applyToAdminForm();
                 } else {
-                    alert('ℹ️ No hay información de contacto guardada.');
+                    contactInfo = JSON.parse(localStorage.getItem('clubContactInfo') || 'null');
+                    if (contactInfo) {
+                        document.getElementById('clubEmail').value = contactInfo.email || 'cdsanabriafc@gmail.com';
+                        document.getElementById('clubPhone').value = contactInfo.phone || '';
+                        document.getElementById('clubAddress').value = contactInfo.address || '';
+                        document.getElementById('clubWebsite').value = contactInfo.website || '';
+                        document.getElementById('clubWhatsApp').value = contactInfo.whatsapp || '';
+                        document.getElementById('clubHours').value = contactInfo.hours || '';
+                    }
+                }
+                if (!silent) {
+                    if (contactInfo) {
+                        alert('✅ Información de contacto cargada correctamente.');
+                    } else {
+                        alert('ℹ️ No hay información de contacto guardada.');
+                    }
                 }
             } catch (error) {
                 console.error('❌ Error cargando información de contacto:', error);
-                alert('❌ Error al cargar la información de contacto.');
+                if (!silent) alert('❌ Error al cargar la información de contacto.');
             }
         }
 
@@ -17299,15 +17556,15 @@ th,td{border:1px solid #ccc;padding:5px 7px;text-align:left;white-space:nowrap;}
                 if (typeof window.syncLocalSettingsBlobToFirebase === 'function') {
                     try {
                         const res = await window.syncLocalSettingsBlobToFirebase('teamSettings');
-                        if (res && res.error) syncMsg = '\n\n⚠️ No se pudo subir a Firebase aún: ' + res.error;
-                        else if (res && res.skipped) syncMsg = '\n\n⚠️ Sincronización omitida (revisa Firebase).';
+                        if (res && res.error) syncMsg = '\n\n⚠️ No se pudo subir a la nube aún: ' + res.error;
+                        else if (res && res.skipped) syncMsg = '\n\n⚠️ Sincronización omitida (revisa la conexión con la nube).';
                         else syncMsg = '\n\n☁️ Sincronizado: el botón TIENDA en web/PWA usará esta URL en todos los dispositivos conectados.';
                     } catch (syncErr) {
                         console.warn(syncErr);
-                        syncMsg = '\n\n⚠️ Guardado solo en este navegador. Abre el panel con Firebase activo para propagar la URL.';
+                        syncMsg = '\n\n⚠️ Guardado solo en este navegador. Abre el panel con la nube activa para propagar la URL.';
                     }
                 } else {
-                    syncMsg = '\n\n⚠️ Firebase no listo: la URL solo está en este equipo hasta que cargue el módulo.';
+                    syncMsg = '\n\n⚠️ Nube no disponible: la URL solo está en este equipo hasta que haya conexión.';
                 }
                 
                 mostrarMensajeTienda('✅ Configuración de tienda guardada correctamente.\n\n🔗 URL: ' + tiendaUrl + syncMsg, 'success');
@@ -17453,7 +17710,7 @@ th,td{border:1px solid #ccc;padding:5px 7px;text-align:left;white-space:nowrap;}
                     const online = typeof navigator !== 'undefined' && navigator.onLine;
                     statusEl.innerHTML =
                         '<span style="display:inline-block;width:12px;height:12px;background:' + (sim ? '#f59e0b' : '#059669') + ';border-radius:50%;margin-right:8px;"></span>' +
-                        '<strong>' + (sim ? 'Modo local (sin Firebase en vivo)' : 'Firebase activo · cdsanabriacf2026') +
+                        '<strong>' + (sim ? 'Modo local (sin nube en vivo)' : 'Nube activa — CD Sanabria CF') +
                         '</strong> · Mismos datos que las pestañas Socios, Amigos, Jugadores, etc.' +
                         (online ? '' : ' · Sin conexión (caché local)');
                 }
@@ -17466,7 +17723,7 @@ th,td{border:1px solid #ccc;padding:5px 7px;text-align:left;white-space:nowrap;}
         function dbAddSocio() {
             showTab('socios');
             if (typeof showAddMemberForm === 'function') showAddMemberForm();
-            showDbSuccess('Abre el formulario en la pestaña Socios (se guardará en Firebase).');
+            showDbSuccess('Abre el formulario en la pestaña Socios (se guardará en la nube).');
         }
 
         function dbViewSocios() {
@@ -17496,7 +17753,7 @@ th,td{border:1px solid #ccc;padding:5px 7px;text-align:left;white-space:nowrap;}
         function dbAddAmigo() {
             showTab('amigos');
             if (typeof showAddFriendForm === 'function') showAddFriendForm();
-            showDbSuccess('Abre el formulario en la pestaña Amigos (se guardará en Firebase).');
+            showDbSuccess('Abre el formulario en la pestaña Amigos (se guardará en la nube).');
         }
 
         function dbViewAmigos() {
@@ -17520,7 +17777,7 @@ th,td{border:1px solid #ccc;padding:5px 7px;text-align:left;white-space:nowrap;}
 
         function dbAddJugador() {
             showTab('jugadores');
-            showDbSuccess('Usa la pestaña Jugadores para registrar (sincroniza con Firebase).');
+            showDbSuccess('Usa la pestaña Jugadores para registrar (sincroniza con la nube).');
         }
 
         function dbViewJugadores() {
@@ -18627,6 +18884,134 @@ th,td{border:1px solid #ccc;padding:5px 7px;text-align:left;white-space:nowrap;}
             });
         }
 
+        // ===== Formulario colaboradores (config pública) =====
+        function loadColaboradorFormConfigAdmin() {
+            if (!window.ColaboradorSolicitud) return;
+            const cfg = window.ColaboradorSolicitud.readConfig();
+            const titleEl = document.getElementById('colabCfgModalTitle');
+            const introEl = document.getElementById('colabCfgModalIntro');
+            if (titleEl) titleEl.value = cfg.modalTitle || '';
+            if (introEl) introEl.value = cfg.modalIntro || '';
+            renderColaboradorFormConfigRows(cfg.services || []);
+            renderColaboradorSubmissionsAdmin();
+        }
+
+        function previewColaboradorMailAdmin() {
+            if (!window.ColaboradorSolicitud) {
+                alert('❌ Módulo colaborador-solicitud.js no cargado.');
+                return;
+            }
+            const sample = window.ColaboradorSolicitud.buildPreviewSample();
+            const body = window.ColaboradorSolicitud.formatMailBody(sample);
+            const pre = document.getElementById('colabCfgMailPreview');
+            if (pre) {
+                pre.textContent = body;
+                pre.style.display = 'block';
+            }
+        }
+
+        function renderColaboradorSubmissionsAdmin() {
+            const listEl = document.getElementById('colabCfgSubmissionsList');
+            if (!listEl || !window.ColaboradorSolicitud) return;
+            const rows = window.ColaboradorSolicitud.readSubmissions();
+            if (!rows.length) {
+                listEl.innerHTML = '<p style="color:#64748b;margin:0;font-size:0.9rem;">No hay solicitudes guardadas en este navegador (solo diagnóstico local).</p>';
+                return;
+            }
+            const sorted = rows.slice().sort(function (a, b) {
+                return new Date(b.createdAt || 0) - new Date(a.createdAt || 0);
+            });
+            listEl.innerHTML =
+                '<div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;font-size:0.88rem;background:#fff;border-radius:8px;">' +
+                '<thead><tr style="background:#f0fdf4;text-align:left;"><th style="padding:8px;">Fecha</th><th style="padding:8px;">Empresa</th><th style="padding:8px;">Contacto</th><th style="padding:8px;">Servicios</th></tr></thead><tbody>' +
+                sorted.map(function (r) {
+                    const svcs = (r.selectedServices || []).map(function (s) { return s.label; }).join(', ') || '—';
+                    return '<tr style="border-top:1px solid #d1fae5;">' +
+                        '<td style="padding:8px;white-space:nowrap;">' + escapeAdminHtml(new Date(r.createdAt || 0).toLocaleString('es-ES')) + '</td>' +
+                        '<td style="padding:8px;"><strong>' + escapeAdminHtml(r.companyName || r.legalName) + '</strong></td>' +
+                        '<td style="padding:8px;">' + escapeAdminHtml(r.contactName) + '<br>' + escapeAdminHtml(r.contactEmail) + '</td>' +
+                        '<td style="padding:8px;">' + escapeAdminHtml(svcs) + '</td></tr>';
+                }).join('') +
+                '</tbody></table></div>';
+        }
+
+        function renderColaboradorFormConfigRows(services) {
+            const list = document.getElementById('colabCfgServicesList');
+            if (!list) return;
+            const rows = (services && services.length ? services : [{ id: 'renovacion', label: 'Renovación', defaultPrice: '00,00 €' }])
+                .map(function (s, i) {
+                    return (
+                        '<div class="colab-cfg-row" data-idx="' + i + '" style="display:grid;grid-template-columns:1fr 140px auto;gap:8px;align-items:center;background:#fff;padding:10px;border-radius:8px;border:1px solid #d1fae5;">' +
+                        '<input type="text" class="colab-cfg-label" placeholder="Descripción (ej. Valla publicitaria)" value="' + escapeAdminHtml(s.label || '') + '" style="padding:8px;border:1px solid #ddd;border-radius:4px;">' +
+                        '<input type="text" class="colab-cfg-price" placeholder="Precio (ej. 300 €)" value="' + escapeAdminHtml(s.defaultPrice || '') + '" style="padding:8px;border:1px solid #ddd;border-radius:4px;">' +
+                        '<button type="button" class="btn" style="background:#fee2e2;color:#b91c1c;border:1px solid #fecaca;padding:6px 10px;" onclick="removeColaboradorFormConfigRow(this)">✕</button>' +
+                        '</div>'
+                    );
+                })
+                .join('');
+            list.innerHTML = rows;
+        }
+
+        function escapeAdminHtml(v) {
+            return String(v || '').replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
+        }
+
+        function addColaboradorFormConfigRow() {
+            const list = document.getElementById('colabCfgServicesList');
+            if (!list) return;
+            const div = document.createElement('div');
+            div.className = 'colab-cfg-row';
+            div.style.cssText = 'display:grid;grid-template-columns:1fr 140px auto;gap:8px;align-items:center;background:#fff;padding:10px;border-radius:8px;border:1px solid #d1fae5;';
+            div.innerHTML =
+                '<input type="text" class="colab-cfg-label" placeholder="Descripción" style="padding:8px;border:1px solid #ddd;border-radius:4px;">' +
+                '<input type="text" class="colab-cfg-price" placeholder="Precio" style="padding:8px;border:1px solid #ddd;border-radius:4px;">' +
+                '<button type="button" class="btn" style="background:#fee2e2;color:#b91c1c;border:1px solid #fecaca;padding:6px 10px;" onclick="removeColaboradorFormConfigRow(this)">✕</button>';
+            list.appendChild(div);
+        }
+
+        function removeColaboradorFormConfigRow(btn) {
+            const row = btn && btn.closest('.colab-cfg-row');
+            if (row) row.remove();
+        }
+
+        function collectColaboradorFormConfigFromAdmin() {
+            const services = [];
+            document.querySelectorAll('#colabCfgServicesList .colab-cfg-row').forEach(function (row, i) {
+                const label = (row.querySelector('.colab-cfg-label') || {}).value.trim();
+                const price = (row.querySelector('.colab-cfg-price') || {}).value.trim();
+                if (!label) return;
+                services.push({
+                    id: 'svc_' + label.toLowerCase().replace(/[^a-z0-9]+/g, '_').slice(0, 40) || i,
+                    label: label,
+                    defaultPrice: price
+                });
+            });
+            return {
+                modalTitle: (document.getElementById('colabCfgModalTitle') || {}).value.trim() || 'Solicitud de colaboración publicitaria',
+                modalIntro: (document.getElementById('colabCfgModalIntro') || {}).value.trim() || '',
+                services: services
+            };
+        }
+
+        function saveColaboradorFormConfigAdmin() {
+            try {
+                if (!window.ColaboradorSolicitud) {
+                    alert('❌ Módulo colaborador-solicitud.js no cargado.');
+                    return;
+                }
+                const cfg = collectColaboradorFormConfigFromAdmin();
+                if (!cfg.services.length) {
+                    alert('❌ Añade al menos una opción de publicidad.');
+                    return;
+                }
+                window.ColaboradorSolicitud.saveConfig(cfg);
+                alert('✅ Formulario de colaboradores guardado (web + Firebase).');
+                loadColaboradorFormConfigAdmin();
+            } catch (err) {
+                alert('❌ ' + (err.message || err));
+            }
+        }
+
         function savePublicidad() {
             try {
                 const titulo = document.getElementById('publicidadTitulo').value.trim();
@@ -18871,6 +19256,128 @@ th,td{border:1px solid #ccc;padding:5px 7px;text-align:left;white-space:nowrap;}
 
         // ===== NUEVAS FUNCIONES DE GESTIÓN AVANZADA =====
 
+        function getAdminDeleteRole() {
+            try {
+                const currentAdmin = JSON.parse(localStorage.getItem('currentAdmin') || '{}');
+                if (currentAdmin.isSuperAdmin || currentAdmin.role === 'super_admin') return 'super_admin';
+            } catch (_) {}
+            return 'admin';
+        }
+
+        function clearClubCollectionLocally(collectionKey) {
+            const empty = [];
+            if (collectionKey === 'members') {
+                syncMembersLocalStorage(empty);
+                return;
+            }
+            if (collectionKey === 'players') {
+                if (typeof window.syncClubPlayersLocal === 'function') {
+                    window.syncClubPlayersLocal(empty);
+                } else {
+                    const json = JSON.stringify(empty);
+                    ['clubPlayers', 'players', 'jugadores'].forEach((k) => localStorage.setItem(k, json));
+                }
+                return;
+            }
+            if (collectionKey === 'player_applications' || collectionKey === 'clubPlayerApplications') {
+                localStorage.setItem('clubPlayerApplications', JSON.stringify(empty));
+            }
+        }
+
+        const PURGE_ALLOWED_COLLECTION_KEYS = new Set(['members', 'players', 'player_applications']);
+
+        async function purgeFirestoreCollection(collectionKey) {
+            if (!PURGE_ALLOWED_COLLECTION_KEYS.has(collectionKey)) {
+                throw new Error('Colección no permitida para borrado masivo: ' + collectionKey);
+            }
+            if (typeof window.getDocuments !== 'function' || typeof window.deleteDocument !== 'function') {
+                return { deleted: 0, skipped: true };
+            }
+            const role = getAdminDeleteRole();
+            const docs = await window.getDocuments(collectionKey);
+            let deleted = 0;
+            for (const item of docs || []) {
+                const id = item && item.id;
+                if (!id) continue;
+                try {
+                    await window.deleteDocument(collectionKey, id, role);
+                    deleted += 1;
+                } catch (err) {
+                    console.warn('No se pudo eliminar', collectionKey, id, err);
+                }
+            }
+            return { deleted };
+        }
+
+        function refreshDbCountersAfterPurge() {
+            if (typeof updateDatabaseStats === 'function') updateDatabaseStats();
+            if (typeof updateMemberCounts === 'function') updateMemberCounts();
+            if (typeof updateDashboardCounts === 'function') updateDashboardCounts();
+            if (typeof loadSystemStatistics === 'function') loadSystemStatistics();
+            if (typeof loadMembers === 'function') loadMembers();
+            if (typeof loadPlayers === 'function') loadPlayers();
+            const nextEl = document.getElementById('nextMemberNumber');
+            if (nextEl && window.ClubMemberNumbers) {
+                nextEl.textContent = String(window.ClubMemberNumbers.REGULAR_MIN);
+            }
+        }
+
+        async function limpiarSocios() {
+            const msg = '⚠️ ELIMINAR TODOS LOS SOCIOS\n\nSe borrarán todos los socios en Firebase y en este dispositivo.\nEl próximo número automático volverá a ser 000051.\n\n¿Continuar?';
+            if (!confirm(msg)) return;
+            const statusEl = document.getElementById('dbCleanStatus');
+            if (statusEl) {
+                statusEl.innerHTML = '<p style="color:#666;">Eliminando socios…</p>';
+                statusEl.style.display = 'block';
+            }
+            try {
+                const result = await purgeFirestoreCollection('members');
+                clearClubCollectionLocally('members');
+                refreshDbCountersAfterPurge();
+                const text = '✅ Socios eliminados: ' + (result.deleted || 0) + ' en Firebase. Contadores a cero en el panel.';
+                if (statusEl) statusEl.innerHTML = '<p style="color:#059669;">' + text + '</p>';
+                else alert(text);
+            } catch (error) {
+                console.error('Error limpiando socios:', error);
+                const errText = '❌ Error limpiando socios: ' + (error.message || error);
+                if (statusEl) statusEl.innerHTML = '<p style="color:#dc2626;">' + errText + '</p>';
+                else alert(errText);
+            }
+        }
+        window.limpiarSocios = limpiarSocios;
+
+        async function limpiarBaseDeDatos() {
+            const msg = '⚠️ RESETEAR SOCIOS Y JUGADORES\n\nSe borrarán PERMANENTEMENTE:\n• Todos los socios\n• Todos los jugadores\n• Solicitudes de nuevo jugador/a\n\nEn Firebase y en este dispositivo.\n\n¿Continuar?';
+            if (!confirm(msg)) return;
+            if (!confirm('Última confirmación: ¿Seguro que quieres dejar socios y jugadores a cero?')) return;
+            const statusEl = document.getElementById('dbCleanStatus');
+            if (statusEl) {
+                statusEl.innerHTML = '<p style="color:#666;">Eliminando socios, jugadores y solicitudes…</p>';
+                statusEl.style.display = 'block';
+            }
+            try {
+                const membersR = await purgeFirestoreCollection('members');
+                const playersR = await purgeFirestoreCollection('players');
+                const appsR = await purgeFirestoreCollection('player_applications');
+                clearClubCollectionLocally('members');
+                clearClubCollectionLocally('players');
+                clearClubCollectionLocally('player_applications');
+                refreshDbCountersAfterPurge();
+                const text = '✅ Reset completado.\nSocios: ' + (membersR.deleted || 0) +
+                    ' · Jugadores: ' + (playersR.deleted || 0) +
+                    ' · Solicitudes: ' + (appsR.deleted || 0) +
+                    '\n\nContadores del panel a cero.';
+                if (statusEl) statusEl.innerHTML = '<p style="color:#059669;white-space:pre-line;">' + text + '</p>';
+                else alert(text);
+            } catch (error) {
+                console.error('Error en reset de base de datos:', error);
+                const errText = '❌ Error: ' + (error.message || error);
+                if (statusEl) statusEl.innerHTML = '<p style="color:#dc2626;">' + errText + '</p>';
+                else alert(errText);
+            }
+        }
+        window.limpiarBaseDeDatos = limpiarBaseDeDatos;
+
         // Función para mostrar estadísticas de duplicados
         function mostrarEstadisticasDuplicados() {
             try {
@@ -19089,31 +19596,36 @@ th,td{border:1px solid #ccc;padding:5px 7px;text-align:left;white-space:nowrap;}
         }
 
         // Función para cerrar sesión y cerrar el panel de administración
-        function logout() {
+        async function logout() {
             try {
-                // Confirmar el cierre
                 const confirmed = confirm('¿Estás seguro de que quieres cerrar el panel de administración?');
                 if (!confirmed) {
                     return;
                 }
-                
-                // Limpiar la sesión del administrador
-                localStorage.removeItem('currentAdmin');
+
+                if (window.AdminSession && window.AdminSession.clearStoredAdminSession) {
+                    window.AdminSession.clearStoredAdminSession();
+                } else {
+                    localStorage.removeItem('currentAdmin');
+                    localStorage.removeItem('adminUser');
+                    localStorage.removeItem('isAdmin');
+                    localStorage.removeItem('isSuperAdmin');
+                }
+
+                if (window.firebaseAuth && !window.firebaseAuth.isSimulation) {
+                    try {
+                        const { signOut } = await import('https://www.gstatic.com/firebasejs/10.12.3/firebase-auth.js');
+                        await signOut(window.firebaseAuth);
+                    } catch (e) {
+                        console.warn('signOut admin:', e);
+                    }
+                }
+
                 console.log('🚪 Sesión de administrador cerrada');
-                
-                // Cerrar la ventana del panel
-                window.close();
-                
-                // Si no se puede cerrar la ventana (algunas restricciones del navegador), 
-                // redirigir a la página principal
-                setTimeout(() => {
-                    window.location.href = 'index.html';
-                }, 500);
-                
+                closeAdminPanelWindow();
             } catch (error) {
                 console.error('❌ Error cerrando sesión:', error);
-                // Como fallback, redirigir a la página principal
-                window.location.href = 'index.html';
+                window.location.replace('index.html');
             }
         }
 
@@ -19389,7 +19901,7 @@ th,td{border:1px solid #ccc;padding:5px 7px;text-align:left;white-space:nowrap;}
                     }
                 }
                 
-                const mensaje = `✅ Sincronización completada:\n\n📊 Socios sincronizados: ${sincronizados}\n❌ Errores: ${errores}\n\nLos datos ahora están disponibles en Firebase para web y móvil.`;
+                const mensaje = `✅ Sincronización completada:\n\n📊 Socios sincronizados: ${sincronizados}\n❌ Errores: ${errores}\n\nLos datos ya están en la nube para web y móvil.`;
                 alert(mensaje);
                 
                 console.log('🔄 Sincronización completada:', { sincronizados, errores });
@@ -19414,15 +19926,15 @@ th,td{border:1px solid #ccc;padding:5px 7px;text-align:left;white-space:nowrap;}
                     // Recargar la lista de socios
                     loadMembers();
                     
-                    alert(`✅ Se obtuvieron ${socios.length} socios desde Firebase.\n\nLos datos se han actualizado en el panel de administración.`);
+                    alert(`✅ Se obtuvieron ${socios.length} socios desde la nube.\n\nLos datos se han actualizado en el panel de administración.`);
                     console.log('📥 Socios obtenidos desde Firebase:', socios.length);
                 } else {
-                    alert('ℹ️ No se encontraron socios en Firebase.\n\nPrimero sincroniza los socios usando el botón "Sincronizar Socios con Backend".');
+                    alert('ℹ️ No se encontraron socios en la nube.\n\nPrimero sincroniza los socios usando el botón «Subir socios a la nube».');
                 }
                 
             } catch (error) {
                 console.error('❌ Error obteniendo socios:', error);
-                alert('❌ Error al obtener socios desde Firebase. Revisa la consola para más detalles.');
+                alert('❌ Error al obtener socios desde la nube. Revisa la consola para más detalles.');
             }
         }
         
@@ -19436,27 +19948,26 @@ th,td{border:1px solid #ccc;padding:5px 7px;text-align:left;white-space:nowrap;}
                 const sim = !!(window.firebaseDb && window.firebaseDb.isSimulation);
 
                 const estado = {
-                    firebase: sim ? '⚠️ Modo local (sin Firebase real)' : '✅ Configurado correctamente',
-                    proyecto: projectId,
+                    nube: sim ? '⚠️ Modo local (sin nube activa)' : '✅ Configurado correctamente',
+                    proyecto: 'CD Sanabria CF',
                     socios: socios ? `${socios.length} socios encontrados` : '0 socios',
                     equipos: equipos ? `${equipos.length} equipos encontrados` : '0 equipos',
-                    sincronizacion: sim ? 'Solo localStorage' : '✅ Activa'
+                    sincronizacion: sim ? 'Solo en este dispositivo' : '✅ Activa'
                 };
 
                 const mensaje =
-                    `🔥 Estado de Firebase CDSANABRIACF:\n\n` +
-                    `📊 Proyecto: ${estado.proyecto}\n` +
+                    `☁️ Estado de la nube — CD Sanabria CF:\n\n` +
                     `👥 Socios: ${estado.socios}\n` +
                     `⚽ Equipos: ${estado.equipos}\n` +
                     `🔄 Sincronización: ${estado.sincronizacion}\n\n` +
-                    (sim ? '⚠️ Firebase en modo limitado; comprueba la conexión con cdsanabriacf2026.' : '✅ Todo funcionando correctamente');
+                    (sim ? '⚠️ La nube no responde; comprueba la conexión a internet.' : '✅ Todo funcionando correctamente');
                 
                 alert(mensaje);
                 console.log('🔍 Estado de Firebase verificado:', estado);
                 
             } catch (error) {
                 console.error('❌ Error verificando Firebase:', error);
-                alert('❌ Error al verificar el estado de Firebase. Revisa la consola para más detalles.');
+                alert('❌ Error al verificar el estado de la nube. Revisa la consola para más detalles.');
             }
         }
 
@@ -19465,7 +19976,7 @@ th,td{border:1px solid #ccc;padding:5px 7px;text-align:left;white-space:nowrap;}
                 const requiredFns = ['getDocuments', 'createDocument', 'updateDocument', 'deleteDocument'];
                 const missing = requiredFns.filter((fn) => typeof window[fn] !== 'function');
                 if (missing.length) {
-                    alert('❌ Firebase no está listo en este panel.\n\nFaltan funciones: ' + missing.join(', '));
+                    alert('❌ La nube no está disponible en este panel.\n\nFaltan funciones: ' + missing.join(', '));
                     return;
                 }
 
@@ -19514,12 +20025,12 @@ th,td{border:1px solid #ccc;padding:5px 7px;text-align:left;white-space:nowrap;}
 
                 let resumen = '🧪 Auditoría de sincronización por módulo\n\n';
                 rows.forEach((r) => {
-                    resumen += `${r.estado} ${r.modulo}: local ${r.local} / firebase ${r.firebase}${r.detalle !== 'OK' ? ` (${r.detalle})` : ''}\n`;
+                    resumen += `${r.estado} ${r.modulo}: local ${r.local} / nube ${r.firebase}${r.detalle !== 'OK' ? ` (${r.detalle})` : ''}\n`;
                 });
 
                 const hasErrors = rows.some((r) => r.estado === '❌');
                 const hasWarnings = rows.some((r) => r.estado === '⚠️');
-                resumen += '\n' + (hasErrors ? '❌ Hay módulos con error de acceso a Firebase.' : hasWarnings ? '⚠️ Hay diferencias de conteo (puede haber sincronización pendiente).' : '✅ Todos los módulos auditados responden y están alineados por conteo.');
+                resumen += '\n' + (hasErrors ? '❌ Hay módulos con error de acceso a la nube.' : hasWarnings ? '⚠️ Hay diferencias de conteo (puede haber sincronización pendiente).' : '✅ Todos los módulos auditados responden y están alineados por conteo.');
 
                 try { console.table(rows); } catch (_) {}
                 alert(resumen);
@@ -19529,10 +20040,33 @@ th,td{border:1px solid #ccc;padding:5px 7px;text-align:left;white-space:nowrap;}
             }
         }
 
-        async function reconciliarModulosConFirebase() {
+        function mostrarResumenReconciliacion(results) {
+            let resumen = '🛠️ Reconciliación completada\n\n';
+            results.forEach((r) => {
+                resumen += `${r.estado} ${r.modulo}: ${r.detalle}\n`;
+            });
+            const hasErr = results.some((r) => r.estado === '❌');
+            const hasWarn = results.some((r) => r.estado === '🔄');
+            resumen +=
+                '\n' +
+                (hasErr
+                    ? '❌ Algunos módulos no pudieron reconciliarse.'
+                    : hasWarn
+                      ? '⚠️ Algunos módulos se han sincronizado (revisa el detalle).'
+                      : '✅ Módulos reconciliados correctamente.');
+            try {
+                console.table(results);
+            } catch (_) {}
+            alert(resumen);
+        }
+
+        async function reconciliarModulosConFirebase(options) {
+            const opts = options || {};
             try {
                 if (typeof window.getDocuments !== 'function' || typeof window.syncLocalArrayKeyToFirebase !== 'function') {
-                    alert('❌ Firebase no está listo para reconciliación en este panel.');
+                    if (!opts.fromAutoOpen) {
+                        alert('❌ La nube no está disponible para reconciliación en este panel.');
+                    }
                     return;
                 }
 
@@ -19580,49 +20114,18 @@ th,td{border:1px solid #ccc;padding:5px 7px;text-align:left;white-space:nowrap;}
                     await window.syncFromFirebase();
                 }
 
-                let resumen = '🛠️ Reconciliación completada\n\n';
-                results.forEach((r) => {
-                    resumen += `${r.estado} ${r.modulo}: ${r.detalle}\n`;
-                });
-
-                const hasErr = results.some((r) => r.estado === '❌');
-                resumen += '\n' + (hasErr ? '⚠️ Algunos módulos no pudieron reconciliarse.' : '✅ Módulos reconciliados correctamente.');
-
-                try { console.table(results); } catch (_) {}
-                alert(resumen);
+                mostrarResumenReconciliacion(results);
             } catch (error) {
                 console.error('❌ Error en reconciliación de módulos:', error);
-                alert('❌ Error al reconciliar módulos con Firebase.');
+                alert('❌ Error al reconciliar módulos con la nube.');
             }
         }
 
         async function intentarReconciliacionAutomaticaAlAbrir() {
             try {
-                // Evitar repetir el diálogo múltiples veces en la misma pestaña.
-                if (sessionStorage.getItem('cdsanabria_auto_reconcile_prompted') === '1') return;
-                sessionStorage.setItem('cdsanabria_auto_reconcile_prompted', '1');
-
-                const pref = localStorage.getItem('cdsanabria_auto_reconcile_on_open'); // enabled | disabled | null
-                let shouldRun = pref === 'enabled';
-
-                if (pref !== 'enabled' && pref !== 'disabled') {
-                    shouldRun = confirm(
-                        '🛠️ Reconciliación automática al abrir\n\n' +
-                        '¿Quieres ejecutar una reconciliación con Firebase al abrir el panel?\n\n' +
-                        'Recomendado para arrancar siempre sincronizado.'
-                    );
-
-                    if (shouldRun) {
-                        const rememberOn = confirm('¿Activar esta reconciliación automática en futuras aperturas?');
-                        if (rememberOn) localStorage.setItem('cdsanabria_auto_reconcile_on_open', 'enabled');
-                    } else {
-                        const rememberOff = confirm('¿No volver a mostrar este aviso?');
-                        if (rememberOff) localStorage.setItem('cdsanabria_auto_reconcile_on_open', 'disabled');
-                    }
-                }
-
-                if (!shouldRun) return;
-                await reconciliarModulosConFirebase();
+                if (sessionStorage.getItem('cdsanabria_auto_reconcile_done') === '1') return;
+                sessionStorage.setItem('cdsanabria_auto_reconcile_done', '1');
+                await reconciliarModulosConFirebase({ fromAutoOpen: true });
             } catch (error) {
                 console.warn('Reconciliación automática al abrir falló:', error);
             }
@@ -19667,7 +20170,7 @@ th,td{border:1px solid #ccc;padding:5px 7px;text-align:left;white-space:nowrap;}
         
         // Función para eliminar completamente todos los datos de ejemplo
         async function eliminarDatosEjemplo() {
-            if (confirm('⚠️ ELIMINACIÓN COMPLETA DE DATOS DE EJEMPLO\n\nEsto eliminará PERMANENTEMENTE:\n• Todos los datos de prueba de localStorage\n• Todos los datos de prueba de Firebase\n• Datos con emails @test.com, @example.com\n• Registros con nombres "Test", "Sincronización", "undefined"\n\n¿Continuar?')) {
+            if (confirm('⚠️ ELIMINACIÓN COMPLETA DE DATOS DE EJEMPLO\n\nEsto eliminará PERMANENTEMENTE:\n• Todos los datos de prueba de este dispositivo\n• Todos los datos de prueba en la nube\n• Datos con emails @test.com, @example.com\n• Registros con nombres "Test", "Sincronización", "undefined"\n\n¿Continuar?')) {
                 try {
                     console.log('🧹 Iniciando eliminación completa de datos de ejemplo...');
                     
@@ -19739,7 +20242,7 @@ th,td{border:1px solid #ccc;padding:5px 7px;text-align:left;white-space:nowrap;}
                     
                     const eliminados = (socios.length - sociosLimpios.length) + (amigos.length - amigosLimpios.length);
                     
-                    alert(`✅ ELIMINACIÓN COMPLETA EXITOSA\n\n📊 Eliminados: ${eliminados} registros de prueba\n📊 Mantenidos: ${sociosLimpios.length} socios, ${amigosLimpios.length} amigos\n\n🔄 Los datos se han limpiado de:\n• localStorage\n• Firebase\n• Caché local`);
+                    alert(`✅ ELIMINACIÓN COMPLETA EXITOSA\n\n📊 Eliminados: ${eliminados} registros de prueba\n📊 Mantenidos: ${sociosLimpios.length} socios, ${amigosLimpios.length} amigos\n\n🔄 Los datos se han limpiado de:\n• Este dispositivo\n• La nube\n• Caché local`);
                     
                     console.log('🧹 Eliminación completa finalizada:', { 
                         eliminados, 
@@ -19806,6 +20309,18 @@ th,td{border:1px solid #ccc;padding:5px 7px;text-align:left;white-space:nowrap;}
 
             if (tabName === 'contabilidad') {
                 loadContabilidadPanel();
+            }
+
+            if (tabName === 'publicidad') {
+                if (typeof loadColaboradorFormConfigAdmin === 'function') loadColaboradorFormConfigAdmin();
+            }
+
+            if (tabName === 'eventos') {
+                if (typeof loadTorneoPreinscripcionesAdmin === 'function') loadTorneoPreinscripcionesAdmin();
+            }
+
+            if (tabName === 'dashboard' && window.SiteUpdateMode && typeof window.SiteUpdateMode.refreshUi === 'function') {
+                window.SiteUpdateMode.refreshUi();
             }
 
             if (tabName === 'basedatos' && typeof updateDatabaseStats === 'function') {

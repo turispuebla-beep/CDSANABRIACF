@@ -149,12 +149,31 @@ async function completeMembershipPayment(payment, redsysParams) {
 
   try {
     const { sendMemberPaymentConfirmedEmail } = require('./member-email');
+    const { sendClubAdminNotification } = require('./club-admin-notify-email');
     const d = resolved.data;
+    const payCh = payment.payMethod === 'bizum' ? 'bizum' : 'tarjeta';
+    const nombre = [d.nombre || d.name, d.apellidos || d.surname].filter(Boolean).join(' ').trim();
     await sendMemberPaymentConfirmedEmail({
       email: d.email || payment.customerEmail,
       nombre: d.nombre || d.name,
       apellidos: d.apellidos || d.surname,
       numeroSocio: d.numeroSocio || d.memberNumber
+    });
+    await sendClubAdminNotification({
+      kind: 'socio_cuota_pagada',
+      title: 'Cuota de socio pagada (pasarela)',
+      subject: `Cuota socio pagada — ${payCh === 'bizum' ? 'Bizum' : 'Tarjeta'}`,
+      paymentChannel: payCh,
+      requesterEmail: d.email || payment.customerEmail,
+      fields: [
+        { label: 'Nombre completo', value: nombre || '—' },
+        { label: 'Email', value: d.email || payment.customerEmail },
+        { label: 'DNI', value: d.dni },
+        { label: 'Teléfono', value: d.telefono || d.phone },
+        { label: 'Nº socio', value: d.numeroSocio || d.memberNumber },
+        { label: 'Cuota (€)', value: d.cuota != null ? d.cuota : payment.amountEur },
+        { label: 'Pedido pasarela', value: payment.orderId }
+      ]
     });
   } catch (mailErr) {
     console.warn('Email alta activa (pago):', mailErr.message || mailErr);
@@ -226,6 +245,25 @@ async function findPlayerDocByDniSeason(dni, season) {
   return { ref: q.docs[0].ref, data: { id: q.docs[0].id, ...q.docs[0].data() } };
 }
 
+function playerInscriptionLinksSocioFromReg(reg) {
+  return String(reg.registrationSource || '') === 'web_inscription';
+}
+
+async function resolveMemberForPlayerInscription(reg) {
+  const linkedId = reg.linkedMemberId ? String(reg.linkedMemberId).trim() : '';
+  if (linkedId && !linkedId.startsWith('MEMBER_')) {
+    const ref = membersRef().doc(linkedId);
+    const snap = await ref.get();
+    if (snap.exists) return { ref, data: snap.data() };
+  }
+  const norm = normalizeDni(reg.dni);
+  if (!norm) return null;
+  const q = await membersRef().where('dni', '==', norm).limit(1).get();
+  if (q.empty) return null;
+  const doc = q.docs[0];
+  return { ref: doc.ref, data: doc.data() };
+}
+
 /**
  * Inscripción jugador/a (web): activa ficha en sanabria_players y socio-jugador si aplica.
  * Evita duplicar por DNI + temporada.
@@ -259,7 +297,7 @@ async function completePlayerInscription(payment) {
     updatedAt: now,
     appScope: APP_SCOPE,
     isJugador: true,
-    socioJugador: !!reg.paySocioSelected
+    socioJugador: playerInscriptionLinksSocioFromReg(reg)
   };
 
   const existing = await findPlayerDocByDniSeason(dni, season);
@@ -273,16 +311,21 @@ async function completePlayerInscription(payment) {
     await ref.set({ ...patch, id: playerId, registrationDate: reg.registrationDate || now }, { merge: true });
   }
 
-  if (reg.paySocioSelected) {
-    const resolved = await resolveMemberDoc({
-      memberId: reg.linkedMemberId || null,
-      customerEmail: reg.email || payment.customerEmail
-    });
+  if (playerInscriptionLinksSocioFromReg(reg)) {
+    const resolved = await resolveMemberForPlayerInscription({ ...reg, linkedMemberId: reg.linkedMemberId });
+    const cb = reg.chargeBreakdown || {};
+    const cuotaSocio =
+      Number(cb.socio) > 0
+        ? Number(cb.socio)
+        : Number(cb.total) > 0
+          ? Number(cb.total)
+          : null;
     const memberPatch = {
       isJugador: true,
       socioJugador: true,
       playerId,
       playerCategory: reg.category || reg.categoria,
+      categoriaJugador: reg.category || reg.categoria,
       nombre: reg.name || reg.nombre,
       name: reg.name || reg.nombre,
       apellidos: reg.surname || reg.apellidos,
@@ -291,6 +334,18 @@ async function completePlayerInscription(payment) {
       telefono: reg.phone || reg.telefono,
       phone: reg.phone || reg.telefono,
       email: String(reg.email || payment.customerEmail || '').toLowerCase(),
+      domicilio: reg.domicilio || reg.address || '',
+      localidad: reg.localidad || '',
+      provincia: reg.provincia || 'Zamora',
+      address: reg.address || reg.domicilio || '',
+      direccion: reg.direccion || reg.address || '',
+      birthDate: reg.birthDate || reg.fechaNacimiento,
+      fechaNacimiento: reg.birthDate || reg.fechaNacimiento,
+      guardianName: reg.guardianName || '',
+      guardianDNI: reg.guardianDNI || '',
+      guardianPhone: reg.guardianPhone || '',
+      guardianEmail: reg.guardianEmail || '',
+      guardianAddress: reg.guardianAddress || '',
       pagado: true,
       paymentStatus: 'paid',
       status: 'active',
@@ -298,14 +353,18 @@ async function completePlayerInscription(payment) {
       paymentOrderId: payment.orderId,
       paymentDate: now,
       inscriptionSeasonSocio: season,
+      inscriptionSeasonJugador: season,
       cuotaVigenteHasta: proximoCierreTemporada31AgostoIso(),
+      cuotaSocioEnInscripcion: true,
       lastModified: now,
       updatedAt: now,
       validatedBy: 'redsys_auto',
       validatedDate: now,
       activationSource: 'redsys_player_inscription',
+      registrationSource: 'web_inscription_socio_jugador',
       appScope: APP_SCOPE
     };
+    if (cuotaSocio != null) memberPatch.cuota = cuotaSocio;
     if (resolved) {
       await resolved.ref.set(memberPatch, { merge: true });
     } else {
@@ -315,12 +374,45 @@ async function completePlayerInscription(payment) {
           ...memberPatch,
           id: ref.id,
           numeroSocio: 'SOC' + String(Date.now()).slice(-6),
-          registrationDate: now,
-          registrationSource: 'web_inscription_socio_jugador'
+          registrationDate: now
         },
         { merge: true }
       );
     }
+  }
+
+  try {
+    const { sendClubAdminNotification } = require('./club-admin-notify-email');
+    const payCh = payment.payMethod === 'bizum' ? 'bizum' : 'tarjeta';
+    const nombre = [reg.name || reg.nombre, reg.surname || reg.apellidos].filter(Boolean).join(' ').trim();
+    const kit = reg.kit && reg.kit.items ? reg.kit.items : reg.kitOrder || [];
+    const kitTxt = Array.isArray(kit)
+      ? kit.map((k) => `${k.garment || k.prenda || ''} ${k.size || k.talla || ''}`.trim()).filter(Boolean).join('; ')
+      : '—';
+    const total = reg.chargeBreakdown && reg.chargeBreakdown.total != null ? reg.chargeBreakdown.total : reg.totalCharge;
+    await sendClubAdminNotification({
+      kind: 'inscripcion_jugador_pagada',
+      title: 'Inscripción jugador/a pagada (pasarela)',
+      subject: `Inscripción pagada — ${payCh === 'bizum' ? 'Bizum' : 'Tarjeta'}`,
+      paymentChannel: payCh,
+      requesterEmail: reg.email || payment.customerEmail,
+      fields: [
+        { label: 'Nombre completo', value: nombre || '—' },
+        { label: 'DNI', value: reg.dni },
+        { label: 'Email', value: reg.email || payment.customerEmail },
+        { label: 'Teléfono', value: reg.phone || reg.telefono },
+        { label: 'Temporada', value: season },
+        { label: 'Categoría', value: reg.category || reg.categoria },
+        { label: 'Domicilio', value: reg.domicilio || reg.address },
+        { label: 'Localidad', value: reg.localidad },
+        { label: 'Provincia', value: reg.provincia },
+        { label: 'Ropa entreno', value: kitTxt || '—' },
+        { label: 'Importe total (€)', value: total },
+        { label: 'Pedido pasarela', value: payment.orderId }
+      ]
+    });
+  } catch (mailErr) {
+    console.warn('Email club inscripción pagada:', mailErr.message || mailErr);
   }
 }
 
@@ -416,9 +508,10 @@ async function approvePlayerApplication(applicationId, adminMeta) {
     fechaNacimiento: app.birthDate,
     category: app.category || '',
     categoria: app.category || '',
-    guardianName: [app.guardianName, app.guardianSurname].filter(Boolean).join(' ').trim(),
+    guardianName: app.guardianName || '',
     guardianSurname: app.guardianSurname || '',
-    guardianDNI: app.guardianDni || '',
+    guardianDNI: app.guardianDni || app.guardianDNI || '',
+    guardianDni: app.guardianDni || app.guardianDNI || '',
     guardianPhone: app.guardianPhone || '',
     guardianEmail: app.guardianEmail || '',
     guardianAddress: app.guardianAddress || '',
@@ -438,6 +531,10 @@ async function approvePlayerApplication(applicationId, adminMeta) {
     approvedBy: adminMeta?.validatedBy || 'admin',
     updatedAt: now
   };
+  if (app.portalPasswordHash) {
+    playerPatch.portalPasswordHash = app.portalPasswordHash;
+    playerPatch.portalPasswordSetAt = app.portalPasswordSetAt || now;
+  }
 
   await playerRef.set(
     {
@@ -483,6 +580,258 @@ async function rejectPlayerApplication(applicationId, adminMeta) {
   return { id: snap.id, ...snap.data(), status: 'rejected' };
 }
 
+const crypto = require('crypto');
+
+const PORTAL_RESETS = 'sanabria_player_portal_resets';
+const RESET_TTL_MS = 60 * 60 * 1000;
+
+function hashPortalPassword(plain) {
+  return crypto.createHash('sha256').update(String(plain || ''), 'utf8').digest('hex');
+}
+
+function normalizeEmail(v) {
+  return String(v || '').trim().toLowerCase();
+}
+
+function playerPortalEmails(player) {
+  const emails = [];
+  const main = normalizeEmail(player.email);
+  const guardian = normalizeEmail(player.guardianEmail);
+  if (main) emails.push(main);
+  if (guardian && guardian !== main) emails.push(guardian);
+  return emails;
+}
+
+function emailMatchesPlayer(player, email) {
+  const e = normalizeEmail(email);
+  if (!e) return false;
+  return playerPortalEmails(player).includes(e);
+}
+
+function normalizeNamePart(v) {
+  return String(v || '').trim().toLowerCase();
+}
+
+async function findPlayerForPortalLookup(dni, name, surname, season) {
+  const norm = normalizeDni(dni);
+  const seasonStr = String(season || '').trim();
+  const nm = normalizeNamePart(name);
+  const sn = normalizeNamePart(surname);
+
+  if (norm) {
+    const found = await findPlayerDocByDniSeason(norm, seasonStr);
+    if (found) return found;
+  }
+
+  if (!nm || !sn) return null;
+  const q = await playersRef().where('appScope', '==', APP_SCOPE).limit(500).get();
+  for (const doc of q.docs) {
+    const data = doc.data();
+    if (seasonStr && String(data.inscriptionSeason || data.temporada || '') !== seasonStr) continue;
+    const pn = normalizeNamePart(data.name || data.nombre);
+    const ps = normalizeNamePart(data.surname || data.apellidos);
+    if (pn === nm && ps === sn) {
+      return { ref: doc.ref, data: { id: doc.id, ...data } };
+    }
+  }
+  return null;
+}
+
+function sanitizePlayerForPortal(data) {
+  if (!data) return null;
+  return {
+    id: data.id,
+    name: data.name || data.nombre || '',
+    nombre: data.name || data.nombre || '',
+    surname: data.surname || data.apellidos || '',
+    apellidos: data.surname || data.apellidos || '',
+    dni: data.dni || '',
+    email: data.email || '',
+    phone: data.phone || data.telefono || '',
+    telefono: data.phone || data.telefono || '',
+    address: data.address || data.direccion || '',
+    direccion: data.address || data.direccion || '',
+    birthDate: data.birthDate || data.fechaNacimiento || '',
+    fechaNacimiento: data.birthDate || data.fechaNacimiento || '',
+    category: data.category || data.categoria || '',
+    categoria: data.category || data.categoria || '',
+    position: data.position || data.posicion || '',
+    posicion: data.position || data.posicion || '',
+    weightKg: data.weightKg != null ? data.weightKg : null,
+    heightCm: data.heightCm != null ? data.heightCm : null,
+    guardianName: data.guardianName || '',
+    guardianDNI: data.guardianDNI || data.guardianDni || '',
+    guardianPhone: data.guardianPhone || '',
+    guardianEmail: data.guardianEmail || '',
+    guardianAddress: data.guardianAddress || '',
+    inscriptionSeason: data.inscriptionSeason || data.temporada || '',
+    inscriptionStatus: data.inscriptionStatus || '',
+    applicationId: data.applicationId || null,
+    status: data.status || '',
+    paymentStatus: data.paymentStatus || '',
+    inscriptionPaid: !!data.inscriptionPaid
+  };
+}
+
+async function setPlayerPortalPasswordHash(playerId, passwordHash) {
+  const ref = playersRef().doc(String(playerId));
+  const snap = await ref.get();
+  if (!snap.exists) throw new Error('Ficha no encontrada');
+  const now = new Date().toISOString();
+  await ref.set(
+    {
+      portalPasswordHash: String(passwordHash || ''),
+      portalPasswordSetAt: now,
+      updatedAt: now
+    },
+    { merge: true }
+  );
+  return { ok: true };
+}
+
+async function verifyPlayerPortalLogin(dni, password, season, name, surname) {
+  const found = await findPlayerForPortalLookup(dni, name, surname, season);
+  if (!found) return { ok: false, error: 'not_found' };
+  const hash = String(found.data.portalPasswordHash || found.data.passwordHash || '').trim();
+  if (!hash) return { ok: false, error: 'no_password', playerId: found.data.id };
+  const computed = hashPortalPassword(password);
+  if (computed !== hash) return { ok: false, error: 'bad_password' };
+  return { ok: true, player: sanitizePlayerForPortal(found.data) };
+}
+
+async function setupPlayerPortalPassword(dni, email, password, season) {
+  const found = await findPlayerForPortalLookup(dni, '', '', season);
+  if (!found) return { ok: false, error: 'not_found' };
+  const existing = String(found.data.portalPasswordHash || '').trim();
+  if (existing) return { ok: false, error: 'already_set' };
+  if (!emailMatchesPlayer(found.data, email)) {
+    return { ok: false, error: 'email_mismatch' };
+  }
+  const hash = hashPortalPassword(password);
+  await setPlayerPortalPasswordHash(found.data.id, hash);
+  return { ok: true, player: sanitizePlayerForPortal(found.data) };
+}
+
+async function createPlayerPortalResetToken(playerId) {
+  const token = crypto.randomBytes(32).toString('hex');
+  const now = Date.now();
+  const expiresAt = new Date(now + RESET_TTL_MS).toISOString();
+  await initAdmin()
+    .collection(PORTAL_RESETS)
+    .doc(token)
+    .set({
+      playerId: String(playerId),
+      appScope: APP_SCOPE,
+      createdAt: new Date(now).toISOString(),
+      expiresAt,
+      used: false
+    });
+  return token;
+}
+
+async function resetPlayerPortalPasswordWithToken(token, password) {
+  const t = String(token || '').trim();
+  if (!t) return { ok: false, error: 'invalid_token' };
+  const resetRef = initAdmin().collection(PORTAL_RESETS).doc(t);
+  const snap = await resetRef.get();
+  if (!snap.exists) return { ok: false, error: 'invalid_token' };
+  const data = snap.data();
+  if (data.used) return { ok: false, error: 'invalid_token' };
+  if (new Date(data.expiresAt).getTime() < Date.now()) {
+    return { ok: false, error: 'expired' };
+  }
+  const hash = hashPortalPassword(password);
+  await setPlayerPortalPasswordHash(data.playerId, hash);
+  await resetRef.set({ used: true, usedAt: new Date().toISOString() }, { merge: true });
+  const playerSnap = await playersRef().doc(String(data.playerId)).get();
+  if (!playerSnap.exists) return { ok: true };
+  return { ok: true, player: sanitizePlayerForPortal({ id: playerSnap.id, ...playerSnap.data() }) };
+}
+
+async function checkPlayerPortalAccess(dni, name, surname, season) {
+  const found = await findPlayerForPortalLookup(dni, name, surname, season);
+  if (!found) return { ok: false, error: 'not_found' };
+  const p = found.data;
+  const hasPortalPassword = !!String(p.portalPasswordHash || '').trim();
+  const approved =
+    String(p.inscriptionStatus || '').toLowerCase() === 'approved_for_inscription';
+  const hintEmail = playerPortalEmails(p)[0] || '';
+  const maskedEmail = hintEmail
+    ? hintEmail.replace(/^(.{1,2})[^@]*(@.*)$/, '$1***$2')
+    : '';
+  return {
+    ok: true,
+    playerId: p.id,
+    hasPortalPassword,
+    clubApproved: approved,
+    maskedEmail
+  };
+}
+
+function normalizePlayerRecordFields(raw) {
+  const p = raw && typeof raw === 'object' ? { ...raw } : {};
+  const name = String(p.name || p.nombre || '').trim();
+  const surname = String(p.surname || p.apellidos || '').trim();
+  const phone = String(p.phone || p.telefono || '').trim();
+  const address = String(p.address || p.direccion || '').trim();
+  const birthDate = String(p.birthDate || p.fechaNacimiento || '').trim();
+  const category = String(p.category || p.categoria || '').trim();
+  const gDni = normalizeDni(p.guardianDNI || p.guardianDni);
+  delete p.password;
+  delete p.pass;
+  delete p.plainPassword;
+  delete p.portalPassword;
+  return {
+    ...p,
+    appScope: APP_SCOPE,
+    name,
+    nombre: name,
+    surname,
+    apellidos: surname,
+    phone,
+    telefono: phone,
+    address,
+    direccion: address,
+    birthDate,
+    fechaNacimiento: birthDate,
+    category,
+    categoria: category,
+    dni: normalizeDni(p.dni),
+    email: String(p.email || '').trim().toLowerCase(),
+    guardianDNI: gDni,
+    guardianDni: gDni,
+    guardianEmail: String(p.guardianEmail || '').trim().toLowerCase(),
+    updatedAt: new Date().toISOString()
+  };
+}
+
+async function upsertPlayerInscriptionRecord(player) {
+  const patch = normalizePlayerRecordFields(player);
+  const dni = patch.dni;
+  const season = String(patch.inscriptionSeason || patch.temporada || '').trim();
+  if (!dni) throw new Error('DNI ausente en inscripción');
+
+  const existing = await findPlayerDocByDniSeason(dni, season);
+  let playerId;
+  if (existing) {
+    playerId = existing.data.id;
+    await existing.ref.set(patch, { merge: true });
+  } else {
+    const ref = playersRef().doc();
+    playerId = ref.id;
+    await ref.set(
+      {
+        ...patch,
+        id: playerId,
+        registrationDate: patch.registrationDate || patch.updatedAt
+      },
+      { merge: true }
+    );
+  }
+  const snap = await playersRef().doc(String(playerId)).get();
+  return { id: playerId, ...(snap.exists ? snap.data() : patch) };
+}
+
 module.exports = {
   savePendingPayment,
   getPayment,
@@ -496,5 +845,18 @@ module.exports = {
   findApplicationByDniSeason,
   createPlayerApplication,
   approvePlayerApplication,
-  rejectPlayerApplication
+  rejectPlayerApplication,
+  hashPortalPassword,
+  findPlayerForPortalLookup,
+  emailMatchesPlayer,
+  playerPortalEmails,
+  sanitizePlayerForPortal,
+  setPlayerPortalPasswordHash,
+  verifyPlayerPortalLogin,
+  setupPlayerPortalPassword,
+  createPlayerPortalResetToken,
+  resetPlayerPortalPasswordWithToken,
+  checkPlayerPortalAccess,
+  normalizePlayerRecordFields,
+  upsertPlayerInscriptionRecord
 };

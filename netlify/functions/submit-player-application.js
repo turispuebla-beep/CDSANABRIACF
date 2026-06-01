@@ -94,6 +94,10 @@ exports.handler = async (event) => {
     if (!body.commitmentAccepted || !body.clubRulesAccepted) {
       return json(400, { ok: false, error: 'Debe aceptar el compromiso y las normas del club' }, origin);
     }
+    const portalPasswordHash = String(body.portalPasswordHash || '').trim();
+    if (!portalPasswordHash || portalPasswordHash.length < 32) {
+      return json(400, { ok: false, error: 'Debe indicar una contraseña de acceso a la ficha' }, origin);
+    }
 
     const dni = normalizeDni(body.dni);
     const existing = await findApplicationByDniSeason(dni, email, season);
@@ -114,22 +118,31 @@ exports.handler = async (event) => {
     const application = await createPlayerApplication({
       season,
       name,
+      nombre: name,
       surname,
+      apellidos: surname,
       dni,
       email,
       phone,
+      telefono: phone,
       address: String(body.address || '').trim(),
+      direccion: String(body.address || '').trim(),
       birthDate,
+      fechaNacimiento: birthDate,
       category: String(body.category || '').trim(),
+      categoria: String(body.category || '').trim(),
       guardianName: String(body.guardianName || '').trim(),
       guardianSurname: String(body.guardianSurname || '').trim(),
-      guardianDni: normalizeDni(body.guardianDni),
+      guardianDni: normalizeDni(body.guardianDni || body.guardianDNI),
+      guardianDNI: normalizeDni(body.guardianDni || body.guardianDNI),
       guardianPhone: String(body.guardianPhone || '').trim(),
-      guardianEmail: String(body.guardianEmail || '').trim(),
+      guardianEmail: String(body.guardianEmail || '').trim().toLowerCase(),
       guardianAddress: String(body.guardianAddress || '').trim(),
       commitmentAccepted: true,
       clubRulesAccepted: true,
       isMinor: !!body.isMinor,
+      portalPasswordHash: portalPasswordHash,
+      portalPasswordSetAt: new Date().toISOString(),
       status: 'pending_review'
     });
 

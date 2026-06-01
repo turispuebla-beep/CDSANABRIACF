@@ -13,6 +13,13 @@
       .replace(/[^0-9A-Z]/g, '');
   }
 
+  function composeAddress(parts) {
+    const domicilio = String(parts?.domicilio || '').trim();
+    const localidad = String(parts?.localidad || parts?.town || '').trim();
+    const provincia = String(parts?.provincia || parts?.province || '').trim();
+    return [domicilio, localidad, provincia].filter(Boolean).join(', ');
+  }
+
   function readPlayers() {
     try {
       return JSON.parse(global.localStorage.getItem('clubPlayers') || '[]');
@@ -49,7 +56,15 @@
     if (p.inscriptionPaid === true || p.paymentStatus === 'paid') return p;
     const ins = String(p.inscriptionStatus || '').toLowerCase();
     if (ins === 'paid') return p;
-    if (p.status === 'active' && ins !== 'pending_payment' && ins !== 'pending_transfer') return p;
+    if (
+      p.status === 'active' &&
+      ins !== 'pending_payment' &&
+      ins !== 'pending_transfer' &&
+      ins !== 'pending_cash' &&
+      ins !== 'pending_tpv'
+    ) {
+      return p;
+    }
     return null;
   }
 
@@ -180,6 +195,12 @@
     if (ins === 'pending_transfer') {
       return { key: 'pending_transfer', text: 'Pendiente transferencia', color: '#d97706' };
     }
+    if (ins === 'pending_tpv') {
+      return { key: 'pending_tpv', text: 'Pendiente TPV', color: '#d97706' };
+    }
+    if (ins === 'pending_cash') {
+      return { key: 'pending_cash', text: 'Pendiente efectivo', color: '#d97706' };
+    }
     if (ins === 'pending_payment') {
       return { key: 'pending_payment', text: 'Pendiente de pago', color: '#ea580c' };
     }
@@ -195,7 +216,9 @@
   function needsPaymentValidation(player) {
     if (!player) return false;
     const ins = String(player.inscriptionStatus || '').toLowerCase();
-    if (ins === 'pending_payment' || ins === 'pending_transfer') return true;
+    if (ins === 'pending_payment' || ins === 'pending_transfer' || ins === 'pending_cash' || ins === 'pending_tpv') {
+      return true;
+    }
     if (player.registrationSource === 'web_inscription' && !player.inscriptionPaid) return true;
     return false;
   }
@@ -246,8 +269,11 @@
       phone: form.phone,
       telefono: form.phone,
       email: String(form.email || '').trim().toLowerCase(),
-      address: form.address || '',
-      direccion: form.address || '',
+      domicilio: form.domicilio || '',
+      localidad: form.localidad || '',
+      provincia: form.provincia || 'Zamora',
+      address: composeAddress(form) || form.address || '',
+      direccion: composeAddress(form) || form.address || '',
       birthDate: form.birthDate,
       fechaNacimiento: form.birthDate,
       age: age,
@@ -303,8 +329,51 @@
       paymentStatus: 'pending',
       inscriptionPaid: false,
       isMinor: age != null && age < 18,
+      portalPasswordHash: form.portalPasswordHash || existing?.portalPasswordHash || '',
+      portalPasswordSetAt:
+        form.portalPasswordHash || existing?.portalPasswordSetAt
+          ? form.portalPasswordSetAt || existing?.portalPasswordSetAt || new Date().toISOString()
+          : '',
+      injuries: form.injuries || '',
+      injuriesYear: form.injuriesYear || '',
+      allergyIllness: form.allergyIllness || '',
+      bloodGroup: form.bloodGroup || '',
+      observations: form.observations || '',
+      previousSeasonPlayed: form.previousSeasonPlayed || '',
       updatedAt: new Date().toISOString()
     };
+  }
+
+  function requiresPasswordForInscriptionAccess(dni, season) {
+    const n = normalizeDni(dni);
+    if (!n) return false;
+    if (findPaidPlayerForSeason(n, season)) return true;
+    const p = findPlayerForSeason(n, season);
+    if (!p) return false;
+    const ins = String(p.inscriptionStatus || '').toLowerCase();
+    if (
+      ins === 'pending_payment' ||
+      ins === 'pending_transfer' ||
+      ins === 'pending_cash' ||
+      ins === 'pending_tpv' ||
+      ins === 'paid'
+    ) {
+      return true;
+    }
+    if (p.inscriptionWebSubmittedAt) return true;
+    if (
+      p.registrationSource === 'web_inscription' &&
+      ((p.kitOrder && p.kitOrder.length) || (p.kit && p.kit.items && p.kit.items.length))
+    ) {
+      return true;
+    }
+    return false;
+  }
+
+  function rememberInscriptionLockDni(dni) {
+    try {
+      if (dni) global.sessionStorage.setItem('cdsan_insc_lock_dni', normalizeDni(dni));
+    } catch (_) {}
   }
 
   function upsertPlayerLocal(player) {
@@ -318,7 +387,12 @@
       idx = players.findIndex((p) => normalizeDni(p.dni) === dni);
     }
     if (idx >= 0) {
-      players[idx] = { ...players[idx], ...player, id: players[idx].id };
+      players[idx] = {
+        ...players[idx],
+        ...player,
+        id: players[idx].id,
+        portalPasswordHash: player.portalPasswordHash || players[idx].portalPasswordHash || ''
+      };
     } else {
       players.push(player);
     }
@@ -331,33 +405,109 @@
     return !v || v.startsWith('PLAYER_') || v.startsWith('MEMBER_');
   }
 
-  async function persistPlayerFirebase(player) {
-    if (typeof global.persistRecordToFirebase === 'function') {
-      await global.persistRecordToFirebase('clubPlayers', 'players', player);
-      return player;
+  function normalizePlayerDualFields(player) {
+    if (!player || typeof player !== 'object') return player;
+    const p = { ...player };
+    const name = String(p.name || p.nombre || '').trim();
+    const surname = String(p.surname || p.apellidos || '').trim();
+    const phone = String(p.phone || p.telefono || '').trim();
+    const legacyAddress = String(p.address || p.direccion || '').trim();
+    let domicilio = String(p.domicilio || '').trim();
+    const localidad = String(p.localidad || p.town || '').trim();
+    const provincia = String(p.provincia || p.province || 'Zamora').trim() || 'Zamora';
+    if (!domicilio && legacyAddress && !localidad) domicilio = legacyAddress;
+    const address = composeAddress({ domicilio: domicilio, localidad: localidad, provincia: provincia }) || legacyAddress;
+    const birthDate = String(p.birthDate || p.fechaNacimiento || '').trim();
+    const category = String(p.category || p.categoria || '').trim();
+    const gDni = normalizeDni(p.guardianDNI || p.guardianDni);
+    p.name = name;
+    p.nombre = name;
+    p.surname = surname;
+    p.apellidos = surname;
+    p.phone = phone;
+    p.telefono = phone;
+    p.domicilio = domicilio;
+    p.localidad = localidad;
+    p.provincia = provincia;
+    p.address = address;
+    p.direccion = address;
+    p.birthDate = birthDate;
+    p.fechaNacimiento = birthDate;
+    p.category = category;
+    p.categoria = category;
+    if (gDni) {
+      p.guardianDNI = gDni;
+      p.guardianDni = gDni;
     }
-    if (typeof global.createDocument !== 'function' || typeof global.updateDocument !== 'function') {
-      return player;
+    p.appScope = p.appScope || 'cdsanabriacf';
+    return p;
+  }
+
+  async function persistPlayerViaNetlify(player) {
+    const res = await fetch('/.netlify/functions/submit-player-inscription', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ player: normalizePlayerDualFields(player) })
+    });
+    const json = await res.json().catch(function () {
+      return { ok: false };
+    });
+    if (!res.ok || !json.ok) {
+      const err = new Error(json.error || 'No se pudo guardar en Firebase');
+      err.code = 'firebase_persist_failed';
+      throw err;
+    }
+    if (json.playerId && String(player.id) !== String(json.playerId)) {
+      player.id = json.playerId;
+      const players = readPlayers();
+      const ix = players.findIndex(function (p) {
+        return normalizeDni(p.dni) === normalizeDni(player.dni);
+      });
+      if (ix >= 0) {
+        players[ix].id = json.playerId;
+        global.localStorage.setItem('clubPlayers', JSON.stringify(players));
+      }
+    }
+    return player;
+  }
+
+  async function persistPlayerFirebase(player) {
+    const normalized = normalizePlayerDualFields(player);
+    if (typeof global.persistRecordToFirebase === 'function') {
+      try {
+        await global.persistRecordToFirebase('clubPlayers', 'players', normalized);
+        return normalized;
+      } catch (e) {
+        console.warn('persistRecordToFirebase:', e);
+      }
     }
     try {
-      if (isTemporaryLocalId(player.id)) {
-        const newId = await global.createDocument('players', player);
+      return await persistPlayerViaNetlify(normalized);
+    } catch (netlifyErr) {
+      console.warn('persistPlayerViaNetlify:', netlifyErr);
+    }
+    if (typeof global.createDocument !== 'function' || typeof global.updateDocument !== 'function') {
+      return normalized;
+    }
+    try {
+      if (isTemporaryLocalId(normalized.id)) {
+        const newId = await global.createDocument('players', normalized);
         if (newId) {
           const players = readPlayers();
-          const ix = players.findIndex((p) => p.id === player.id);
+          const ix = players.findIndex((p) => p.id === normalized.id);
           if (ix >= 0) {
             players[ix].id = newId;
-            player.id = newId;
+            normalized.id = newId;
             global.localStorage.setItem('clubPlayers', JSON.stringify(players));
           }
         }
       } else {
-        await global.updateDocument('players', player.id, player);
+        await global.updateDocument('players', normalized.id, normalized);
       }
     } catch (e) {
       console.warn('persistPlayerFirebase:', e);
     }
-    return player;
+    return normalized;
   }
 
   function generarNumeroSocioProvisional() {
@@ -368,7 +518,60 @@
     return 'SOC' + String(Date.now()).slice(-6);
   }
 
-  function upsertMemberSocioJugador(player, paySocio, paymentMeta) {
+  /** Inscripción web: el socio es el propio jugador/a (menor o mayor), nunca el tutor por inscripción. */
+  function playerInscriptionLinksSocio(player) {
+    return String(player.registrationSource || '') === 'web_inscription';
+  }
+
+  function resolveSocioCuotaFromPlayer(player) {
+    const cb = player.chargeBreakdown || {};
+    const socioLine = Number(cb.socio);
+    if (Number.isFinite(socioLine) && socioLine > 0) return socioLine;
+    if (
+      typeof global.ClubAccounting !== 'undefined' &&
+      global.ClubAccounting.cuotaDesdeFechaNacimiento
+    ) {
+      const c = global.ClubAccounting.cuotaDesdeFechaNacimiento(
+        player.birthDate || player.fechaNacimiento
+      );
+      if (Number.isFinite(c) && c > 0) return c;
+    }
+    const total = Number(cb.total);
+    return Number.isFinite(total) && total > 0 ? total : null;
+  }
+
+  function applyMemberPaymentStateFromPlayer(member, player, paymentMeta) {
+    const paid = !!(paymentMeta && paymentMeta.paid);
+    const cuota = resolveSocioCuotaFromPlayer(player);
+    if (cuota != null) member.cuota = cuota;
+
+    if (paid) {
+      member.pagado = true;
+      member.paymentStatus = 'paid';
+      member.status = 'active';
+      member.estado = 'activo';
+      member.pendingReason = null;
+      member.inscriptionSeasonSocio = player.inscriptionSeason;
+      member.validatedDate = paymentMeta.validatedAt || new Date().toISOString();
+      member.validatedBy = paymentMeta.validatedBy || member.validatedBy || 'inscripcion_jugador';
+      if (paymentMeta.orderId) member.paymentOrderId = paymentMeta.orderId;
+      return;
+    }
+
+    member.pagado = false;
+    member.paymentStatus = 'pending';
+    member.status = 'pending_validation';
+    member.estado = 'pendiente';
+    member.pendingReason =
+      player.pendingReason || player.offlinePaymentChannel || 'inscripcion_jugador_pendiente';
+    if (player.paymentMethod) member.paymentMethod = player.paymentMethod;
+    if (player.offlinePaymentChannel) member.offlinePaymentChannel = player.offlinePaymentChannel;
+    member.inscriptionSeasonSocio = player.inscriptionSeason;
+  }
+
+  function upsertMemberSocioJugador(player, paymentMeta) {
+    if (!playerInscriptionLinksSocio(player)) return null;
+
     const members = readMembers();
     const playerDni = normalizeDni(player.dni);
     const now = new Date().toISOString();
@@ -377,13 +580,14 @@
     if (playerDni) {
       member = members.find((m) => normalizeDni(m.dni) === playerDni);
     }
-    if (!member && player.email) {
-      const em = String(player.email).trim().toLowerCase();
-      member = members.find((m) => String(m.email || '').trim().toLowerCase() === em);
+    if (!member && player.id) {
+      member = members.find((m) => m.playerId === player.id);
     }
-    if (!member && player.guardianEmail) {
-      const gem = String(player.guardianEmail).trim().toLowerCase();
-      member = members.find((m) => String(m.email || '').trim().toLowerCase() === gem);
+    if (!member && player.email && playerDni) {
+      const em = String(player.email).trim().toLowerCase();
+      member = members.find(
+        (m) => String(m.email || '').trim().toLowerCase() === em && normalizeDni(m.dni) === playerDni
+      );
     }
 
     if (member) {
@@ -392,50 +596,53 @@
       member.playerId = player.id;
       member.playerCategory = player.category;
       member.categoriaJugador = player.category;
-      member.nombre = member.nombre || player.nombre;
-      member.name = member.name || player.name;
-      member.apellidos = member.apellidos || player.apellidos;
-      member.surname = member.surname || player.surname;
-      member.telefono = member.telefono || player.telefono;
-      member.phone = member.phone || player.phone;
-      member.email = member.email || player.email;
-      member.address = member.address || player.address;
-      member.direccion = member.direccion || player.direccion;
-      member.birthDate = member.birthDate || player.birthDate;
-      member.fechaNacimiento = member.fechaNacimiento || player.fechaNacimiento;
-      if (!member.dni && playerDni) member.dni = playerDni;
+      member.nombre = player.nombre || player.name;
+      member.name = player.name || player.nombre;
+      member.apellidos = player.apellidos || player.surname;
+      member.surname = player.surname || player.apellidos;
+      member.telefono = player.telefono || player.phone || member.telefono;
+      member.phone = player.phone || player.telefono || member.phone;
+      if (player.email) member.email = String(player.email).trim().toLowerCase();
+      member.address = player.address || player.domicilio || member.address;
+      member.direccion = player.direccion || player.address || member.direccion;
+      member.domicilio = player.domicilio || member.domicilio;
+      member.localidad = player.localidad || member.localidad;
+      member.provincia = player.provincia || member.provincia;
+      member.birthDate = player.birthDate;
+      member.fechaNacimiento = player.birthDate;
+      if (playerDni) member.dni = playerDni;
+      if (player.portalPasswordHash) {
+        member.passwordHash = player.portalPasswordHash;
+        member.portalPasswordHash = player.portalPasswordHash;
+      }
       if (player.guardianName) member.guardianName = player.guardianName;
       if (player.guardianDNI) member.guardianDNI = player.guardianDNI;
       if (player.guardianPhone) member.guardianPhone = player.guardianPhone;
       if (player.guardianEmail) member.guardianEmail = player.guardianEmail;
       if (player.guardianAddress) member.guardianAddress = player.guardianAddress;
       member.inscriptionSeasonJugador = player.inscriptionSeason;
+      member.registrationSource = member.registrationSource || 'web_inscription_socio_jugador';
       member.lastModified = now;
-      if (paymentMeta && paymentMeta.paid) {
-        member.pagado = true;
-        member.paymentStatus = 'paid';
-        member.status = 'active';
-        member.estado = 'activo';
-        member.inscriptionSeasonSocio = player.inscriptionSeason;
-      }
+      applyMemberPaymentStateFromPlayer(member, player, paymentMeta);
       if (typeof global.applyClubRoleFlagsToMember === 'function') {
         global.applyClubRoleFlagsToMember(member);
       }
     } else {
-      const memberDni = playerDni || normalizeDni(player.guardianDNI) || '';
-      const memberEmail = player.email || player.guardianEmail || '';
       member = {
         id: 'MEMBER_' + Date.now() + '_' + Math.random().toString(36).slice(2, 9),
         name: player.name,
         nombre: player.name,
         surname: player.surname,
         apellidos: player.surname,
-        dni: memberDni,
-        phone: player.phone || player.guardianPhone || '',
-        telefono: player.phone || player.guardianPhone || '',
-        email: memberEmail,
-        address: player.address || player.guardianAddress || '',
-        direccion: player.address || player.guardianAddress || '',
+        dni: playerDni || '',
+        phone: player.phone || '',
+        telefono: player.phone || '',
+        email: String(player.email || '').trim().toLowerCase(),
+        address: player.address || player.domicilio || '',
+        direccion: player.direccion || player.address || '',
+        domicilio: player.domicilio || '',
+        localidad: player.localidad || '',
+        provincia: player.provincia || 'Zamora',
         birthDate: player.birthDate,
         fechaNacimiento: player.birthDate,
         guardianName: player.guardianName || '',
@@ -445,10 +652,6 @@
         guardianAddress: player.guardianAddress || '',
         numeroSocio: generarNumeroSocioProvisional(),
         memberNumber: null,
-        status: paymentMeta && paymentMeta.paid ? 'active' : 'pending_validation',
-        estado: paymentMeta && paymentMeta.paid ? 'activo' : 'pendiente',
-        pagado: !!(paymentMeta && paymentMeta.paid),
-        paymentStatus: paymentMeta && paymentMeta.paid ? 'paid' : 'pending',
         registrationDate: now,
         socioJugador: true,
         isJugador: true,
@@ -458,8 +661,11 @@
         inscriptionSeasonSocio: player.inscriptionSeason,
         inscriptionSeasonJugador: player.inscriptionSeason,
         registrationSource: 'web_inscription_socio_jugador',
-        cuotaSocioEnInscripcion: !!paySocio
+        cuotaSocioEnInscripcion: true,
+        passwordHash: player.portalPasswordHash || '',
+        portalPasswordHash: player.portalPasswordHash || ''
       };
+      applyMemberPaymentStateFromPlayer(member, player, paymentMeta);
       if (typeof global.applyClubRoleFlagsToMember === 'function') {
         global.applyClubRoleFlagsToMember(member);
       }
@@ -537,13 +743,27 @@
       player.validatedBy =
         paymentMeta?.validatedBy ||
         (method.indexOf('redsys') >= 0 ? 'redsys_auto' : method === 'free' ? 'inscripcion_gratis' : 'admin');
-    } else if (method === 'transfer') {
-      player.inscriptionStatus = 'pending_transfer';
+    } else if (method === 'transfer' || method === 'cash' || method === 'tpv') {
+      const offlineCh =
+        paymentMeta?.offlinePaymentChannel ||
+        player.offlinePaymentChannel ||
+        (method === 'cash' ? 'efectivo' : method === 'tpv' ? 'tpv' : 'transferencia');
+      player.offlinePaymentChannel = offlineCh;
+      if (offlineCh === 'efectivo') {
+        player.inscriptionStatus = 'pending_cash';
+        player.paymentMethod = 'cash';
+      } else if (offlineCh === 'tpv') {
+        player.inscriptionStatus = 'pending_tpv';
+        player.paymentMethod = 'tpv';
+      } else {
+        player.inscriptionStatus = 'pending_transfer';
+        player.paymentMethod = 'transfer';
+      }
       player.status = 'pending_validation';
       player.estado = 'pendiente';
       player.paymentStatus = 'pending';
       player.inscriptionPaid = false;
-      player.pendingReason = 'transferencia';
+      player.pendingReason = offlineCh;
     } else {
       player.inscriptionStatus = 'pending_payment';
       player.status = 'pending_validation';
@@ -555,7 +775,9 @@
       }
     }
 
-    player.paymentMethod = method || player.paymentMethod || '';
+    if (method !== 'transfer' && method !== 'cash' && method !== 'tpv') {
+      player.paymentMethod = method || player.paymentMethod || '';
+    }
     player.paymentOrderId = paymentMeta?.orderId || player.paymentOrderId || null;
     if (!paid) {
       player.paidAt = null;
@@ -563,13 +785,17 @@
       player.validatedBy = null;
     }
     player.updatedAt = now;
+    player.inscriptionWebSubmittedAt = player.inscriptionWebSubmittedAt || now;
+    rememberInscriptionLockDni(player.dni);
 
     const saved = upsertPlayerLocal(player);
     await persistPlayerFirebase(saved);
 
-    const member = upsertMemberSocioJugador(saved, !!player.paySocioSelected, {
+    const member = upsertMemberSocioJugador(saved, {
       paid: paid,
-      orderId: paymentMeta?.orderId
+      orderId: paymentMeta?.orderId,
+      validatedBy: paymentMeta?.validatedBy,
+      validatedAt: paymentMeta?.validatedAt
     });
     if (member) {
       saved.linkedMemberId = member.id;
@@ -653,8 +879,17 @@
     }
 
     if (payMethod === 'transfer') {
-      await finalizeInscription(registration, { paid: false, method: 'transfer' });
-      return { ok: true, transfer: true };
+      const raw = registration.offlinePaymentChannel;
+      const ch =
+        raw === 'efectivo' ? 'efectivo' : raw === 'tpv' ? 'tpv' : 'transferencia';
+      registration.offlinePaymentChannel = ch;
+      const method = ch === 'efectivo' ? 'cash' : ch === 'tpv' ? 'tpv' : 'transfer';
+      await finalizeInscription(registration, {
+        paid: false,
+        method: method,
+        offlinePaymentChannel: ch
+      });
+      return { ok: true, transfer: true, offlineChannel: ch };
     }
 
     if (!global.CdsanRedsys) throw new Error('Pasarela de pago no disponible');
@@ -695,8 +930,11 @@
     findApprovedForInscriptionByIdentity: findApprovedForInscriptionByIdentity,
     findPlayerForContinueLookup: findPlayerForContinueLookup,
     findReturningPlayerForInscription: findReturningPlayerForInscription,
+    requiresPasswordForInscriptionAccess: requiresPasswordForInscriptionAccess,
+    rememberInscriptionLockDni: rememberInscriptionLockDni,
     findPlayerByDni: findPlayerByDni,
     findMemberByDni: findMemberByDni,
+    composeAddress: composeAddress,
     computeCart: computeCart,
     buildPlayerRecord: buildPlayerRecord,
     finalizeInscription: finalizeInscription,

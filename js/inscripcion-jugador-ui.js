@@ -9,8 +9,12 @@
     kitSelections: {},
     photoData: null,
     flowContinue: false,
+    flowFinalize: false,
     continuePlayer: null,
-    continueEditable: false
+    continueEditable: false,
+    lookupIdentity: null,
+    lookupCheck: null,
+    portalResetToken: null
   };
 
   function $(id) {
@@ -83,9 +87,292 @@
 
   function canLookupPlayerRecord(session, player, season) {
     if (!player) return false;
-    if (isPlayerClubApproved(player, season)) return true;
     if (session && canAccessPlayerRecord(session, player)) return true;
+    if (isPlayerClubApproved(player, season)) {
+      return !!String(player.portalPasswordHash || '').trim();
+    }
     return false;
+  }
+
+  function getLookupIdentityFromForm() {
+    return {
+      dni: ($('insLookupDni') && $('insLookupDni').value.trim()) || '',
+      name: ($('insLookupName') && $('insLookupName').value.trim()) || '',
+      surname: ($('insLookupSurname') && $('insLookupSurname').value.trim()) || ''
+    };
+  }
+
+  function hidePortalAuthBlocks() {
+    ['insPortalLoginBlock', 'insPortalSetupBlock', 'insPortalResetBlock', 'insPortalResetTokenBlock'].forEach(
+      function (id) {
+        show($(id), false);
+      }
+    );
+    show($('insLookupAuthWrap'), false);
+  }
+
+  function showPortalAuthBlock(blockId, hintText) {
+    hidePortalAuthBlocks();
+    show($('insLookupAuthWrap'), true);
+    show($(blockId), true);
+    const hint = $('insLookupAuthHint');
+    if (hint) hint.textContent = hintText || '';
+  }
+
+  function resetLookupAuthFlow() {
+    state.lookupCheck = null;
+    hidePortalAuthBlocks();
+    show($('insLookupFieldsWrap'), true);
+  }
+
+  function openForgotPasswordPanel() {
+    const identity = state.lookupIdentity || getLookupIdentityFromForm();
+    state.lookupIdentity = identity;
+    hidePortalAuthBlocks();
+    show($('insLookupAuthWrap'), true);
+    show($('insPortalResetBlock'), true);
+    const hint = $('insLookupAuthHint');
+    if (hint) hint.textContent = 'Recuperación de contraseña — el club te responderá por email o teléfono.';
+    const msg = $('insLookupMsg');
+    if (msg) msg.textContent = '';
+  }
+
+  function finishLookupWithPlayer(player) {
+    if (!player) return;
+    if (global.PlayerPortalAuth && global.PlayerPortalAuth.mergePlayerIntoLocalStorage) {
+      global.PlayerPortalAuth.mergePlayerIntoLocalStorage(player);
+    }
+    const season = state.settings.season;
+    const msg = $('insLookupMsg');
+    hidePortalAuthBlocks();
+
+    if (
+      global.PlayerInscription.requiresPasswordForInscriptionAccess &&
+      global.PlayerInscription.requiresPasswordForInscriptionAccess(player.dni, season)
+    ) {
+      enforceInscriptionCompletedMode();
+      return;
+    }
+
+    if (state.flowFinalize && !isPlayerClubApproved(player, season)) {
+      if (msg) {
+        msg.style.color = '#d97706';
+        msg.textContent =
+          'El club aún no te ha admitido. Cuando te acepten, vuelve a pulsar Finalizar ficha en Nuevo jugador/a.';
+      }
+      hideInscriptionFormSections();
+      return;
+    }
+
+    enterContinueMode(player);
+  }
+
+  async function runPortalLogin() {
+    const msg = $('insLookupMsg');
+    const identity = state.lookupIdentity || getLookupIdentityFromForm();
+    const password = ($('insPortalPassword') && $('insPortalPassword').value) || '';
+    if (!password) {
+      if (msg) msg.textContent = 'Introduce tu contraseña de acceso.';
+      return;
+    }
+    if (!global.PlayerPortalAuth) {
+      if (msg) {
+        msg.style.color = '#dc2626';
+        msg.textContent = 'Servicio de acceso no disponible. Prueba más tarde o inicia sesión como socio/a.';
+      }
+      return;
+    }
+    try {
+      if (msg) msg.textContent = 'Verificando acceso…';
+      const player = await global.PlayerPortalAuth.login({
+        dni: identity.dni,
+        password: password,
+        season: state.settings.season
+      });
+      finishLookupWithPlayer(player);
+    } catch (e) {
+      if (msg) {
+        msg.style.color = '#dc2626';
+        msg.textContent =
+          e.code === 'bad_password'
+            ? 'Contraseña incorrecta.'
+            : e.code === 'not_found'
+              ? 'No encontramos la ficha.'
+              : e.message || 'No se pudo acceder.';
+      }
+    }
+  }
+
+  async function runPortalSetup() {
+    const msg = $('insLookupMsg');
+    const identity = state.lookupIdentity || getLookupIdentityFromForm();
+    const email = ($('insPortalSetupEmail') && $('insPortalSetupEmail').value.trim()) || '';
+    const pwd = ($('insPortalSetupPwd') && $('insPortalSetupPwd').value) || '';
+    const pwd2 = ($('insPortalSetupPwd2') && $('insPortalSetupPwd2').value) || '';
+    if (!email || !pwd || !pwd2) {
+      if (msg) msg.textContent = 'Completa email y contraseña.';
+      return;
+    }
+    if (pwd !== pwd2) {
+      if (msg) {
+        msg.style.color = '#dc2626';
+        msg.textContent = 'Las contraseñas no coinciden.';
+      }
+      return;
+    }
+    if (pwd.length < 6) {
+      if (msg) {
+        msg.style.color = '#dc2626';
+        msg.textContent = 'La contraseña debe tener al menos 6 caracteres.';
+      }
+      return;
+    }
+    try {
+      if (msg) msg.textContent = 'Guardando contraseña…';
+      const player = await global.PlayerPortalAuth.setupPassword({
+        dni: identity.dni,
+        email: email,
+        password: pwd,
+        season: state.settings.season
+      });
+      finishLookupWithPlayer(player);
+    } catch (e) {
+      if (msg) {
+        msg.style.color = '#dc2626';
+        msg.textContent =
+          e.code === 'email_mismatch'
+            ? 'El email no coincide con el de la ficha. Usa el mismo correo del jugador/a o del tutor/a.'
+            : e.code === 'already_set'
+              ? 'Esta ficha ya tiene contraseña. Inicia sesión o recupérala por email.'
+              : e.message || 'No se pudo crear la contraseña.';
+      }
+    }
+  }
+
+  function runPortalResetRequest() {
+    const msg = $('insLookupMsg');
+    const identity = state.lookupIdentity || getLookupIdentityFromForm();
+    const email = ($('insPortalResetEmail') && $('insPortalResetEmail').value.trim()) || '';
+    if (global.PlayerPortalAuth && global.PlayerPortalAuth.openPasswordRecoveryMailto) {
+      global.PlayerPortalAuth.openPasswordRecoveryMailto({
+        dni: identity.dni,
+        name: identity.name,
+        surname: identity.surname,
+        email: email,
+        season: state.settings.season
+      });
+      if (msg) {
+        msg.style.color = '#059669';
+        msg.textContent =
+          'Se abrirá tu programa de correo hacia el club. Pulsa Enviar en Gmail/Outlook. Cuando te restablezcan la contraseña, vuelve a «Acceder a mi ficha».';
+      }
+      return;
+    }
+    if (msg) {
+      msg.style.color = '#dc2626';
+      msg.textContent = 'No se pudo abrir el correo. Escribe a cdsanabriafc@gmail.com con tu DNI.';
+    }
+  }
+
+  function runPortalResetMailto() {
+    runPortalResetRequest();
+  }
+
+  async function runPortalResetWithToken() {
+    const msg = $('insLookupMsg');
+    const token = state.portalResetToken;
+    const pwd = ($('insPortalResetTokenPwd') && $('insPortalResetTokenPwd').value) || '';
+    const pwd2 = ($('insPortalResetTokenPwd2') && $('insPortalResetTokenPwd2').value) || '';
+    if (!token) return;
+    if (!pwd || pwd !== pwd2) {
+      if (msg) {
+        msg.style.color = '#dc2626';
+        msg.textContent = pwd !== pwd2 ? 'Las contraseñas no coinciden.' : 'Indica la nueva contraseña.';
+      }
+      return;
+    }
+    try {
+      if (msg) msg.textContent = 'Guardando nueva contraseña…';
+      await global.PlayerPortalAuth.resetPasswordWithToken(token, pwd);
+      if (msg) {
+        msg.style.color = '#059669';
+        msg.textContent = 'Contraseña actualizada. Busca tu ficha con DNI y la nueva contraseña.';
+      }
+      hidePortalAuthBlocks();
+      show($('insLookupFieldsWrap'), true);
+      setLookupPanelOpen(true);
+      state.portalResetToken = null;
+      if (global.history && global.history.replaceState) {
+        global.history.replaceState({}, '', 'inscripcion-jugador.html?flow=finalize');
+      }
+    } catch (e) {
+      if (msg) {
+        msg.style.color = '#dc2626';
+        msg.textContent =
+          e.code === 'expired' || e.code === 'invalid_token'
+            ? 'El enlace ha caducado o no es válido. Solicita uno nuevo.'
+            : e.message || 'No se pudo restablecer la contraseña.';
+      }
+    }
+  }
+
+  async function proceedAfterIdentityCheck(session, player, check) {
+    const msg = $('insLookupMsg');
+    const season = state.settings.season;
+
+    if (player && global.PlayerInscription.findPaidPlayerForSeason(player.dni, season)) {
+      if (msg) {
+        msg.style.color = '#dc2626';
+        msg.textContent = 'Inscripción ya completada para esta temporada.';
+      }
+      return;
+    }
+
+    if (session && player && canAccessPlayerRecord(session, player)) {
+      finishLookupWithPlayer(player);
+      return;
+    }
+
+    if (!check || !check.ok) {
+      if (global.PlayerApplication && state.lookupIdentity && state.lookupIdentity.dni) {
+        const pending = global.PlayerApplication.findPendingByDni(state.lookupIdentity.dni, season);
+        if (pending) {
+          if (msg) {
+            msg.style.color = '#d97706';
+            msg.textContent =
+              'Tu solicitud está pendiente de revisión por el club. Te avisaremos cuando puedas continuar aquí.';
+          }
+          return;
+        }
+      }
+      if (msg) {
+        msg.style.color = '#b45309';
+        msg.textContent =
+          'No encontramos tu ficha. Puedes rellenar el formulario de abajo. Si eres nuevo/a, solicita alta desde la página principal.';
+      }
+      hideInscriptionFormSections();
+      return;
+    }
+
+    show($('insLookupFieldsWrap'), false);
+    state.lookupCheck = check;
+
+    if (check.hasPortalPassword) {
+      showPortalAuthBlock(
+        'insPortalLoginBlock',
+        'Introduce la contraseña de acceso a tu ficha' +
+          (check.maskedEmail ? ' (email registrado: ' + check.maskedEmail + ').' : '.')
+      );
+      if (msg) msg.textContent = '';
+      return;
+    }
+
+    showPortalAuthBlock(
+      'insPortalSetupBlock',
+      'Crea tu contraseña de acceso. Debe coincidir el email de la ficha' +
+        (check.maskedEmail ? ' (' + check.maskedEmail + ').' : '.')
+    );
+    if (msg) msg.textContent = '';
   }
 
   function canAccessPlayerRecord(session, player) {
@@ -115,7 +402,7 @@
 
   function getLoginReturnUrl() {
     const path = 'inscripcion-jugador.html';
-    const q = state.flowContinue ? '?flow=continue' : '';
+    const q = state.flowFinalize ? '?flow=finalize' : state.flowContinue ? '?flow=continue' : '';
     return path + q;
   }
 
@@ -150,10 +437,11 @@
         warn.style.border = '1px solid #93c5fd';
         warn.style.color = '#1e3a8a';
         warn.innerHTML =
-          'Si el club <strong>ya te admitió</strong> como jugador/a esta temporada, busca con tu DNI (o nombre y apellidos) <strong>sin iniciar sesión</strong>. ' +
-          'Si ya eres socio/a con acceso, también puedes <a href="index.html?openAcceso=1&amp;return=' +
+          'Si el club <strong>ya te admitió</strong>, busca con tu DNI y la <strong>contraseña de acceso</strong>. ' +
+          'Si la olvidas, usa <strong>¿Olvidaste tu contraseña?</strong> y escribe al club (no hace falta correo automático). ' +
+          'Si ya eres socio/a, también puedes <a href="index.html?openAcceso=1&amp;return=' +
           encodeURIComponent(getLoginReturnUrl()) +
-          '" style="color:#1d4ed8;font-weight:700;">iniciar sesión</a> para otras fichas (p. ej. menores a tu cargo).';
+          '" style="color:#1d4ed8;font-weight:700;">iniciar sesión</a>.';
       }
     }
     if (fields) fields.style.display = '';
@@ -162,9 +450,79 @@
 
   function sizeOptionsHtml() {
     if (!global.ClubInscriptionConfig) return '';
-    return global.ClubInscriptionConfig.ALL_SIZES.map(function (s) {
-      return '<option value="' + s + '">' + s + '</option>';
-    }).join('');
+    const sizes =
+      global.ClubInscriptionConfig.INSCRIPTION_KIT_SIZES ||
+      global.ClubInscriptionConfig.ALL_SIZES;
+    return sizes
+      .map(function (s) {
+        return '<option value="' + s + '">' + s + '</option>';
+      })
+      .join('');
+  }
+
+  function getCategoryRow(categoryId) {
+    const rows = global.ClubInscriptionConfig.INSCRIPTION_CATEGORY_ROWS || [];
+    return rows.find(function (r) {
+      return r.id === categoryId;
+    });
+  }
+
+  function categoryFeeLabel(row) {
+    if (!row) return '';
+    return row.ficha + '€ + ' + row.socio + '€ cuota socio';
+  }
+
+  function hasExistingPortalPassword() {
+    const p = state.continuePlayer;
+    if (p && String(p.portalPasswordHash || '').trim().length >= 32) return true;
+    const season = state.settings ? state.settings.season : '';
+    const dni =
+      ($('insDni') && $('insDni').value.trim()) ||
+      ($('insGuardianDni') && $('insGuardianDni').value.trim()) ||
+      '';
+    if (dni && global.PlayerInscription) {
+      const found =
+        global.PlayerInscription.findPlayerForSeason(dni, season) ||
+        global.PlayerInscription.findApprovedForInscription(dni, season);
+      if (found && String(found.portalPasswordHash || '').trim().length >= 32) return true;
+    }
+    if (dni) {
+      try {
+        const apps = JSON.parse(global.localStorage.getItem('clubPlayerApplications') || '[]');
+        const n = normalizeDniAuth(dni);
+        const app = apps.find(function (a) {
+          return (
+            normalizeDniAuth(a.dni) === n &&
+            String(a.season || '') === String(season) &&
+            String(a.portalPasswordHash || '').trim().length >= 32
+          );
+        });
+        if (app) return true;
+      } catch (_) {}
+    }
+    return false;
+  }
+
+  function updatePortalPasswordBlockUI() {
+    const block = $('insPortalPwdBlock');
+    if (!block) return;
+    if (state.passwordOnlyMode || (state.continuePlayer && !state.continueEditable)) {
+      show(block, false);
+      return;
+    }
+    show(block, true);
+    const existing = hasExistingPortalPassword();
+    const hint = $('insPortalPwdExistingHint');
+    const l1 = $('insPortalPasswordNewLabel');
+    const l2 = $('insPortalPasswordNew2Label');
+    const req = existing ? '' : ' *';
+    if (hint) show(hint, existing);
+    if (l1) l1.textContent = 'Contraseña' + req;
+    if (l2) l2.textContent = 'Repetir contraseña' + req;
+    const p1 = $('insPortalPasswordNew');
+    const p2 = $('insPortalPasswordNew2');
+    if (p1) p1.required = !existing;
+    if (p2) p2.required = !existing;
   }
 
   function setPersonalReadonly(readonly) {
@@ -175,11 +533,18 @@
       'insEmail',
       'insPhone',
       'insBirth',
-      'insAddress',
-      'insCategory',
+      'insDomicilio',
+      'insLocalidad',
+      'insProvincia',
+      'insPortalPasswordNew',
+      'insPortalPasswordNew2',
       'insWeight',
       'insHeight',
       'insPosition',
+      'insBloodGroup',
+      'insInjuries',
+      'insAllergy',
+      'insObservations',
       'insGuardianName',
       'insGuardianDni',
       'insGuardianPhone',
@@ -189,7 +554,84 @@
       const el = $(id);
       if (el) el.disabled = !!readonly;
     });
+    document.querySelectorAll('[name="insCategoryPick"]').forEach(function (cb) {
+      cb.disabled = !!readonly;
+    });
     if ($('insPhoto')) $('insPhoto').disabled = !!readonly;
+    updatePortalPasswordBlockUI();
+  }
+
+  function setCategoryCheckbox(categoryId) {
+    const id = String(categoryId || '').trim();
+    document.querySelectorAll('[name="insCategoryPick"]').forEach(function (cb) {
+      cb.checked = cb.value === id;
+    });
+    if ($('insCategory')) $('insCategory').value = id;
+    refreshCart();
+  }
+
+  function onCategoryCheckChange(changedCb) {
+    if (changedCb && changedCb.checked) {
+      document.querySelectorAll('[name="insCategoryPick"]').forEach(function (cb) {
+        if (cb !== changedCb) cb.checked = false;
+      });
+    }
+    const picked = document.querySelector('[name="insCategoryPick"]:checked');
+    if ($('insCategory')) $('insCategory').value = picked ? picked.value : '';
+    refreshCart();
+  }
+
+  function renderCategoryFeesTable() {
+    const tbody = $('insCategoryFeesBody');
+    if (!tbody || !global.ClubInscriptionConfig) return;
+    const rows = global.ClubInscriptionConfig.INSCRIPTION_CATEGORY_ROWS || [];
+    tbody.innerHTML = rows
+      .map(function (r) {
+        const yrs = r.years ? ' <span style="font-weight:400;color:#64748b;">' + r.years + '</span>' : '';
+        return (
+          '<tr><td class="insc-cat-pick">' +
+          '<input type="checkbox" name="insCategoryPick" value="' +
+          r.id +
+          '" aria-label="' +
+          r.label +
+          yrs +
+          '">' +
+          '</td><td><strong>' +
+          r.label +
+          '</strong>' +
+          yrs +
+          '</td><td>' +
+          categoryFeeLabel(r) +
+          '</td></tr>'
+        );
+      })
+      .join('');
+    tbody.querySelectorAll('[name="insCategoryPick"]').forEach(function (cb) {
+      cb.addEventListener('change', function () {
+        onCategoryCheckChange(cb);
+      });
+    });
+  }
+
+  function enforceInscriptionCompletedMode() {
+    state.passwordOnlyMode = true;
+    hideInscriptionFormSections();
+    show($('inscFinalizeIntro'), false);
+    const banner = $('inscPasswordOnlyBanner');
+    if (banner) {
+      banner.style.display = 'block';
+      banner.innerHTML =
+        'Ya has completado (o enviado) tu inscripción. Entra con <strong>Acceso</strong> en la página principal como <strong>socio/a</strong> o <strong>jugador/a</strong>, con tu <strong>email</strong> y la <strong>misma contraseña</strong>.';
+    }
+    setLookupPanelOpen(true);
+    show($('insLookupFieldsWrap'), false);
+    hidePortalAuthBlocks();
+    const msg = $('insLookupMsg');
+    if (msg) msg.textContent = '';
+  }
+
+  function enforcePasswordOnlyMode() {
+    enforceInscriptionCompletedMode();
   }
 
   function prefillFromPlayer(p) {
@@ -200,25 +642,53 @@
     if ($('insEmail')) $('insEmail').value = p.email || '';
     if ($('insPhone')) $('insPhone').value = p.phone || p.telefono || '';
     if ($('insBirth')) $('insBirth').value = p.birthDate || p.fechaNacimiento || '';
-    if ($('insAddress')) $('insAddress').value = p.address || p.direccion || '';
-    if ($('insCategory') && p.category) $('insCategory').value = p.category || p.categoria || '';
+    if ($('insDomicilio')) {
+      $('insDomicilio').value =
+        p.domicilio || (p.localidad || p.provincia ? '' : p.address || p.direccion || '');
+    }
+    if ($('insLocalidad')) $('insLocalidad').value = p.localidad || p.town || '';
+    if ($('insProvincia')) {
+      $('insProvincia').value = p.provincia || p.province || 'Zamora';
+    }
+    if (p.category || p.categoria) setCategoryCheckbox(p.category || p.categoria);
     if ($('insWeight') && p.weightKg != null) $('insWeight').value = p.weightKg;
     if ($('insHeight') && p.heightCm != null) $('insHeight').value = p.heightCm;
     if ($('insPosition') && p.position) $('insPosition').value = p.position || p.posicion || '';
+    if ($('insBloodGroup') && p.bloodGroup) $('insBloodGroup').value = p.bloodGroup;
+    if ($('insInjuries')) {
+      const inj = [p.injuries, p.injuriesYear].filter(Boolean).join(p.injuriesYear ? ' — ' : '');
+      $('insInjuries').value = inj || p.injuries || '';
+    }
+    if ($('insAllergy') && p.allergyIllness) $('insAllergy').value = p.allergyIllness;
+    if ($('insObservations') && p.observations) $('insObservations').value = p.observations;
     if ($('insGuardianName')) $('insGuardianName').value = p.guardianName || '';
     if ($('insGuardianDni')) $('insGuardianDni').value = p.guardianDNI || p.guardianDni || '';
     if ($('insGuardianPhone')) $('insGuardianPhone').value = p.guardianPhone || '';
     if ($('insGuardianEmail')) $('insGuardianEmail').value = p.guardianEmail || '';
     if ($('insGuardianAddress')) $('insGuardianAddress').value = p.guardianAddress || '';
     onBirthChange();
+    updatePortalPasswordBlockUI();
+  }
+
+  function hideInscriptionFormSections() {
+    ['insCategorySection', 'insPersonalSection', 'guardianBlock'].forEach(function (id) {
+      const el = $(id);
+      if (el) el.style.display = 'none';
+    });
+    document.querySelectorAll('#inscFormWrap section.card').forEach(function (el) {
+      if (el.id === 'insLookupBlock' || el.id === 'insPersonalSection' || el.id === 'insCategorySection') return;
+      el.style.display = 'none';
+    });
   }
 
   function showAllFormSections() {
-    document.querySelectorAll('#inscFormWrap section.card, #inscFormWrap #guardianBlock').forEach(function (el) {
+    show($('insCategorySection'), true);
+    show($('insPersonalSection'), true);
+    document.querySelectorAll('#inscFormWrap section.card').forEach(function (el) {
       if (el.id === 'insLookupBlock') return;
       el.style.display = '';
     });
-    show($('insPersonalSection'), true);
+    show($('guardianBlock'), false);
     onBirthChange();
   }
 
@@ -227,6 +697,7 @@
     state.continueEditable = false;
     prefillFromPlayer(player);
     setPersonalReadonly(true);
+    show($('inscFinalizeIntro'), false);
     show($('insClubRulesLine'), true);
     if ($('insPlayerConsent')) $('insPlayerConsent').checked = true;
     if ($('insPhotoConsent')) $('insPhotoConsent').checked = true;
@@ -265,37 +736,37 @@
   }
 
   function setLookupPanelOpen(open) {
-    const block = $('insLookupBlock');
-    const btn = $('insToggleLookupBtn');
-    show(block, !!open);
-    if (btn) {
-      btn.setAttribute('aria-expanded', open ? 'true' : 'false');
-      btn.textContent = open ? '✕ Cerrar búsqueda' : '🔍 Buscar mi ficha';
-    }
+    show($('insLookupBlock'), !!open);
   }
 
-  function toggleLookupPanel() {
-    const block = $('insLookupBlock');
-    const isOpen = block && block.style.display !== 'none';
-    setLookupPanelOpen(!isOpen);
-    if (!isOpen) updateLookupAuthUI();
-  }
-
-  function runLookup() {
+  async function runLookup() {
     const session = getInscriptionSession();
-    const dni = ($('insLookupDni') && $('insLookupDni').value.trim()) || '';
-    const name = ($('insLookupName') && $('insLookupName').value.trim()) || '';
-    const surname = ($('insLookupSurname') && $('insLookupSurname').value.trim()) || '';
+    const identity = getLookupIdentityFromForm();
+    const password = ($('insPortalPassword') && $('insPortalPassword').value) || '';
     const msg = $('insLookupMsg');
     const season = state.settings.season;
 
-    if (!dni && (!name || !surname)) {
-      if (msg) msg.textContent = 'Introduce tu DNI o nombre y apellidos.';
+    state.lookupIdentity = identity;
+    hidePortalAuthBlocks();
+
+    if (!identity.dni && (!identity.name || !identity.surname)) {
+      if (msg) {
+        msg.style.color = '#dc2626';
+        msg.textContent = 'Introduce tu DNI o nombre y apellidos.';
+      }
+      return;
+    }
+    if (!password) {
+      if (msg) {
+        msg.style.color = '#dc2626';
+        msg.textContent = 'Introduce la contraseña de acceso a tu ficha.';
+      }
+      if ($('insPortalPassword') && $('insPortalPassword').focus) $('insPortalPassword').focus();
       return;
     }
 
-    const paid = dni
-      ? global.PlayerInscription.findPaidPlayerForSeason(dni, season)
+    const paid = identity.dni
+      ? global.PlayerInscription.findPaidPlayerForSeason(identity.dni, season)
       : null;
     if (paid) {
       if (msg) {
@@ -307,73 +778,81 @@
 
     let player = null;
     if (global.PlayerInscription.findApprovedForInscriptionByIdentity) {
-      player = global.PlayerInscription.findApprovedForInscriptionByIdentity(dni, name, surname, season);
-    } else if (dni) {
-      player = global.PlayerInscription.findApprovedForInscription(dni, season);
+      player = global.PlayerInscription.findApprovedForInscriptionByIdentity(
+        identity.dni,
+        identity.name,
+        identity.surname,
+        season
+      );
+    } else if (identity.dni) {
+      player = global.PlayerInscription.findApprovedForInscription(identity.dni, season);
     }
-
     if (!player) {
-      player = global.PlayerInscription.findPlayerForContinueLookup(dni, name, surname, season);
-    }
-    if (!player && global.PlayerInscription.findReturningPlayerForInscription) {
-      player = global.PlayerInscription.findReturningPlayerForInscription(dni, name, surname, season);
+      player = global.PlayerInscription.findPlayerForContinueLookup(
+        identity.dni,
+        identity.name,
+        identity.surname,
+        season
+      );
     }
 
-    if (player && global.PlayerInscription.findPaidPlayerForSeason(player.dni, season)) {
+    if (session && player && canAccessPlayerRecord(session, player)) {
+      finishLookupWithPlayer(player);
+      return;
+    }
+
+    if (!global.PlayerPortalAuth) {
       if (msg) {
         msg.style.color = '#dc2626';
-        msg.textContent = 'Inscripción ya completada para esta temporada.';
+        msg.textContent = 'Acceso protegido no disponible. Inicia sesión como socio/a o inténtalo más tarde.';
       }
       return;
     }
 
-    if (player && !canLookupPlayerRecord(session, player, season)) {
+    try {
       if (msg) {
-        msg.style.color = '#dc2626';
-        msg.textContent = session
-          ? 'No puedes consultar esta ficha. Solo datos vinculados a tu sesión o admitidos por el club como jugador/a.'
-          : 'No encontramos una admisión del club para estos datos. Si el club ya te aceptó, usa el mismo DNI o nombre de la solicitud. Si ya eres socio/a, inicia sesión. Si no, rellena el formulario de abajo.';
+        msg.style.color = '#64748b';
+        msg.textContent = 'Comprobando acceso…';
       }
-      return;
-    }
-
-    if (player && isPlayerClubApproved(player, season)) {
-      enterContinueMode(player);
-      return;
-    }
-
-    if (player && session) {
-      prefillReturningPlayer(player);
-      return;
-    }
-
-    if (player && !session) {
-      if (msg) {
-        msg.style.color = '#b45309';
-        msg.textContent =
-          'Ficha encontrada, pero necesitas iniciar sesión como socio/a para ver estos datos, o que el club te admita primero como jugador/a desde «¿Quieres Jugar?».';
+      const loggedPlayer = await global.PlayerPortalAuth.login({
+        dni: identity.dni,
+        name: identity.name,
+        surname: identity.surname,
+        password: password,
+        season: season
+      });
+      if (!loggedPlayer) {
+        throw new Error('No se pudo acceder a la ficha.');
       }
-      return;
-    }
-
-    if (global.PlayerApplication && dni) {
-      const pending = global.PlayerApplication.findPendingByDni(dni, season);
-      if (pending) {
-        if (msg) {
-          msg.style.color = '#d97706';
-          msg.textContent =
-            'Tu solicitud está pendiente de revisión por el club. Te avisaremos cuando puedas continuar aquí.';
+      finishLookupWithPlayer(loggedPlayer);
+    } catch (e) {
+      if (global.PlayerApplication && identity.dni) {
+        const pending = global.PlayerApplication.findPendingByDni(identity.dni, season);
+        if (pending) {
+          if (msg) {
+            msg.style.color = '#d97706';
+            msg.textContent =
+              'Tu solicitud está pendiente de revisión. Cuando el club te acepte, usa aquí la contraseña que elegiste al registrarte.';
+          }
+          return;
         }
-        return;
+      }
+      if (msg) {
+        msg.style.color = '#dc2626';
+        if (e.code === 'bad_password') {
+          msg.textContent = 'Contraseña incorrecta. Si la olvidaste, pulsa «¿Olvidaste tu contraseña?».';
+        } else if (e.code === 'no_password') {
+          msg.textContent =
+            'Esta ficha aún no tiene contraseña. Escríbe al club o pide que te la asignen desde el panel de administración.';
+        } else if (e.code === 'not_found') {
+          msg.textContent =
+            'No encontramos tu ficha con esos datos. Si eres nuevo/a, solicita el alta en la página principal. Si ya te aceptaron, comprueba DNI y contraseña.';
+          hideInscriptionFormSections();
+        } else {
+          msg.textContent = e.message || 'No se pudo acceder. Comprueba DNI y contraseña.';
+        }
       }
     }
-
-    if (msg) {
-      msg.style.color = '#b45309';
-      msg.textContent =
-        'No encontramos tu ficha. Puedes rellenar el formulario de abajo igualmente. Si eres nuevo/a en el club, también puedes solicitar alta desde «¿Quieres Jugar?» en la página principal.';
-    }
-    showAllFormSections();
   }
 
   function renderKitSection() {
@@ -385,73 +864,32 @@
       wrap.innerHTML = '<p style="color:#64748b;">No hay equipación configurada para esta temporada.</p>';
       return;
     }
-    const perGarment = state.settings.kitMode === 'per_garment';
     garments.forEach(function (g) {
       const row = document.createElement('div');
       row.className = 'kit-row';
+      const priceHint =
+        Number(g.price) > 0 ? ' <span class="muted">(' + formatEur(g.price) + ')</span>' : '';
       row.innerHTML =
-        (perGarment
-          ? '<label class="kit-check"><input type="checkbox" data-kit-id="' +
-            g.id +
-            '"> <span>' +
-            g.label +
-            ' (' +
-            formatEur(g.price) +
-            ')</span></label>'
-          : '<span class="kit-label">' + g.label + ' (' + formatEur(g.price) + ')</span>') +
+        '<span class="kit-label">' +
+        g.label +
+        priceHint +
+        '</span>' +
         '<select data-kit-size="' +
         g.id +
-        '" class="kit-size" disabled><option value="">Talla</option>' +
+        '" class="kit-size"><option value="">Talla</option>' +
         sizeOptionsHtml() +
         '</select>';
       wrap.appendChild(row);
-      const cb = row.querySelector('[data-kit-id]');
       const sel = row.querySelector('[data-kit-size]');
-      if (cb) {
-        cb.addEventListener('change', function () {
-          sel.disabled = !cb.checked;
-          if (!cb.checked) sel.value = '';
-          refreshCart();
-        });
-      } else if (sel) {
-        sel.disabled = false;
-      }
       if (sel) sel.addEventListener('change', refreshCart);
     });
-  }
-
-  function renderFeeCheckboxes() {
-    const box = $('feeCheckboxes');
-    if (!box || !state.settings) return;
-    const s = state.settings;
-    let html = '';
-    if (s.chargeFicha) {
-      html +=
-        '<label class="fee-line"><input type="checkbox" id="payFichaCb" checked> Cuota de ficha / inscripción federativa</label>';
-    }
-    if (s.chargeSocio) {
-      html +=
-        '<label class="fee-line"><input type="checkbox" id="paySocioCb"> Cuota de socio/a del club (socio-jugador, sin duplicar alta)</label>';
-    }
-    if (!html) {
-      html = '<p class="muted">No hay cuotas configuradas para cobrar en la inscripción.</p>';
-    }
-    box.innerHTML = html;
-    const ficha = $('payFichaCb');
-    const socio = $('paySocioCb');
-    if (ficha) ficha.addEventListener('change', refreshCart);
-    if (socio) socio.addEventListener('change', refreshCart);
   }
 
   function collectKitItems() {
     const items = [];
     const garments = global.ClubInscriptionConfig.getEnabledGarments(state.settings);
-    const perGarment = state.settings.kitMode === 'per_garment';
     garments.forEach(function (g) {
-      const cb = document.querySelector('[data-kit-id="' + g.id + '"]');
       const sel = document.querySelector('[data-kit-size="' + g.id + '"]');
-      const selected = perGarment ? cb && cb.checked : true;
-      if (!selected) return;
       const size = sel ? sel.value : '';
       if (!size) return;
       items.push({
@@ -464,6 +902,11 @@
     return items;
   }
 
+  function inscriptionPaysCategoryFees() {
+    const s = state.settings || {};
+    return !!(s.chargeFicha || s.chargeSocio);
+  }
+
   function getFormData() {
     return {
       name: ($('insName') && $('insName').value.trim()) || '',
@@ -471,10 +914,25 @@
       dni: ($('insDni') && $('insDni').value.trim()) || '',
       email: ($('insEmail') && $('insEmail').value.trim()) || '',
       phone: ($('insPhone') && $('insPhone').value.trim()) || '',
-      address: ($('insAddress') && $('insAddress').value.trim()) || '',
+      domicilio: ($('insDomicilio') && $('insDomicilio').value.trim()) || '',
+      localidad: ($('insLocalidad') && $('insLocalidad').value.trim()) || '',
+      provincia: ($('insProvincia') && $('insProvincia').value.trim()) || 'Zamora',
+      address: global.PlayerInscription.composeAddress
+        ? global.PlayerInscription.composeAddress({
+            domicilio: ($('insDomicilio') && $('insDomicilio').value.trim()) || '',
+            localidad: ($('insLocalidad') && $('insLocalidad').value.trim()) || '',
+            provincia: ($('insProvincia') && $('insProvincia').value.trim()) || 'Zamora'
+          })
+        : '',
       birthDate: ($('insBirth') && $('insBirth').value) || '',
       category: ($('insCategory') && $('insCategory').value) || '',
       position: ($('insPosition') && $('insPosition').value) || '',
+      bloodGroup: ($('insBloodGroup') && $('insBloodGroup').value.trim()) || '',
+      injuries: ($('insInjuries') && $('insInjuries').value.trim()) || '',
+      injuriesYear: '',
+      allergyIllness: ($('insAllergy') && $('insAllergy').value.trim()) || '',
+      observations: ($('insObservations') && $('insObservations').value.trim()) || '',
+      previousSeasonPlayed: state.flowContinue || state.flowFinalize ? '2025-2026' : '',
       weightKg: $('insWeight') && $('insWeight').value ? Number($('insWeight').value) : null,
       heightCm: $('insHeight') && $('insHeight').value ? Number($('insHeight').value) : null,
       guardianName: ($('insGuardianName') && $('insGuardianName').value.trim()) || '',
@@ -485,34 +943,100 @@
       playerConsent: $('insPlayerConsent') && $('insPlayerConsent').checked,
       photoConsent: $('insPhotoConsent') && $('insPhotoConsent').checked,
       clubRulesAccepted: $('insClubRules') && $('insClubRules').checked,
-      photoData: state.photoData
+      photoData: state.photoData,
+      portalPassword: ($('insPortalPasswordNew') && $('insPortalPasswordNew').value) || '',
+      portalPasswordConfirm: ($('insPortalPasswordNew2') && $('insPortalPasswordNew2').value) || ''
     };
+  }
+
+  function validatePortalPasswordFields() {
+    if (state.passwordOnlyMode || (state.continuePlayer && !state.continueEditable)) {
+      return null;
+    }
+    const pwd = ($('insPortalPasswordNew') && $('insPortalPasswordNew').value) || '';
+    const pwd2 = ($('insPortalPasswordNew2') && $('insPortalPasswordNew2').value) || '';
+    const existing = hasExistingPortalPassword();
+    if (!existing) {
+      if (!pwd || pwd.length < 6) {
+        return 'Indica una contraseña de acceso a tu ficha (mínimo 6 caracteres).';
+      }
+      if (pwd !== pwd2) {
+        return 'Las contraseñas de acceso no coinciden.';
+      }
+      return null;
+    }
+    if (!pwd && !pwd2) return null;
+    if (pwd.length < 6) {
+      return 'La nueva contraseña debe tener al menos 6 caracteres.';
+    }
+    if (pwd !== pwd2) {
+      return 'Las contraseñas no coinciden.';
+    }
+    return null;
   }
 
   function refreshCart() {
     const form = getFormData();
     const category = form.category || global.ClubInscriptionConfig.suggestCategoryFromBirthDate(form.birthDate);
     const kitItems = collectKitItems();
-    const payFicha = !$('payFichaCb') || $('payFichaCb').checked;
-    const paySocio = $('paySocioCb') && $('paySocioCb').checked;
+    const payFees = !!category && inscriptionPaysCategoryFees();
+    const payFicha = payFees && state.settings.chargeFicha !== false;
+    const paySocio = payFees && state.settings.chargeSocio !== false;
     const cart = global.PlayerInscription.computeCart(state.settings, category, kitItems, payFicha, paySocio);
 
     const lines = $('cartLines');
     if (!lines) return;
     let html = '';
-    kitItems.forEach(function (it) {
-      html += '<div class="cart-line"><span>' + it.label + ' — talla ' + it.size + '</span><span>' + formatEur(it.price) + '</span></div>';
-    });
+    let hasLines = false;
+
     if (cart.fichaFee > 0) {
-      html += '<div class="cart-line"><span>Cuota ficha</span><span>' + formatEur(cart.fichaFee) + '</span></div>';
+      html +=
+        '<div class="cart-line"><span>Cuota inscripción federativa</span><span>' +
+        formatEur(cart.fichaFee) +
+        '</span></div>';
+      hasLines = true;
     }
     if (cart.socioFee > 0) {
-      html += '<div class="cart-line"><span>Cuota socio/a</span><span>' + formatEur(cart.socioFee) + '</span></div>';
+      html +=
+        '<div class="cart-line"><span>Cuota socio del club</span><span>' +
+        formatEur(cart.socioFee) +
+        '</span></div>';
+      hasLines = true;
     }
-    if (!html) html = '<p class="muted">Selecciona equipación y/o cuotas.</p>';
+    const feesSubtotal = (cart.fichaFee || 0) + (cart.socioFee || 0);
+    if (feesSubtotal > 0) {
+      html +=
+        '<div class="cart-subtotal"><span>Subtotal inscripción</span><span>' +
+        formatEur(feesSubtotal) +
+        '</span></div>';
+    }
+
+    kitItems.forEach(function (it) {
+      const priceTxt = it.price > 0 ? formatEur(it.price) : '—';
+      html +=
+        '<div class="cart-line"><span>' +
+        it.label +
+        ' (talla ' +
+        it.size +
+        ')</span><span>' +
+        priceTxt +
+        '</span></div>';
+      hasLines = true;
+    });
+    if (cart.kitTotal > 0) {
+      html +=
+        '<div class="cart-subtotal"><span>Subtotal ropa entreno</span><span>' +
+        formatEur(cart.kitTotal) +
+        '</span></div>';
+    }
+
     lines.innerHTML = html;
     if ($('cartTotal')) $('cartTotal').textContent = formatEur(cart.total);
     state.lastCart = { kitItems: kitItems, cart: cart, category: category };
+  }
+
+  function clubEmailsEqual(a, b) {
+    return String(a || '').trim().toLowerCase() === String(b || '').trim().toLowerCase();
   }
 
   function toggleGuardian() {
@@ -526,8 +1050,9 @@
   function onBirthChange() {
     const bd = $('insBirth') && $('insBirth').value;
     const cat = global.ClubInscriptionConfig.suggestCategoryFromBirthDate(bd);
-    if ($('insCategory') && cat && (!state.continuePlayer || state.continueEditable)) {
-      $('insCategory').value = cat;
+    if (cat && (!state.continuePlayer || state.continueEditable) && !state.passwordOnlyMode) {
+      const picked = document.querySelector('[name="insCategoryPick"]:checked');
+      if (!picked) setCategoryCheckbox(cat);
     }
     if ($('insAge')) $('insAge').textContent = global.ClubInscriptionConfig.calculateAge(bd) ?? '—';
     const hint = $('insDniHint');
@@ -559,14 +1084,20 @@
         if (!f.guardianName || !f.guardianDNI || !f.guardianPhone || !f.guardianEmail) {
           return 'Para menores, los datos del tutor/a son obligatorios.';
         }
+        if (clubEmailsEqual(f.email, f.guardianEmail)) {
+          return 'El menor no puede usar el mismo correo que su padre o tutor/a. Indica un email distinto para el jugador/a.';
+        }
       }
     }
 
-    if (state.flowContinue && !f.clubRulesAccepted) {
-      return 'Debes aceptar las normas y el compromiso deportivo del club.';
+    if ((state.flowContinue || state.flowFinalize) && !f.clubRulesAccepted) {
+      return 'Debes leer y aceptar las normas y condiciones de inscripción del club.';
     }
     if (!f.playerConsent || !f.photoConsent) {
       return 'Debes aceptar los consentimientos obligatorios.';
+    }
+    if (!f.category) {
+      return 'Marca la categoría a la que perteneces esta temporada.';
     }
 
     const season = state.settings.season;
@@ -581,18 +1112,10 @@
     const kitItems = collectKitItems();
     const garments = global.ClubInscriptionConfig.getEnabledGarments(state.settings);
     if (garments.length && !kitItems.length) {
-      return 'Indica al menos una prenda con su talla.';
+      return 'Indica al menos una prenda de entreno con su talla.';
     }
-    for (let i = 0; i < garments.length; i++) {
-      const g = garments[i];
-      const perGarment = state.settings.kitMode === 'per_garment';
-      const cb = document.querySelector('[data-kit-id="' + g.id + '"]');
-      const sel = document.querySelector('[data-kit-size="' + g.id + '"]');
-      const selected = perGarment ? cb && cb.checked : true;
-      if (selected && sel && !sel.value) {
-        return 'Selecciona la talla de: ' + g.label;
-      }
-    }
+    const pwdErr = validatePortalPasswordFields();
+    if (pwdErr) return pwdErr;
     return null;
   }
 
@@ -618,8 +1141,9 @@
     const f = getFormData();
     f.category = f.category || global.ClubInscriptionConfig.suggestCategoryFromBirthDate(f.birthDate);
     const kitItems = state.lastCart ? state.lastCart.kitItems : collectKitItems();
-    const payFicha = !$('payFichaCb') || $('payFichaCb').checked;
-    const paySocio = $('paySocioCb') && $('paySocioCb').checked;
+    const payFees = !!f.category && inscriptionPaysCategoryFees();
+    const payFicha = payFees && state.settings.chargeFicha !== false;
+    const paySocio = payFees && state.settings.chargeSocio !== false;
     const cart = global.PlayerInscription.computeCart(state.settings, f.category, kitItems, payFicha, paySocio);
     const player = global.PlayerInscription.buildPlayerRecord(f, { kitItems: kitItems, ...cart }, state.settings);
     if (state.continuePlayer && state.continuePlayer.id) {
@@ -632,7 +1156,69 @@
     return player;
   }
 
-  async function submit(method) {
+  function buildPlayerClubNotifyFields(reg) {
+    const kit = (reg.kit && reg.kit.items) || reg.kitOrder || [];
+    const kitTxt = Array.isArray(kit)
+      ? kit
+          .map(function (k) {
+            return (k.garment || k.prenda || '') + ' ' + (k.size || k.talla || '');
+          })
+          .join('; ')
+      : '—';
+    const cb = reg.chargeBreakdown || {};
+    return [
+      { label: 'Nombre', value: reg.name || reg.nombre },
+      { label: 'Apellidos', value: reg.surname || reg.apellidos },
+      { label: 'DNI', value: reg.dni },
+      { label: 'Email', value: reg.email },
+      { label: 'Teléfono', value: reg.phone || reg.telefono },
+      { label: 'Temporada', value: reg.inscriptionSeason || reg.temporada },
+      { label: 'Categoría', value: reg.category || reg.categoria },
+      { label: 'Fecha nacimiento', value: reg.birthDate || reg.fechaNacimiento },
+      { label: 'Domicilio', value: reg.domicilio || reg.address },
+      { label: 'Localidad', value: reg.localidad },
+      { label: 'Provincia', value: reg.provincia },
+      { label: 'Cuota ficha (€)', value: cb.ficha != null ? cb.ficha : reg.fichaFee },
+      { label: 'Cuota socio (€)', value: cb.socio != null ? cb.socio : reg.socioFee },
+      { label: 'Ropa entreno (€)', value: cb.kit != null ? cb.kit : reg.kitTotal },
+      { label: 'Total (€)', value: cb.total != null ? cb.total : reg.totalCharge },
+      { label: 'Ropa (tallas)', value: kitTxt || '—' },
+      { label: 'Tutor/a', value: reg.guardianName || '—' },
+      { label: 'DNI tutor/a', value: reg.guardianDNI || reg.guardianDni || '—' },
+      { label: 'Cuenta club', value: 'CAJA RURAL ES12 3085 0034 8222 5127 9226' }
+    ];
+  }
+
+  function offlinePaymentSubjectLabel(ch) {
+    if (ch === 'efectivo') return 'efectivo';
+    if (ch === 'tpv') return 'TPV';
+    return 'transferencia';
+  }
+
+  function offlinePaymentUserHint(ch) {
+    if (ch === 'efectivo') return 'efectivo en el club';
+    if (ch === 'tpv') return 'TPV (datáfono en el club)';
+    return 'transferencia a la cuenta del club (CAJA RURAL ES12 3085 0034 8222 5127 9226)';
+  }
+
+  function notifyClubPlayerInscription(reg, paymentChannel) {
+    if (!global.CdsanClubEmail || !reg || !reg.email) return;
+    const ch =
+      paymentChannel === 'efectivo' ? 'efectivo' : paymentChannel === 'tpv' ? 'tpv' : 'transferencia';
+    global.CdsanClubEmail.sendClubAdminNotify({
+      kind: 'inscripcion_jugador',
+      title: 'Nueva inscripción jugador/a (pendiente de pago)',
+      subject: 'Inscripción jugador — ' + offlinePaymentSubjectLabel(ch),
+      paymentChannel: ch,
+      requesterEmail: reg.email,
+      fields: buildPlayerClubNotifyFields(reg)
+    }).catch(function (e) {
+      console.warn('Correo aviso club inscripción:', e);
+    });
+  }
+
+  async function submit(method, offlineChannel) {
+    if (global.SiteUpdateMode && !global.SiteUpdateMode.guard()) return;
     const err = validateForm();
     if (err) {
       alert('❌ ' + err);
@@ -640,13 +1226,25 @@
     }
     try {
       const reg = buildRegistration();
+      if (offlineChannel) reg.offlinePaymentChannel = offlineChannel;
+      const f = getFormData();
+      if (f.portalPassword && typeof global.hashClubAccessKey === 'function') {
+        reg.portalPasswordHash = await global.hashClubAccessKey(f.portalPassword);
+        reg.portalPasswordSetAt = new Date().toISOString();
+      }
       const result = await global.PlayerInscription.submitCheckout(reg, method);
       if (result.free) {
         alert('✅ Inscripción completada (importe 0 €). Tu ficha queda activa.');
         global.location.href = 'index.html';
       } else if (result.transfer) {
+        const ch = result.offlineChannel || offlineChannel || 'transferencia';
+        notifyClubPlayerInscription(reg, ch);
         alert(
-          '✅ Inscripción registrada con estado PENDIENTE DE PAGO (transferencia).\n\nRealiza el ingreso según indique el club. Un administrador validará el pago y activará tu ficha.'
+          '✅ Inscripción registrada con estado PENDIENTE DE PAGO (' +
+            offlinePaymentSubjectLabel(ch) +
+            ').\n\nRealiza el pago por ' +
+            offlinePaymentUserHint(ch) +
+            '. Un administrador validará el ingreso y activará tu ficha.\n\n📧 Hemos enviado un aviso al club con tus datos.'
         );
         global.location.href = 'index.html';
       } else if (result.redirect) {
@@ -657,17 +1255,28 @@
     }
   }
 
-  function initCategorySelect() {
-    const sel = $('insCategory');
-    if (!sel) return;
-    sel.innerHTML = '<option value="">Automática por edad</option>';
-    global.ClubInscriptionConfig.CATEGORIES.forEach(function (c) {
-      const o = document.createElement('option');
-      o.value = c.id;
-      o.textContent = c.label;
-      sel.appendChild(o);
+  async function submitTransferWithPicker() {
+    const err = validateForm();
+    if (err) {
+      alert('❌ ' + err);
+      return;
+    }
+    if (!global.PaymentMethodPicker || !global.PaymentMethodPicker.showPaymentOfflinePicker) {
+      await submit('transfer', 'transferencia');
+      return;
+    }
+    const choice = await global.PaymentMethodPicker.showPaymentOfflinePicker({
+      title: 'Forma de pago de la inscripción'
     });
-    sel.addEventListener('change', refreshCart);
+    if (!choice) return;
+    await submit('transfer', choice);
+  }
+
+  function initCategoryUI() {
+    if (global.ClubInscriptionConfig.applyDefaultFeesIfEmpty) {
+      state.settings = global.ClubInscriptionConfig.applyDefaultFeesIfEmpty(state.settings);
+    }
+    renderCategoryFeesTable();
   }
 
   function initPaymentButtons() {
@@ -677,7 +1286,7 @@
     show($('payTransferBlock'), !!pm.transfer);
     if ($('btnPayCard')) $('btnPayCard').onclick = function () { submit('card'); };
     if ($('btnPayBizum')) $('btnPayBizum').onclick = function () { submit('bizum'); };
-    if ($('btnPayTransfer')) $('btnPayTransfer').onclick = function () { submit('transfer'); };
+    if ($('btnPayTransfer')) $('btnPayTransfer').onclick = function () { submitTransferWithPicker(); };
     if (global.CdsanRedsys && global.CdsanRedsys.loadConfig) {
       global.CdsanRedsys.loadConfig().then(function () {
         if ($('btnPayBizum') && !global.CdsanRedsys.isBizumEnabled()) {
@@ -688,21 +1297,118 @@
     }
   }
 
+  function bindPortalAuthControls() {
+    function bindClick(id, handler) {
+      const el = $(id);
+      if (!el || el.dataset.bound) return;
+      el.dataset.bound = '1';
+      el.addEventListener('click', function (ev) {
+        ev.preventDefault();
+        handler();
+      });
+    }
+    bindClick('insPortalSetupBtn', runPortalSetup);
+    bindClick('insPortalResetBtn', runPortalResetRequest);
+    bindClick('insPortalResetMailtoBtn', runPortalResetMailto);
+    bindClick('insPortalResetTokenBtn', runPortalResetWithToken);
+    bindClick('insPortalForgotLink', function (e) {
+      if (e && e.preventDefault) e.preventDefault();
+      openForgotPasswordPanel();
+    });
+    bindClick('insPortalBackLink2', resetLookupAuthFlow);
+    bindClick('insPortalBackLink3', resetLookupAuthFlow);
+    const pwd = $('insPortalPassword');
+    if (pwd && !pwd.dataset.bound) {
+      pwd.dataset.bound = '1';
+      pwd.addEventListener('keydown', function (ev) {
+        if (ev.key === 'Enter') runLookup();
+      });
+    }
+  }
+
+  function setupPortalResetFromUrl(token) {
+    if (!token) return;
+    state.portalResetToken = token;
+    setupFinalizeFichaFlow();
+    setLookupPanelOpen(true);
+    show($('insLookupFieldsWrap'), false);
+    showPortalAuthBlock('insPortalResetTokenBlock', 'Restablecer contraseña de acceso a la ficha');
+    const msg = $('insLookupMsg');
+    if (msg) {
+      msg.style.color = '#1e3a8a';
+      msg.textContent = 'Enlace de recuperación detectado. Elige tu nueva contraseña.';
+    }
+  }
+
   function setupYaSoyJugadorFlow() {
+    state.flowContinue = true;
+    state.flowFinalize = false;
     show($('inscYaSoyIntro'), true);
-    show($('insToggleLookupBtn'), true);
-    show($('insClubRulesLine'), true);
-    setLookupPanelOpen(false);
-    showAllFormSections();
-    updateLookupAuthUI();
+    show($('inscFinalizeIntro'), false);
+    if ($('inscPageTitle')) $('inscPageTitle').textContent = 'Inscripción jugador/a';
+    show($('inscPasswordOnlyBanner'), false);
+    bindPortalAuthControls();
     if ($('insLookupBtn') && !$('insLookupBtn').dataset.bound) {
       $('insLookupBtn').dataset.bound = '1';
       $('insLookupBtn').addEventListener('click', runLookup);
     }
-    if ($('insToggleLookupBtn') && !$('insToggleLookupBtn').dataset.bound) {
-      $('insToggleLookupBtn').dataset.bound = '1';
-      $('insToggleLookupBtn').addEventListener('click', toggleLookupPanel);
+
+    const season = state.settings.season;
+    let lockDni = '';
+    try {
+      lockDni = global.sessionStorage.getItem('cdsan_insc_lock_dni') || '';
+    } catch (_) {}
+    if (
+      lockDni &&
+      global.PlayerInscription.requiresPasswordForInscriptionAccess &&
+      global.PlayerInscription.requiresPasswordForInscriptionAccess(lockDni, season)
+    ) {
+      enforceInscriptionCompletedMode();
+      return;
     }
+
+    state.passwordOnlyMode = false;
+    show($('insClubRulesLine'), true);
+    showAllFormSections();
+    setLookupPanelOpen(false);
+    updateLookupAuthUI();
+    const msg = $('insLookupMsg');
+    if (msg) msg.textContent = '';
+  }
+
+  function setupFinalizeFichaFlow() {
+    state.flowFinalize = true;
+    state.flowContinue = false;
+    show($('inscYaSoyIntro'), false);
+    show($('inscFinalizeIntro'), true);
+    if ($('inscPageTitle')) $('inscPageTitle').textContent = 'Finalizar ficha';
+    show($('inscPasswordOnlyBanner'), false);
+    bindPortalAuthControls();
+    if ($('insLookupBtn') && !$('insLookupBtn').dataset.bound) {
+      $('insLookupBtn').dataset.bound = '1';
+      $('insLookupBtn').addEventListener('click', runLookup);
+    }
+
+    const season = state.settings.season;
+    let lockDni = '';
+    try {
+      lockDni = global.sessionStorage.getItem('cdsan_insc_lock_dni') || '';
+    } catch (_) {}
+    if (
+      lockDni &&
+      global.PlayerInscription.requiresPasswordForInscriptionAccess &&
+      global.PlayerInscription.requiresPasswordForInscriptionAccess(lockDni, season)
+    ) {
+      enforceInscriptionCompletedMode();
+      return;
+    }
+
+    state.passwordOnlyMode = false;
+    hideInscriptionFormSections();
+    setLookupPanelOpen(true);
+    updateLookupAuthUI();
+    const msg = $('insLookupMsg');
+    if (msg) msg.textContent = '';
   }
 
   function init() {
@@ -711,9 +1417,14 @@
       return;
     }
     const params = new URLSearchParams(global.location.search);
-    state.flowContinue = params.get('flow') === 'continue';
+    const flowParam = params.get('flow') || '';
+    state.flowFinalize = flowParam === 'finalize';
+    state.flowContinue = flowParam === 'continue';
 
     state.settings = global.ClubInscriptionConfig.read();
+    if (global.ClubInscriptionConfig.applyDefaultFeesIfEmpty) {
+      state.settings = global.ClubInscriptionConfig.applyDefaultFeesIfEmpty(state.settings);
+    }
     if (global.ClubSeason && global.ClubSeason.getActiveSeason) {
       state.settings.season = global.ClubSeason.getActiveSeason();
     }
@@ -727,21 +1438,44 @@
     }
     show($('inscClosedWrap'), false);
     show($('inscFormWrap'), true);
-    initCategorySelect();
+    initCategoryUI();
     renderKitSection();
-    renderFeeCheckboxes();
     initPaymentButtons();
 
-    if (state.flowContinue) {
+    if (!state.flowFinalize && !state.flowContinue) {
+      global.location.replace('index.html');
+      return;
+    }
+    const portalReset = params.get('portalReset');
+    if (portalReset) {
+      setupPortalResetFromUrl(portalReset);
+    } else if (state.flowContinue) {
       setupYaSoyJugadorFlow();
     } else {
-      show($('inscYaSoyIntro'), false);
-      show($('insToggleLookupBtn'), false);
-      show($('insLookupBlock'), false);
+      setupFinalizeFichaFlow();
     }
 
+    if (global.ClubInscriptionLegal && global.ClubInscriptionLegal.bindModal) {
+      global.ClubInscriptionLegal.bindModal();
+    }
+    updatePortalPasswordBlockUI();
+    const dniForPwd = $('insDni');
+    if (dniForPwd && !dniForPwd.dataset.pwdUiBound) {
+      dniForPwd.dataset.pwdUiBound = '1';
+      dniForPwd.addEventListener('blur', updatePortalPasswordBlockUI);
+    }
+    const gDniForPwd = $('insGuardianDni');
+    if (gDniForPwd && !gDniForPwd.dataset.pwdUiBound) {
+      gDniForPwd.dataset.pwdUiBound = '1';
+      gDniForPwd.addEventListener('blur', updatePortalPasswordBlockUI);
+    }
     refreshCart();
-    if ($('insBirth')) $('insBirth').addEventListener('change', onBirthChange);
+    if ($('insBirth')) {
+      $('insBirth').addEventListener('change', onBirthChange);
+      $('insBirth').addEventListener('input', onBirthChange);
+      if ($('insBirth').value) onBirthChange();
+      else toggleGuardian();
+    }
     if ($('insPhoto')) {
       $('insPhoto').addEventListener('change', function (e) {
         handlePhoto(e.target.files[0]);
@@ -751,6 +1485,21 @@
       const node = $(id);
       if (node) node.addEventListener('blur', refreshCart);
     });
+    const dniNode = $('insDni');
+    if (dniNode && !dniNode.dataset.lockBound) {
+      dniNode.dataset.lockBound = '1';
+      dniNode.addEventListener('blur', function () {
+        if ((!state.flowContinue && !state.flowFinalize) || state.passwordOnlyMode) return;
+        const dni = dniNode.value.trim();
+        if (
+          dni &&
+          global.PlayerInscription.requiresPasswordForInscriptionAccess &&
+          global.PlayerInscription.requiresPasswordForInscriptionAccess(dni, state.settings.season)
+        ) {
+          enforcePasswordOnlyMode();
+        }
+      });
+    }
   }
 
   document.addEventListener('DOMContentLoaded', init);

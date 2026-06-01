@@ -2,7 +2,14 @@
   "name": "cdsanabriacf",
   "private": true,
   "description": "Dependencias funciones Netlify — TPV Redsys (Caja Rural)",
+  "scripts": {
+    "build:dist": "powershell -NoProfile -ExecutionPolicy Bypass -File ./build-netlify-dist.ps1",
+    "deploy:prod": "powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/deploy-netlify-prod.ps1",
+    "deploy:draft": "powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/deploy-netlify-prod.ps1 -Draft",
+    "netlify:setup": "powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/netlify-cli-setup.ps1"
+  },
   "dependencies": {
-    "firebase-admin": "^12.7.0"
+    "firebase-admin": "^12.7.0",
+    "nodemailer": "^6.10.1"
   }
 }

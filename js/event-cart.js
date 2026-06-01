@@ -189,6 +189,7 @@
   }
 
   function openAddModal(eventId) {
+    if (global.SiteUpdateMode && !global.SiteUpdateMode.guard()) return;
     const registrant = typeof global.getCurrentRegistrant === 'function' ? global.getCurrentRegistrant() : null;
     if (!registrant) {
       alert('❌ Debes iniciar sesión para inscribirte en eventos.');
@@ -299,6 +300,7 @@
     });
 
     document.getElementById('ecAddConfirm').onclick = function () {
+      if (global.SiteUpdateMode && !global.SiteUpdateMode.guard()) return;
       const guests = [];
       if (allowGuests) {
         const n = parseInt(document.getElementById('ecAddGuestCount').value, 10) || 0;
@@ -444,6 +446,7 @@
     });
 
     document.getElementById('ecCartConfirm').onclick = function () {
+      if (global.SiteUpdateMode && !global.SiteUpdateMode.guard()) return;
       let payMethod = 'free';
       if (!free) {
         const picked = overlay.querySelector('input[name="ecPayMethod"]:checked');
@@ -461,6 +464,7 @@
   }
 
   async function finalizeCheckout(eventId, payMethod) {
+    if (global.SiteUpdateMode && !global.SiteUpdateMode.guard()) return;
     const cart = getCart(eventId);
     if (!cart || !cart.holder) throw new Error('Carrito vacío');
 

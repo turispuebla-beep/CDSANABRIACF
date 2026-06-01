@@ -65,6 +65,11 @@
       ) {
         return 'Para menores, indica nombre, apellidos, DNI, teléfono y email del tutor/a.';
       }
+      const em = String(data.email || '').trim().toLowerCase();
+      const gEm = String(data.guardianEmail || '').trim().toLowerCase();
+      if (em && gEm && em === gEm) {
+        return 'El menor no puede usar el mismo correo que su padre o tutor/a. Indica un email distinto para el jugador/a.';
+      }
     }
     if (!data.commitmentAccepted) {
       return 'Debes confirmar el compromiso y la política interna del club.';
@@ -72,24 +77,38 @@
     if (!data.clubRulesAccepted) {
       return 'Debes leer y aceptar el compromiso deportivo del club.';
     }
+    const pwd = String(data.portalPassword || '');
+    const pwd2 = String(data.portalPasswordConfirm || '');
+    if (!pwd || pwd.length < 6) {
+      return 'Indica una contraseña de acceso a tu ficha (mínimo 6 caracteres).';
+    }
+    if (pwd !== pwd2) {
+      return 'Las contraseñas de acceso a la ficha no coinciden.';
+    }
     return null;
   }
 
-  async function submitApplication(formData) {
-    const err = validateApplicationForm(formData);
-    if (err) throw new Error(err);
-
-    const season = getActiveSeason();
-    const payload = {
+  function buildApplicationPayload(formData, season, portalPasswordHash) {
+    return {
       season: season,
       name: formData.name.trim(),
+      nombre: formData.name.trim(),
       surname: formData.surname.trim(),
+      apellidos: formData.surname.trim(),
       dni: formData.dni ? normalizeDni(formData.dni) : '',
       email: String(formData.email).trim().toLowerCase(),
       phone: formData.phone.trim(),
+      telefono: formData.phone.trim(),
       address: (formData.address || '').trim(),
+      direccion: (formData.address || '').trim(),
       birthDate: formData.birthDate,
+      fechaNacimiento: formData.birthDate,
       category:
+        formData.category ||
+        (global.ClubInscriptionConfig
+          ? global.ClubInscriptionConfig.suggestCategoryFromBirthDate(formData.birthDate)
+          : ''),
+      categoria:
         formData.category ||
         (global.ClubInscriptionConfig
           ? global.ClubInscriptionConfig.suggestCategoryFromBirthDate(formData.birthDate)
@@ -97,36 +116,262 @@
       guardianName: (formData.guardianName || '').trim(),
       guardianSurname: (formData.guardianSurname || '').trim(),
       guardianDni: formData.guardianDni ? normalizeDni(formData.guardianDni) : '',
+      guardianDNI: formData.guardianDni ? normalizeDni(formData.guardianDni) : '',
       guardianPhone: (formData.guardianPhone || '').trim(),
-      guardianEmail: (formData.guardianEmail || '').trim(),
+      guardianEmail: String(formData.guardianEmail || '').trim().toLowerCase(),
       guardianAddress: (formData.guardianAddress || '').trim(),
       commitmentAccepted: !!formData.commitmentAccepted,
       clubRulesAccepted: !!formData.clubRulesAccepted,
-      isMinor: calculateAge(formData.birthDate) != null && calculateAge(formData.birthDate) < 18
+      isMinor: calculateAge(formData.birthDate) != null && calculateAge(formData.birthDate) < 18,
+      portalPasswordHash: portalPasswordHash,
+      appScope: 'cdsanabriacf',
+      status: 'pending_review',
+      source: 'web_mailto'
     };
+  }
 
-    const res = await fetch(FN_PATH, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload)
+  function upsertLocalApplication(application) {
+    const list = readApplications();
+    const dni = normalizeDni(application.dni);
+    const season = String(application.season || '');
+    const ix = list.findIndex(function (a) {
+      return normalizeDni(a.dni) === dni && String(a.season || '') === season;
     });
-    const json = await res.json().catch(function () {
-      return { ok: false, error: 'Respuesta no válida del servidor' };
-    });
-    if (!res.ok || !json.ok) {
-      throw new Error(json.error || 'No se pudo enviar la solicitud');
-    }
+    if (ix >= 0) list[ix] = Object.assign({}, list[ix], application);
+    else list.push(application);
+    writeApplications(list);
+    return application;
+  }
 
-    if (json.application) {
-      const list = readApplications();
-      const ix = list.findIndex(function (a) {
-        return a.id === json.application.id;
+  function syncApplicationToFirestore(application) {
+    if (!global.createDocument || !application) return Promise.resolve();
+    if (global.firebaseDb && global.firebaseDb.isSimulation) return Promise.resolve();
+    const doc = Object.assign({}, application, { localId: application.id });
+    return global.createDocument('player_applications', doc).catch(function (err) {
+      console.warn('[PlayerApplication] Firestore:', err);
+    });
+  }
+
+  async function trySubmitApplicationServer(payload) {
+    try {
+      const res = await fetch(FN_PATH, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
       });
-      if (ix >= 0) list[ix] = json.application;
-      else list.push(json.application);
-      writeApplications(list);
+      const json = await res.json().catch(function () {
+        return { ok: false, error: 'Respuesta no válida del servidor' };
+      });
+      if (!res.ok || !json.ok) {
+        console.warn('submit-player-application:', json.error || res.status);
+        return null;
+      }
+      return json.application || null;
+    } catch (err) {
+      console.warn('submit-player-application:', err);
+      return null;
     }
-    return json;
+  }
+
+  /**
+   * Guarda la solicitud y prepara mailto al club (no depende de SMTP ni de que el servidor responda).
+   */
+  async function submitApplication(formData) {
+    const err = validateApplicationForm(formData);
+    if (err) throw new Error(err);
+
+    const season = getActiveSeason();
+    let portalPasswordHash = '';
+    if (typeof global.hashClubAccessKey === 'function') {
+      portalPasswordHash = await global.hashClubAccessKey(formData.portalPassword);
+    } else {
+      throw new Error('No se pudo proteger la contraseña. Recarga la página e inténtalo de nuevo.');
+    }
+
+    const payload = buildApplicationPayload(formData, season, portalPasswordHash);
+    let application = Object.assign(
+      {
+        id: 'APP_' + Date.now() + '_' + Math.random().toString(36).slice(2, 9),
+        createdAt: new Date().toISOString()
+      },
+      payload
+    );
+
+    const serverApp = await trySubmitApplicationServer(payload);
+    if (serverApp) {
+      application = Object.assign({}, application, serverApp);
+    }
+
+    application = upsertLocalApplication(application);
+    await syncApplicationToFirestore(application);
+
+    return {
+      ok: true,
+      application: application,
+      serverSynced: !!serverApp,
+      mailtoUrl: buildClubNotifyMailto(
+        Object.assign({}, formData, application, { season: application.season || season })
+      )
+    };
+  }
+
+  function getClubNotifyEmail() {
+    if (global.ClubMailto && global.ClubMailto.getClubNotifyEmail) {
+      return global.ClubMailto.getClubNotifyEmail();
+    }
+    if (global.ClubContactDefaults && global.ClubContactDefaults.getNotifyEmail) {
+      return global.ClubContactDefaults.getNotifyEmail();
+    }
+    try {
+      const c = JSON.parse(global.localStorage.getItem('clubContactInfo') || 'null');
+      const em = c && c.email ? String(c.email).trim() : '';
+      if (em && em.includes('@')) return em;
+    } catch (_) {}
+    return 'cdsanabriafc@gmail.com';
+  }
+
+  function getSiteBaseUrl() {
+    if (global.location && /^https?:$/i.test(global.location.protocol)) {
+      return String(global.location.origin).replace(/\/$/, '');
+    }
+    return 'https://www.cdsanabriacf.com';
+  }
+
+  function buildMailtoUrl(to, subject, body) {
+    if (global.ClubMailto && global.ClubMailto.buildMailtoUrl) {
+      return global.ClubMailto.buildMailtoUrl(to, '', subject, body);
+    }
+    const addr = String(to || '').trim();
+    if (!addr || !addr.includes('@')) return '';
+    const q = [];
+    if (subject) q.push('subject=' + encodeURIComponent(subject));
+    if (body) q.push('body=' + encodeURIComponent(body));
+    return 'mailto:' + encodeURIComponent(addr) + (q.length ? '?' + q.join('&') : '');
+  }
+
+  function formatApplicationBody(data) {
+    const requesterEmail = String(data.email || data.guardianEmail || '').trim();
+    const sections = [
+      {
+        heading: 'DATOS DEL JUGADOR/A',
+        fields: [
+          { label: 'Temporada', value: data.season || getActiveSeason() },
+          { label: 'Nombre', value: (data.name || '') + ' ' + (data.surname || '') },
+          { label: 'DNI', value: data.dni },
+          { label: 'Email', value: data.email },
+          { label: 'Teléfono', value: data.phone },
+          { label: 'Nacimiento', value: data.birthDate },
+          { label: 'Dirección', value: data.address },
+          { label: 'Categoría', value: data.category }
+        ]
+      }
+    ];
+    if (data.isMinor || (data.guardianName && data.guardianEmail)) {
+      sections.push({
+        heading: 'TUTOR/A LEGAL',
+        fields: [
+          {
+            label: 'Nombre',
+            value: (data.guardianName || '') + ' ' + (data.guardianSurname || '')
+          },
+          { label: 'DNI tutor/a', value: data.guardianDni },
+          { label: 'Tel. tutor/a', value: data.guardianPhone },
+          { label: 'Email tutor/a', value: data.guardianEmail },
+          { label: 'Dirección tutor/a', value: data.guardianAddress }
+        ]
+      });
+    }
+    if (global.ClubMailto && global.ClubMailto.formatStructuredEmail) {
+      return global.ClubMailto.formatStructuredEmail({
+        title: 'SOLICITUD INSCRIPCIÓN JUGADOR/A',
+        sections: sections,
+        footerLines: ['Estado: pendiente de revisión en el panel de administración.'],
+        requesterEmail: requesterEmail
+      });
+    }
+    return formatApplicationBodyLegacy(data);
+  }
+
+  function formatApplicationBodyLegacy(data) {
+    const lines = [
+      'Nueva solicitud de jugador/a — CD Sanabria CF',
+      '',
+      'Temporada: ' + (data.season || getActiveSeason()),
+      'Nombre: ' + (data.name || '') + ' ' + (data.surname || ''),
+      'DNI: ' + (data.dni || '—'),
+      'Email: ' + (data.email || ''),
+      'Teléfono: ' + (data.phone || ''),
+      'Nacimiento: ' + (data.birthDate || '—'),
+      'Dirección: ' + (data.address || '—'),
+      'Categoría: ' + (data.category || '—')
+    ];
+    if (data.isMinor || (data.guardianName && data.guardianEmail)) {
+      lines.push(
+        '',
+        'Tutor/a legal:',
+        (data.guardianName || '') + ' ' + (data.guardianSurname || ''),
+        'DNI tutor/a: ' + (data.guardianDni || '—'),
+        'Tel. tutor/a: ' + (data.guardianPhone || '—'),
+        'Email tutor/a: ' + (data.guardianEmail || '—')
+      );
+    }
+    lines.push('', 'Estado: pendiente de revisión en el panel de administración.');
+    return lines.join('\r\n');
+  }
+
+  /** Correo al club tras guardar solicitud (mailto, sin servidor SMTP). */
+  function buildClubNotifyMailto(data) {
+    const subject =
+      'Nueva solicitud jugador/a — ' +
+      (data.name || '') +
+      ' ' +
+      (data.surname || '') +
+      ' (' +
+      (data.season || getActiveSeason()) +
+      ')';
+    const requesterEmail = String(data.email || data.guardianEmail || '').trim();
+    const body = formatApplicationBody(data);
+    if (global.ClubMailto && global.ClubMailto.buildNotifyClubMailto) {
+      return global.ClubMailto.buildNotifyClubMailto({
+        subject: subject,
+        requesterEmail: requesterEmail,
+        body: body
+      });
+    }
+    return buildMailtoUrl(getClubNotifyEmail(), subject, body);
+  }
+
+  /** Correo al jugador/a cuando el admin acepta (mailto). */
+  function buildPlayerApprovedMailto(app) {
+    const season = app.season || getActiveSeason();
+    const base = getSiteBaseUrl();
+    const link = base + '/inscripcion-jugador.html?flow=finalize';
+    const body =
+      'Hola ' +
+      (app.name || '') +
+      ' ' +
+      (app.surname || '') +
+      ',\n\n' +
+      'El CD Sanabria CF ha aceptado tu solicitud para la temporada ' +
+      season +
+      '.\n\n' +
+      'Puedes completar la inscripción (ropa y pago) en la web:\n' +
+      link +
+      '\n\n' +
+      'Entra en «Nuevo jugador/a» → «Finalizar ficha» (solo admitidos) con tu DNI y la contraseña que elegiste al solicitar el alta.\n\n' +
+      'Un saludo,\nCD Sanabria CF';
+    const subject = 'Solicitud aceptada — completa tu inscripción — CD Sanabria CF';
+    const to = String(app.email || app.guardianEmail || '').trim();
+    return buildMailtoUrl(to, subject, body);
+  }
+
+  function openMailto(url) {
+    if (global.ClubMailto && global.ClubMailto.openMailto) {
+      return global.ClubMailto.openMailto(url);
+    }
+    if (!url) return false;
+    global.location.href = url;
+    return true;
   }
 
   function findPendingByDni(dni, season) {
@@ -151,6 +396,10 @@
     getActiveSeason: getActiveSeason,
     validateApplicationForm: validateApplicationForm,
     submitApplication: submitApplication,
-    findPendingByDni: findPendingByDni
+    findPendingByDni: findPendingByDni,
+    getClubNotifyEmail: getClubNotifyEmail,
+    buildClubNotifyMailto: buildClubNotifyMailto,
+    buildPlayerApprovedMailto: buildPlayerApprovedMailto,
+    openMailto: openMailto
   };
 })(typeof window !== 'undefined' ? window : globalThis);

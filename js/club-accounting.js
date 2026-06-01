@@ -5,7 +5,7 @@
 (function (global) {
   var LEDGER_KEY = 'clubAccountingLedger';
   var PRICING_KEY = 'clubMembershipPricing';
-  var DEFAULT_PRICING = { cuotaMenor: 10, cuotaMayor: 20, edadMaxMenor: 17, updatedAt: null, updatedBy: null };
+  var DEFAULT_PRICING = { cuotaMenor: 10, cuotaMayor: 25, edadMaxMenor: 17, updatedAt: null, updatedBy: null };
 
   /** Primer 31/08 de cierre de temporada de socios (vigencia y referencia de edad hasta esta fecha). */
   var CUOTA_TEMPORADA_PRIMER_CIERRE_ANIO = 2027;
@@ -101,9 +101,16 @@
       var raw = localStorage.getItem(PRICING_KEY);
       if (!raw) return Object.assign({}, DEFAULT_PRICING);
       var o = JSON.parse(raw);
+      var cuotaMayor = Math.max(
+        0,
+        Number(o.cuotaMayor != null ? o.cuotaMayor : DEFAULT_PRICING.cuotaMayor)
+      );
+      if (cuotaMayor === 20 && DEFAULT_PRICING.cuotaMayor === 25) {
+        cuotaMayor = 25;
+      }
       return {
         cuotaMenor: Math.max(0, Number(o.cuotaMenor != null ? o.cuotaMenor : DEFAULT_PRICING.cuotaMenor)),
-        cuotaMayor: Math.max(0, Number(o.cuotaMayor != null ? o.cuotaMayor : DEFAULT_PRICING.cuotaMayor)),
+        cuotaMayor: cuotaMayor,
         edadMaxMenor: Math.max(0, Math.floor(Number(o.edadMaxMenor != null ? o.edadMaxMenor : DEFAULT_PRICING.edadMaxMenor))),
         updatedAt: o.updatedAt || null,
         updatedBy: o.updatedBy || null
