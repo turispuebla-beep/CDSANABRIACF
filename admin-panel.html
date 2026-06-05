@@ -4194,15 +4194,6 @@
                 });
             }, 1200);
 
-            // Copia de respaldo en archivo JSON como máximo una vez por día (misma lógica que «Backup Club»).
-            setTimeout(() => {
-                try {
-                    if (typeof maybeDownloadDailyClubBackup === 'function') maybeDownloadDailyClubBackup();
-                } catch (err) {
-                    console.warn('Backup diario al abrir:', err);
-                }
-            }, 5500);
-
             window.addEventListener('clubMediaUpdated', function () {
                 try { if (typeof renderMultimediaAdminList === 'function') renderMultimediaAdminList(); } catch (_) {}
             });

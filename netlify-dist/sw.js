@@ -3,9 +3,9 @@
  * Compatible con iOS, Android, HarmonyOS y notificaciones push
  */
 
-const CACHE_NAME = 'cdsanabriacf-v20260602-0044';
-const STATIC_CACHE = 'cdsanabriacf-v20260602-0044-static';
-const DYNAMIC_CACHE = 'cdsanabriacf-v20260602-0044-dynamic';
+const CACHE_NAME = 'cdsanabriacf-v20260605-0752';
+const STATIC_CACHE = 'cdsanabriacf-v20260605-0752-static';
+const DYNAMIC_CACHE = 'cdsanabriacf-v20260605-0752-dynamic';
 
 // Archivos críticos para cache (solo rutas que existen en el despliegue)
 const STATIC_ASSETS = [
