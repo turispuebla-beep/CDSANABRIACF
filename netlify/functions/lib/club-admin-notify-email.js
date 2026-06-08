@@ -1,6 +1,6 @@
 'use strict';
 
-const { escapeHtml, getEmailConfig, sendViaSendGrid } = require('./club-email');
+const { escapeHtml, getEmailConfig, sendViaSendGrid, CLUB_EMAIL_DEFAULT } = require('./club-email');
 
 const CLUB_NAME = 'CD Sanabria CF';
 
@@ -11,7 +11,7 @@ function clubNotifyRecipient(cfg) {
     String(process.env.CLUB_REPLY_EMAIL || '').trim() ||
     String(process.env.SMTP_FROM_EMAIL || '').trim() ||
     String(process.env.SENDGRID_FROM_EMAIL || '').trim() ||
-    'cdsanabriafc@gmail.com'
+    CLUB_EMAIL_DEFAULT
   );
 }
 
@@ -88,14 +88,15 @@ async function sendClubAdminNotification(data) {
 
   const to = clubNotifyRecipient(cfg);
   const content = buildClubAdminContent(data);
-  const replyTo = String(data.requesterEmail || cfg.replyTo || cfg.fromEmail || '').trim();
+  const requester = String(data.requesterEmail || '').trim();
+  const replyTo = requester && requester.includes('@') ? requester : cfg.replyTo || cfg.fromEmail;
 
   await sendViaSendGrid({
     to,
     subject: content.subject,
     html: content.html,
     text: content.text,
-    bcc: undefined
+    replyTo
   });
 
   return { sent: true, to };

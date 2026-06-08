@@ -36,6 +36,57 @@
     }
   }
 
+  function getCategorySuperiorAuthHtml() {
+    return (
+      '<p style="margin:0;line-height:1.55;">Autorizo al CD Sanabria CF a que mi hijo/a, siendo menor de edad, participe en entrenamientos y/o competiciones de categoría superior a la que le corresponda por edad, de forma temporal o permanente, en los entrenamientos y/o competiciones, siempre dentro de la normativa federativa aplicable y previa valoración del cuerpo técnico.</p>'
+    );
+  }
+
+  function openCategoryAuthModal() {
+    const m = global.document.getElementById('insCategoryAuthModal');
+    if (m) {
+      m.style.display = 'flex';
+      global.document.body.style.overflow = 'hidden';
+    }
+  }
+
+  function closeCategoryAuthModal() {
+    const m = global.document.getElementById('insCategoryAuthModal');
+    if (m) {
+      m.style.display = 'none';
+      global.document.body.style.overflow = '';
+    }
+  }
+
+  function bindCategoryAuthModal() {
+    const body = global.document.getElementById('insCategoryAuthBody');
+    if (body && !body.dataset.filled) {
+      body.innerHTML = getCategorySuperiorAuthHtml();
+      body.dataset.filled = '1';
+    }
+    const openBtn = global.document.getElementById('insOpenCategoryAuthBtn');
+    if (openBtn && !openBtn.dataset.bound) {
+      openBtn.dataset.bound = '1';
+      openBtn.addEventListener('click', function (e) {
+        e.preventDefault();
+        e.stopPropagation();
+        openCategoryAuthModal();
+      });
+    }
+    global.document.querySelectorAll('[data-ins-category-auth-close]').forEach(function (el) {
+      if (el.dataset.boundCategory) return;
+      el.dataset.boundCategory = '1';
+      el.addEventListener('click', closeCategoryAuthModal);
+    });
+    const m = global.document.getElementById('insCategoryAuthModal');
+    if (m && !m.dataset.bound) {
+      m.dataset.bound = '1';
+      m.addEventListener('click', function (e) {
+        if (e.target === m) closeCategoryAuthModal();
+      });
+    }
+  }
+
   function bindModal() {
     const body = global.document.getElementById('insCompromisoLegalBody');
     if (body && !body.dataset.filled) {
@@ -65,10 +116,18 @@
     }
   }
 
+  function bindAllModals() {
+    bindModal();
+    bindCategoryAuthModal();
+  }
+
   global.ClubInscriptionLegal = {
     getInscriptionLegalHtml: getInscriptionLegalHtml,
+    getCategorySuperiorAuthHtml: getCategorySuperiorAuthHtml,
     openModal: openModal,
     closeModal: closeModal,
-    bindModal: bindModal
+    bindModal: bindModal,
+    bindCategoryAuthModal: bindCategoryAuthModal,
+    bindAllModals: bindAllModals
   };
 })(typeof window !== 'undefined' ? window : globalThis);

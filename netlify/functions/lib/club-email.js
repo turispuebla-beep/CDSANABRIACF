@@ -2,6 +2,10 @@
 
 const nodemailer = require('nodemailer');
 
+/** Buzón único del club (Gmail): web, modales, SMTP y avisos. */
+const CLUB_EMAIL_DEFAULT = 'cdsanabriacf@gmail.com';
+const CLUB_EMAIL_PUBLIC_DEFAULT = 'cdsanabriacf@gmail.com';
+
 function escapeHtml(value = '') {
   return String(value)
     .replace(/&/g, '&amp;')
@@ -17,14 +21,15 @@ function escapeHtml(value = '') {
  * 2) SendGrid — si está configurado SENDGRID_API_KEY
  */
 function getEmailConfig() {
-  const notifyEmail = String(process.env.CLUB_NOTIFY_EMAIL || '').trim();
+  const notifyEmailRaw = String(process.env.CLUB_NOTIFY_EMAIL || '').trim();
   const fromNameDefault = String(process.env.SMTP_FROM_NAME || process.env.SENDGRID_FROM_NAME || 'CD Sanabria CF').trim();
 
   const smtpUser = String(process.env.SMTP_USER || process.env.GMAIL_USER || '').trim();
   const smtpPass = String(process.env.SMTP_PASS || process.env.GMAIL_APP_PASSWORD || '').trim();
   if (smtpUser && smtpPass) {
     const fromEmail = String(process.env.SMTP_FROM_EMAIL || smtpUser).trim();
-    const replyTo = String(process.env.CLUB_REPLY_EMAIL || fromEmail).trim();
+    const replyTo = String(process.env.CLUB_REPLY_EMAIL || fromEmail || CLUB_EMAIL_DEFAULT).trim();
+    const notifyEmail = notifyEmailRaw || fromEmail || CLUB_EMAIL_DEFAULT;
     const smtpHost = String(process.env.SMTP_HOST || 'smtp.gmail.com').trim();
     const smtpPort = parseInt(process.env.SMTP_PORT || '587', 10);
     return {
@@ -43,9 +48,10 @@ function getEmailConfig() {
   }
 
   const apiKey = String(process.env.SENDGRID_API_KEY || '').trim();
-  const fromEmail = String(process.env.SENDGRID_FROM_EMAIL || '').trim();
+  const fromEmail = String(process.env.SENDGRID_FROM_EMAIL || CLUB_EMAIL_DEFAULT).trim();
   const fromName = fromNameDefault;
-  const replyTo = String(process.env.CLUB_REPLY_EMAIL || fromEmail).trim();
+  const replyTo = String(process.env.CLUB_REPLY_EMAIL || fromEmail || CLUB_EMAIL_DEFAULT).trim();
+  const notifyEmail = notifyEmailRaw || fromEmail || CLUB_EMAIL_DEFAULT;
   if (apiKey && fromEmail) {
     return {
       ok: true,
@@ -71,7 +77,7 @@ function normalizeRecipients(to) {
     .filter(Boolean);
 }
 
-async function sendViaSmtp(cfg, { to, subject, html, text, bcc }) {
+async function sendViaSmtp(cfg, { to, subject, html, text, bcc, replyTo }) {
   const toList = normalizeRecipients(to);
   if (!toList.length) throw new Error('Destinatario vacío');
 
@@ -86,9 +92,10 @@ async function sendViaSmtp(cfg, { to, subject, html, text, bcc }) {
   });
 
   const bccList = normalizeRecipients(bcc);
+  const reply = String(replyTo || cfg.replyTo || cfg.fromEmail || CLUB_EMAIL_DEFAULT).trim();
   await transporter.sendMail({
     from: `"${cfg.fromName}" <${cfg.fromEmail}>`,
-    replyTo: cfg.replyTo || cfg.fromEmail,
+    replyTo: reply,
     to: toList.join(', '),
     bcc: bccList.length ? bccList.join(', ') : undefined,
     subject,
@@ -98,7 +105,7 @@ async function sendViaSmtp(cfg, { to, subject, html, text, bcc }) {
   return true;
 }
 
-async function sendViaSendGridApi(cfg, { to, subject, html, text, bcc }) {
+async function sendViaSendGridApi(cfg, { to, subject, html, text, bcc, replyTo }) {
   const toList = normalizeRecipients(to).map((email) => ({ email }));
   if (!toList.length) throw new Error('Destinatario vacío');
 
@@ -106,10 +113,11 @@ async function sendViaSendGridApi(cfg, { to, subject, html, text, bcc }) {
   const bccList = normalizeRecipients(bcc).map((email) => ({ email }));
   if (bccList.length) personalizations[0].bcc = bccList;
 
+  const reply = String(replyTo || cfg.replyTo || cfg.fromEmail || CLUB_EMAIL_DEFAULT).trim();
   const body = {
     personalizations,
     from: { email: cfg.fromEmail, name: cfg.fromName },
-    reply_to: { email: cfg.replyTo || cfg.fromEmail, name: cfg.fromName },
+    reply_to: { email: reply, name: cfg.fromName },
     subject,
     content: [
       { type: 'text/plain', value: text },
@@ -142,6 +150,8 @@ async function sendViaSendGrid(payload) {
 }
 
 module.exports = {
+  CLUB_EMAIL_DEFAULT,
+  CLUB_EMAIL_PUBLIC_DEFAULT,
   escapeHtml,
   getEmailConfig,
   sendViaSendGrid

@@ -25,6 +25,10 @@ function membersRef() {
   return initAdmin().collection('sanabria_members');
 }
 
+function friendsRef() {
+  return initAdmin().collection('sanabria_friends');
+}
+
 function eventsRef() {
   return initAdmin().collection('sanabria_events');
 }
@@ -228,6 +232,40 @@ async function completeEventPayment(payment) {
     { participants, registeredMembers: participants, updatedAt: now },
     { merge: true }
   );
+
+  try {
+    const { sendClubAdminNotification } = require('./club-admin-notify-email');
+    const payCh = payment.payMethod === 'bizum' ? 'bizum' : 'tarjeta';
+    const holder = toAdd[0] || {};
+    const eventTitle = event.title || event.name || 'Evento';
+    const guestCount = Math.max(0, toAdd.length - 1);
+    const totalEur =
+      payment.amountEur != null
+        ? payment.amountEur
+        : registrationBundle && registrationBundle.totalEur != null
+          ? registrationBundle.totalEur
+          : toAdd.reduce(function (s, r) {
+              return s + Number(r.appliedPrice || 0);
+            }, 0);
+    await sendClubAdminNotification({
+      kind: 'evento_inscripcion_pagada',
+      title: 'Inscripción a evento pagada (pasarela)',
+      subject: `Evento pagado — ${eventTitle}`,
+      paymentChannel: payCh,
+      requesterEmail: payment.customerEmail || holder.email,
+      fields: [
+        { label: 'Evento', value: eventTitle },
+        { label: 'Titular', value: [holder.nombre || holder.name, holder.apellidos || holder.surname].filter(Boolean).join(' ') },
+        { label: 'Email', value: payment.customerEmail || holder.email },
+        { label: 'Plazas', value: String(toAdd.length) },
+        { label: 'Invitados', value: String(guestCount) },
+        { label: 'Importe (€)', value: totalEur },
+        { label: 'Pedido pasarela', value: payment.orderId }
+      ]
+    });
+  } catch (mailErr) {
+    console.warn('Email club evento pagado:', mailErr.message || mailErr);
+  }
 }
 
 async function findPlayerDocByDniSeason(dni, season) {
@@ -243,6 +281,28 @@ async function findPlayerDocByDniSeason(dni, season) {
     }
   }
   return { ref: q.docs[0].ref, data: { id: q.docs[0].id, ...q.docs[0].data() } };
+}
+
+/** Localiza ficha por DNI+temporada o, en menores sin DNI, por email+temporada. */
+async function findPlayerDocByIdentity(player) {
+  const season = String(player.inscriptionSeason || player.temporada || '').trim();
+  const dni = normalizeDni(player.dni);
+  if (dni) {
+    const byDni = await findPlayerDocByDniSeason(dni, season);
+    if (byDni) return byDni;
+  }
+  const email = String(player.email || '').trim().toLowerCase();
+  if (email && season) {
+    const q = await playersRef().where('email', '==', email).limit(25).get();
+    for (const doc of q.docs) {
+      const data = doc.data();
+      if (data.appScope && data.appScope !== APP_SCOPE) continue;
+      if (String(data.inscriptionSeason || data.temporada || '') === season) {
+        return { ref: doc.ref, data: { id: doc.id, ...data } };
+      }
+    }
+  }
+  return null;
 }
 
 function playerInscriptionLinksSocioFromReg(reg) {
@@ -805,13 +865,159 @@ function normalizePlayerRecordFields(raw) {
   };
 }
 
+function resolveSocioCuotaFromPlayer(reg) {
+  const cb = reg.chargeBreakdown || {};
+  const socioLine = Number(cb.socio);
+  if (Number.isFinite(socioLine) && socioLine > 0) return socioLine;
+  const total = Number(cb.total);
+  return Number.isFinite(total) && total > 0 ? total : null;
+}
+
+function applyMemberPaymentStateFromPlayerRecord(member, player) {
+  const paid =
+    !!player.inscriptionPaid ||
+    String(player.paymentStatus || '').toLowerCase() === 'paid' ||
+    String(player.inscriptionStatus || '').toLowerCase() === 'paid';
+  const cuota = resolveSocioCuotaFromPlayer(player);
+  if (cuota != null) member.cuota = cuota;
+
+  if (paid) {
+    member.pagado = true;
+    member.paymentStatus = 'paid';
+    member.status = 'active';
+    member.estado = 'activo';
+    member.pendingReason = null;
+    member.validatedDate = player.validatedDate || new Date().toISOString();
+    member.validatedBy = player.validatedBy || 'inscripcion_jugador';
+    if (player.paymentOrderId) member.paymentOrderId = player.paymentOrderId;
+    return;
+  }
+
+  member.pagado = false;
+  member.paymentStatus = 'pending';
+  member.status = 'pending_validation';
+  member.estado = 'pendiente';
+  member.pendingReason =
+    player.pendingReason || player.offlinePaymentChannel || 'inscripcion_jugador_pendiente';
+  if (player.paymentMethod) member.paymentMethod = player.paymentMethod;
+  if (player.offlinePaymentChannel) member.offlinePaymentChannel = player.offlinePaymentChannel;
+  member.inscriptionSeasonSocio = player.inscriptionSeason || player.temporada;
+}
+
+async function findMemberDocForPlayerInscription(player) {
+  const linkedId = player.linkedMemberId ? String(player.linkedMemberId).trim() : '';
+  if (linkedId && !linkedId.startsWith('MEMBER_')) {
+    const ref = membersRef().doc(linkedId);
+    const snap = await ref.get();
+    if (snap.exists) return { ref, data: { id: snap.id, ...snap.data() } };
+  }
+  const dni = normalizeDni(player.dni);
+  if (dni) {
+    const q = await membersRef().where('dni', '==', dni).limit(1).get();
+    if (!q.empty) {
+      const doc = q.docs[0];
+      return { ref: doc.ref, data: { id: doc.id, ...doc.data() } };
+    }
+  }
+  const playerId = player.id ? String(player.id).trim() : '';
+  if (playerId && !playerId.startsWith('PLAYER_')) {
+    const q2 = await membersRef().where('playerId', '==', playerId).limit(1).get();
+    if (!q2.empty) {
+      const doc = q2.docs[0];
+      return { ref: doc.ref, data: { id: doc.id, ...doc.data() } };
+    }
+  }
+  const email = String(player.email || '').trim().toLowerCase();
+  if (email) {
+    const q3 = await membersRef().where('email', '==', email).limit(5).get();
+    for (const doc of q3.docs) {
+      const data = doc.data();
+      if (data.socioJugador || data.isJugador) {
+        return { ref: doc.ref, data: { id: doc.id, ...data } };
+      }
+    }
+  }
+  return null;
+}
+
+async function upsertMemberSocioJugadorFromPlayer(player) {
+  if (!playerInscriptionLinksSocioFromReg(player)) return null;
+
+  const now = new Date().toISOString();
+  const playerDni = normalizeDni(player.dni);
+  const existing = await findMemberDocForPlayerInscription(player);
+
+  const memberPatch = {
+    isJugador: true,
+    socioJugador: true,
+    playerId: player.id,
+    playerCategory: player.category || player.categoria,
+    categoriaJugador: player.category || player.categoria,
+    nombre: player.name || player.nombre,
+    name: player.name || player.nombre,
+    apellidos: player.surname || player.apellidos,
+    surname: player.surname || player.apellidos,
+    dni: playerDni || '',
+    telefono: player.phone || player.telefono || '',
+    phone: player.phone || player.telefono || '',
+    email: String(player.email || '').trim().toLowerCase(),
+    domicilio: player.domicilio || player.address || '',
+    localidad: player.localidad || '',
+    provincia: player.provincia || 'Zamora',
+    address: player.address || player.domicilio || '',
+    direccion: player.direccion || player.address || '',
+    birthDate: player.birthDate || player.fechaNacimiento,
+    fechaNacimiento: player.birthDate || player.fechaNacimiento,
+    guardianName: player.guardianName || '',
+    guardianDNI: normalizeDni(player.guardianDNI || player.guardianDni) || '',
+    guardianPhone: player.guardianPhone || '',
+    guardianEmail: String(player.guardianEmail || '').trim().toLowerCase(),
+    guardianAddress: player.guardianAddress || '',
+    inscriptionSeasonSocio: player.inscriptionSeason || player.temporada,
+    inscriptionSeasonJugador: player.inscriptionSeason || player.temporada,
+    registrationSource: 'web_inscription_socio_jugador',
+    cuotaSocioEnInscripcion: true,
+    appScope: APP_SCOPE,
+    lastModified: now,
+    updatedAt: now
+  };
+  if (player.portalPasswordHash) {
+    memberPatch.passwordHash = player.portalPasswordHash;
+    memberPatch.portalPasswordHash = player.portalPasswordHash;
+  }
+  applyMemberPaymentStateFromPlayerRecord(memberPatch, player);
+
+  let memberId;
+  if (existing) {
+    memberId = existing.data.id;
+    await existing.ref.set(memberPatch, { merge: true });
+  } else {
+    const ref = membersRef().doc();
+    memberId = ref.id;
+    await ref.set(
+      {
+        ...memberPatch,
+        id: memberId,
+        numeroSocio: 'SOC' + String(Date.now()).slice(-6),
+        memberNumber: null,
+        registrationDate: now
+      },
+      { merge: true }
+    );
+  }
+  const snap = await membersRef().doc(String(memberId)).get();
+  return { id: memberId, ...(snap.exists ? snap.data() : memberPatch) };
+}
+
 async function upsertPlayerInscriptionRecord(player) {
   const patch = normalizePlayerRecordFields(player);
   const dni = patch.dni;
+  const email = patch.email;
   const season = String(patch.inscriptionSeason || patch.temporada || '').trim();
-  if (!dni) throw new Error('DNI ausente en inscripción');
+  if (!dni && !email) throw new Error('Identificador ausente (DNI o email) en inscripción');
+  if (!season) throw new Error('Temporada ausente en inscripción');
 
-  const existing = await findPlayerDocByDniSeason(dni, season);
+  const existing = await findPlayerDocByIdentity(patch);
   let playerId;
   if (existing) {
     playerId = existing.data.id;
@@ -828,8 +1034,181 @@ async function upsertPlayerInscriptionRecord(player) {
       { merge: true }
     );
   }
-  const snap = await playersRef().doc(String(playerId)).get();
-  return { id: playerId, ...(snap.exists ? snap.data() : patch) };
+  const playerSnap = await playersRef().doc(String(playerId)).get();
+  const savedPlayer = { id: playerId, ...(playerSnap.exists ? playerSnap.data() : patch) };
+
+  let savedMember = null;
+  if (playerInscriptionLinksSocioFromReg(savedPlayer)) {
+    savedMember = await upsertMemberSocioJugadorFromPlayer({ ...savedPlayer, id: playerId });
+    if (savedMember && savedMember.id) {
+      await playersRef().doc(String(playerId)).set(
+        { linkedMemberId: savedMember.id, updatedAt: new Date().toISOString() },
+        { merge: true }
+      );
+      savedPlayer.linkedMemberId = savedMember.id;
+    }
+  }
+
+  return { player: savedPlayer, member: savedMember };
+}
+
+function normalizeMemberRecordFields(raw) {
+  const m = raw && typeof raw === 'object' ? { ...raw } : {};
+  const name = String(m.name || m.nombre || '').trim();
+  const surname = String(m.surname || m.apellidos || '').trim();
+  const phone = String(m.phone || m.telefono || '').trim();
+  const address = String(m.address || m.direccion || '').trim();
+  delete m.password;
+  delete m.pass;
+  delete m.plainPassword;
+  delete m.portalPassword;
+  return {
+    ...m,
+    appScope: APP_SCOPE,
+    name,
+    nombre: name,
+    surname,
+    apellidos: surname,
+    phone,
+    telefono: phone,
+    address,
+    direccion: address,
+    email: String(m.email || '').trim().toLowerCase(),
+    dni: normalizeDni(m.dni),
+    guardianEmail: String(m.guardianEmail || '').trim().toLowerCase(),
+    updatedAt: new Date().toISOString()
+  };
+}
+
+async function findMemberDocByIdentity(member) {
+  const dni = normalizeDni(member.dni);
+  if (dni) {
+    const q = await membersRef().where('dni', '==', dni).limit(1).get();
+    if (!q.empty) {
+      const doc = q.docs[0];
+      return { ref: doc.ref, data: { id: doc.id, ...doc.data() } };
+    }
+  }
+  const email = String(member.email || '').trim().toLowerCase();
+  if (email) {
+    const q = await membersRef().where('email', '==', email).limit(1).get();
+    if (!q.empty) {
+      const doc = q.docs[0];
+      return { ref: doc.ref, data: { id: doc.id, ...doc.data() } };
+    }
+  }
+  return null;
+}
+
+/** Alta/actualización de socio desde la web (registro público o socio-jugador). */
+async function upsertMemberRegistrationRecord(member) {
+  const patch = normalizeMemberRecordFields(member);
+  const email = patch.email;
+  if (!email) throw new Error('Email ausente en alta de socio');
+
+  const existing = await findMemberDocByIdentity(patch);
+  let memberId;
+  if (existing) {
+    memberId = existing.data.id;
+    await existing.ref.set(patch, { merge: true });
+  } else {
+    const ref = membersRef().doc();
+    memberId = ref.id;
+    const now = patch.updatedAt || new Date().toISOString();
+    await ref.set(
+      {
+        ...patch,
+        id: memberId,
+        registrationDate: patch.registrationDate || patch.fechaRegistro || now,
+        fechaRegistro: patch.fechaRegistro || patch.registrationDate || now
+      },
+      { merge: true }
+    );
+  }
+  const snap = await membersRef().doc(String(memberId)).get();
+  return { id: memberId, ...(snap.exists ? snap.data() : patch) };
+}
+
+function normalizeFriendRecordFields(raw) {
+  const f = raw && typeof raw === 'object' ? { ...raw } : {};
+  const nombre = String(f.nombre || f.name || '').trim();
+  const apellidos = String(f.apellidos || f.surname || '').trim();
+  const telefono = String(f.telefono || f.phone || '').trim();
+  delete f.password;
+  delete f.pass;
+  delete f.plainPassword;
+  delete f.portalPassword;
+  const status = String(f.status || f.estado || 'active').trim() || 'active';
+  const estado = String(f.estado || (status === 'active' ? 'activo' : f.estado) || 'activo').trim() || 'activo';
+  return {
+    ...f,
+    appScope: APP_SCOPE,
+    nombre,
+    name: nombre,
+    apellidos,
+    surname: apellidos,
+    telefono,
+    phone: telefono,
+    email: String(f.email || '').trim().toLowerCase(),
+    dni: normalizeDni(f.dni),
+    status,
+    estado,
+    updatedAt: new Date().toISOString()
+  };
+}
+
+async function findFriendDocByIdentity(friend) {
+  const dni = normalizeDni(friend.dni);
+  if (dni) {
+    const q = await friendsRef().where('dni', '==', dni).limit(1).get();
+    if (!q.empty) {
+      const doc = q.docs[0];
+      return { ref: doc.ref, data: { id: doc.id, ...doc.data() } };
+    }
+  }
+  const email = String(friend.email || '').trim().toLowerCase();
+  if (email) {
+    const q = await friendsRef().where('email', '==', email).limit(1).get();
+    if (!q.empty) {
+      const doc = q.docs[0];
+      return { ref: doc.ref, data: { id: doc.id, ...doc.data() } };
+    }
+  }
+  return null;
+}
+
+/** Alta/actualización de amigo del club desde la web pública. */
+async function upsertFriendRegistrationRecord(friend) {
+  const patch = normalizeFriendRecordFields(friend);
+  const email = patch.email;
+  const dni = patch.dni;
+  if (!email) throw new Error('Email ausente en alta de amigo/a');
+  if (!dni) throw new Error('DNI ausente en alta de amigo/a');
+  if (!patch.nombre || !patch.apellidos) {
+    throw new Error('Nombre y apellidos obligatorios en alta de amigo/a');
+  }
+
+  const existing = await findFriendDocByIdentity(patch);
+  let friendId;
+  if (existing) {
+    friendId = existing.data.id;
+    await existing.ref.set(patch, { merge: true });
+  } else {
+    const ref = friendsRef().doc();
+    friendId = ref.id;
+    const now = patch.updatedAt || new Date().toISOString();
+    await ref.set(
+      {
+        ...patch,
+        id: friendId,
+        fechaRegistro: patch.fechaRegistro || patch.registrationDate || now,
+        registrationDate: patch.registrationDate || patch.fechaRegistro || now
+      },
+      { merge: true }
+    );
+  }
+  const snap = await friendsRef().doc(String(friendId)).get();
+  return { id: friendId, ...(snap.exists ? snap.data() : patch) };
 }
 
 module.exports = {
@@ -858,5 +1237,13 @@ module.exports = {
   resetPlayerPortalPasswordWithToken,
   checkPlayerPortalAccess,
   normalizePlayerRecordFields,
-  upsertPlayerInscriptionRecord
+  upsertPlayerInscriptionRecord,
+  upsertMemberSocioJugadorFromPlayer,
+  findPlayerDocByIdentity,
+  normalizeMemberRecordFields,
+  upsertMemberRegistrationRecord,
+  findMemberDocByIdentity,
+  normalizeFriendRecordFields,
+  upsertFriendRegistrationRecord,
+  findFriendDocByIdentity
 };

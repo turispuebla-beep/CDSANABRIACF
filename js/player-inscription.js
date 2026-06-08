@@ -294,7 +294,19 @@
       guardianDNI: form.guardianDNI || '',
       guardianPhone: form.guardianPhone || '',
       guardianEmail: form.guardianEmail || '',
-      guardianAddress: form.guardianAddress || '',
+      guardianSameDomicilio: !!form.guardianSameDomicilio,
+      guardianDomicilio: form.guardianDomicilio || '',
+      guardianLocalidad: form.guardianLocalidad || '',
+      guardianProvincia: form.guardianProvincia || '',
+      guardianAddress:
+        form.guardianAddress ||
+        composeAddress({
+          domicilio: form.guardianDomicilio,
+          localidad: form.guardianLocalidad,
+          provincia: form.guardianProvincia
+        }) ||
+        '',
+      categorySuperiorConsent: !!form.categorySuperiorConsent,
       playerConsent: !!form.playerConsent,
       photoConsent: !!form.photoConsent,
       photo: form.photoData || existing?.photo || null,
@@ -443,36 +455,113 @@
     return p;
   }
 
-  async function persistPlayerViaNetlify(player) {
+  function syncLocalPlayerAfterRemote(player, remotePlayer) {
+    const players = readPlayers();
+    const normDni = normalizeDni(player.dni);
+    const email = String(player.email || '').trim().toLowerCase();
+    let ix = players.findIndex(function (p) {
+      return p.id === player.id || (normDni && normalizeDni(p.dni) === normDni);
+    });
+    if (ix < 0 && email) {
+      ix = players.findIndex(function (p) {
+        return String(p.email || '').trim().toLowerCase() === email;
+      });
+    }
+    const merged = { ...(ix >= 0 ? players[ix] : player), ...player, ...(remotePlayer || {}) };
+    if (remotePlayer && remotePlayer.id) merged.id = remotePlayer.id;
+    if (ix >= 0) {
+      players[ix] = merged;
+    } else {
+      players.push(merged);
+    }
+    global.localStorage.setItem('clubPlayers', JSON.stringify(players));
+    return merged;
+  }
+
+  function syncLocalMemberAfterRemote(localMember, remoteMember) {
+    if (!remoteMember || !remoteMember.id) return localMember;
+    const members = readMembers();
+    let ix = -1;
+    if (localMember && localMember.id) {
+      ix = members.findIndex(function (m) {
+        return m.id === localMember.id;
+      });
+    }
+    if (ix < 0) {
+      const dni = normalizeDni(remoteMember.dni);
+      if (dni) {
+        ix = members.findIndex(function (m) {
+          return normalizeDni(m.dni) === dni;
+        });
+      }
+    }
+    if (ix < 0 && remoteMember.email) {
+      const em = String(remoteMember.email).trim().toLowerCase();
+      ix = members.findIndex(function (m) {
+        return String(m.email || '').trim().toLowerCase() === em;
+      });
+    }
+    const merged = { ...(ix >= 0 ? members[ix] : localMember || {}), ...remoteMember };
+    if (ix >= 0) {
+      members[ix] = merged;
+    } else {
+      members.push(merged);
+    }
+    global.localStorage.setItem('clubMembers', JSON.stringify(members));
+    global.localStorage.setItem('socios', JSON.stringify(members));
+    return merged;
+  }
+
+  async function persistInscriptionViaNetlify(player) {
+    const payload = normalizePlayerDualFields(player);
+    delete payload.photo;
     const res = await fetch('/.netlify/functions/submit-player-inscription', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ player: normalizePlayerDualFields(player) })
+      body: JSON.stringify({ player: payload })
     });
     const json = await res.json().catch(function () {
       return { ok: false };
     });
     if (!res.ok || !json.ok) {
-      const err = new Error(json.error || 'No se pudo guardar en Firebase');
+      const err = new Error(
+        json.error ||
+          'No se pudo registrar la inscripción en la nube. Reintenta o contacta con el club (cdsanabriacf@gmail.com).'
+      );
       err.code = 'firebase_persist_failed';
       throw err;
     }
-    if (json.playerId && String(player.id) !== String(json.playerId)) {
-      player.id = json.playerId;
-      const players = readPlayers();
-      const ix = players.findIndex(function (p) {
-        return normalizeDni(p.dni) === normalizeDni(player.dni);
-      });
-      if (ix >= 0) {
-        players[ix].id = json.playerId;
-        global.localStorage.setItem('clubPlayers', JSON.stringify(players));
-      }
+    const remotePlayer = json.player || null;
+    const remoteMember = json.member || null;
+    if (json.playerId) player.id = json.playerId;
+    else if (remotePlayer && remotePlayer.id) player.id = remotePlayer.id;
+    if (json.memberId) player.linkedMemberId = json.memberId;
+    else if (remoteMember && remoteMember.id) player.linkedMemberId = remoteMember.id;
+    const savedPlayer = syncLocalPlayerAfterRemote(player, remotePlayer || { id: player.id });
+    let savedMember = null;
+    if (remoteMember) {
+      savedMember = syncLocalMemberAfterRemote(null, remoteMember);
     }
-    return player;
+    return { player: savedPlayer, member: savedMember };
   }
 
-  async function persistPlayerFirebase(player) {
+  async function persistPlayerViaNetlify(player) {
+    const result = await persistInscriptionViaNetlify(player);
+    return result.player;
+  }
+
+  async function persistPlayerFirebase(player, opts) {
     const normalized = normalizePlayerDualFields(player);
+    const requireCloud =
+      opts && opts.requireCloud !== undefined
+        ? opts.requireCloud
+        : String(player.registrationSource || '') === 'web_inscription';
+
+    if (requireCloud) {
+      const remote = await persistInscriptionViaNetlify(normalized);
+      return remote.player;
+    }
+
     if (typeof global.persistRecordToFirebase === 'function') {
       try {
         await global.persistRecordToFirebase('clubPlayers', 'players', normalized);
@@ -588,6 +677,15 @@
       member = members.find(
         (m) => String(m.email || '').trim().toLowerCase() === em && normalizeDni(m.dni) === playerDni
       );
+    }
+    if (!member && player.email) {
+      const em = String(player.email).trim().toLowerCase();
+      member = members.find(function (m) {
+        return (
+          String(m.email || '').trim().toLowerCase() === em &&
+          (m.socioJugador || m.isJugador || m.playerId === player.id)
+        );
+      });
     }
 
     if (member) {
@@ -789,8 +887,6 @@
     rememberInscriptionLockDni(player.dni);
 
     const saved = upsertPlayerLocal(player);
-    await persistPlayerFirebase(saved);
-
     const member = upsertMemberSocioJugador(saved, {
       paid: paid,
       orderId: paymentMeta?.orderId,
@@ -805,13 +901,12 @@
         players[pix].linkedMemberId = member.id;
         global.localStorage.setItem('clubPlayers', JSON.stringify(players));
       }
-      await persistMemberFirebase(member);
-      await persistPlayerFirebase(saved);
-      if (typeof global.refreshMembersRoleFlagsForIdentity === 'function') {
-        await refreshMemberRoles(saved.dni, saved.name, saved.surname);
-      }
-    } else if (paid) {
-      await refreshMemberRoles(player.dni, player.name, player.surname);
+    }
+
+    await persistPlayerFirebase(saved, { requireCloud: true });
+
+    if (typeof global.refreshMembersRoleFlagsForIdentity === 'function') {
+      await refreshMemberRoles(saved.dni, saved.name, saved.surname);
     }
 
     const keepPending = opts && opts.keepPending;

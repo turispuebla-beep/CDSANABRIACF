@@ -1,4 +1,4 @@
-﻿/**
+/**
  * ðŸ”” SISTEMA DE NOTIFICACIONES EN TIEMPO REAL - CDSANABRIACF
  * ComunicaciÃ³n entre entrenadores, equipo, administradores, socios y amigos del club
  * Integrado con Firebase para sincronizaciÃ³n en tiempo real
@@ -26,6 +26,7 @@ class ClubNotificationSystem {
         this.setupPushNotifications();
         this.setupEmailNotifications();
         this.setupRealTimeListeners();
+        this.loadNotificationsForUser();
         console.log('ðŸ”” Sistema de notificaciones CD Sanabria CF inicializado');
     }
 
@@ -431,7 +432,13 @@ class ClubNotificationSystem {
 
         notificationsList.innerHTML = '';
 
-        // Mostrar las Ãºltimas 10 notificaciones
+        if (this.notifications.length === 0) {
+            notificationsList.innerHTML = '<p class="club-notif-empty">No tienes notificaciones</p>';
+            this.updateNotificationCounter();
+            return;
+        }
+
+        // Mostrar las últimas 10 notificaciones
         this.notifications.slice(0, 10).forEach(notification => {
             const notificationDiv = document.createElement('div');
             notificationDiv.className = `notification-item ${notification.read ? 'read' : 'unread'} ${notification.priority}`;
@@ -471,10 +478,18 @@ class ClubNotificationSystem {
     // Actualizar contador de notificaciones
     updateNotificationCounter() {
         const counter = document.getElementById('notificationCounter');
+        const btn = document.getElementById('notificationBellBtn');
+        const unreadCount = this.notifications.filter(n => !n.read).length;
         if (counter) {
-            const unreadCount = this.notifications.filter(n => !n.read).length;
-            counter.textContent = unreadCount;
-            counter.style.display = unreadCount > 0 ? 'block' : 'none';
+            counter.textContent = unreadCount > 99 ? '99+' : String(unreadCount);
+            counter.hidden = unreadCount === 0;
+            counter.setAttribute('aria-hidden', unreadCount === 0 ? 'true' : 'false');
+        }
+        if (btn) {
+            btn.setAttribute(
+                'aria-label',
+                unreadCount > 0 ? `Notificaciones (${unreadCount} sin leer)` : 'Notificaciones'
+            );
         }
     }
 

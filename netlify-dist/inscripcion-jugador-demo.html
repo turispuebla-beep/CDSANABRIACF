@@ -27,6 +27,8 @@
         .grid3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; }
         @media (max-width: 600px) { .grid2, .grid3 { grid-template-columns: 1fr; } }
         .kit-row { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; padding: 10px 0; border-bottom: 1px solid #f1f5f9; }
+        .kit-mandatory-hint { color: #dc2626; font-size: 0.85rem; font-weight: 600; }
+        .kit-optional-hint { color: #dc2626; font-size: 0.85rem; font-weight: 600; }
         .kit-size { max-width: 120px; margin-bottom: 0; }
         .fee-line { display: flex; align-items: flex-start; gap: 10px; margin-bottom: 10px; font-weight: 500; }
         .cart-line { display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px dashed #e2e8f0; }
@@ -174,10 +176,10 @@
     garments: {
       match_shirt: { label: 'Camiseta de partido', price: 18, enabled: true },
       match_shorts: { label: 'Pantalón corto de partido', price: 12, enabled: true },
-      tracksuit: { label: 'Chándal', price: 35, enabled: true },
-      train_shirt: { label: 'Camiseta de entreno', price: 14, enabled: true },
-      train_shorts: { label: 'Pantalón de entreno', price: 12, enabled: true },
-      train_jacket: { label: 'Chubasquero', price: 28, enabled: true }
+      tracksuit: { label: 'Sudadera', price: 16, enabled: true },
+      train_kit: { label: 'Ropa de entreno', price: 16, enabled: true },
+      train_jacket: { label: 'Chubasquero', price: 18, enabled: true },
+      cazadora: { label: 'Cazadora', price: 40, enabled: true }
     }
   };
 
@@ -235,7 +237,9 @@
       row.innerHTML = (per
         ? '<label><input type="checkbox" data-kit-id="' + g.id + '"> ' + g.label + ' (' + formatEur(g.price) + ')</label>'
         : '<span>' + g.label + ' (' + formatEur(g.price) + ')</span>') +
-        '<select data-kit-size="' + g.id + '" class="kit-size"' + (per ? ' disabled' : '') + '><option value="">Talla</option>' + sizes + '</select>';
+        '<select data-kit-size="' + g.id + '" class="kit-size"' + (per ? ' disabled' : '') + '><option value="">Talla</option>' + sizes + '</select>' +
+        (g.id === 'train_kit' ? ' <span class="kit-mandatory-hint">Obligatoria en los entrenamientos</span>' : '') +
+        (g.id === 'cazadora' ? ' <span class="kit-optional-hint">Opcional</span>' : '');
       wrap.appendChild(row);
       var cb = row.querySelector('[data-kit-id]');
       var sel = row.querySelector('[data-kit-size]');

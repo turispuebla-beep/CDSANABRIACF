@@ -11,6 +11,47 @@
     return CART_PREFIX + String(eventId || '');
   }
 
+  function getClubPublicEmail() {
+    if (global.ClubContactDefaults && global.ClubContactDefaults.getPublicEmail) {
+      return global.ClubContactDefaults.getPublicEmail();
+    }
+    return 'cdsanabriacf@gmail.com';
+  }
+
+  function getClubNotifyEmail() {
+    if (global.ClubContactDefaults && global.ClubContactDefaults.getNotifyEmail) {
+      return global.ClubContactDefaults.getNotifyEmail();
+    }
+    if (global.ClubMailto && global.ClubMailto.getClubNotifyEmail) {
+      return global.ClubMailto.getClubNotifyEmail();
+    }
+    return 'cdsanabriacf@gmail.com';
+  }
+
+  function notifyClubEventRegistration(event, cart, registrant, total, paymentChannel) {
+    if (!global.CdsanClubEmail || !registrant || !registrant.email) return;
+    const ch = paymentChannel === 'transfer' ? 'transferencia' : paymentChannel || 'transferencia';
+    const holder = cart.holder || {};
+    const guests = cart.guests || [];
+    global.CdsanClubEmail.sendClubAdminNotify({
+      kind: 'evento_inscripcion',
+      title: 'Nueva inscripción a evento (pendiente de pago)',
+      subject: 'Inscripción evento — ' + (event.title || event.name || 'CD Sanabria CF'),
+      paymentChannel: ch,
+      requesterEmail: registrant.email,
+      fields: [
+        { label: 'Evento', value: event.title || event.name },
+        { label: 'Titular', value: [holder.nombre || holder.name, holder.apellidos || holder.surname].filter(Boolean).join(' ') },
+        { label: 'Email', value: registrant.email },
+        { label: 'Plazas', value: String(1 + guests.length) },
+        { label: 'Invitados', value: String(guests.length) },
+        { label: 'Importe (€)', value: total != null ? Number(total).toFixed(2) : '—' }
+      ]
+    }).catch(function (e) {
+      console.warn('Correo aviso club evento:', e);
+    });
+  }
+
   function escapeHtml(s) {
     return String(s || '')
       .replace(/&/g, '&amp;')
@@ -518,10 +559,12 @@
         paid: false
       });
       clearCart(eventId);
+      notifyClubEventRegistration(event, cart, registrant, total, 'transfer');
       alert(
         '✅ Inscripción registrada.\n\n🏦 Realiza el ingreso de ' +
           total.toFixed(2) +
-          ' € por transferencia o efectivo. El club validará el pago.\n\nConsultas: cdsanabriafc@gmail.com'
+          ' € por transferencia o efectivo. El club validará el pago.\n\nConsultas: ' +
+          getClubPublicEmail()
       );
       if (typeof global.showEventsInfo === 'function') global.showEventsInfo();
       return;

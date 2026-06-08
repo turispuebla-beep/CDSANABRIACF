@@ -12,7 +12,7 @@ $admins = @(
     },
     @{
         uid          = 'H15Is5zg6iegMX3Nnj8xMnKsjII2'
-        email        = 'cdsanabriafc@gmail.com'
+        email        = 'cdsanabriacf@gmail.com'
         name         = 'CD Sanabria CF'
         isSuperAdmin = $false
         role         = 'admin'

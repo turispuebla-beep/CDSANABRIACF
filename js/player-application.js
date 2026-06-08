@@ -124,6 +124,7 @@
       clubRulesAccepted: !!formData.clubRulesAccepted,
       isMinor: calculateAge(formData.birthDate) != null && calculateAge(formData.birthDate) < 18,
       portalPasswordHash: portalPasswordHash,
+      photoDataUrl: formData.photoDataUrl ? String(formData.photoDataUrl).trim() : '',
       appScope: 'cdsanabriacf',
       status: 'pending_review',
       source: 'web_mailto'
@@ -222,12 +223,10 @@
     if (global.ClubContactDefaults && global.ClubContactDefaults.getNotifyEmail) {
       return global.ClubContactDefaults.getNotifyEmail();
     }
-    try {
-      const c = JSON.parse(global.localStorage.getItem('clubContactInfo') || 'null');
-      const em = c && c.email ? String(c.email).trim() : '';
-      if (em && em.includes('@')) return em;
-    } catch (_) {}
-    return 'cdsanabriafc@gmail.com';
+    return (
+      (global.ClubContactDefaults && global.ClubContactDefaults.CLUB_EMAIL_NOTIFY) ||
+      'cdsanabriacf@gmail.com'
+    );
   }
 
   function getSiteBaseUrl() {
@@ -266,6 +265,9 @@
         ]
       }
     ];
+    if (data.photoDataUrl) {
+      sections[0].fields.push({ label: 'Foto', value: 'Adjunta en la solicitud (panel admin)' });
+    }
     if (data.isMinor || (data.guardianName && data.guardianEmail)) {
       sections.push({
         heading: 'TUTOR/A LEGAL',

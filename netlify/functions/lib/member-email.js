@@ -1,16 +1,13 @@
 'use strict';
 
-const { escapeHtml, getEmailConfig, sendViaSendGrid } = require('./club-email');
+const { escapeHtml, getEmailConfig, sendViaSendGrid, CLUB_EMAIL_PUBLIC_DEFAULT } = require('./club-email');
 
 const CLUB_NAME = 'CD Sanabria CF';
 
 function clubContactEmail() {
-  return (
-    String(process.env.CLUB_REPLY_EMAIL || '').trim() ||
-    String(process.env.SMTP_FROM_EMAIL || '').trim() ||
-    String(process.env.SENDGRID_FROM_EMAIL || '').trim() ||
-    'cdsanabriafc@gmail.com'
-  );
+  const pub = String(process.env.CLUB_PUBLIC_EMAIL || '').trim();
+  if (pub && pub.includes('@')) return pub;
+  return CLUB_EMAIL_PUBLIC_DEFAULT;
 }
 
 function memberDisplayName(data) {

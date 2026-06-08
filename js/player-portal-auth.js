@@ -6,7 +6,7 @@
   'use strict';
 
   const FN_PATH = '/.netlify/functions/player-portal-auth';
-  const CLUB_EMAIL_DEFAULT = 'cdsanabriafc@gmail.com';
+  const CLUB_EMAIL_NOTIFY_FALLBACK = 'cdsanabriacf@gmail.com';
 
   function normalizeDni(v) {
     if (global.PlayerInscription && global.PlayerInscription.normalizeDni) {
@@ -252,7 +252,7 @@
     if (global.ClubMailto && global.ClubMailto.getClubNotifyEmail) {
       return global.ClubMailto.getClubNotifyEmail();
     }
-    return CLUB_EMAIL_DEFAULT;
+    return CLUB_EMAIL_NOTIFY_FALLBACK;
   }
 
   function openPasswordRecoveryMailto(opts) {

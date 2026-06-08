@@ -13,28 +13,38 @@
   const DEFAULT_CONFIG = {
     modalTitle: 'Solicitud de colaboración publicitaria',
     modalIntro:
-      'Completa el formulario para solicitar colaboración con el CD Sanabria CF. Al enviar se abrirá tu correo con el mensaje rellenado para el club (adjunta los PDF o JPG que hayas seleccionado).',
-    services: [
-      { id: 'renovacion', label: 'Renovación', defaultPrice: '00,00 €' },
-      { id: 'valla', label: 'Valla publicitaria', defaultPrice: '00,00 €' },
-      { id: 'web_carnet', label: 'Publicidad web / carnet', defaultPrice: '00,00 €' }
-    ]
+      'Completa el formulario para solicitar colaboración con el CD Sanabria CF. Al enviar, el club recibirá tus datos por correo.',
+    services: [{ id: 'renovacion', label: 'Renovación', defaultPrice: '50,00 €' }]
   };
 
-  /** De momento no mostrar precios reales en la web pública. */
-  const MASK_PUBLIC_SERVICE_PRICES = true;
-  const PUBLIC_PRICE_PLACEHOLDER = '00,00 €';
+  const MASK_PUBLIC_SERVICE_PRICES = false;
 
   function publicDisplayPrice(price) {
-    if (MASK_PUBLIC_SERVICE_PRICES) return PUBLIC_PRICE_PLACEHOLDER;
+    if (MASK_PUBLIC_SERVICE_PRICES) return '00,00 €';
     return price ? String(price) : '—';
+  }
+
+  function normalizePublicServices(services) {
+    const list = Array.isArray(services) ? services : [];
+    const renov = list.find(function (s) {
+      return String(s.id || '') === 'renovacion';
+    });
+    return [
+      {
+        id: 'renovacion',
+        label: 'Renovación',
+        defaultPrice: String((renov && renov.defaultPrice) || '50,00 €').trim() || '50,00 €'
+      }
+    ];
   }
 
   function readConfig() {
     try {
       const raw = JSON.parse(global.localStorage.getItem(CONFIG_KEY) || 'null');
       if (!raw || typeof raw !== 'object') return cloneConfig(DEFAULT_CONFIG);
-      const services = Array.isArray(raw.services) && raw.services.length ? raw.services : DEFAULT_CONFIG.services;
+      const services = normalizePublicServices(
+        Array.isArray(raw.services) && raw.services.length ? raw.services : DEFAULT_CONFIG.services
+      );
       return {
         modalTitle: raw.modalTitle || DEFAULT_CONFIG.modalTitle,
         modalIntro: raw.modalIntro || DEFAULT_CONFIG.modalIntro,
@@ -67,6 +77,7 @@
 
   function saveConfig(cfg) {
     const payload = cloneConfig(cfg || DEFAULT_CONFIG);
+    payload.services = normalizePublicServices(payload.services);
     payload.lastModified = new Date().toISOString();
     global.localStorage.setItem(CONFIG_KEY, JSON.stringify(payload));
     if (typeof global.syncLocalSettingsBlobToFirebase === 'function') {
@@ -85,7 +96,10 @@
     if (global.PlayerApplication && global.PlayerApplication.getClubNotifyEmail) {
       return global.PlayerApplication.getClubNotifyEmail();
     }
-    return 'cdsanabriafc@gmail.com';
+    return (
+      (global.ClubContactDefaults && global.ClubContactDefaults.CLUB_EMAIL_NOTIFY) ||
+      'cdsanabriacf@gmail.com'
+    );
   }
 
   function buildMailtoUrl(to, cc, subject, body) {
@@ -176,17 +190,14 @@
         {
           heading: 'SERVICIOS SOLICITADOS',
           lines: serviceLines.length ? serviceLines : ['(Ninguno marcado)']
-        },
-        {
-          heading: 'ARCHIVOS (adjuntar manualmente al correo)',
-          lines: fileLines.length
-            ? fileLines.concat([
-                '',
-                '⚠️ Recuerda adjuntar estos archivos en tu programa de correo antes de pulsar Enviar.'
-              ])
-            : ['(Sin archivos indicados en el formulario)']
         }
       ];
+      if (fileLines.length) {
+        sections.push({
+          heading: 'ARCHIVOS INDICADOS',
+          lines: fileLines
+        });
+      }
       return global.ClubMailto.formatStructuredEmail({
         title: 'SOLICITUD COLABORADOR / PUBLICIDAD',
         sections: sections,
@@ -217,14 +228,11 @@
       lines.push(ln);
     });
 
-    lines.push('', '── ARCHIVOS (adjuntar manualmente al correo) ──');
     if (fileLines.length) {
+      lines.push('', '── ARCHIVOS INDICADOS ──');
       fileLines.forEach(function (ln) {
         lines.push(ln);
       });
-      lines.push('', '⚠️ Recuerda adjuntar estos archivos en tu programa de correo antes de pulsar Enviar.');
-    } else {
-      lines.push('(Sin archivos indicados en el formulario)');
     }
 
     lines.push(
@@ -303,7 +311,7 @@
           escapeAttr(svc.id) +
           '" name="colabService" value="' +
           escapeAttr(svc.id) +
-          '">' +
+          '" checked>' +
           '<span class="colab-service-label">' +
           escapeHtml(svc.label) +
           '</span>' +
@@ -326,6 +334,39 @@
 
   function escapeAttr(s) {
     return String(s || '').replace(/"/g, '&quot;');
+  }
+
+  async function notifyClubViaServer(data) {
+    if (!global.CdsanClubEmail || !global.CdsanClubEmail.sendClubAdminNotify) {
+      return { sent: false };
+    }
+    const fields = [
+      { label: 'Nombre comercial', value: data.companyName },
+      { label: 'Razón social', value: data.legalName },
+      { label: 'Contacto', value: data.contactName },
+      { label: 'Email', value: data.contactEmail },
+      { label: 'Teléfono', value: data.contactPhone }
+    ];
+    (data.selectedServices || []).forEach(function (s) {
+      fields.push({ label: 'Servicio', value: s.label + ' — ' + (s.price || '—') });
+    });
+    (data.files || []).forEach(function (f) {
+      fields.push({ label: 'Archivo', value: f.name + ' (' + formatFileSize(f.size) + ')' });
+    });
+    try {
+      const res = await global.CdsanClubEmail.sendClubAdminNotify({
+        kind: 'colaborador_publicidad',
+        title: 'Solicitud colaborador / publicidad',
+        subject: 'Solicitud colaborador/publicidad — ' + (data.companyName || data.legalName || 'Empresa'),
+        paymentChannel: 'consulta',
+        requesterEmail: data.contactEmail,
+        fields: fields
+      });
+      return { sent: !!(res && res.ok !== false && res.sent !== false) };
+    } catch (e) {
+      console.warn('Colaborador notify:', e);
+      return { sent: false };
+    }
   }
 
   function submitFromForm(formEl) {
@@ -366,7 +407,7 @@
       return { id: s.id, label: s.label, price: s.defaultPrice || '—' };
     });
     if (!services.length) {
-      services.push({ id: 'ejemplo', label: 'Valla publicitaria', price: PUBLIC_PRICE_PLACEHOLDER });
+      services.push({ id: 'renovacion', label: 'Renovación', price: '50,00 €' });
     }
     return {
       companyName: 'Empresa Ejemplo S.L.',
@@ -402,6 +443,7 @@
     renderServiceOptions: renderServiceOptions,
     validate: validate,
     formatMailBody: formatMailBody,
+    notifyClubViaServer: notifyClubViaServer,
     submitFromForm: submitFromForm,
     openMailto: openMailto,
     getClubNotifyEmail: getClubNotifyEmail

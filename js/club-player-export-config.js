@@ -27,9 +27,9 @@
     { id: 'kit_match_shirt', label: 'Talla camiseta partido', defaultEnabled: true, group: 'equipacion' },
     { id: 'kit_match_shorts', label: 'Talla pantalón partido', defaultEnabled: true, group: 'equipacion' },
     { id: 'kit_tracksuit', label: 'Talla chándal', defaultEnabled: true, group: 'equipacion' },
-    { id: 'kit_train_shirt', label: 'Talla camiseta entreno', defaultEnabled: true, group: 'equipacion' },
-    { id: 'kit_train_shorts', label: 'Talla pantalón entreno', defaultEnabled: true, group: 'equipacion' },
-    { id: 'kit_train_jacket', label: 'Talla chaqueta/basquera', defaultEnabled: true, group: 'equipacion' },
+    { id: 'kit_train_kit', label: 'Talla ropa de entreno', defaultEnabled: true, group: 'equipacion' },
+    { id: 'kit_train_jacket', label: 'Talla chubasquero', defaultEnabled: true, group: 'equipacion' },
+    { id: 'kit_cazadora', label: 'Talla cazadora', defaultEnabled: true, group: 'equipacion' },
     { id: 'kit_resumen', label: 'Equipación (resumen)', defaultEnabled: false, group: 'equipacion' },
     { id: 'importe_ropa', label: 'Importe ropa (€)', defaultEnabled: true, group: 'pagos' },
     { id: 'importe_ficha', label: 'Cuota ficha (€)', defaultEnabled: true, group: 'pagos' },
@@ -93,6 +93,15 @@
     FIELD_CATALOG.forEach(function (f) {
       if (f.mandatory) merged.enabledFields[f.id] = true;
     });
+    const ef = merged.enabledFields;
+    if (raw && raw.enabledFields) {
+      if (
+        (ef.kit_train_shirt || ef.kit_train_shorts) &&
+        ef.kit_train_kit == null
+      ) {
+        ef.kit_train_kit = !!(ef.kit_train_shirt || ef.kit_train_shorts);
+      }
+    }
     return merged;
   }
 

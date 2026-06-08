@@ -39,7 +39,10 @@
     if (global.PlayerApplication && global.PlayerApplication.getClubNotifyEmail) {
       return global.PlayerApplication.getClubNotifyEmail();
     }
-    return 'cdsanabriafc@gmail.com';
+    return (
+      (global.ClubContactDefaults && global.ClubContactDefaults.CLUB_EMAIL_NOTIFY) ||
+      'cdsanabriacf@gmail.com'
+    );
   }
 
   function buildMailtoUrl(to, cc, subject, body) {

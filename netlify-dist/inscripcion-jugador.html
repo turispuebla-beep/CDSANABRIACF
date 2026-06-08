@@ -46,6 +46,16 @@
             border-bottom: 1px solid #f1f5f9;
         }
         .kit-size { max-width: 120px; margin-bottom: 0; }
+        .kit-mandatory-hint {
+            color: #dc2626;
+            font-size: 0.85rem;
+            font-weight: 600;
+        }
+        .kit-optional-hint {
+            color: #dc2626;
+            font-size: 0.85rem;
+            font-weight: 600;
+        }
         .fee-line { display: flex; align-items: flex-start; gap: 10px; margin-bottom: 10px; font-weight: 500; }
         .cart-line { display: flex; justify-content: space-between; gap: 12px; padding: 6px 0; border-bottom: 1px dashed #e2e8f0; font-size: 0.92rem; }
         .cart-line span:first-child { flex: 1; }
@@ -395,11 +405,11 @@
                         <div><label for="insWeight">Peso (kg)</label><input id="insWeight" type="number" min="20" max="200" step="0.1"></div>
                     </div>
                     <label for="insInjuries">Lesiones y año en que se produjeron</label>
-                    <textarea id="insInjuries" rows="2" placeholder="Ej. Esguince tobillo — 2024"></textarea>
+                    <textarea id="insInjuries" rows="2"></textarea>
                     <label for="insAllergy">Alergia o enfermedad</label>
-                    <textarea id="insAllergy" rows="2" placeholder="Indica alergias o enfermedades relevantes"></textarea>
+                    <textarea id="insAllergy" rows="2"></textarea>
                     <label for="insObservations">Observaciones / anotaciones</label>
-                    <textarea id="insObservations" rows="3" placeholder="Cualquier información adicional para el club"></textarea>
+                    <textarea id="insObservations" rows="3"></textarea>
                     <p class="muted" style="margin-top:-4px;">El dorsal y el número de licencia federativa los asignará el club cuando corresponda (no se solicitan en esta inscripción).</p>
                     <label for="insPhoto">Foto (opcional, máx. 2 MB)</label>
                     <input id="insPhoto" type="file" accept="image/*">
@@ -416,8 +426,25 @@
                         <div><label for="insGuardianPhone">Teléfono *</label><input id="insGuardianPhone" type="tel"></div>
                         <div><label for="insGuardianEmail">Email *</label><input id="insGuardianEmail" type="email"></div>
                     </div>
-                    <label for="insGuardianAddress">Dirección tutor/a</label>
-                    <input id="insGuardianAddress">
+                    <label class="fee-line" style="margin:12px 0 10px;align-items:flex-start;">
+                        <input type="checkbox" id="insGuardianSameDomicilio" checked style="margin-top:4px;">
+                        <span>Mismo domicilio que el menor</span>
+                    </label>
+                    <div id="insGuardianDomicilioFields" style="display:none;">
+                        <label for="insGuardianDomicilio">Domicilio</label>
+                        <input id="insGuardianDomicilio" autocomplete="street-address">
+                        <div class="grid2">
+                            <div><label for="insGuardianLocalidad">Localidad</label><input id="insGuardianLocalidad" autocomplete="address-level2"></div>
+                            <div><label for="insGuardianProvincia">Provincia</label><input id="insGuardianProvincia" value="Zamora" autocomplete="address-level1"></div>
+                        </div>
+                    </div>
+                    <label class="fee-line" style="margin:12px 0 0;align-items:flex-start;">
+                        <input type="checkbox" id="insCategorySuperiorConsent" style="margin-top:4px;">
+                        <span>
+                            He leído y acepto la autorización de categoría superior *
+                            <button type="button" class="ins-legal-link" id="insOpenCategoryAuthBtn" style="display:inline-block;margin-top:6px;">CATEGORÍA</button>
+                        </span>
+                    </label>
                 </div>
 
                 <section class="card">
@@ -462,6 +489,34 @@
                     <div id="payBizumBlock"><button type="button" class="btn btn-bizum" id="btnPayBizum">📱 Pagar con Bizum</button></div>
                     <div id="payTransferBlock"><button type="button" class="btn btn-transfer" id="btnPayTransfer">🏦 Solicitar inscripción por transferencia, efectivo o TPV</button></div>
                 </section>
+            </div>
+        </div>
+    </div>
+    <div id="insPayWarningModal" class="ins-modal-overlay" role="alertdialog" aria-modal="true" aria-labelledby="insPayWarningTitle" style="display:none;">
+        <div class="ins-modal-panel" style="max-width:480px;">
+            <div class="ins-modal-head" style="border-bottom:none;padding-bottom:0;">
+                <h2 id="insPayWarningTitle" style="font-size:1rem;">Aviso</h2>
+                <button type="button" class="ins-modal-close" data-ins-pay-warning-close aria-label="Cerrar">&times;</button>
+            </div>
+            <div class="ins-modal-body" style="padding-top:8px;">
+                <p style="margin:0;line-height:1.55;font-weight:600;color:#b91c1c;">
+                    Si no jugaste con nosotros durante la temporada 2025-2026 <strong>NO</strong> realices tu inscripción aquí; hazla en <strong>Nuevo jugador/a</strong>. <strong>NO SERÁ VÁLIDA</strong>.
+                </p>
+            </div>
+        </div>
+    </div>
+    <div id="insCategoryAuthModal" class="ins-modal-overlay" role="dialog" aria-modal="true" aria-labelledby="insCategoryAuthTitle" style="display:none;">
+        <div class="ins-modal-panel">
+            <div class="ins-modal-brand">
+                <img src="assets/escudo-cdsanabriacf.png" alt="Escudo CD Sanabria CF" width="96" height="96" onerror="this.onerror=null;this.src='assets/escudo-192.png';">
+            </div>
+            <div class="ins-modal-head">
+                <h2 id="insCategoryAuthTitle">CATEGORÍA</h2>
+                <button type="button" class="ins-modal-close" data-ins-category-auth-close aria-label="Cerrar">&times;</button>
+            </div>
+            <div class="ins-modal-body" id="insCategoryAuthBody"></div>
+            <div class="ins-modal-foot">
+                <button type="button" class="btn btn-primary" data-ins-category-auth-close style="margin:0;">Cerrar</button>
             </div>
         </div>
     </div>

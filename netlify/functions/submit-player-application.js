@@ -1,6 +1,7 @@
 'use strict';
 
-const { getEmailConfig, sendViaSendGrid, escapeHtml } = require('./lib/club-email');
+const { getEmailConfig } = require('./lib/club-email');
+const { sendClubAdminNotification } = require('./lib/club-admin-notify-email');
 const {
   normalizeDni,
   findApplicationByDniSeason,
@@ -43,27 +44,24 @@ function getActiveSeasonIso() {
   return `${year - 1}-${year}`;
 }
 
-function buildNotifyEmail(app) {
-  const subject = `Nueva solicitud jugador/a — ${app.name} ${app.surname} (${app.season})`;
-  const lines = [
-    `Temporada: ${app.season}`,
-    `Nombre: ${app.name} ${app.surname}`,
-    `DNI: ${app.dni || '—'}`,
-    `Email: ${app.email}`,
-    `Teléfono: ${app.phone}`,
-    `Nacimiento: ${app.birthDate || '—'}`,
-    `Categoría sugerida: ${app.category || '—'}`,
+function buildNotifyFields(app) {
+  return [
+    { label: 'Temporada', value: app.season },
+    { label: 'Nombre', value: `${app.name} ${app.surname}`.trim() },
+    { label: 'DNI', value: app.dni },
+    { label: 'Email', value: app.email },
+    { label: 'Teléfono', value: app.phone },
+    { label: 'Nacimiento', value: app.birthDate },
+    { label: 'Categoría sugerida', value: app.category },
     app.isMinor
-      ? `Tutor/a: ${app.guardianName} ${app.guardianSurname || ''} — DNI ${app.guardianDni} — ${app.guardianPhone} — ${app.guardianEmail}`
-      : '',
-    `Estado: pendiente de revisión en el panel de administración.`
+      ? {
+          label: 'Tutor/a',
+          value: `${app.guardianName || ''} ${app.guardianSurname || ''} — DNI ${app.guardianDni} — ${app.guardianPhone} — ${app.guardianEmail}`
+        }
+      : null,
+    { label: 'Estado', value: 'Pendiente de revisión en el panel de administración' },
+    app.photoDataUrl ? { label: 'Foto', value: 'Incluida en la solicitud (panel admin)' } : null
   ].filter(Boolean);
-  const text = lines.join('\n');
-  const html =
-    '<h2>Nueva solicitud de jugador/a</h2><ul>' +
-    lines.map((l) => '<li>' + escapeHtml(l) + '</li>').join('') +
-    '</ul>';
-  return { subject, text, html };
 }
 
 exports.handler = async (event) => {
@@ -143,18 +141,19 @@ exports.handler = async (event) => {
       isMinor: !!body.isMinor,
       portalPasswordHash: portalPasswordHash,
       portalPasswordSetAt: new Date().toISOString(),
+      photoDataUrl: String(body.photoDataUrl || '').trim(),
       status: 'pending_review'
     });
 
     const cfg = getEmailConfig();
-    if (cfg.ok && cfg.notifyEmail) {
+    if (cfg.ok) {
       try {
-        const mail = buildNotifyEmail(application);
-        await sendViaSendGrid({
-          to: cfg.notifyEmail,
-          subject: mail.subject,
-          text: mail.text,
-          html: mail.html
+        await sendClubAdminNotification({
+          kind: 'nuevo_jugador',
+          title: 'Nueva solicitud de jugador/a',
+          subject: `Nueva solicitud jugador/a — ${application.name} ${application.surname} (${application.season})`,
+          requesterEmail: application.email,
+          fields: buildNotifyFields(application)
         });
       } catch (mailErr) {
         console.warn('submit-player-application email:', mailErr);

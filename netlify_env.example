@@ -1,38 +1,82 @@
 # =============================================================================
+
 # Plantilla — Netlify → Site configuration → Environment variables
+
 # Proyecto: CDSANABRIACF (cdsanabriacf.netlify.app)
+
 # Guía correo: docs/EMAIL-SOCIOS.md
+
 # =============================================================================
 
+
+
 # --- URL pública (sin barra final) ---
+
 SITE_URL=https://www.cdsanabriacf.com
+
 ALLOWED_ORIGINS=https://www.cdsanabriacf.com,https://cdsanabriacf.com,https://cdsanabriacf.netlify.app
 
-# --- OPCIÓN A (recomendada): Gmail gratis — NO hace falta cdsanabriafc@gmail.com ---
-# Crea un Gmail que controles tú (ej. cdsanabriacf.inscripciones@gmail.com)
-# 1) Verificación en 2 pasos en ESA cuenta
+
+
+# --- Gmail SMTP — buzón único del club ---
+
+# Cuenta: cdsanabriacf@gmail.com
+
+CLUB_PUBLIC_EMAIL=cdsanabriacf@gmail.com
+
+# 1) Verificación en 2 pasos en esa cuenta Google
+
 # 2) https://myaccount.google.com/apppasswords → contraseña de aplicación "Correo"
+
 # 3) SMTP_PASS = 16 caracteres sin espacios
+
 SMTP_HOST=smtp.gmail.com
+
 SMTP_PORT=587
-SMTP_USER=tu-gmail-inscripciones@gmail.com
+
+SMTP_USER=cdsanabriacf@gmail.com
+
 SMTP_PASS=xxxx-xxxx-xxxx-xxxx
-SMTP_FROM_EMAIL=tu-gmail-inscripciones@gmail.com
+
+SMTP_FROM_EMAIL=cdsanabriacf@gmail.com
+
 SMTP_FROM_NAME=CD Sanabria CF
-CLUB_REPLY_EMAIL=tu-gmail-inscripciones@gmail.com
-CLUB_NOTIFY_EMAIL=tu-gmail-inscripciones@gmail.com
+
+CLUB_REPLY_EMAIL=cdsanabriacf@gmail.com
+
+CLUB_NOTIFY_EMAIL=cdsanabriacf@gmail.com
+
+
 
 # --- OPCIÓN B (opcional): SendGrid — solo si no usas Gmail SMTP ---
+
 # SENDGRID_API_KEY=SG.xxx...
-# SENDGRID_FROM_EMAIL=cdsanabriafc@gmail.com
+
+# SENDGRID_FROM_EMAIL=cdsanabriacf@gmail.com
+
 # SENDGRID_FROM_NAME=CD Sanabria CF
 
+# CLUB_REPLY_EMAIL=cdsanabriacf@gmail.com
+
+# CLUB_NOTIFY_EMAIL=cdsanabriacf@gmail.com
+
+
+
 # --- Firebase Admin (JSON en UNA sola línea) ---
+
 FIREBASE_SERVICE_ACCOUNT_JSON=
 
-# --- Redsys / Caja Rural (pago cuota con tarjeta) ---
+
+
+# --- Redsys / Caja Rural (pago cuota, inscripción jugador, eventos — TPV tarjeta/Bizum) ---
+
 REDSYS_MERCHANT_CODE=
+
 REDSYS_TERMINAL=001
+
 REDSYS_SECRET_KEY=
+
 REDSYS_ENV=test
+
 REDSYS_BIZUM_ENABLED=false
+

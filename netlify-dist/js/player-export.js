@@ -8,9 +8,11 @@
     match_shirt: 'Camiseta partido',
     match_shorts: 'Pantalón corto partido',
     tracksuit: 'Chándal',
+    train_kit: 'Ropa de entreno',
     train_shirt: 'Camiseta entreno',
     train_shorts: 'Pantalón entreno',
-    train_jacket: 'Chubasquero'
+    train_jacket: 'Chubasquero',
+    cazadora: 'Cazadora'
   };
 
   const CATEGORY_LABELS = {
@@ -122,7 +124,18 @@
     const it = items.find(function (x) {
       return x.id === garmentId;
     });
-    return it && it.size ? it.size : '';
+    if (it && it.size) return it.size;
+    if (garmentId === 'train_kit') {
+      const shirt = items.find(function (x) {
+        return x.id === 'train_shirt';
+      });
+      if (shirt && shirt.size) return shirt.size;
+      const shorts = items.find(function (x) {
+        return x.id === 'train_shorts';
+      });
+      if (shorts && shorts.size) return shorts.size;
+    }
+    return '';
   }
 
   function clubDorsalValue(p) {
@@ -166,9 +179,9 @@
       kit_match_shirt: kitSizeFor(p, 'match_shirt'),
       kit_match_shorts: kitSizeFor(p, 'match_shorts'),
       kit_tracksuit: kitSizeFor(p, 'tracksuit'),
-      kit_train_shirt: kitSizeFor(p, 'train_shirt'),
-      kit_train_shorts: kitSizeFor(p, 'train_shorts'),
+      kit_train_kit: kitSizeFor(p, 'train_kit'),
       kit_train_jacket: kitSizeFor(p, 'train_jacket'),
+      kit_cazadora: kitSizeFor(p, 'cazadora'),
       kit_resumen: formatKitSummary(p),
       importe_ropa: cb.kit != null ? Number(cb.kit).toFixed(2) : '',
       importe_ficha: cb.ficha != null ? Number(cb.ficha).toFixed(2) : '',

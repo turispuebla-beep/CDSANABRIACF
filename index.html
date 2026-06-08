@@ -32,6 +32,7 @@
     <script src="js/payment-method-picker.js"></script>
     <!-- Configuración Firebase CDSANABRIACF -->
     <script type="module" src="js/firebase-config.js"></script>
+    <script src="js/member-cloud-persist.js"></script>
     <script src="js/club-accounting.js"></script>
     <script src="js/notification-system.js" defer></script>
     <script src="js/support-mode.js" defer></script>
@@ -178,6 +179,155 @@
             pointer-events: auto;
         }
 
+        .club-notif-bell {
+            position: relative;
+            background: rgba(255, 255, 255, 0.95);
+            border: none;
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            cursor: pointer;
+            font-size: 1.15rem;
+            line-height: 1;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.18);
+        }
+
+        .club-notif-bell:hover {
+            background: #fff;
+        }
+
+        .club-notif-badge {
+            position: absolute;
+            top: -3px;
+            right: -3px;
+            min-width: 17px;
+            height: 17px;
+            padding: 0 4px;
+            border-radius: 999px;
+            background: #dc2626;
+            color: white;
+            font-size: 0.62rem;
+            font-weight: 700;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            border: 2px solid #1e3a8a;
+        }
+
+        .club-notif-panel {
+            position: fixed;
+            top: 52px;
+            right: 8px;
+            width: min(380px, calc(100vw - 16px));
+            max-height: min(70vh, 480px);
+            background: white;
+            color: #1f2937;
+            border-radius: 12px;
+            box-shadow: 0 16px 40px rgba(0, 0, 0, 0.22);
+            z-index: 10001;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .club-notif-panel[hidden] {
+            display: none !important;
+        }
+
+        .club-notif-panel-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px 14px;
+            border-bottom: 1px solid #e5e7eb;
+            background: #f8fafc;
+        }
+
+        .club-notif-panel-header h3 {
+            margin: 0;
+            font-size: 1rem;
+            color: #1e3a8a;
+        }
+
+        .club-notif-panel-header button {
+            background: none;
+            border: none;
+            cursor: pointer;
+            font-size: 1.1rem;
+            color: #64748b;
+        }
+
+        .club-notif-list {
+            overflow-y: auto;
+            padding: 10px;
+            flex: 1;
+        }
+
+        .club-notif-list .notification-item {
+            background: #f8fafc;
+            border-radius: 8px;
+            padding: 10px;
+            margin-bottom: 8px;
+            border-left: 4px solid #3b82f6;
+        }
+
+        .club-notif-list .notification-item.unread {
+            background: #eff6ff;
+            border-left-color: #2563eb;
+        }
+
+        .club-notif-list .notification-item.high {
+            border-left-color: #dc2626;
+        }
+
+        .club-notif-list .notification-header {
+            display: flex;
+            gap: 8px;
+            align-items: flex-start;
+            margin-bottom: 6px;
+        }
+
+        .club-notif-list .notification-title h3 {
+            margin: 0;
+            font-size: 0.9rem;
+            color: #1e3a8a;
+        }
+
+        .club-notif-list .notification-time {
+            font-size: 0.72rem;
+            color: #94a3b8;
+            margin-left: auto;
+            white-space: nowrap;
+        }
+
+        .club-notif-list .notification-body p {
+            margin: 0 0 8px;
+            font-size: 0.85rem;
+            color: #475569;
+        }
+
+        .club-notif-list .notification-actions {
+            display: flex;
+            gap: 6px;
+        }
+
+        .club-notif-list .mark-read-btn,
+        .club-notif-list .delete-btn {
+            background: #e2e8f0;
+            border: none;
+            border-radius: 6px;
+            padding: 4px 8px;
+            font-size: 0.75rem;
+            cursor: pointer;
+        }
+
+        .club-notif-empty {
+            text-align: center;
+            color: #64748b;
+            padding: 24px 12px;
+            font-size: 0.9rem;
+        }
+
         #databaseStatusIndicator {
             padding: 5px 10px;
             border-radius: 16px;
@@ -194,6 +344,19 @@
             right: 8px;
             z-index: 10000;
             max-width: calc(100vw - 16px);
+        }
+
+        /* PC: campana de avisos debajo de «Visitante» para que no tape el contador */
+        @media (min-width: 701px) {
+            .login-status-host {
+                top: 8px;
+            }
+            .header-status-corner {
+                top: 46px;
+            }
+            .club-notif-panel {
+                top: 90px;
+            }
         }
 
         #loginStatus {
@@ -1976,7 +2139,20 @@
         })();
     </script>
 
-    <div id="headerStatusCorner" class="header-status-corner" aria-live="polite"></div>
+    <div id="headerStatusCorner" class="header-status-corner" aria-live="polite">
+        <button type="button" id="notificationBellBtn" class="club-notif-bell" onclick="toggleClubNotificationsPanel()" aria-label="Notificaciones" aria-expanded="false" aria-controls="clubNotificationsPanel">
+            🔔
+            <span id="notificationCounter" class="club-notif-badge" hidden aria-hidden="true">0</span>
+        </button>
+    </div>
+
+    <div id="clubNotificationsPanel" class="club-notif-panel" hidden role="dialog" aria-label="Notificaciones del club">
+        <div class="club-notif-panel-header">
+            <h3>🔔 Notificaciones</h3>
+            <button type="button" onclick="toggleClubNotificationsPanel()" aria-label="Cerrar">✕</button>
+        </div>
+        <div id="notificationsList" class="club-notif-list"></div>
+    </div>
 
     <div class="container">
         <header>
@@ -2254,7 +2430,7 @@
                     <p class="quienes-somos-cta">¡¡¡Únete!!!</p>
                     <div class="quienes-somos-contact">
                         <p><strong>Contacto</strong></p>
-                        <p>📧 <a href="mailto:cdsanabriafc@gmail.com">cdsanabriafc@gmail.com</a></p>
+                        <p>📧 <a href="mailto:cdsanabriacf@gmail.com" class="club-email-public">cdsanabriacf@gmail.com</a></p>
                         <p>📍 Crta. de El Pinar, s/n, 49300 Puebla de Sanabria, Zamora</p>
                         <p>🌐 Sitio web: <a href="https://www.cdsanabriacf.com" target="_blank" rel="noopener noreferrer">www.cdsanabriacf.com</a></p>
                     </div>
@@ -2268,13 +2444,15 @@
                 <span class="close" onclick="closeQuieresJugarModal()" aria-label="Cerrar">&times;</span>
                 <h2>Inscripción jugador/a</h2>
                 <p style="color:#64748b;margin-bottom:12px;">Temporada <strong id="qjSeasonLabel">2026-2027</strong></p>
-                <p style="font-size:0.78rem;color:#64748b;margin:0 0 16px;line-height:1.4;">El menor no puede compartir el mismo correo que su padre o tutor/a como socios.</p>
                 <div style="display:flex;flex-direction:column;gap:12px;">
                     <div>
                         <button type="button" class="cta-button" style="margin:0;background:#1e3a8a;width:100%;" onclick="goYaSoyJugadorInscripcion()">Ya soy jugador/a</button>
                         <p style="margin:6px 0 0;font-size:0.78rem;text-align:center;"><strong style="text-transform:uppercase;color:#1e3a8a;">Jugué en la temporada 2025-2026</strong></p>
                     </div>
-                    <button type="button" class="cta-button" style="margin:0;background:#059669;" onclick="openNuevoJugadorIntroModal()">Nuevo jugador/a</button>
+                    <div>
+                        <button type="button" class="cta-button" style="margin:0;background:#059669;width:100%;" onclick="openNuevoJugadorIntroModal()">Nuevo jugador/a</button>
+                        <p style="margin:6px 0 0;font-size:0.78rem;text-align:center;"><strong style="text-transform:uppercase;color:#1e3a8a;">Jugadores que NO PERTENECIERON AL CLUB en la temporada 2025-2026</strong></p>
+                    </div>
                 </div>
             </div>
         </div>
@@ -2298,7 +2476,9 @@
                         <div><label for="appPhone">Teléfono *</label><input type="tel" id="appPhone" name="appPhone" autocomplete="tel" required></div>
                         <div><label for="appBirth">Fecha nacimiento *</label><input type="date" id="appBirth" name="appBirth" required onchange="onAppBirthChange()" oninput="onAppBirthChange()"></div>
                     </div>
-                    <p id="appEmailSocioHint" class="muted" style="font-size:0.78rem;margin:0 0 12px;line-height:1.4;">El menor no puede compartir el mismo correo que su padre o tutor/a como socios.</p>
+                    <label for="appPhoto">Foto (opcional, máx. 2 MB)</label>
+                    <input type="file" id="appPhoto" name="appPhoto" accept="image/*" onchange="previewAppPhoto()">
+                    <div id="appPhotoPreviewBox" style="display:none;margin:0 0 12px;"><img id="appPhotoPreview" alt="Vista previa" style="max-width:160px;border-radius:8px;"></div>
                     <label for="appAddress">Dirección</label><input type="text" id="appAddress" name="appAddress" autocomplete="street-address">
                     <div class="nj-portal-pwd-block" style="margin-top:14px;padding:12px;background:#eff6ff;border:1px solid #93c5fd;border-radius:8px;">
                         <h3 style="margin:0 0 8px;font-size:1rem;color:#1e3a8a;">🔒 Contraseña de acceso a tu ficha</h3>
@@ -2390,7 +2570,7 @@
                     Los datos de tu equipo quedan guardados en este navegador y el club los revisará. Más adelante pediremos la ficha de cada jugador.
                 </p>
                 <p style="color:#64748b;font-size:0.92rem;line-height:1.5;margin:0 0 20px;">
-                    Para que llegue al club, pulsa el botón y envía el correo a <strong>cdsanabriafc@gmail.com</strong> (con copia a tu email). Mensaje ya rellenado con todos los datos del formulario.
+                    Para que llegue al club, pulsa el botón y envía el correo a <strong class="club-email-notify">cdsanabriacf@gmail.com</strong> (con copia a tu email). Mensaje ya rellenado con todos los datos del formulario.
                 </p>
                 <a id="tpMailtoClubBtn" class="btn-primary" href="#" style="display:inline-block;text-align:center;text-decoration:none;margin-bottom:10px;width:100%;box-sizing:border-box;">📧 Enviar aviso al club por correo</a>
                 <button type="button" class="btn-secondary" style="width:100%;" onclick="closeTorneoPreinscripcionSuccessModal()">Cerrar</button>
@@ -2420,19 +2600,13 @@
                     <input type="tel" id="colabContactPhone" name="colabContactPhone" required autocomplete="tel">
 
                     <span style="display:block;font-weight:600;color:#334155;margin-top:14px;">Servicios de publicidad *</span>
-                    <p style="font-size:0.85rem;color:#64748b;margin:4px 0 8px;">Marca los que te interesen (precios orientativos del club):</p>
+                    <p style="font-size:0.85rem;color:#64748b;margin:4px 0 8px;">Renovación anual (precio orientativo del club):</p>
                     <div id="colabServicesBox" class="colab-services-box" role="group" aria-label="Servicios de publicidad"></div>
 
-                    <div class="colab-attach-notice" role="note">
-                        <strong>📎 Importante — adjunta los archivos en el mismo correo</strong>
-                        <p>Los PDF o JPG que selecciones aquí <strong>no se suben solos</strong>. Al pulsar «Enviar solicitud» se abrirá tu correo hacia <strong id="colabAttachClubEmail">cdsanabriafc@gmail.com</strong>. En ese mismo mensaje, <strong>debajo del texto con tus datos</strong>, adjunta manualmente los archivos antes de pulsar Enviar en tu app de correo.</p>
-                    </div>
-
-                    <label for="colabFiles">Archivos adjuntos (PDF o JPG, máx. 2)</label>
+                    <label for="colabFiles">Archivos adjuntos (PDF o JPG, máx. 2, opcional)</label>
                     <input type="file" id="colabFiles" name="colabFiles" accept=".pdf,.jpg,.jpeg,application/pdf,image/jpeg" multiple>
-                    <p class="colab-files-hint">Selecciona aquí los archivos; luego adjúntalos en el correo que se abrirá (no se envían automáticamente desde la web).</p>
 
-                    <button type="submit" class="btn-primary" style="width:100%;margin-top:18px;">📧 Enviar solicitud al club</button>
+                    <button type="submit" class="btn-primary" style="width:100%;margin-top:18px;">Enviar solicitud</button>
                 </form>
             </div>
         </div>
@@ -2440,11 +2614,12 @@
         <div id="colaboradorSolicitudSuccessModal" class="modal" style="display: none;" role="dialog" aria-modal="true" aria-labelledby="colabSuccessTitle">
             <div class="modal-content" style="max-width: 480px;">
                 <span class="close" onclick="closeColaboradorSolicitudSuccessModal()" aria-label="Cerrar">&times;</span>
-                <h2 id="colabSuccessTitle">✅ Solicitud preparada</h2>
+                <h2 id="colabSuccessTitle">✅ Solicitud enviada</h2>
                 <p style="color:#334155;line-height:1.55;margin:0 0 16px;">
-                    Se ha abierto (o preparado) tu correo hacia <strong>cdsanabriafc@gmail.com</strong> con copia a tu email. Revisa el mensaje, <strong>adjunta los PDF o JPG</strong> si los has seleccionado y pulsa Enviar.
+                    Hemos enviado tus datos al club (<strong class="club-email-notify">cdsanabriacf@gmail.com</strong>). Si hace falta, el club te contactará por email o teléfono.
                 </p>
-                <a id="colabMailtoClubBtn" class="btn-primary" href="#" style="display:inline-block;text-align:center;text-decoration:none;margin-bottom:10px;width:100%;box-sizing:border-box;">📧 Abrir correo de nuevo</a>
+                <p id="colabSuccessMailtoHint" style="display:none;margin:0 0 12px;font-size:0.9rem;color:#64748b;">No se pudo avisar por correo automático. Usa el botón para abrir un mensaje al club.</p>
+                <a id="colabMailtoClubBtn" class="btn-primary" href="#" style="display:none;text-align:center;text-decoration:none;margin-bottom:10px;width:100%;box-sizing:border-box;">📧 Escribir al club</a>
                 <button type="button" class="btn-secondary" style="width:100%;" onclick="closeColaboradorSolicitudSuccessModal()">Cerrar</button>
             </div>
         </div>
@@ -2460,8 +2635,8 @@
                 <p style="color:#64748b;font-size:0.92rem;line-height:1.5;margin:0 0 20px;">
                     Cuando te acepten, abre <strong>Nuevo jugador/a</strong> → <strong>Finalizar ficha</strong> (solo admitidos) con tu DNI y la <strong>contraseña que elegiste al solicitar el alta</strong> para completar ropa y pago.
                 </p>
-                <p style="margin:0 0 12px;font-size:0.9rem;color:#64748b;">Se abrirá tu correo hacia <strong>cdsanabriafc@gmail.com</strong> con copia a tu email y todos los datos rellenados.</p>
-                <a id="njMailtoClubBtn" class="btn-primary" href="#" style="display:inline-block;text-align:center;text-decoration:none;margin-bottom:10px;">📧 Avisar al club por correo</a>
+                <p id="njSuccessMailtoHint" style="display:none;margin:0 0 12px;font-size:0.9rem;color:#64748b;">Si no recibes confirmación, puedes avisar al club por correo.</p>
+                <a id="njMailtoClubBtn" class="btn-secondary" href="#" style="display:none;text-align:center;text-decoration:none;margin-bottom:10px;width:100%;box-sizing:border-box;">📧 Escribir al club</a>
                 <button type="button" class="btn-secondary" style="width:100%;" onclick="closeNuevoJugadorSuccessModal()">Cerrar</button>
             </div>
         </div>
@@ -2529,7 +2704,7 @@
                         <li><strong>7 días</strong> para ingresar la cuota</li>
                         <li>Validación manual cuando el club vea el pago en cuenta</li>
                         <li>Sin ingreso en plazo, el alta caduca</li>
-                        <li>Dudas: <strong>cdsanabriafc@gmail.com</strong></li>
+                        <li>Dudas: <strong class="club-email-public">cdsanabriacf@gmail.com</strong></li>
                     </ul>
                 </div>
                 
@@ -2757,7 +2932,7 @@
                     <button type="button" class="btn-secondary" onclick="closeRecuperarPasswordModal()">Cerrar</button>
                 </div>
                 <p style="color: #4b5563; font-size: 0.9rem; line-height: 1.55; margin-bottom: 12px;">
-                    Si no recibes el correo, no tienes cuenta aún o prefieres que te ayude el club, escríbenos a <a href="mailto:cdsanabriafc@gmail.com" style="color: var(--primary-color); font-weight: 600;">cdsanabriafc@gmail.com</a> e incluye tu <strong>DNI</strong> y nombre completo.
+                    Si no recibes el correo, no tienes cuenta aún o prefieres que te ayude el club, escríbenos a <a href="mailto:cdsanabriacf@gmail.com" class="club-email-public" style="color: var(--primary-color); font-weight: 600;">cdsanabriacf@gmail.com</a> e incluye tu <strong>DNI</strong> y nombre completo.
                 </p>
                 <div class="form-buttons" style="flex-wrap: wrap; gap: 10px;">
                     <button type="button" class="btn-secondary" onclick="abrirCorreoRecuperacionContrasena()">Abrir mensaje en mi correo (club)</button>
@@ -2795,7 +2970,7 @@
             <div id="contactInfo" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 20px; text-align: center;">
                 <div>
                     <h4 style="color: var(--text-color); margin-bottom: 10px;">📧 Email</h4>
-                    <p id="contactEmail" style="color: var(--text-light-color);">cdsanabriafc@gmail.com</p>
+                    <p id="contactEmail" style="color: var(--text-light-color);">cdsanabriacf@gmail.com</p>
                 </div>
                 <div>
                     <h4 style="color: var(--text-color); margin-bottom: 10px;">📱 Teléfono</h4>
@@ -2840,7 +3015,7 @@
                 <div style="background: #f8fafc; padding: 15px; border-radius: 10px; border-left: 4px solid var(--primary-color);">
                     <p><strong>Club Deportivo Sanabriacf (CDSANABRIACF)</strong></p>
                     <p><strong>Dirección:</strong> Crta. de El Pinar, s/n, 49300 Puebla de Sanabria, Zamora, España</p>
-                    <p><strong>Email:</strong> <a href="mailto:cdsanabriafc@gmail.com" style="color: var(--primary-color);">cdsanabriafc@gmail.com</a></p>
+                    <p><strong>Email:</strong> <a href="mailto:cdsanabriacf@gmail.com" class="club-email-public" style="color: var(--primary-color);">cdsanabriacf@gmail.com</a></p>
                     <p><strong>Teléfono:</strong> +34 600 000 000</p>
                     <p><strong>CIF:</strong> G49115413</p>
                     <p><strong>Registro:</strong> Federación de Fútbol de Castilla y León</p>
@@ -2910,7 +3085,7 @@
                     <strong>Información adicional sobre derechos:</strong> <a href="https://www.aepd.es/derechos-y-deberes" target="_blank" style="color: var(--primary-color);">www.aepd.es/derechos-y-deberes</a>
                 </p>
                 <p><strong>Para ejercer estos derechos, contacte con nosotros:</strong><br>
-                Email: cdsanabriafc@gmail.com<br>
+                Email: <span class="club-email-public">cdsanabriacf@gmail.com</span><br>
                 Teléfono: +34 600 000 000<br>
                 Dirección: Crta. de El Pinar, s/n, 49300 Puebla de Sanabria, Zamora</p>
 
@@ -2995,7 +3170,7 @@
         let teamSettings = {
             teamName: 'CDSANABRIACF',
             teamSubtitle: 'Club Deportivo Sanabriacf - Pasión por el Fútbol',
-            contactEmail: 'cdsanabriafc@gmail.com',
+            contactEmail: 'cdsanabriacf@gmail.com',
             phoneNumber: '+34 123 456 789',
             address: 'Crta. de El Pinar, s/n, 49300 Puebla de Sanabria, Zamora',
             primaryColor: '#dc2626', // Rojo por defecto
@@ -3654,28 +3829,28 @@
             const m = document.getElementById('nuevoJugadorIntroModal');
             if (m) m.style.display = 'none';
         }
-        function showNuevoJugadorSuccessModal(mailData) {
+        function showNuevoJugadorSuccessModal(mailData, serverSynced) {
             const m = document.getElementById('nuevoJugadorSuccessModal');
             const btn = document.getElementById('njMailtoClubBtn');
+            const hint = document.getElementById('njSuccessMailtoHint');
             let mailtoUrl = '';
             if (window.PlayerApplication && window.PlayerApplication.buildClubNotifyMailto) {
                 mailtoUrl = window.PlayerApplication.buildClubNotifyMailto(mailData) || '';
             }
             if (btn) {
-                if (mailtoUrl) {
+                if (mailtoUrl && !serverSynced) {
                     btn.href = mailtoUrl;
                     btn.style.display = 'inline-block';
+                    if (hint) hint.style.display = 'block';
                     btn.onclick = function (e) {
                         e.preventDefault();
                         if (window.PlayerApplication && window.PlayerApplication.openMailto) {
                             window.PlayerApplication.openMailto(mailtoUrl);
                         }
                     };
-                    if (window.PlayerApplication && window.PlayerApplication.openMailto) {
-                        window.PlayerApplication.openMailto(mailtoUrl);
-                    }
                 } else {
                     btn.style.display = 'none';
+                    if (hint) hint.style.display = 'none';
                 }
             }
             if (m) m.style.display = 'block';
@@ -3730,6 +3905,54 @@
                 if (el) el.required = isMinor;
             });
         }
+        function previewAppPhoto() {
+            const input = document.getElementById('appPhoto');
+            const box = document.getElementById('appPhotoPreviewBox');
+            const img = document.getElementById('appPhotoPreview');
+            if (!input || !box || !img) return;
+            const file = input.files && input.files[0];
+            if (!file) {
+                box.style.display = 'none';
+                img.removeAttribute('src');
+                return;
+            }
+            if (file.size > 2 * 1024 * 1024) {
+                alert('❌ La foto no puede superar 2 MB.');
+                input.value = '';
+                box.style.display = 'none';
+                return;
+            }
+            const reader = new FileReader();
+            reader.onload = function () {
+                img.src = reader.result;
+                box.style.display = 'block';
+            };
+            reader.readAsDataURL(file);
+        }
+
+        function readAppPhotoDataUrl() {
+            return new Promise(function (resolve) {
+                const input = document.getElementById('appPhoto');
+                const file = input && input.files && input.files[0];
+                if (!file) {
+                    resolve('');
+                    return;
+                }
+                if (file.size > 2 * 1024 * 1024) {
+                    resolve('');
+                    return;
+                }
+                const reader = new FileReader();
+                reader.onload = function () {
+                    resolve(typeof reader.result === 'string' ? reader.result : '');
+                };
+                reader.onerror = function () {
+                    resolve('');
+                };
+                reader.readAsDataURL(file);
+            });
+        }
+
         async function submitNuevoJugadorApplication(ev) {
             if (ev) ev.preventDefault();
             if (window.SiteUpdateMode && !SiteUpdateMode.guard()) return;
@@ -3754,7 +3977,8 @@
                 portalPassword: document.getElementById('appPortalPassword').value,
                 portalPasswordConfirm: document.getElementById('appPortalPassword2').value,
                 commitmentAccepted: document.getElementById('appCommitment').checked,
-                clubRulesAccepted: document.getElementById('appClubRules').checked
+                clubRulesAccepted: document.getElementById('appClubRules').checked,
+                photoDataUrl: await readAppPhotoDataUrl()
             };
             try {
                 const result = await window.PlayerApplication.submitApplication(data);
@@ -3776,14 +4000,20 @@
                             : ''),
                     isMinor: age != null && age < 18
                 });
-                showNuevoJugadorSuccessModal(mailData);
-                const mailtoUrl =
-                    result.mailtoUrl ||
-                    (window.PlayerApplication.buildClubNotifyMailto
-                        ? window.PlayerApplication.buildClubNotifyMailto(mailData)
-                        : '');
-                if (mailtoUrl && window.PlayerApplication.openMailto) {
-                    window.PlayerApplication.openMailto(mailtoUrl);
+                showNuevoJugadorSuccessModal(mailData, !!result.serverSynced);
+                const photoBox = document.getElementById('appPhotoPreviewBox');
+                if (photoBox) photoBox.style.display = 'none';
+                const photoPreview = document.getElementById('appPhotoPreview');
+                if (photoPreview) photoPreview.removeAttribute('src');
+                if (!result.serverSynced) {
+                    const mailtoUrl =
+                        result.mailtoUrl ||
+                        (window.PlayerApplication.buildClubNotifyMailto
+                            ? window.PlayerApplication.buildClubNotifyMailto(mailData)
+                            : '');
+                    if (mailtoUrl && window.PlayerApplication.openMailto) {
+                        window.PlayerApplication.openMailto(mailtoUrl);
+                    }
                 }
             } catch (e) {
                 alert('❌ ' + (e.message || e));
@@ -4218,12 +4448,8 @@
             const introEl = document.getElementById('colabModalIntro');
             if (titleEl && cfg) titleEl.textContent = '🤝 ' + (cfg.modalTitle || 'Solicitud de colaboración publicitaria');
             if (introEl && cfg) introEl.textContent = cfg.modalIntro || '';
-            const clubEmailEl = document.getElementById('colabAttachClubEmail');
-            if (clubEmailEl) {
-                const em = window.ClubContactDefaults && window.ClubContactDefaults.getNotifyEmail
-                    ? window.ClubContactDefaults.getNotifyEmail()
-                    : 'cdsanabriafc@gmail.com';
-                clubEmailEl.textContent = em;
+            if (window.ClubContactDefaults && window.ClubContactDefaults.refreshClubEmailDisplays) {
+                window.ClubContactDefaults.refreshClubEmailDisplays();
             }
             if (window.ColaboradorSolicitud) {
                 window.ColaboradorSolicitud.renderServiceOptions(document.getElementById('colabServicesBox'));
@@ -4244,7 +4470,7 @@
             if (m) m.style.display = 'none';
         }
 
-        function submitColaboradorSolicitud(ev) {
+        async function submitColaboradorSolicitud(ev) {
             if (ev) ev.preventDefault();
             if (window.SiteUpdateMode && !SiteUpdateMode.guard()) return;
             if (!window.ColaboradorSolicitud) {
@@ -4255,7 +4481,17 @@
             try {
                 const result = window.ColaboradorSolicitud.submitFromForm(form);
                 closeColaboradorSolicitudModal();
+                form.reset();
+                if (window.ColaboradorSolicitud.renderServiceOptions) {
+                    window.ColaboradorSolicitud.renderServiceOptions(document.getElementById('colabServicesBox'));
+                }
+                let serverSent = false;
+                if (window.ColaboradorSolicitud.notifyClubViaServer) {
+                    const notifyRes = await window.ColaboradorSolicitud.notifyClubViaServer(result.data);
+                    serverSent = !!(notifyRes && notifyRes.sent);
+                }
                 const btn = document.getElementById('colabMailtoClubBtn');
+                const hint = document.getElementById('colabSuccessMailtoHint');
                 if (btn && result.mailtoUrl) {
                     btn.href = result.mailtoUrl;
                     btn.onclick = function (e) {
@@ -4263,7 +4499,17 @@
                         window.ColaboradorSolicitud.openMailto(result.mailtoUrl);
                     };
                 }
-                window.ColaboradorSolicitud.openMailto(result.mailtoUrl);
+                if (serverSent) {
+                    if (btn) btn.style.display = 'none';
+                    if (hint) hint.style.display = 'none';
+                } else {
+                    if (btn) btn.style.display = 'inline-block';
+                    if (hint) hint.style.display = 'block';
+                    if (result.mailtoUrl) window.ColaboradorSolicitud.openMailto(result.mailtoUrl);
+                }
+                if (window.ClubContactDefaults && window.ClubContactDefaults.refreshClubEmailDisplays) {
+                    window.ClubContactDefaults.refreshClubEmailDisplays();
+                }
                 document.getElementById('colaboradorSolicitudSuccessModal').style.display = 'block';
             } catch (e) {
                 alert('❌ ' + (e.message || e));
@@ -4601,7 +4847,26 @@
             }
         }
 
-        const CLUB_EMAIL_RECOVERY = 'cdsanabriafc@gmail.com';
+        function getClubPublicEmail() {
+            if (window.ClubContactDefaults && window.ClubContactDefaults.getPublicEmail) {
+                return window.ClubContactDefaults.getPublicEmail();
+            }
+            return 'cdsanabriacf@gmail.com';
+        }
+
+        function getClubNotifyEmail() {
+            if (window.ClubContactDefaults && window.ClubContactDefaults.getNotifyEmail) {
+                return window.ClubContactDefaults.getNotifyEmail();
+            }
+            if (window.ClubMailto && window.ClubMailto.getClubNotifyEmail) {
+                return window.ClubMailto.getClubNotifyEmail();
+            }
+            return 'cdsanabriacf@gmail.com';
+        }
+
+        function getClubRecoveryEmail() {
+            return getClubNotifyEmail();
+        }
 
         function openRecuperarPasswordModal(tipo) {
             const modal = document.getElementById('recuperarPasswordModal');
@@ -4686,7 +4951,13 @@
                 'DNI (verificación): \r\n\r\n' +
                 'Gracias.'
             );
-            window.location.href = 'mailto:' + CLUB_EMAIL_RECOVERY + '?subject=' + subject + '&body=' + body;
+            window.location.href =
+                'mailto:' +
+                encodeURIComponent(getClubRecoveryEmail()) +
+                '?subject=' +
+                subject +
+                '&body=' +
+                body;
         }
 
         // Login de amigo: implementación unificada más abajo (Firebase Auth + migración desde local).
@@ -7173,7 +7444,10 @@
                     const whatsappElement = document.getElementById('contactWhatsApp');
                     const hoursElement = document.getElementById('contactHours');
                     
-                    if (emailElement) emailElement.textContent = contactInfo.email || 'cdsanabriafc@gmail.com';
+                    if (emailElement) emailElement.textContent = contactInfo.email || 'cdsanabriacf@gmail.com';
+                    if (window.ClubContactDefaults && window.ClubContactDefaults.refreshClubEmailDisplays) {
+                        window.ClubContactDefaults.refreshClubEmailDisplays();
+                    }
                     if (phoneElement) phoneElement.textContent = contactInfo.phone || '+34 600 000 000';
                     if (addressElement) addressElement.textContent = contactInfo.address || 'Crta. de El Pinar, s/n, 49300 Puebla de Sanabria, Zamora';
                     if (websiteElement) websiteElement.textContent = contactInfo.website || 'www.cdsanabriacf.com';
@@ -9893,7 +10167,8 @@
                 pendingReason: 'nueva_alta',
                 proteccionDatos: document.getElementById('socioProteccionDatos').checked,
                 notificaciones: document.getElementById('socioNotificaciones').checked,
-                consentimiento: document.getElementById('socioConsentimiento').checked
+                consentimiento: document.getElementById('socioConsentimiento').checked,
+                registrationSource: 'web_modal_socio'
             };
 
             if (formData.password !== document.getElementById('socioPasswordConfirm').value) {
@@ -9959,7 +10234,12 @@
                 okFirebase = await enviarSocioABaseDatos(formData);
             } catch (e) {
                 console.warn('enviarSocioABaseDatos:', e);
-                okFirebase = false;
+                alert(
+                    '❌ No se pudo guardar tu alta de socio/a en la nube del club.\n\n' +
+                        (e && e.message ? e.message + '\n\n' : '') +
+                        'Reintenta en unos minutos o escribe a cdsanabriacf@gmail.com.'
+                );
+                return;
             }
 
             if (window.firebaseAuth && !window.firebaseAuth.isSimulation) {
@@ -9970,18 +10250,24 @@
             }
 
             if (!okFirebase) {
-                sociosExistentes.push(formData);
-                if (typeof window.syncClubMembersLocal === 'function') {
-                    window.syncClubMembersLocal(sociosExistentes);
-                } else {
-                    localStorage.setItem('clubMembers', JSON.stringify(sociosExistentes));
-                    localStorage.setItem('socios', JSON.stringify(sociosExistentes));
+                if (location.protocol === 'file:') {
+                    sociosExistentes.push(formData);
+                    if (typeof window.syncClubMembersLocal === 'function') {
+                        window.syncClubMembersLocal(sociosExistentes);
+                    } else {
+                        localStorage.setItem('clubMembers', JSON.stringify(sociosExistentes));
+                        localStorage.setItem('socios', JSON.stringify(sociosExistentes));
+                    }
                 }
-            } else {
-                const synced = JSON.parse(localStorage.getItem('clubMembers') || '[]');
-                const saved = synced.find((s) => String(s.email || '').toLowerCase() === String(formData.email || '').toLowerCase());
-                if (saved) Object.assign(formData, saved);
+                alert(
+                    '❌ No se pudo guardar tu alta de socio/a en la nube del club.\n\nReintenta o contacta con cdsanabriacf@gmail.com.'
+                );
+                return;
             }
+
+            const synced = JSON.parse(localStorage.getItem('clubMembers') || '[]');
+            const saved = synced.find((s) => String(s.email || '').toLowerCase() === String(formData.email || '').toLowerCase());
+            if (saved) Object.assign(formData, saved);
 
             if (formData.notificaciones) {
                 activarNotificacionesPush('socio', formData.email, formData.nombre);
@@ -9990,10 +10276,6 @@
             const mensajeNotificaciones = formData.notificaciones
                 ? '\n\n🔔 Notificaciones push activadas - Recibirás información del club'
                 : '\n\n📧 Recibirás información por email';
-
-            const avisoFirebase = okFirebase
-                ? ''
-                : '\n\n⚠️ La cuenta de acceso se creó pero el alta en el servidor falló. El club te ayudará a completar el registro.';
 
             const cuota = Number(formData.cuota) || 0;
             const modoPago = window._socioRegistroModoPago === 'transfer' ? 'transfer' : 'card';
@@ -10026,6 +10308,23 @@
                         localStorage.setItem('clubMembers', JSON.stringify(list));
                         localStorage.setItem('socios', JSON.stringify(list));
                     }
+                    try {
+                        const okTransfer = await enviarSocioABaseDatos(list[ix]);
+                        if (!okTransfer) {
+                            alert(
+                                '❌ No se pudo confirmar el método de pago en la nube. Reintenta o contacta con cdsanabriacf@gmail.com.'
+                            );
+                            return;
+                        }
+                    } catch (syncErr) {
+                        console.warn('Sync transferencia socio:', syncErr);
+                        alert(
+                            '❌ No se pudo confirmar el método de pago en la nube.\n\n' +
+                                (syncErr && syncErr.message ? syncErr.message : '') +
+                                '\n\nContacta con cdsanabriacf@gmail.com.'
+                        );
+                        return;
+                    }
                 }
             }
 
@@ -10033,7 +10332,7 @@
                 notifySocioRegisteredEmail(formData, memberId, 'card');
                 closeSociosModal();
                 alert(
-                    `✅ Registro guardado.\n\n📋 ${formatNumeroSocioDisplay(formData.numeroSocio)}\n💰 Cuota: ${cuota}€${perfilRegistroMsg}\n\nEn la siguiente pantalla elige pagar con tarjeta o Bizum. Si el pago es correcto, tu alta quedará activa al instante.${mensajeNotificaciones}${avisoFirebase}`
+                    `✅ Registro guardado en la nube del club.\n\n📋 ${formatNumeroSocioDisplay(formData.numeroSocio)}\n💰 Cuota: ${cuota}€${perfilRegistroMsg}\n\nEn la siguiente pantalla elige pagar con tarjeta o Bizum. Si el pago es correcto, tu alta quedará activa al instante.${mensajeNotificaciones}`
                 );
                 window.location.href = 'pago-cuota-socio.html?email=' + encodeURIComponent(formData.email);
                 return;
@@ -10046,7 +10345,7 @@
             const pagoHumano = offlineSocioPaymentHint(offlineCh);
 
             alert(
-                `✅ ¡Registro de socio completado!\n\n📋 ${formatNumeroSocioDisplay(formData.numeroSocio)}\n💰 Cuota: ${cuota}€${perfilRegistroMsg}\n\n🏦 Ingresa la cuota en 7 días por ${pagoHumano}.\nEl club validará tu alta al ver el pago.\n• Dudas: cdsanabriafc@gmail.com\n\n📧 Hemos enviado un aviso al club con tus datos.${mensajeNotificaciones}${avisoFirebase}`
+                `✅ ¡Registro de socio completado!\n\nTu alta figura ya en el sistema del club (pendiente de validación del pago si aplica).\n\n📋 ${formatNumeroSocioDisplay(formData.numeroSocio)}\n💰 Cuota: ${cuota}€${perfilRegistroMsg}\n\n🏦 Ingresa la cuota en 7 días por ${pagoHumano}.\nEl club validará tu alta al ver el pago.\n• Dudas: ${getClubPublicEmail()}\n\n📧 Hemos enviado un aviso al club con tus datos.${mensajeNotificaciones}`
             );
 
             closeSociosModal();
@@ -10086,7 +10385,8 @@
                 status: 'active',
                 proteccionDatos: document.getElementById('amigoProteccionDatos').checked,
                 notificaciones: document.getElementById('amigoNotificaciones').checked,
-                consentimiento: document.getElementById('amigoConsentimiento').checked
+                consentimiento: document.getElementById('amigoConsentimiento').checked,
+                registrationSource: 'web_modal_amigo'
             };
 
             if (formData.password !== document.getElementById('amigoPasswordConfirm').value) {
@@ -10149,7 +10449,12 @@
                 okFirebase = await enviarAmigoABaseDatos(formData);
             } catch (e) {
                 console.warn('enviarAmigoABaseDatos:', e);
-                okFirebase = false;
+                alert(
+                    '❌ No se pudo guardar tu alta de amigo/a en la nube del club.\n\n' +
+                        (e && e.message ? e.message + '\n\n' : '') +
+                        'Reintenta en unos minutos o escribe a cdsanabriacf@gmail.com.'
+                );
+                return;
             }
 
             if (window.firebaseAuth && !window.firebaseAuth.isSimulation) {
@@ -10160,18 +10465,24 @@
             }
 
             if (!okFirebase) {
-                amigosExistentes.push(formData);
-                if (typeof window.syncClubFriendsLocal === 'function') {
-                    window.syncClubFriendsLocal(amigosExistentes);
-                } else {
-                    localStorage.setItem('clubFriends', JSON.stringify(amigosExistentes));
-                    localStorage.setItem('amigos', JSON.stringify(amigosExistentes));
+                if (location.protocol === 'file:') {
+                    amigosExistentes.push(formData);
+                    if (typeof window.syncClubFriendsLocal === 'function') {
+                        window.syncClubFriendsLocal(amigosExistentes);
+                    } else {
+                        localStorage.setItem('clubFriends', JSON.stringify(amigosExistentes));
+                        localStorage.setItem('amigos', JSON.stringify(amigosExistentes));
+                    }
                 }
-            } else {
-                const synced = JSON.parse(localStorage.getItem('clubFriends') || '[]');
-                const saved = synced.find((a) => String(a.email || '').toLowerCase() === String(formData.email || '').toLowerCase());
-                if (saved) Object.assign(formData, saved);
+                alert(
+                    '❌ No se pudo guardar tu alta de amigo/a en la nube del club.\n\nReintenta o contacta con cdsanabriacf@gmail.com.'
+                );
+                return;
             }
+
+            const synced = JSON.parse(localStorage.getItem('clubFriends') || '[]');
+            const saved = synced.find((a) => String(a.email || '').toLowerCase() === String(formData.email || '').toLowerCase());
+            if (saved) Object.assign(formData, saved);
 
             if (formData.notificaciones) {
                 activarNotificacionesPush('amigo', formData.email, formData.nombre);
@@ -10181,12 +10492,10 @@
                 ? '\n\n🔔 Notificaciones push activadas - Recibirás información del club'
                 : '\n\n📧 Recibirás información por email';
 
-            const avisoFirebase = okFirebase
-                ? ''
-                : '\n\n⚠️ La cuenta de acceso se creó pero el alta en el servidor falló. Contacta con el club.';
+            const avisoFirebase = '';
 
             alert(
-                `✅ ¡Registro de amigo completado!\n\n🤝 ¡Bienvenido al club!\n\nAhora puedes acceder a competiciones y encuentros.${mensajeNotificaciones}${avisoFirebase}`
+                `✅ ¡Registro de amigo/a completado!\n\nTu alta figura ya en el sistema del club.\n\n🤝 ¡Bienvenido/a al club!\n\nAhora puedes acceder a competiciones y encuentros.${mensajeNotificaciones}`
             );
 
             closeAmigosModal();
@@ -10300,9 +10609,24 @@
             socioSafe.apellidos = socioSafe.apellidos || socioSafe.surname;
             socioSafe.phone = socioSafe.phone || socioSafe.telefono || '';
             socioSafe.telefono = socioSafe.telefono || socioSafe.phone;
+            socioSafe.appScope = socioSafe.appScope || 'cdsanabriacf';
             if (typeof window.applyClubRoleFlagsToMember === 'function') {
                 window.applyClubRoleFlagsToMember(socioSafe);
             }
+
+            if (window.ClubMemberCloudPersist && typeof window.ClubMemberCloudPersist.persistMemberViaNetlify === 'function') {
+                try {
+                    await window.ClubMemberCloudPersist.persistMemberViaNetlify(socioSafe);
+                    console.log('✅ Socio guardado en Firebase (Netlify):', socioSafe.nombre);
+                    return true;
+                } catch (netlifyErr) {
+                    console.warn('⚠️ Netlify socio:', netlifyErr);
+                    if (typeof window.clubCloudPersistIsRequired === 'function' && window.clubCloudPersistIsRequired()) {
+                        throw netlifyErr;
+                    }
+                }
+            }
+
             if (!window.createDocument) return false;
             try {
                 const docId = await window.createDocument('members', socioSafe);
@@ -10337,6 +10661,23 @@
             amigoSafe.apellidos = amigoSafe.apellidos || amigoSafe.surname;
             amigoSafe.phone = amigoSafe.phone || amigoSafe.telefono || '';
             amigoSafe.telefono = amigoSafe.telefono || amigoSafe.phone;
+            amigoSafe.appScope = amigoSafe.appScope || 'cdsanabriacf';
+            amigoSafe.status = amigoSafe.status || 'active';
+            amigoSafe.estado = amigoSafe.estado || 'activo';
+
+            if (window.ClubFriendCloudPersist && typeof window.ClubFriendCloudPersist.persistFriendViaNetlify === 'function') {
+                try {
+                    await window.ClubFriendCloudPersist.persistFriendViaNetlify(amigoSafe);
+                    console.log('✅ Amigo guardado en Firebase (Netlify):', amigoSafe.nombre);
+                    return true;
+                } catch (netlifyErr) {
+                    console.warn('⚠️ Netlify amigo:', netlifyErr);
+                    if (typeof window.clubCloudPersistIsRequired === 'function' && window.clubCloudPersistIsRequired()) {
+                        throw netlifyErr;
+                    }
+                }
+            }
+
             if (!window.createDocument) return false;
             try {
                 const docId = await window.createDocument('friends', amigoSafe);
@@ -10867,7 +11208,7 @@
                     <p><strong>Titular:</strong> Club Deportivo Sanabriacf (CD Sanabria CF)<br>
                     <strong>CIF:</strong> G49115413<br>
                     <strong>Domicilio:</strong> Crta. de El Pinar, s/n, 49300 Puebla de Sanabria, Zamora<br>
-                    <strong>Email:</strong> cdsanabriafc@gmail.com<br>
+                    <strong>Email:</strong> <span class="club-email-public">cdsanabriacf@gmail.com</span><br>
                     <strong>Teléfono:</strong> +34 600 000 000</p>
                     
                     <h4 style="margin-top: 20px; color: #1f2937;">2. Objeto</h4>
@@ -10921,7 +11262,7 @@
                     <p><strong>Identidad:</strong> Club Deportivo Sanabriacf (CD Sanabria CF)<br>
                     <strong>CIF:</strong> G49115413<br>
                     <strong>Dirección:</strong> Crta. de El Pinar, s/n, 49300 Puebla de Sanabria, Zamora<br>
-                    <strong>Email:</strong> cdsanabriafc@gmail.com</p>
+                    <strong>Email:</strong> <span class="club-email-public">cdsanabriacf@gmail.com</span></p>
                     
                     <h4 style="margin-top: 20px; color: #1f2937;">2. Datos que Recopilamos</h4>
                     <ul style="margin-left: 20px;">
@@ -10950,7 +11291,7 @@
                     
                     <h4 style="margin-top: 20px; color: #1f2937;">5. Derechos del Usuario</h4>
                     <p>Puede ejercer sus derechos de acceso, rectificación, supresión, portabilidad, 
-                    limitación y oposición enviando un email a cdsanabriafc@gmail.com</p>
+                    limitación y oposición enviando un email a <span class="club-email-public">cdsanabriacf@gmail.com</span></p>
                     
                     <h4 style="margin-top: 20px; color: #1f2937;">6. Conservación de Datos</h4>
                     <p>Los datos se conservarán mientras dure la relación con el club y, posteriormente, 
@@ -11087,7 +11428,7 @@
                     <h4 style="color: var(--text-color); margin-top: 20px; margin-bottom: 10px;">Responsable del Tratamiento</h4>
                     <p><strong>Club Deportivo Sanabriacf (CDSANABRIACF)</strong><br>
                     Dirección: Crta. de El Pinar, s/n, 49300 Puebla de Sanabria, Zamora<br>
-                    Email: cdsanabriafc@gmail.com<br>
+                    Email: <span class="club-email-public">cdsanabriacf@gmail.com</span><br>
                     Teléfono: +34 600 000 000<br>
                     CIF: G49115413</p>
 
@@ -11128,7 +11469,7 @@
 
                     <p style="margin-top: 20px; font-size: 0.9rem; color: var(--text-light-color);">
                         <strong>Para ejercer estos derechos:</strong><br>
-                        Email: cdsanabriafc@gmail.com<br>
+                        Email: <span class="club-email-public">cdsanabriacf@gmail.com</span><br>
                         Teléfono: +34 600 000 000
                     </p>
 
@@ -11797,12 +12138,51 @@
             });
         }
         
+        function toggleClubNotificationsPanel(forceOpen) {
+            const panel = document.getElementById('clubNotificationsPanel');
+            const btn = document.getElementById('notificationBellBtn');
+            const list = document.getElementById('notificationsList');
+            if (!panel) return;
+            const shouldOpen = typeof forceOpen === 'boolean' ? forceOpen : panel.hidden;
+            if (shouldOpen) {
+                if (window.clubNotificationSystem) {
+                    window.clubNotificationSystem.loadNotificationsForUser();
+                    const items = window.clubNotificationSystem.getNotifications();
+                    if (list && items.length === 0) {
+                        list.innerHTML = '<p class="club-notif-empty">No tienes notificaciones</p>';
+                    }
+                } else if (list) {
+                    list.innerHTML = '<p class="club-notif-empty">No tienes notificaciones</p>';
+                }
+                panel.hidden = false;
+                if (btn) btn.setAttribute('aria-expanded', 'true');
+            } else {
+                panel.hidden = true;
+                if (btn) btn.setAttribute('aria-expanded', 'false');
+            }
+        }
+
         // Mostrar banner al cargar
         document.addEventListener('DOMContentLoaded', function() {
             registrarServiceWorker();
             mostrarBannerInstalacion();
             refrescarDatosAlAbrir('domcontentloaded');
             setTimeout(mostrarBannerCookies, 1500);
+            if (window.clubNotificationSystem && typeof window.clubNotificationSystem.loadNotificationsForUser === 'function') {
+                window.clubNotificationSystem.loadNotificationsForUser();
+            }
+            document.addEventListener('click', function (e) {
+                const panel = document.getElementById('clubNotificationsPanel');
+                const btn = document.getElementById('notificationBellBtn');
+                if (!panel || panel.hidden) return;
+                if (panel.contains(e.target) || (btn && btn.contains(e.target))) return;
+                toggleClubNotificationsPanel(false);
+            });
+            window.addEventListener('storage', function (e) {
+                if (e.key === 'club_notifications' && window.clubNotificationSystem) {
+                    window.clubNotificationSystem.loadNotificationsForUser();
+                }
+            });
             try {
                 const params = new URLSearchParams(window.location.search);
                 const ret = params.get('return');
@@ -11811,6 +12191,12 @@
                 }
                 if (params.get('openAcceso') === '1' && typeof openAccesoClubModal === 'function') {
                     setTimeout(openAccesoClubModal, 400);
+                }
+                if (params.get('open') === 'nuevo-jugador' && typeof openNuevoJugadorIntroModal === 'function') {
+                    setTimeout(openNuevoJugadorIntroModal, 400);
+                    try {
+                        history.replaceState({}, '', window.location.pathname);
+                    } catch (_) {}
                 }
             } catch (_) {}
         });

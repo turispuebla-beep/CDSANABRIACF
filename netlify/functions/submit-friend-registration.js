@@ -1,6 +1,6 @@
 'use strict';
 
-const { upsertPlayerInscriptionRecord } = require('./lib/firestore-admin');
+const { upsertFriendRegistrationRecord } = require('./lib/firestore-admin');
 
 const CORS_BASE = {
   'Access-Control-Allow-Headers': 'Content-Type',
@@ -41,25 +41,14 @@ exports.handler = async (event) => {
 
   try {
     const body = JSON.parse(event.body || '{}');
-    const player = body.player;
-    if (!player || typeof player !== 'object') {
-      return json(400, { ok: false, error: 'Datos de jugador/a ausentes' }, origin);
+    const friend = body.friend;
+    if (!friend || typeof friend !== 'object') {
+      return json(400, { ok: false, error: 'Datos de amigo/a ausentes' }, origin);
     }
-    const saved = await upsertPlayerInscriptionRecord(player);
-    const savedPlayer = saved.player || saved;
-    return json(
-      200,
-      {
-        ok: true,
-        playerId: savedPlayer.id,
-        memberId: saved.member ? saved.member.id : null,
-        player: savedPlayer,
-        member: saved.member || null
-      },
-      origin
-    );
+    const saved = await upsertFriendRegistrationRecord(friend);
+    return json(200, { ok: true, friendId: saved.id, friend: saved }, origin);
   } catch (err) {
-    console.error('submit-player-inscription:', err);
+    console.error('submit-friend-registration:', err);
     return json(500, { ok: false, error: err.message || 'Error interno' }, origin);
   }
 };

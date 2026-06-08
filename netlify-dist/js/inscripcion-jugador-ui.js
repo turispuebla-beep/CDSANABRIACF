@@ -13,6 +13,7 @@
     continuePlayer: null,
     continueEditable: false,
     lookupIdentity: null,
+    payWarningAcknowledged: false,
     lookupCheck: null,
     portalResetToken: null
   };
@@ -270,7 +271,11 @@
     }
     if (msg) {
       msg.style.color = '#dc2626';
-      msg.textContent = 'No se pudo abrir el correo. Escribe a cdsanabriafc@gmail.com con tu DNI.';
+      const clubEm =
+        (global.ClubContactDefaults && global.ClubContactDefaults.getNotifyEmail && global.ClubContactDefaults.getNotifyEmail()) ||
+        (global.ClubMailto && global.ClubMailto.getClubNotifyEmail && global.ClubMailto.getClubNotifyEmail()) ||
+        'cdsanabriacf@gmail.com';
+      msg.textContent = 'No se pudo abrir el correo. Escribe a ' + clubEm + ' con tu DNI.';
     }
   }
 
@@ -525,6 +530,44 @@
     if (p2) p2.required = !existing;
   }
 
+  function composeGuardianAddress(parts) {
+    if (global.PlayerInscription && global.PlayerInscription.composeAddress) {
+      return global.PlayerInscription.composeAddress(parts);
+    }
+    const domicilio = String(parts?.domicilio || '').trim();
+    const localidad = String(parts?.localidad || '').trim();
+    const provincia = String(parts?.provincia || '').trim();
+    return [domicilio, localidad, provincia].filter(Boolean).join(', ');
+  }
+
+  function guardianSameDomicilioChecked() {
+    const cb = $('insGuardianSameDomicilio');
+    return !cb || cb.checked;
+  }
+
+  function toggleGuardianDomicilioFields() {
+    const wrap = $('insGuardianDomicilioFields');
+    if (!wrap) return;
+    wrap.style.display = guardianSameDomicilioChecked() ? 'none' : 'block';
+  }
+
+  function resolveGuardianAddressFromForm() {
+    if (guardianSameDomicilioChecked()) {
+      return {
+        guardianSameDomicilio: true,
+        guardianDomicilio: ($('insDomicilio') && $('insDomicilio').value.trim()) || '',
+        guardianLocalidad: ($('insLocalidad') && $('insLocalidad').value.trim()) || '',
+        guardianProvincia: ($('insProvincia') && $('insProvincia').value.trim()) || 'Zamora'
+      };
+    }
+    return {
+      guardianSameDomicilio: false,
+      guardianDomicilio: ($('insGuardianDomicilio') && $('insGuardianDomicilio').value.trim()) || '',
+      guardianLocalidad: ($('insGuardianLocalidad') && $('insGuardianLocalidad').value.trim()) || '',
+      guardianProvincia: ($('insGuardianProvincia') && $('insGuardianProvincia').value.trim()) || 'Zamora'
+    };
+  }
+
   function setPersonalReadonly(readonly) {
     [
       'insName',
@@ -549,7 +592,10 @@
       'insGuardianDni',
       'insGuardianPhone',
       'insGuardianEmail',
-      'insGuardianAddress'
+      'insGuardianSameDomicilio',
+      'insGuardianDomicilio',
+      'insGuardianLocalidad',
+      'insGuardianProvincia'
     ].forEach(function (id) {
       const el = $(id);
       if (el) el.disabled = !!readonly;
@@ -665,7 +711,34 @@
     if ($('insGuardianDni')) $('insGuardianDni').value = p.guardianDNI || p.guardianDni || '';
     if ($('insGuardianPhone')) $('insGuardianPhone').value = p.guardianPhone || '';
     if ($('insGuardianEmail')) $('insGuardianEmail').value = p.guardianEmail || '';
-    if ($('insGuardianAddress')) $('insGuardianAddress').value = p.guardianAddress || '';
+    const playerAddr = composeGuardianAddress({
+      domicilio: p.domicilio,
+      localidad: p.localidad,
+      provincia: p.provincia
+    });
+    const guardianAddr =
+      p.guardianAddress ||
+      composeGuardianAddress({
+        domicilio: p.guardianDomicilio,
+        localidad: p.guardianLocalidad,
+        provincia: p.guardianProvincia
+      });
+    const sameDom =
+      p.guardianSameDomicilio === true ||
+      (p.guardianSameDomicilio !== false && (!guardianAddr || guardianAddr === playerAddr));
+    if ($('insGuardianSameDomicilio')) $('insGuardianSameDomicilio').checked = sameDom;
+    if ($('insGuardianDomicilio')) {
+      $('insGuardianDomicilio').value = p.guardianDomicilio || '';
+    }
+    if ($('insGuardianLocalidad')) $('insGuardianLocalidad').value = p.guardianLocalidad || '';
+    if ($('insGuardianProvincia')) {
+      $('insGuardianProvincia').value = p.guardianProvincia || p.provincia || 'Zamora';
+    }
+    if ($('insCategorySuperiorConsent')) {
+      $('insCategorySuperiorConsent').checked =
+        !!p.categorySuperiorConsent || !!p.categorySuperiorConsentAt;
+    }
+    toggleGuardianDomicilioFields();
     onBirthChange();
     updatePortalPasswordBlockUI();
   }
@@ -869,6 +942,12 @@
       row.className = 'kit-row';
       const priceHint =
         Number(g.price) > 0 ? ' <span class="muted">(' + formatEur(g.price) + ')</span>' : '';
+      const mandatoryHint =
+        g.id === 'train_kit'
+          ? ' <span class="kit-mandatory-hint">Obligatoria en los entrenamientos</span>'
+          : '';
+      const optionalHint =
+        g.id === 'cazadora' ? ' <span class="kit-optional-hint">Opcional</span>' : '';
       row.innerHTML =
         '<span class="kit-label">' +
         g.label +
@@ -878,7 +957,9 @@
         g.id +
         '" class="kit-size"><option value="">Talla</option>' +
         sizeOptionsHtml() +
-        '</select>';
+        '</select>' +
+        mandatoryHint +
+        optionalHint;
       wrap.appendChild(row);
       const sel = row.querySelector('[data-kit-size]');
       if (sel) sel.addEventListener('change', refreshCart);
@@ -908,6 +989,7 @@
   }
 
   function getFormData() {
+    const guardianAddrParts = resolveGuardianAddressFromForm();
     return {
       name: ($('insName') && $('insName').value.trim()) || '',
       surname: ($('insSurname') && $('insSurname').value.trim()) || '',
@@ -939,7 +1021,13 @@
       guardianDNI: ($('insGuardianDni') && $('insGuardianDni').value.trim()) || '',
       guardianPhone: ($('insGuardianPhone') && $('insGuardianPhone').value.trim()) || '',
       guardianEmail: ($('insGuardianEmail') && $('insGuardianEmail').value.trim()) || '',
-      guardianAddress: ($('insGuardianAddress') && $('insGuardianAddress').value.trim()) || '',
+      guardianSameDomicilio: guardianAddrParts.guardianSameDomicilio,
+      guardianDomicilio: guardianAddrParts.guardianDomicilio,
+      guardianLocalidad: guardianAddrParts.guardianLocalidad,
+      guardianProvincia: guardianAddrParts.guardianProvincia,
+      guardianAddress: composeGuardianAddress(guardianAddrParts),
+      categorySuperiorConsent:
+        $('insCategorySuperiorConsent') && $('insCategorySuperiorConsent').checked,
       playerConsent: $('insPlayerConsent') && $('insPlayerConsent').checked,
       photoConsent: $('insPhotoConsent') && $('insPhotoConsent').checked,
       clubRulesAccepted: $('insClubRules') && $('insClubRules').checked,
@@ -1064,6 +1152,7 @@
           : '(obligatorio si eres mayor de edad)';
     }
     toggleGuardian();
+    toggleGuardianDomicilioFields();
     refreshCart();
   }
 
@@ -1087,6 +1176,9 @@
         if (clubEmailsEqual(f.email, f.guardianEmail)) {
           return 'El menor no puede usar el mismo correo que su padre o tutor/a. Indica un email distinto para el jugador/a.';
         }
+        if (!f.categorySuperiorConsent) {
+          return 'Para menores, debes leer y aceptar la autorización de categoría superior (CATEGORÍA).';
+        }
       }
     }
 
@@ -1109,11 +1201,6 @@
       }
     }
 
-    const kitItems = collectKitItems();
-    const garments = global.ClubInscriptionConfig.getEnabledGarments(state.settings);
-    if (garments.length && !kitItems.length) {
-      return 'Indica al menos una prenda de entreno con su talla.';
-    }
     const pwdErr = validatePortalPasswordFields();
     if (pwdErr) return pwdErr;
     return null;
@@ -1153,6 +1240,7 @@
     const member = global.PlayerInscription.findMemberByDni(f.dni);
     if (member && member.id) player.linkedMemberId = member.id;
     if (f.clubRulesAccepted) player.clubRulesAcceptedAt = new Date().toISOString();
+    if (f.categorySuperiorConsent) player.categorySuperiorConsentAt = new Date().toISOString();
     return player;
   }
 
@@ -1185,6 +1273,18 @@
       { label: 'Ropa (tallas)', value: kitTxt || '—' },
       { label: 'Tutor/a', value: reg.guardianName || '—' },
       { label: 'DNI tutor/a', value: reg.guardianDNI || reg.guardianDni || '—' },
+      {
+        label: 'Autorización categoría superior',
+        value: reg.categorySuperiorConsent ? 'Sí' : 'No'
+      },
+      {
+        label: 'Domicilio tutor/a',
+        value: reg.guardianAddress || composeGuardianAddress({
+          domicilio: reg.guardianDomicilio,
+          localidad: reg.guardianLocalidad,
+          provincia: reg.guardianProvincia
+        }) || '—'
+      },
       { label: 'Cuenta club', value: 'CAJA RURAL ES12 3085 0034 8222 5127 9226' }
     ];
   }
@@ -1215,6 +1315,47 @@
     }).catch(function (e) {
       console.warn('Correo aviso club inscripción:', e);
     });
+  }
+
+  function openInsPayWarningModal() {
+    const m = $('insPayWarningModal');
+    if (m) {
+      m.style.display = 'flex';
+      global.document.body.style.overflow = 'hidden';
+    }
+  }
+
+  function closeInsPayWarningModal() {
+    const m = $('insPayWarningModal');
+    if (m) {
+      m.style.display = 'none';
+      global.document.body.style.overflow = '';
+    }
+    state.payWarningAcknowledged = true;
+  }
+
+  function bindInsPayWarningModal() {
+    global.document.querySelectorAll('[data-ins-pay-warning-close]').forEach(function (el) {
+      if (el.dataset.boundPayWarn) return;
+      el.dataset.boundPayWarn = '1';
+      el.addEventListener('click', closeInsPayWarningModal);
+    });
+    const m = $('insPayWarningModal');
+    if (m && !m.dataset.bound) {
+      m.dataset.bound = '1';
+      m.addEventListener('click', function (e) {
+        if (e.target === m) closeInsPayWarningModal();
+      });
+    }
+  }
+
+  function guardPaymentAction(fn) {
+    return function () {
+      if (state.payWarningAcknowledged) {
+        return fn.apply(this, arguments);
+      }
+      openInsPayWarningModal();
+    };
   }
 
   async function submit(method, offlineChannel) {
@@ -1284,9 +1425,13 @@
     show($('payCardBlock'), !!pm.card);
     show($('payBizumBlock'), !!pm.bizum);
     show($('payTransferBlock'), !!pm.transfer);
-    if ($('btnPayCard')) $('btnPayCard').onclick = function () { submit('card'); };
-    if ($('btnPayBizum')) $('btnPayBizum').onclick = function () { submit('bizum'); };
-    if ($('btnPayTransfer')) $('btnPayTransfer').onclick = function () { submitTransferWithPicker(); };
+    if ($('btnPayCard')) $('btnPayCard').onclick = guardPaymentAction(function () { submit('card'); });
+    if ($('btnPayBizum')) $('btnPayBizum').onclick = guardPaymentAction(function () { submit('bizum'); });
+    if ($('btnPayTransfer')) {
+      $('btnPayTransfer').onclick = guardPaymentAction(function () {
+        submitTransferWithPicker();
+      });
+    }
     if (global.CdsanRedsys && global.CdsanRedsys.loadConfig) {
       global.CdsanRedsys.loadConfig().then(function () {
         if ($('btnPayBizum') && !global.CdsanRedsys.isBizumEnabled()) {
@@ -1455,7 +1600,10 @@
       setupFinalizeFichaFlow();
     }
 
-    if (global.ClubInscriptionLegal && global.ClubInscriptionLegal.bindModal) {
+    bindInsPayWarningModal();
+    if (global.ClubInscriptionLegal && global.ClubInscriptionLegal.bindAllModals) {
+      global.ClubInscriptionLegal.bindAllModals();
+    } else if (global.ClubInscriptionLegal && global.ClubInscriptionLegal.bindModal) {
       global.ClubInscriptionLegal.bindModal();
     }
     updatePortalPasswordBlockUI();
@@ -1468,6 +1616,11 @@
     if (gDniForPwd && !gDniForPwd.dataset.pwdUiBound) {
       gDniForPwd.dataset.pwdUiBound = '1';
       gDniForPwd.addEventListener('blur', updatePortalPasswordBlockUI);
+    }
+    const guardianSameDom = $('insGuardianSameDomicilio');
+    if (guardianSameDom && !guardianSameDom.dataset.bound) {
+      guardianSameDom.dataset.bound = '1';
+      guardianSameDom.addEventListener('change', toggleGuardianDomicilioFields);
     }
     refreshCart();
     if ($('insBirth')) {

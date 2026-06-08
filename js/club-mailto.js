@@ -1,23 +1,20 @@
 /**
  * Correo mailto al club — formato unificado (CD Sanabria CF).
- * Para: cdsanabriafc@gmail.com (o clubContactInfo) · CC: email del solicitante.
+ * Para: cdsanabriacf@gmail.com (modales) · CC: email del solicitante.
  */
 (function (global) {
   'use strict';
 
-  const CLUB_EMAIL_DEFAULT = 'cdsanabriafc@gmail.com';
+  const CLUB_EMAIL_NOTIFY_FALLBACK =
+    (global.ClubContactDefaults && global.ClubContactDefaults.CLUB_EMAIL_NOTIFY) ||
+    'cdsanabriacf@gmail.com';
   const BORDER = '══════════════════════════════════════════';
 
   function getClubNotifyEmail() {
     if (global.ClubContactDefaults && global.ClubContactDefaults.getNotifyEmail) {
       return global.ClubContactDefaults.getNotifyEmail();
     }
-    try {
-      const c = JSON.parse(global.localStorage.getItem('clubContactInfo') || 'null');
-      const em = c && c.email ? String(c.email).trim() : '';
-      if (em && em.includes('@')) return em;
-    } catch (_) {}
-    return CLUB_EMAIL_DEFAULT;
+    return CLUB_EMAIL_NOTIFY_FALLBACK;
   }
 
   function padField(label, value) {
@@ -97,7 +94,7 @@
   }
 
   global.ClubMailto = {
-    CLUB_EMAIL_DEFAULT: CLUB_EMAIL_DEFAULT,
+    CLUB_EMAIL_NOTIFY_FALLBACK: CLUB_EMAIL_NOTIFY_FALLBACK,
     getClubNotifyEmail: getClubNotifyEmail,
     formatStructuredEmail: formatStructuredEmail,
     buildMailtoUrl: buildMailtoUrl,

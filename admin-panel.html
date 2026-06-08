@@ -49,6 +49,7 @@
     <script src="js/club-player-export-config.js"></script>
     <script src="js/player-export.js"></script>
     <script src="js/admin-player-export-config.js"></script>
+    <script src="js/admin-notifications.js"></script>
     <script type="module" src="js/firebase-config.js"></script>
     <script src="js/club-accounting.js"></script>
     <script src="js/support-mode.js" defer></script>
@@ -120,6 +121,140 @@
 
         .logout-btn:hover {
             background: rgba(220,53,69,1);
+        }
+
+        .admin-header-actions {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .admin-notif-wrap {
+            position: relative;
+        }
+
+        .admin-notif-btn {
+            position: relative;
+            background: rgba(255,255,255,0.25);
+            color: white;
+            border: none;
+            width: 42px;
+            height: 42px;
+            border-radius: 50%;
+            cursor: pointer;
+            font-size: 1.2rem;
+            line-height: 1;
+            transition: background 0.2s ease;
+        }
+
+        .admin-notif-btn:hover {
+            background: rgba(255,255,255,0.4);
+        }
+
+        .admin-notif-badge {
+            position: absolute;
+            top: -4px;
+            right: -4px;
+            min-width: 18px;
+            height: 18px;
+            padding: 0 4px;
+            border-radius: 999px;
+            background: #dc2626;
+            color: white;
+            font-size: 0.65rem;
+            font-weight: 700;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            border: 2px solid #1e3a8a;
+        }
+
+        .admin-notif-panel {
+            position: absolute;
+            top: calc(100% + 8px);
+            right: 0;
+            width: min(360px, calc(100vw - 24px));
+            max-height: 420px;
+            overflow: hidden;
+            background: white;
+            color: #1f2937;
+            border-radius: 10px;
+            box-shadow: 0 12px 32px rgba(0,0,0,0.2);
+            z-index: 2000;
+        }
+
+        .admin-notif-panel-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px 12px;
+            border-bottom: 1px solid #e5e7eb;
+            background: #f8fafc;
+        }
+
+        .admin-notif-panel-header button {
+            background: none;
+            border: none;
+            cursor: pointer;
+            font-size: 1rem;
+            color: #64748b;
+        }
+
+        .admin-notif-panel-list {
+            max-height: 360px;
+            overflow-y: auto;
+            padding: 8px;
+        }
+
+        .admin-notif-item {
+            display: flex;
+            gap: 8px;
+            align-items: flex-start;
+            padding: 10px;
+            margin-bottom: 8px;
+            background: #f8f9fa;
+            border-radius: 6px;
+            border-left: 4px solid #8b5cf6;
+        }
+
+        .admin-notif-item-body {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .admin-notif-item-title {
+            font-weight: 700;
+            font-size: 0.9rem;
+        }
+
+        .admin-notif-item-msg {
+            font-size: 0.85rem;
+            color: #4b5563;
+            margin-top: 4px;
+        }
+
+        .admin-notif-item-time {
+            font-size: 0.75rem;
+            color: #9ca3af;
+            margin-top: 4px;
+        }
+
+        .admin-notif-item-action {
+            background: #6c757d;
+            color: white;
+            border: none;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 0.8rem;
+            cursor: pointer;
+            flex-shrink: 0;
+        }
+
+        .admin-notif-empty {
+            text-align: center;
+            color: #6c757d;
+            padding: 20px 12px;
+            margin: 0;
         }
 
         .navigation {
@@ -454,7 +589,16 @@
                 <div class="current-admin" id="currentAdminInfo">
                     👤 Cargando información del administrador...
                 </div>
-                <button class="logout-btn" onclick="logout()">🚪 Cerrar Sesión</button>
+                <div class="admin-header-actions">
+                    <div class="admin-notif-wrap">
+                        <button type="button" class="admin-notif-btn" id="adminNotifBtn" onclick="toggleAdminNotificationsPanel()" aria-label="Notificaciones" aria-expanded="false" aria-controls="adminNotificationsPanel">
+                            🔔
+                            <span id="adminNotificationCounter" class="admin-notif-badge" hidden aria-hidden="true">0</span>
+                        </button>
+                        <div id="adminNotificationsPanel" class="admin-notif-panel" style="display:none;" role="region" aria-label="Notificaciones pendientes"></div>
+                    </div>
+                    <button class="logout-btn" onclick="logout()">🚪 Cerrar Sesión</button>
+                </div>
             </div>
         </div>
 
@@ -494,7 +638,7 @@
                     <div style="flex: 1; min-width: 220px;">
                         <strong style="color: #9a3412;">📌 Recordatorio: nueva temporada de cuotas</strong>
                         <p style="margin: 6px 0 0 0; font-size: 0.95rem; color: #7c2d12;">
-                            Tras el cierre del <span id="cuotaRenewalCierreLabel">31 de agosto</span>, puedes <strong>marcar como pendientes de pago</strong> a los socios activos (nueva temporada). La <strong>validación</strong> es siempre <strong>una a una</strong>, cuando veas el ingreso en la cuenta bancaria. Contacto club: <a href="mailto:cdsanabriafc@gmail.com">cdsanabriafc@gmail.com</a>
+                            Tras el cierre del <span id="cuotaRenewalCierreLabel">31 de agosto</span>, puedes <strong>marcar como pendientes de pago</strong> a los socios activos (nueva temporada). La <strong>validación</strong> es siempre <strong>una a una</strong>, cuando veas el ingreso en la cuenta bancaria. Contacto club: <a href="mailto:cdsanabriacf@gmail.com">cdsanabriacf@gmail.com</a>
                         </p>
                     </div>
                     <div style="display: flex; flex-wrap: wrap; gap: 8px;">
@@ -3260,7 +3404,7 @@
                                 ⚠️ <strong>El socio tiene 7 días para realizar el ingreso</strong> tras registrarse. Tú <strong>no valides en bloque</strong>: usa <strong>«Validar pago»</strong> en cada uno cuando veas el abono en la cuenta del club.
                             </p>
                             <p style="margin: 5px 0; font-size: 0.9em;">
-                                📧 Contacto del club: <strong>cdsanabriafc@gmail.com</strong> · Podéis coordinar avisos también por <strong>notificaciones</strong> si el socio las activa en la web.
+                                📧 Contacto del club: <strong>cdsanabriacf@gmail.com</strong> · Podéis coordinar avisos también por <strong>notificaciones</strong> si el socio las activa en la web.
                             </p>
                             <p style="margin: 5px 0; font-size: 0.9em;">
                                 🗑️ Si no se paga en plazo, el alta caduca y puede eliminarse al limpiar pendientes caducados.
@@ -3315,7 +3459,7 @@
                         <button class="btn" onclick="cleanExpiredMembers()" style="background: #dc2626;">🗑️ Limpiar Socios Caducados</button>
                     </div>
                     <p style="text-align: center; color: #475569; font-size: 0.9rem; max-width: 760px; margin: 0 auto 18px auto; line-height: 1.45;">
-                        <strong>Validación de pagos:</strong> siempre individual. Pulsa <strong>«Validar pago»</strong> en cada socio cuando compruebes el ingreso en la cuenta. No se usa validación masiva. Contacto interno: <a href="mailto:cdsanabriafc@gmail.com">cdsanabriafc@gmail.com</a> · Los socios pueden activar <strong>notificaciones</strong> en la web para avisos del club.
+                        <strong>Validación de pagos:</strong> siempre individual. Pulsa <strong>«Validar pago»</strong> en cada socio cuando compruebes el ingreso en la cuenta. No se usa validación masiva. Contacto interno: <a href="mailto:cdsanabriacf@gmail.com">cdsanabriacf@gmail.com</a> · Los socios pueden activar <strong>notificaciones</strong> en la web para avisos del club.
                     </p>
                 </div>
 
@@ -3875,12 +4019,12 @@
                 <div class="section">
                     <h3>📞 Datos de Contacto</h3>
                     <p><strong>Información de contacto del club</strong> (se muestra en la web y en los avisos por correo de solicitudes de jugador).</p>
-                    <p style="font-size:0.9rem;color:#64748b;margin:0 0 12px;">Email por defecto del club: <strong>cdsanabriafc@gmail.com</strong>. Pulsa <strong>Guardar contacto</strong> para fijarlo en la nube.</p>
+                    <p style="font-size:0.9rem;color:#64748b;margin:0 0 12px;">Email del club: <strong>cdsanabriacf@gmail.com</strong> (web, formularios y SMTP en Netlify). Pulsa <strong>Guardar contacto</strong> para fijarlo en la nube.</p>
                     
                     <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin: 20px 0;">
                         <div>
                             <label style="display: block; margin-bottom: 5px; font-weight: bold;">📧 Email del Club</label>
-                            <input type="email" id="clubEmail" placeholder="cdsanabriafc@gmail.com" value="cdsanabriafc@gmail.com" style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 8px;">
+                            <input type="email" id="clubEmail" placeholder="cdsanabriacf@gmail.com" value="cdsanabriacf@gmail.com" style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 8px;">
                         </div>
                         <div>
                             <label style="display: block; margin-bottom: 5px; font-weight: bold;">📱 Teléfono</label>
@@ -4218,7 +4362,7 @@
                 const adminInfo = document.getElementById('currentAdminInfo');
                 if (adminInfo) {
                     const isPrincipal = currentAdmin.email === 'amco@gmx.es';
-                    const isSecondAdmin = currentAdmin.email === 'cdsanabriafc@gmail.com';
+                    const isSecondAdmin = currentAdmin.email === 'cdsanabriacf@gmail.com';
                     
                     // Ocultar información del administrador principal
                     if (isPrincipal) {
@@ -4440,7 +4584,7 @@
                 const secondAdmin = {
                     id: 'ADMIN_SECONDARY',
                     name: 'Administrador Secundario',
-                    email: 'cdsanabriafc@gmail.com',
+                    email: 'cdsanabriacf@gmail.com',
                     role: 'super_admin',
                     status: 'active'
                 };
@@ -5642,6 +5786,7 @@
             updateAdvertisementCounts();
             updateCategoryCounts();
             try { if (typeof updateDatabaseStats === 'function') updateDatabaseStats(); } catch (_) {}
+            if (typeof actualizarContadorNotificacionesAdmin === 'function') actualizarContadorNotificacionesAdmin();
         });
 
         // === MÓDULO DE CALENDARIO ===
@@ -12384,7 +12529,7 @@
                 updateMemberCounts();
                 updateDashboardCounts();
 
-                alert('✅ Socio registrado.\n\n⚠️ Tiene 7 días para ingresar la cuota. Un administrador lo validará al ver el pago en la cuenta (cdsanabriafc@gmail.com).');
+                alert('✅ Socio registrado.\n\n⚠️ Tiene 7 días para ingresar la cuota. Un administrador lo validará al ver el pago en la cuenta (cdsanabriacf@gmail.com).');
                 console.log('👤 Nuevo socio registrado:', newMember.name + ' ' + newMember.surname);
 
             } catch (error) {
@@ -14424,7 +14569,7 @@
 
         /** Política del club: nunca validación masiva; solo al ver el pago en cuenta. */
         function validateAllPendingMembers() {
-            alert('No está disponible la validación masiva.\n\nValida cada socio con «Validar pago» cuando hayas comprobado el ingreso en la cuenta bancaria.\n\nContacto: cdsanabriafc@gmail.com');
+            alert('No está disponible la validación masiva.\n\nValida cada socio con «Validar pago» cuando hayas comprobado el ingreso en la cuenta bancaria.\n\nContacto: cdsanabriacf@gmail.com');
         }
 
         /**
@@ -14625,6 +14770,7 @@
                 if (nextElement) nextElement.textContent = nextNumber;
                 
                 console.log('📊 Contadores de socios actualizados:', { activeCount, pendingCount, expiredCount, nextNumber });
+                if (typeof actualizarContadorNotificacionesAdmin === 'function') actualizarContadorNotificacionesAdmin();
                 
             } catch (error) {
                 console.error('❌ Error actualizando contadores de socios:', error);
@@ -14690,6 +14836,7 @@
                 }
 
                 console.log('📊 Dashboard actualizado:', { teamsRegistered, activePlayers, activeMembers, activeFriends, eventsCount, competitionsCount });
+                if (typeof actualizarContadorNotificacionesAdmin === 'function') actualizarContadorNotificacionesAdmin();
                 
             } catch (error) {
                 console.error('❌ Error actualizando dashboard:', error);
@@ -17461,7 +17608,7 @@ th,td{border:1px solid #ccc;padding:5px 7px;text-align:left;white-space:nowrap;}
             try {
                 let email = document.getElementById('clubEmail').value.trim();
                 if (!email || !email.includes('@')) {
-                    email = 'cdsanabriafc@gmail.com';
+                    email = 'cdsanabriacf@gmail.com';
                     document.getElementById('clubEmail').value = email;
                 }
                 const contactInfo = {
@@ -17494,7 +17641,7 @@ th,td{border:1px solid #ccc;padding:5px 7px;text-align:left;white-space:nowrap;}
                 } else {
                     contactInfo = JSON.parse(localStorage.getItem('clubContactInfo') || 'null');
                     if (contactInfo) {
-                        document.getElementById('clubEmail').value = contactInfo.email || 'cdsanabriafc@gmail.com';
+                        document.getElementById('clubEmail').value = contactInfo.email || 'cdsanabriacf@gmail.com';
                         document.getElementById('clubPhone').value = contactInfo.phone || '';
                         document.getElementById('clubAddress').value = contactInfo.address || '';
                         document.getElementById('clubWebsite').value = contactInfo.website || '';
@@ -19421,8 +19568,9 @@ th,td{border:1px solid #ccc;padding:5px 7px;text-align:left;white-space:nowrap;}
                 html += '<div style="max-height: 300px; overflow-y: auto;">';
                 
                 notificaciones.forEach(notif => {
-                    const tipoColor = notif.tipo === 'nuevo_socio' ? '#059669' : '#dc2626';
-                    const tipoIcono = notif.tipo === 'nuevo_socio' ? '👤' : '🗑️';
+                    const tipoColor = notif.tipo === 'nuevo_socio' ? '#059669' : notif.tipo === 'solicitud_jugador' ? '#2563eb' : notif.tipo === 'inscripcion_jugador' ? '#ea580c' : '#dc2626';
+                    const tipoIcono = notif.tipo === 'nuevo_socio' ? '👤' : notif.tipo === 'solicitud_jugador' ? '⚽' : notif.tipo === 'inscripcion_jugador' ? '📋' : '🗑️';
+                    const safeId = String(notif.id).replace(/'/g, "\\'");
                     
                     html += `
                         <div style="background: #f8f9fa; padding: 10px; border-radius: 5px; margin-bottom: 10px; border-left: 4px solid ${tipoColor};">
@@ -19438,7 +19586,7 @@ th,td{border:1px solid #ccc;padding:5px 7px;text-align:left;white-space:nowrap;}
                                         ${new Date(notif.fecha).toLocaleString()}
                                     </div>
                                 </div>
-                                <button onclick="marcarNotificacionLeida(${notif.id})" style="background: #6c757d; color: white; border: none; padding: 4px 8px; border-radius: 4px; font-size: 0.8rem; cursor: pointer;">
+                                <button onclick="marcarNotificacionLeida('${safeId}')" style="background: #6c757d; color: white; border: none; padding: 4px 8px; border-radius: 4px; font-size: 0.8rem; cursor: pointer;">
                                     ✓
                                 </button>
                             </div>
@@ -19460,7 +19608,11 @@ th,td{border:1px solid #ccc;padding:5px 7px;text-align:left;white-space:nowrap;}
         function limpiarNotificaciones() {
             try {
                 if (confirm('¿Estás seguro de que quieres limpiar todas las notificaciones?')) {
-                    localStorage.removeItem('notificacionesAdmin');
+                    if (typeof limpiarNotificacionesAdminStore === 'function') {
+                        limpiarNotificacionesAdminStore();
+                    } else {
+                        localStorage.removeItem('notificacionesAdmin');
+                    }
                     alert('✅ Notificaciones limpiadas correctamente');
                     mostrarNotificaciones();
                 }
@@ -20392,6 +20544,7 @@ th,td{border:1px solid #ccc;padding:5px 7px;text-align:left;white-space:nowrap;}
             console.log('🔄 Actualizando lista de jugadores en tiempo real:', players.length);
             if (typeof loadPlayersList === 'function') loadPlayersList();
             if (typeof updateDashboardCounts === 'function') updateDashboardCounts();
+            if (typeof actualizarContadorNotificacionesAdmin === 'function') actualizarContadorNotificacionesAdmin();
         };
         
         window.updateTeamsList = function(teams) {
