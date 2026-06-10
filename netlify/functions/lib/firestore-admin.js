@@ -74,12 +74,118 @@ async function updatePayment(orderId, patch) {
   );
 }
 
-function proximoCierreTemporada31AgostoIso() {
-  const now = new Date();
-  let y = now.getFullYear();
-  let aug31 = new Date(y, 7, 31, 23, 59, 59, 999);
-  if (now > aug31) aug31 = new Date(y + 1, 7, 31, 23, 59, 59, 999);
-  return aug31.toISOString();
+const membershipSeason = require('./membership-season');
+
+function proximoCierreTemporadaIso() {
+  return membershipSeason.proximoCierreTemporadaIso();
+}
+
+function settingsRef() {
+  return initAdmin().collection('sanabria_config');
+}
+
+const DEFAULT_MEMBERSHIP_PRICING = { cuotaMenor: 10, cuotaMayor: 25, edadMaxMenor: 17 };
+
+async function readMembershipPricing() {
+  try {
+    const snap = await settingsRef().doc('clubMembershipPricing').get();
+    if (snap.exists) {
+      const d = snap.data() || {};
+      return {
+        cuotaMenor: Number(d.cuotaMenor) || DEFAULT_MEMBERSHIP_PRICING.cuotaMenor,
+        cuotaMayor: Number(d.cuotaMayor) || DEFAULT_MEMBERSHIP_PRICING.cuotaMayor,
+        edadMaxMenor: Number(d.edadMaxMenor) || DEFAULT_MEMBERSHIP_PRICING.edadMaxMenor
+      };
+    }
+  } catch (e) {
+    console.warn('readMembershipPricing:', e.message);
+  }
+  return { ...DEFAULT_MEMBERSHIP_PRICING };
+}
+
+/**
+ * Tras el cierre de temporada (31/05): activos → pendientes de renovación (una vez por cierre).
+ */
+async function applyAutomaticSeasonRenewal(options = {}) {
+  const now = options.now instanceof Date ? options.now : new Date();
+  const closeYear = membershipSeason.getSeasonCloseYearToProcess(now);
+  if (closeYear == null) {
+    return { ok: true, skipped: true, reason: 'before_season_close' };
+  }
+
+  const renewalKey = membershipSeason.getCierreCuotaKey(closeYear);
+  const seasonDocRef = settingsRef().doc('membershipSeason');
+  const seasonSnap = await seasonDocRef.get();
+  const prev = seasonSnap.exists ? seasonSnap.data() : {};
+  if (!options.force && prev.lastAutoRenewalKey === renewalKey) {
+    return { ok: true, skipped: true, reason: 'already_applied', renewalKey };
+  }
+
+  const anioRef = membershipSeason.getCuotaEdadReferenciaAnio(now);
+  const pricing = await readMembershipPricing();
+  const temporada = `${closeYear}-${anioRef}`;
+  const refLabel = membershipSeason.cierreRefLabel(anioRef);
+  const ts = now.toISOString();
+
+  const q = await membersRef().where('status', '==', 'active').get();
+  let updated = 0;
+  const batchSize = 400;
+  let batch = initAdmin().batch();
+  let ops = 0;
+
+  async function commitBatch() {
+    if (ops === 0) return;
+    await batch.commit();
+    batch = initAdmin().batch();
+    ops = 0;
+  }
+
+  for (const doc of q.docs) {
+    const data = doc.data() || {};
+    const cuota = membershipSeason.cuotaSegunMiembro(data, anioRef, pricing);
+    batch.set(
+      doc.ref,
+      {
+        status: 'pending_validation',
+        estado: 'pendiente',
+        pagado: false,
+        pendingReason: 'renovacion',
+        cuota,
+        renovacionDesde: ts,
+        fechaLimitePago: null,
+        diasLimiteRenovacion: null,
+        renovacionTemporada: temporada,
+        cuotaReferenciaEdadCierre: refLabel,
+        cuotaReferenciaEdad31Agosto: refLabel,
+        lastModified: ts,
+        updatedAt: ts,
+        autoRenewalKey: renewalKey,
+        appScope: APP_SCOPE
+      },
+      { merge: true }
+    );
+    updated++;
+    ops++;
+    if (ops >= batchSize) await commitBatch();
+  }
+  await commitBatch();
+
+  const cfg = membershipSeason.getConfig();
+  await seasonDocRef.set(
+    {
+      lastAutoRenewalKey: renewalKey,
+      lastAutoRenewalAt: ts,
+      closeMonth: cfg.closeMonth,
+      closeDay: cfg.closeDay,
+      paymentDeadlineDays: cfg.paymentDeadlineDays,
+      firstCloseYear: cfg.firstCloseYear,
+      membersUpdated: updated,
+      appScope: APP_SCOPE
+    },
+    { merge: true }
+  );
+
+  return { ok: true, renewalKey, updated, anioRef, temporada };
 }
 
 /** Localiza el documento del socio por id de pedido o, en su defecto, por email. */
@@ -141,7 +247,7 @@ async function completeMembershipPayment(payment, redsysParams) {
       fechaVencimiento: null,
       validatedBy: 'redsys_auto',
       validatedDate: now,
-      cuotaVigenteHasta: proximoCierreTemporada31AgostoIso(),
+      cuotaVigenteHasta: proximoCierreTemporadaIso(),
       lastModified: now,
       updatedAt: now,
       activatedAt: now,
@@ -443,7 +549,7 @@ async function completePlayerInscription(payment) {
       paymentDate: now,
       inscriptionSeasonSocio: season,
       inscriptionSeasonJugador: season,
-      cuotaVigenteHasta: proximoCierreTemporada31AgostoIso(),
+      cuotaVigenteHasta: proximoCierreTemporadaIso(),
       cuotaSocioEnInscripcion: true,
       lastModified: now,
       updatedAt: now,
@@ -1346,6 +1452,19 @@ function normalizeMemberRecordFields(raw) {
   delete m.pass;
   delete m.plainPassword;
   delete m.portalPassword;
+  const now = new Date().toISOString();
+  const status = String(m.status || m.estado || '').toLowerCase();
+  const pendingReason = String(m.pendingReason || '').toLowerCase();
+  const reg = m.registrationDate || m.fechaRegistro || now;
+  const isPending =
+    status === 'pending_validation' || status === 'pendiente' || status === 'pending';
+  const isRenovacion = pendingReason === 'renovacion';
+  let fechaLimitePago = m.fechaLimitePago || m.fechaVencimiento || null;
+  if (isPending && !isRenovacion && !fechaLimitePago) {
+    fechaLimitePago = membershipSeason.paymentDeadlineIsoFromRegistration(reg);
+  }
+  if (isRenovacion) fechaLimitePago = null;
+  const pr = isRenovacion ? 'renovacion' : isPending ? 'nueva_alta' : m.pendingReason || null;
   return {
     ...m,
     appScope: APP_SCOPE,
@@ -1360,7 +1479,10 @@ function normalizeMemberRecordFields(raw) {
     email: String(m.email || '').trim().toLowerCase(),
     dni: normalizeDni(m.dni),
     guardianEmail: String(m.guardianEmail || '').trim().toLowerCase(),
-    updatedAt: new Date().toISOString()
+    pendingReason: isPending ? pr : m.pendingReason || null,
+    fechaLimitePago: isPending ? fechaLimitePago : m.fechaLimitePago || null,
+    fechaVencimiento: m.fechaVencimiento || fechaLimitePago || null,
+    updatedAt: now
   };
 }
 
@@ -1704,6 +1826,7 @@ module.exports = {
   findPlayerDocByIdentity,
   normalizeMemberRecordFields,
   upsertMemberRegistrationRecord,
+  applyAutomaticSeasonRenewal,
   findMemberDocByIdentity,
   normalizeFriendRecordFields,
   upsertFriendRegistrationRecord,

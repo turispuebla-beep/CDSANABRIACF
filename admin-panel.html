@@ -54,6 +54,7 @@
     <script src="js/admin-player-export-config.js"></script>
     <script src="js/admin-notifications.js"></script>
     <script type="module" src="js/firebase-config.js"></script>
+    <script src="js/club-membership-season.js"></script>
     <script src="js/club-accounting.js"></script>
     <script src="js/support-mode.js" defer></script>
     
@@ -641,7 +642,7 @@
                     <div style="flex: 1; min-width: 220px;">
                         <strong style="color: #9a3412;">📌 Recordatorio: nueva temporada de cuotas</strong>
                         <p style="margin: 6px 0 0 0; font-size: 0.95rem; color: #7c2d12;">
-                            Tras el cierre del <span id="cuotaRenewalCierreLabel">31 de agosto</span>, puedes <strong>marcar como pendientes de pago</strong> a los socios activos (nueva temporada). La <strong>validación</strong> es siempre <strong>una a una</strong>, cuando veas el ingreso en la cuenta bancaria. Contacto club: <a href="mailto:cdsanabriafc@gmail.com">cdsanabriafc@gmail.com</a>
+                            Tras el cierre del <span id="cuotaRenewalCierreLabel">31 de mayo</span>, los socios <strong>activos pasan automáticamente a pendiente de renovación</strong> (también en Firebase). La <strong>validación</strong> del pago es siempre <strong>una a una</strong> cuando veas el ingreso en la cuenta. Tarjeta/Bizum activan al instante. Contacto: <a href="mailto:cdsanabriafc@gmail.com">cdsanabriafc@gmail.com</a>
                         </p>
                     </div>
                     <div style="display: flex; flex-wrap: wrap; gap: 8px;">
@@ -2861,9 +2862,12 @@
                                 <label style="display: block; margin-bottom: 5px; font-weight: bold;">Estado:</label>
                                 <select id="exportMemberStatus" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
                                     <option value="all">Todos los estados</option>
-                                    <option value="active">Solo activos</option>
-                                    <option value="pending">Solo pendientes</option>
-                                    <option value="expired">Solo expirados</option>
+                                    <option value="active">Solo activos (pagados)</option>
+                                    <option value="paid">Solo con cuota pagada</option>
+                                    <option value="pending">Pendientes (todos)</option>
+                                    <option value="pending_renewal">Pendientes renovación</option>
+                                    <option value="pending_new">Pendientes alta nueva</option>
+                                    <option value="expired">Solo caducados</option>
                                 </select>
                             </div>
                             
@@ -3355,12 +3359,18 @@
                             <h3>Filtrar Socios</h3>
                             <select id="memberStatusFilter" onchange="filterMembers()" style="padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
                                 <option value="all">Todos los Estados</option>
-                                <option value="pending">Pendientes de Validación</option>
-                                <option value="active">Activos</option>
-                                <option value="expired">Caducados (7 días)</option>
+                                <option value="active">Activos (pagados)</option>
+                                <option value="pending">Pendientes (todos)</option>
+                                <option value="pending_renewal">Pendientes renovación</option>
+                                <option value="pending_new">Pendientes alta nueva</option>
+                                <option value="expired">Caducados (7 días offline)</option>
                             </select>
                         </div>
-                        <button class="btn btn-success" onclick="showAddMemberForm()">➕ Registrar Nuevo Socio</button>
+                        <div style="display:flex; flex-wrap:wrap; gap:8px; align-items:center;">
+                            <button class="btn btn-success" onclick="showAddMemberForm()">➕ Registrar Nuevo Socio</button>
+                            <button type="button" class="btn" onclick="exportClubList('socios','xlsx')" style="background:#2563eb;color:white;">📊 Excel</button>
+                            <button type="button" class="btn" onclick="exportClubList('socios','pdf')" style="background:#475569;color:white;">🖨️ PDF</button>
+                        </div>
                     </div>
                     
                     <!-- Formulario para registrar socio -->
@@ -3432,12 +3442,12 @@
                             </p>
                         </div>
                         <div style="background: #e0f2fe; padding: 15px; border-radius: 8px; margin-bottom: 20px; border-left: 4px solid #0284c7;">
-                            <h5>📅 Cuota anual (31 de agosto)</h5>
+                            <h5>📅 Cuota anual (31 de mayo)</h5>
                             <p style="margin: 5px 0; font-size: 0.9em;">
-                                Tras el <strong>31 de agosto</strong>, el botón inferior <strong>marca como pendientes de pago</strong> a los socios <strong>activos</strong> (renovación). Ellos ingresan la cuota; tú <strong>validas uno a uno</strong> cuando veas el movimiento en el banco — igual que con las altas nuevas.
+                                Tras el <strong>31 de mayo</strong>, los socios <strong>activos</strong> pasan a <strong>pendiente de renovación</strong> de forma automática (Firebase + panel). Transferencia, efectivo y TPV manual: <strong>7 días</strong> para pagar en altas nuevas. Tarjeta/Bizum: activación al instante.
                             </p>
                             <p style="margin: 5px 0; font-size: 0.9em;">
-                                Cuota <strong>menor (10 €)</strong> / <strong>mayor (25 €)</strong> según edad en el <strong>31/08</strong> del año que indiques.
+                                Cuota <strong>menor (10 €)</strong> / <strong>mayor (25 €)</strong> según edad al <strong>31/05</strong> del año de referencia.
                             </p>
                             <p style="margin: 5px 0; text-align: center;">
                                 <button type="button" class="btn" onclick="iniciarNuevaTemporadaCuotas()" style="background: #0284c7; color: white;">📆 Nueva temporada (marcar pendientes de pago)</button>
@@ -4328,6 +4338,7 @@
             checkAdminSession();
             checkAdminPermissions();
             checkExpiredMembers(); // Verificar socios expirados al cargar
+            checkAutomaticSeasonRenewal(); // Renovación automática tras 31/05 (Firebase)
             cargarConfiguracionTienda(); // Cargar configuración de tienda
             
             // Abrir pestaña si viene desde enlace de la web principal
@@ -12916,38 +12927,66 @@
             return edad <= p.edadMaxMenor ? p.cuotaMenor : p.cuotaMayor;
         }
 
-        /** anio31Agosto: año civil del 31/08 de referencia (ej. 2026 → edad en 31/08/2026). */
-        function cuotaSegunEdadAl31Agosto(member, anio31Agosto) {
-            const ref = new Date(anio31Agosto, 7, 31, 12, 0, 0, 0);
+        function getMembershipSeasonCfg() {
+            return (typeof ClubMembershipSeason !== 'undefined' && ClubMembershipSeason.getConfig)
+                ? ClubMembershipSeason.getConfig()
+                : { closeMonth: 5, closeDay: 31, paymentDeadlineDays: 7, firstCloseYear: 2027 };
+        }
+
+        function fechaReferenciaCierreTemporada(anioRef) {
+            const c = getMembershipSeasonCfg();
+            return new Date(anioRef, c.closeMonth - 1, c.closeDay, 12, 0, 0, 0);
+        }
+
+        /** Año del cierre de temporada para calcular menor/mayor (ej. edad al 31/05/2027). */
+        function cuotaSegunEdadAlCierre(member, anioRef) {
             const birth = member.birthDate || member.fechaNacimiento;
-            const edad = edadEnFechaReferencia(birth, ref);
+            const edad = edadEnFechaReferencia(birth, fechaReferenciaCierreTemporada(anioRef));
             return cuotaSegunEdad(edad);
         }
 
-        function proximoCierreTemporada31Agosto() {
+        function cuotaSegunEdadAl31Agosto(member, anioRef) {
+            return cuotaSegunEdadAlCierre(member, anioRef);
+        }
+
+        function proximoCierreTemporada() {
             if (typeof ClubAccounting !== 'undefined' && typeof ClubAccounting.getProximaVigenciaCuotaHasta === 'function') {
                 return ClubAccounting.getProximaVigenciaCuotaHasta();
             }
-            const now = new Date();
-            let y = now.getFullYear();
-            let aug31 = new Date(y, 7, 31, 23, 59, 59, 999);
-            if (now > aug31) aug31 = new Date(y + 1, 7, 31, 23, 59, 59, 999);
-            return aug31;
+            if (typeof ClubMembershipSeason !== 'undefined') {
+                return ClubMembershipSeason.getProximaVigenciaCuotaHasta();
+            }
+            return new Date(new Date().getFullYear(), 4, 31, 23, 59, 59, 999);
         }
 
-        /** Solo altas nuevas tienen plazo (7 días). Renovaciones: sin caducidad automática. */
+        function proximoCierreTemporada31Agosto() {
+            return proximoCierreTemporada();
+        }
+
+        function isMemberPendingRenewal(member) {
+            const m = normalizeClubMember(member);
+            return m.status === 'pending_validation' && m.pendingReason === 'renovacion';
+        }
+
+        function isMemberPendingNewAlta(member) {
+            const m = normalizeClubMember(member);
+            if (m.status !== 'pending_validation') return false;
+            return m.pendingReason !== 'renovacion';
+        }
+
+        /** Solo altas nuevas offline (transferencia/efectivo/TPV): 7 días. Renovaciones: sin caducidad. */
         function getMemberPaymentDeadline(member) {
             const m = normalizeClubMember(member);
-            const pr = m.pendingReason || 'nueva_alta';
-            if (pr === 'renovacion') return null;
+            if (m.pendingReason === 'renovacion') return null;
             const lim = m.fechaLimitePago || m.fechaVencimiento;
             if (lim) {
                 const d = new Date(lim);
                 if (!isNaN(d.getTime())) return d;
             }
-            const reg = new Date(m.registrationDate);
+            const reg = new Date(m.registrationDate || m.fechaRegistro);
             if (isNaN(reg.getTime())) return null;
-            return new Date(reg.getTime() + 7 * 86400000);
+            const days = getMembershipSeasonCfg().paymentDeadlineDays || 7;
+            return new Date(reg.getTime() + days * 86400000);
         }
 
         function isPastMemberPaymentDeadline(member) {
@@ -13012,7 +13051,8 @@
                 fechaVencimiento: nm.fechaVencimiento || null,
                 renovacionDesde: nm.renovacionDesde || null,
                 renovacionTemporada: nm.renovacionTemporada || null,
-                cuotaReferenciaEdad31Agosto: nm.cuotaReferenciaEdad31Agosto || null,
+                cuotaReferenciaEdad31Agosto: nm.cuotaReferenciaEdad31Agosto || nm.cuotaReferenciaEdadCierre || null,
+                cuotaReferenciaEdadCierre: nm.cuotaReferenciaEdadCierre || nm.cuotaReferenciaEdad31Agosto || null,
                 cuotaVigenteHasta: nm.cuotaVigenteHasta || null,
                 diasLimiteRenovacion: typeof nm.diasLimiteRenovacion === 'number' ? nm.diasLimiteRenovacion : null,
                 socioDeHonor: m.socioDeHonor === true,
@@ -13117,7 +13157,7 @@
                 'status', 'estado', 'registrationDate', 'fechaRegistro', 'consentimiento',
                 'consentimientoFecha', 'consentimientoIP', 'proteccionDatos', 'notificaciones',
                 'pendingReason', 'fechaLimitePago', 'fechaVencimiento', 'cuota', 'renovacionDesde',
-                'renovacionTemporada', 'cuotaReferenciaEdad31Agosto', 'cuotaVigenteHasta', 'diasLimiteRenovacion'
+                'renovacionTemporada', 'cuotaReferenciaEdad31Agosto', 'cuotaReferenciaEdadCierre', 'cuotaVigenteHasta', 'diasLimiteRenovacion', 'offlinePaymentChannel'
             ];
             fields.forEach((field) => {
                 merged[field] = pickBetterMemberValue(merged[field], b[field]);
@@ -14224,6 +14264,8 @@
                 if (statusFilter !== 'all') {
                     filteredMembers = members.filter(member => {
                         if (statusFilter === 'pending') return member.status === 'pending_validation';
+                        if (statusFilter === 'pending_renewal') return isMemberPendingRenewal(member);
+                        if (statusFilter === 'pending_new') return isMemberPendingNewAlta(member);
                         if (statusFilter === 'active') return member.status === 'active';
                         if (statusFilter === 'expired') return isMemberExpired(member);
                         return true;
@@ -14443,7 +14485,7 @@
                     members[memberIndex].renovacionTemporada = null;
                     members[memberIndex].cuotaReferenciaEdad31Agosto = null;
                     members[memberIndex].diasLimiteRenovacion = null;
-                    members[memberIndex].cuotaVigenteHasta = proximoCierreTemporada31Agosto().toISOString();
+                    members[memberIndex].cuotaVigenteHasta = proximoCierreTemporada().toISOString();
                     members[memberIndex].validatedBy = currentAdmin.name || currentAdmin.email || 'Administrador';
                     members[memberIndex].validatedDate = new Date().toISOString();
                     members[memberIndex].lastModified = new Date().toISOString();
@@ -14452,7 +14494,8 @@
 
                     let cuotaImporte = Number(nm.cuota);
                     if (!Number.isFinite(cuotaImporte) || cuotaImporte <= 0) {
-                        const yRef = nm.cuotaReferenciaEdad31Agosto != null ? parseInt(String(nm.cuotaReferenciaEdad31Agosto), 10) : NaN;
+                        const refRaw = nm.cuotaReferenciaEdadCierre || nm.cuotaReferenciaEdad31Agosto;
+                        const yRef = refRaw != null ? parseInt(String(refRaw).slice(0, 4), 10) : NaN;
                         const yDefault = (typeof ClubAccounting !== 'undefined' && ClubAccounting.getCuotaEdadReferenciaAnio)
                             ? ClubAccounting.getCuotaEdadReferenciaAnio()
                             : new Date().getFullYear();
@@ -14546,7 +14589,8 @@
                 }
                 let cuotaImporte = Number(m.cuota);
                 if (!Number.isFinite(cuotaImporte) || cuotaImporte <= 0) {
-                    const yRef = m.cuotaReferenciaEdad31Agosto != null ? parseInt(String(m.cuotaReferenciaEdad31Agosto), 10) : NaN;
+                    const refRawM = m.cuotaReferenciaEdadCierre || m.cuotaReferenciaEdad31Agosto;
+                    const yRef = refRawM != null ? parseInt(String(refRawM).slice(0, 4), 10) : NaN;
                     const yDefault = ClubAccounting.getCuotaEdadReferenciaAnio ? ClubAccounting.getCuotaEdadReferenciaAnio() : new Date().getFullYear();
                     const y = !isNaN(yRef) ? yRef : yDefault;
                     cuotaImporte = cuotaSegunEdadAl31Agosto(members[ix], y);
@@ -14927,15 +14971,18 @@
         }
 
         /**
-         * Tras el 31/08: marca socios activos como pendientes de renovación.
-         * La cuota (10/25 €) se recalcula según la edad el 31 de agosto del año indicado.
+         * Renovación manual (respaldo): marca activos como pendientes.
+         * Lo habitual es la renovación automática tras el 31/05 (Firebase + función programada).
          */
         async function iniciarNuevaTemporadaCuotas() {
             const anioDef = (typeof ClubAccounting !== 'undefined' && ClubAccounting.getCuotaEdadReferenciaAnio)
                 ? ClubAccounting.getCuotaEdadReferenciaAnio()
                 : new Date().getFullYear();
+            const cierreLabel = (typeof ClubMembershipSeason !== 'undefined' && ClubMembershipSeason.formatCierreFechaCorta)
+                ? ClubMembershipSeason.formatCierreFechaCorta(anioDef)
+                : '31/05/' + anioDef;
             const anioStr = prompt(
-                'Año del 31 de agosto de REFERENCIA para calcular si es menor o mayor (ej. 2027 → edad en el 31/08/2027):',
+                'Año de REFERENCIA (edad al ' + cierreLabel + ') para calcular cuota menor/mayor:',
                 String(anioDef)
             );
             if (anioStr == null) return;
@@ -14945,23 +14992,23 @@
                 return;
             }
             const _cp = typeof ClubAccounting !== 'undefined' ? ClubAccounting.getMembershipPricing() : { cuotaMenor: 10, cuotaMayor: 25 };
+            const refLabel = anio + '-' + String(getMembershipSeasonCfg().closeMonth).padStart(2, '0') + '-' + String(getMembershipSeasonCfg().closeDay).padStart(2, '0');
             if (!confirm(
                 `Se marcarán como PENDIENTES DE PAGO todos los socios ACTIVOS (renovación de temporada).\n` +
                 `Tú validarás UNO A UNO cuando veas cada ingreso en la cuenta — no hay validación masiva.\n\n` +
-                `• Cuota según edad el 31/08/${anio}: ${_cp.cuotaMenor} € (menor) / ${_cp.cuotaMayor} € (mayor) — editable en Contabilidad\n` +
-                `• Los socios en renovación no caducan por plazo; solo las altas nuevas tienen 7 días para ingresar.\n\n¿Continuar?`
+                `• Cuota según edad al ${cierreLabel}: ${_cp.cuotaMenor} € (menor) / ${_cp.cuotaMayor} € (mayor)\n` +
+                `• Altas nuevas offline: ${getMembershipSeasonCfg().paymentDeadlineDays} días. Renovaciones: sin caducidad automática.\n\n¿Continuar?`
             )) return;
 
             try {
                 const members = JSON.parse(localStorage.getItem('clubMembers') || '[]');
                 const temporada = `${anio - 1}-${anio}`;
-                const refLabel = `${anio}-08-31`;
                 let n = 0;
                 let syncFailed = false;
 
                 for (let i = 0; i < members.length; i++) {
                     if (normalizeClubMember(members[i]).status !== 'active') continue;
-                    const cuota = cuotaSegunEdadAl31Agosto(members[i], anio);
+                    const cuota = cuotaSegunEdadAlCierre(members[i], anio);
                     members[i].status = 'pending_validation';
                     members[i].estado = 'pendiente';
                     members[i].pagado = false;
@@ -14971,6 +15018,7 @@
                     members[i].fechaLimitePago = null;
                     members[i].diasLimiteRenovacion = null;
                     members[i].renovacionTemporada = temporada;
+                    members[i].cuotaReferenciaEdadCierre = refLabel;
                     members[i].cuotaReferenciaEdad31Agosto = refLabel;
                     members[i].lastModified = new Date().toISOString();
                     n++;
@@ -15002,20 +15050,35 @@
         const LS_CUOTA_CIERRE_OK = 'cuotaRenovacionMasivaUltimoCierre';
         const LS_CUOTA_RECORD_DESCARTE = 'cuotaRenovacionRecordatorioDescartado';
 
-        /** Último 31 de agosto ya cerrado (fecha de corte para la temporada de socios). */
-        function getUltimo31AgostoCerradoAnio() {
+        function getUltimoCierreCerradoAnio() {
+            if (typeof ClubMembershipSeason !== 'undefined' && ClubMembershipSeason.getSeasonCloseYearToProcess) {
+                const y = ClubMembershipSeason.getSeasonCloseYearToProcess();
+                return y != null ? y : new Date().getFullYear() - 1;
+            }
             const now = new Date();
             const y = now.getFullYear();
-            const aug31 = new Date(y, 7, 31, 23, 59, 59, 999);
-            if (now > aug31) return y;
+            const c = getMembershipSeasonCfg();
+            const close = new Date(y, c.closeMonth - 1, c.closeDay, 23, 59, 59, 999);
+            if (now > close) return y;
             return y - 1;
         }
 
+        function getUltimo31AgostoCerradoAnio() {
+            return getUltimoCierreCerradoAnio();
+        }
+
         function getCierreCuotaKey() {
-            if (typeof ClubAccounting !== 'undefined' && ClubAccounting.getCuotaEdadReferenciaAnio) {
-                return 'cierre-' + ClubAccounting.getCuotaEdadReferenciaAnio() + '-08-31';
+            if (typeof ClubMembershipSeason !== 'undefined' && ClubMembershipSeason.getCurrentAutoRenewalKey) {
+                const k = ClubMembershipSeason.getCurrentAutoRenewalKey();
+                if (k) return k;
             }
-            return 'cierre-' + getUltimo31AgostoCerradoAnio() + '-08-31';
+            const y = (typeof ClubAccounting !== 'undefined' && ClubAccounting.getCuotaEdadReferenciaAnio)
+                ? ClubAccounting.getCuotaEdadReferenciaAnio()
+                : getUltimoCierreCerradoAnio();
+            const c = getMembershipSeasonCfg();
+            const m = String(c.closeMonth).padStart(2, '0');
+            const d = String(c.closeDay).padStart(2, '0');
+            return 'cierre-' + y + '-' + m + '-' + d;
         }
 
         function shouldShowCuotaRenewalBanner() {
@@ -15034,7 +15097,7 @@
         }
 
         function markCuotaRenovacionMasivaHechaManual() {
-            if (!confirm('¿Confirmas que la renovación de cuotas para este cierre de temporada ya está gestionada (o no aplica)? Se ocultará el recordatorio hasta el próximo 31 de agosto.')) return;
+            if (!confirm('¿Confirmas que la renovación de cuotas para este cierre de temporada ya está gestionada (o no aplica)? Se ocultará el recordatorio hasta el próximo 31 de mayo.')) return;
             markCuotaRenovacionMasivaHecha();
         }
 
@@ -15054,12 +15117,47 @@
             if (lbl) {
                 const yLbl = (typeof ClubAccounting !== 'undefined' && ClubAccounting.getCuotaEdadReferenciaAnio)
                     ? ClubAccounting.getCuotaEdadReferenciaAnio()
-                    : getUltimo31AgostoCerradoAnio();
-                lbl.textContent = '31 de agosto de ' + yLbl;
+                    : getUltimoCierreCerradoAnio();
+                lbl.textContent = (typeof ClubMembershipSeason !== 'undefined' && ClubMembershipSeason.formatCierreLabel)
+                    ? ClubMembershipSeason.formatCierreLabel(yLbl)
+                    : ('31 de mayo de ' + yLbl);
             }
         }
 
         window.refreshCuotaRenewalBanner = refreshCuotaRenewalBanner;
+
+        /** Llama a la función Netlify que aplica renovación automática tras el 31/05 (idempotente). */
+        async function triggerAutomaticSeasonRenewal(options) {
+            const silent = options && options.silent;
+            try {
+                const res = await fetch('/.netlify/functions/member-season-renewal', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: '{}'
+                });
+                const data = await res.json().catch(() => ({}));
+                if (!res.ok || !data.ok) {
+                    if (!silent) console.warn('Renovación automática:', data.error || res.status);
+                    return data;
+                }
+                if (data.updated > 0) {
+                    console.log('📆 Renovación automática:', data.updated, 'socio(s) → pendiente renovación');
+                    try {
+                        loadMembersList();
+                        updateMemberCounts();
+                        updateDashboardCounts();
+                    } catch (_) {}
+                }
+                return data;
+            } catch (e) {
+                if (!silent) console.warn('triggerAutomaticSeasonRenewal:', e);
+                return { ok: false, error: e.message };
+            }
+        }
+
+        function checkAutomaticSeasonRenewal() {
+            triggerAutomaticSeasonRenewal({ silent: true }).catch((e) => console.warn(e));
+        }
 
         async function cleanExpiredMembers() {
             if (!confirm('¿Estás seguro de que quieres eliminar TODOS los socios caducados?\n\n⚠️ Incluye: pendientes de alta que superaron el plazo de ingreso, y registros con estado «caducado». No afecta a renovaciones dentro de plazo.')) return;
@@ -16731,12 +16829,28 @@
 
         function memberMatchesExportStatusFilter(member, statusFilter) {
             if (!statusFilter || statusFilter === 'all') return true;
-            const s = String(member.status || member.estado || '').toLowerCase();
+            const m = typeof normalizeClubMember === 'function' ? normalizeClubMember(member) : member;
+            const s = String(m.status || m.estado || '').toLowerCase();
             if (statusFilter === 'active') return s === 'active' || s === 'activo' || s === 'activa';
+            if (statusFilter === 'paid') return m.pagado === true || s === 'active' || s === 'activo';
             if (statusFilter === 'pending') return s === 'pending' || s === 'pending_validation' || s === 'pendiente';
-            if (statusFilter === 'expired') return s === 'expired' || s === 'caducado' || s === 'expirado';
+            if (statusFilter === 'pending_renewal') return isMemberPendingRenewal(m);
+            if (statusFilter === 'pending_new') return isMemberPendingNewAlta(m);
+            if (statusFilter === 'expired') {
+                return s === 'expired' || s === 'caducado' || s === 'expirado' || isMemberExpired(m);
+            }
             if (statusFilter === 'inactive') return s === 'inactive' || s === 'inactivo';
             return true;
+        }
+
+        function memberPaymentMethodExportLabel(m) {
+            const method = String(m.paymentMethod || m.metodoPago || m.offlinePaymentChannel || '').toLowerCase();
+            if (method.indexOf('bizum') >= 0 || method.indexOf('redsys_bizum') >= 0) return 'Bizum';
+            if (method.indexOf('redsys') >= 0 || method.indexOf('card') >= 0 || method.indexOf('tarjeta') >= 0) return 'Tarjeta';
+            if (method === 'efectivo' || method.indexOf('cash') >= 0) return 'Efectivo';
+            if (method === 'tpv') return 'TPV manual';
+            if (method.indexOf('transfer') >= 0 || method === 'transferencia') return 'Transferencia';
+            return method || '';
         }
 
         function mapPlayerExportRow(p) {
@@ -16787,6 +16901,7 @@
                 window.ClubMemberNumbers && m.memberNumber
                     ? window.ClubMemberNumbers.formatMemberLabel(m)
                     : m.memberNumber || m.numeroSocio || '';
+            const dl = getMemberPaymentDeadline(m);
             return {
                 'Nº socio': numDisplay,
                 Nombre: m.name || m.nombre || '',
@@ -16798,7 +16913,12 @@
                 Teléfono: m.phone || m.telefono || '',
                 Dirección: m.address || m.direccion || '',
                 Cuota: m.cuota != null ? m.cuota : '',
+                Pagado: m.pagado === true || m.status === 'active' ? 'Sí' : 'No',
+                'Método pago': memberPaymentMethodExportLabel(m),
                 Estado: memberStatusExportLabel(m.status || m.estado),
+                'Tipo pendiente': m.pendingReason === 'renovacion' ? 'Renovación' : (m.status === 'pending_validation' ? 'Alta nueva' : ''),
+                'Plazo pago': dl && !isNaN(dl.getTime()) ? dl.toLocaleString('es-ES') : '',
+                'Cuota vigente hasta': formatExportDate(m.cuotaVigenteHasta),
                 'Fecha registro': formatExportDate(m.registrationDate || m.fechaRegistro),
                 'Es jugador/a': m.isJugador ? 'Sí' : '',
                 'Es directiva': m.isDirectiva || m.isBoardMember ? 'Sí' : ''
@@ -20682,7 +20802,7 @@ th,td{border:1px solid #ccc;padding:5px 7px;text-align:left;white-space:nowrap;}
                     shouldRun = confirm(
                         '🔁 Paso de temporada al abrir\n\n' +
                         '¿Quieres revisar y actualizar automáticamente categorías de jugadores por edad al abrir el panel?\n\n' +
-                        'Usa la edad al 31 de agosto de ' + yJug + ' (misma referencia que cuotas de socios).'
+                        'Usa la edad al 31 de mayo de ' + yJug + ' (misma referencia que cuotas de socios).'
                     );
 
                     if (shouldRun) {

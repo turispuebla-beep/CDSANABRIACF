@@ -7,6 +7,11 @@
   NODE_VERSION = "18"
   # Firebase Web API key es pública por diseño; evitar falso positivo del escáner en build.
   SECRETS_SCAN_SMART_DETECTION_ENABLED = "false"
+  # Temporada de socios (cierre 31/05, plazo offline 7 días)
+  MEMBERSHIP_SEASON_CLOSE_MONTH = "5"
+  MEMBERSHIP_SEASON_CLOSE_DAY = "31"
+  MEMBERSHIP_PAYMENT_DEADLINE_DAYS = "7"
+  MEMBERSHIP_SEASON_FIRST_CLOSE_YEAR = "2027"
 
 [[redirects]]
   from = "/*"
@@ -45,3 +50,7 @@
   for = "*.ico"
   [headers.values]
     Cache-Control = "public, max-age=31536000, immutable"
+
+# Renovación automática de socios activos tras el cierre de temporada (31/05)
+[functions."member-season-renewal"]
+  schedule = "0 6 * * *"

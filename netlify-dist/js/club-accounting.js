@@ -7,33 +7,40 @@
   var PRICING_KEY = 'clubMembershipPricing';
   var DEFAULT_PRICING = { cuotaMenor: 10, cuotaMayor: 25, edadMaxMenor: 17, updatedAt: null, updatedBy: null };
 
-  /** Primer 31/08 de cierre de temporada de socios (vigencia y referencia de edad hasta esta fecha). */
-  var CUOTA_TEMPORADA_PRIMER_CIERRE_ANIO = 2027;
+  /** Primer cierre de temporada (31/05 por defecto). Ver club-membership-season.js / MEMBERSHIP_* en Netlify. */
+  var CUOTA_TEMPORADA_PRIMER_CIERRE_ANIO =
+    global.ClubMembershipSeason && global.ClubMembershipSeason.getConfig
+      ? global.ClubMembershipSeason.getConfig().firstCloseYear
+      : 2027;
 
-  function finDia31Agosto(anio) {
-    return new Date(anio, 7, 31, 23, 59, 59, 999);
+  function seasonApi() {
+    return global.ClubMembershipSeason || null;
   }
 
-  /**
-   * Siguiente cierre 31/08 (fin de día) con año >= CUOTA_TEMPORADA_PRIMER_CIERRE_ANIO y fecha >= hoy.
-   * Ej.: en 2026 devuelve 31/08/2027 para cuotaVigenteHasta de socios validados ahora.
-   */
+  function finDiaCierreTemporada(anio) {
+    if (seasonApi()) return seasonApi().finDiaCierreTemporada(anio);
+    return new Date(anio, 4, 31, 23, 59, 59, 999);
+  }
+
+  /** Siguiente cierre de temporada (31/05 por defecto) para cuotaVigenteHasta. */
   function getProximaVigenciaCuotaHasta() {
+    if (seasonApi()) return seasonApi().getProximaVigenciaCuotaHasta();
     var now = new Date();
     var y = CUOTA_TEMPORADA_PRIMER_CIERRE_ANIO;
     for (var i = 0; i < 25; i++) {
-      var d = finDia31Agosto(y);
+      var d = finDiaCierreTemporada(y);
       if (d >= now) return d;
       y++;
     }
-    return finDia31Agosto(CUOTA_TEMPORADA_PRIMER_CIERRE_ANIO);
+    return finDiaCierreTemporada(CUOTA_TEMPORADA_PRIMER_CIERRE_ANIO);
   }
 
-  /** Año civil del 31/08 usado para calcular menor/mayor cuota (edad en esa fecha). */
+  /** Año del cierre de temporada usado para calcular menor/mayor cuota (edad en esa fecha). */
   function getCuotaEdadReferenciaAnio() {
+    if (seasonApi()) return seasonApi().getCuotaEdadReferenciaAnio();
     var now = new Date();
     var y = CUOTA_TEMPORADA_PRIMER_CIERRE_ANIO;
-    while (now > finDia31Agosto(y)) y++;
+    while (now > finDiaCierreTemporada(y)) y++;
     return y;
   }
 
@@ -43,8 +50,9 @@
     return isNaN(d.getTime()) ? null : d;
   }
 
-  function edadEnFechaReferencia31Agosto(birth, anio31) {
-    var ref = new Date(anio31, 7, 31, 12, 0, 0, 0);
+  function edadEnFechaReferenciaCierre(birth, anioRef) {
+    if (seasonApi()) return seasonApi().edadEnFechaReferenciaCierre(birth, anioRef);
+    var ref = new Date(anioRef, 4, 31, 12, 0, 0, 0);
     var b = parseBirthDate(birth);
     if (!b) return NaN;
     var age = ref.getFullYear() - b.getFullYear();
@@ -53,11 +61,15 @@
     return age;
   }
 
-  /** Cuota menor/mayor según fecha de nacimiento y reglas del panel, edad al 31/08 del año de referencia. */
+  function edadEnFechaReferencia31Agosto(birth, anioRef) {
+    return edadEnFechaReferenciaCierre(birth, anioRef);
+  }
+
+  /** Cuota menor/mayor según fecha de nacimiento y reglas del panel, edad al cierre de temporada. */
   function cuotaDesdeFechaNacimiento(birthDateStr) {
     var p = getMembershipPricing();
     var anio = getCuotaEdadReferenciaAnio();
-    var edad = edadEnFechaReferencia31Agosto(birthDateStr, anio);
+    var edad = edadEnFechaReferenciaCierre(birthDateStr, anio);
     if (edad == null || isNaN(edad)) return p.cuotaMayor;
     return edad <= p.edadMaxMenor ? p.cuotaMenor : p.cuotaMayor;
   }
@@ -391,6 +403,7 @@
     getProximaVigenciaCuotaHasta: getProximaVigenciaCuotaHasta,
     getCuotaEdadReferenciaAnio: getCuotaEdadReferenciaAnio,
     edadEnFechaReferencia31Agosto: edadEnFechaReferencia31Agosto,
+    edadEnFechaReferenciaCierre: edadEnFechaReferenciaCierre,
     cuotaDesdeFechaNacimiento: cuotaDesdeFechaNacimiento
   };
 })(typeof window !== 'undefined' ? window : this);

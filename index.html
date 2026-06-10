@@ -34,6 +34,7 @@
     <!-- Configuración Firebase CDSANABRIACF -->
     <script type="module" src="js/firebase-config.js"></script>
     <script src="js/member-cloud-persist.js"></script>
+    <script src="js/club-membership-season.js"></script>
     <script src="js/club-accounting.js"></script>
     <script src="js/notification-system.js" defer></script>
     <script src="js/support-mode.js" defer></script>
@@ -7576,8 +7577,11 @@
             const yRef = (typeof ClubAccounting !== 'undefined' && ClubAccounting.getCuotaEdadReferenciaAnio)
                 ? ClubAccounting.getCuotaEdadReferenciaAnio()
                 : new Date().getFullYear();
-            if (lm) lm.textContent = `Cuota: ${p.cuotaMayor} € (Mayor — edad > ${p.edadMaxMenor} al 31/08/${yRef})`;
-            if (ln) ln.textContent = `Cuota: ${p.cuotaMenor} € (Menor — edad ≤ ${p.edadMaxMenor} al 31/08/${yRef})`;
+            const cierreTxt = (typeof ClubMembershipSeason !== 'undefined' && ClubMembershipSeason.formatCierreFechaCorta)
+                ? ClubMembershipSeason.formatCierreFechaCorta(yRef)
+                : '31/05/' + yRef;
+            if (lm) lm.textContent = `Cuota: ${p.cuotaMayor} € (Mayor — edad > ${p.edadMaxMenor} al ${cierreTxt})`;
+            if (ln) ln.textContent = `Cuota: ${p.cuotaMenor} € (Menor — edad ≤ ${p.edadMaxMenor} al ${cierreTxt})`;
         }
 
         function actualizarCuotaSocioPorEdad() {
@@ -7592,7 +7596,9 @@
             let edadRef = null;
             if (typeof ClubAccounting !== 'undefined' && ClubAccounting.cuotaDesdeFechaNacimiento) {
                 monto = ClubAccounting.cuotaDesdeFechaNacimiento(fecha);
-                if (ClubAccounting.edadEnFechaReferencia31Agosto) {
+                if (ClubAccounting.edadEnFechaReferenciaCierre) {
+                    edadRef = ClubAccounting.edadEnFechaReferenciaCierre(fecha, yRef);
+                } else if (ClubAccounting.edadEnFechaReferencia31Agosto) {
                     edadRef = ClubAccounting.edadEnFechaReferencia31Agosto(fecha, yRef);
                 }
             } else {
@@ -7603,7 +7609,10 @@
             }
             if (edadInfo) {
                 if (edadRef != null && !isNaN(edadRef)) {
-                    edadInfo.textContent = `Edad al 31/08/${yRef}: ${edadRef} años`;
+                    const cierreEdad = (typeof ClubMembershipSeason !== 'undefined' && ClubMembershipSeason.formatCierreFechaCorta)
+                        ? ClubMembershipSeason.formatCierreFechaCorta(yRef)
+                        : '31/05/' + yRef;
+                    edadInfo.textContent = `Edad al ${cierreEdad}: ${edadRef} años`;
                 } else {
                     edadInfo.textContent = `Edad: ${calcularEdad(fecha)} años`;
                 }
@@ -8896,19 +8905,18 @@
                 let sociosEliminados = 0;
                 
                 const sociosActualizados = socios.filter(socio => {
-                    const fechaVencimiento = new Date(socio.fechaVencimiento);
+                    if (socio.pendingReason === 'renovacion') return true;
+                    const limite = socio.fechaLimitePago || socio.fechaVencimiento;
+                    if (!limite) return true;
+                    const fechaVencimiento = new Date(limite);
+                    if (isNaN(fechaVencimiento.getTime())) return true;
                     const diasRestantes = Math.ceil((fechaVencimiento - ahora) / (1000 * 60 * 60 * 24));
+                    const pendiente = socio.estado === 'pendiente' || socio.status === 'pending_validation';
                     
-                    // Si han pasado más de 7 días y no está pagado, eliminar
-                    if (diasRestantes < 0 && !socio.pagado && socio.estado === 'pendiente') {
-                        sociosEliminados++;
-                        console.log(`🗑️ Socio expirado eliminado: ${socio.nombre} ${socio.apellidos} (${socio.numeroSocio})`);
-                        return false;
-                    }
-                    
-                    // Si han pasado 7 días y no está pagado, marcar como expirado
-                    if (diasRestantes <= 0 && !socio.pagado && socio.estado === 'pendiente') {
+                    // Solo altas nuevas offline sin pago: caducan a los 7 días (no se eliminan solas)
+                    if (diasRestantes <= 0 && !socio.pagado && pendiente) {
                         socio.estado = 'expirado';
+                        socio.status = 'expired';
                         console.log(`⏰ Socio marcado como expirado: ${socio.nombre} ${socio.apellidos} (${socio.numeroSocio})`);
                     }
                     
@@ -10477,7 +10485,7 @@
                 formData.offlinePaymentChannel = offlineCh;
                 formData.paymentMethod =
                     offlineCh === 'efectivo' ? 'cash' : offlineCh === 'tpv' ? 'tpv' : 'transfer';
-                formData.pendingReason = offlineCh;
+                formData.pendingReason = 'nueva_alta';
                 formData.pagado = false;
                 formData.estado = 'pendiente';
                 formData.status = 'pending_validation';

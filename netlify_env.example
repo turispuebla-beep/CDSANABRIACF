@@ -89,3 +89,21 @@ REDSYS_ENV=test
 
 REDSYS_BIZUM_ENABLED=false
 
+
+
+# --- Temporada de socios (cierre cuota anual y plazos de pago) ---
+
+# Cierre de temporada: día y mes (mayo = 5). Tras esta fecha los activos pasan a pendiente de renovación.
+
+MEMBERSHIP_SEASON_CLOSE_MONTH=5
+
+MEMBERSHIP_SEASON_CLOSE_DAY=31
+
+# Plazo para transferencia, efectivo y TPV manual (altas nuevas pendientes)
+
+MEMBERSHIP_PAYMENT_DEADLINE_DAYS=7
+
+# Primer año de cierre de referencia (edad menor/mayor al 31/05 de ese año)
+
+MEMBERSHIP_SEASON_FIRST_CLOSE_YEAR=2027
+
