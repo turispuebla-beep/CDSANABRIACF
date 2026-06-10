@@ -230,6 +230,163 @@ function buildPlayerPortalResetContent(data) {
   return { subject, html, text };
 }
 
+const CLUB_BANK_ACCOUNT = 'CAJA RURAL ES12 3085 0034 8222 5127 9226';
+
+function formatEventPaymentLabel(channel) {
+  const c = String(channel || '').trim().toLowerCase();
+  if (c === 'transferencia' || c === 'transfer' || c === 'pending_transfer') return 'Transferencia bancaria';
+  if (c === 'efectivo' || c === 'cash') return 'Efectivo en el club';
+  if (c === 'bizum' || c === 'redsys_bizum') return 'Bizum';
+  if (c === 'tarjeta' || c === 'card' || c === 'redsys_card') return 'Tarjeta';
+  if (c === 'gratuito' || c === 'free') return 'Gratuito';
+  if (c) return c;
+  return '—';
+}
+
+function formatEventWhen(data) {
+  const parts = [];
+  const d = data.eventDate || data.date;
+  if (d) {
+    try {
+      parts.push(new Date(d).toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }));
+    } catch (_) {
+      parts.push(String(d));
+    }
+  }
+  const t = data.eventTime || data.time;
+  if (t) parts.push(String(t));
+  const loc = data.eventLocation || data.location;
+  if (loc) parts.push(String(loc));
+  return parts.join(' · ') || '—';
+}
+
+function formatEurAmount(value) {
+  const n = Number(value);
+  if (!Number.isFinite(n) || n <= 0) return 'Gratuito';
+  return n.toFixed(2) + ' €';
+}
+
+function buildEventRegistrationPendingContent(data) {
+  const nombre = escapeHtml(memberDisplayName(data));
+  const eventTitle = escapeHtml(String(data.eventTitle || data.title || 'Evento').trim());
+  const when = escapeHtml(formatEventWhen(data));
+  const total = escapeHtml(formatEurAmount(data.totalEur));
+  const slots = escapeHtml(String(data.slots != null ? data.slots : 1));
+  const guests = escapeHtml(String(data.guestCount != null ? data.guestCount : 0));
+  const contact = escapeHtml(clubContactEmail());
+  const bank = escapeHtml(CLUB_BANK_ACCOUNT);
+  const siteUrl = String(process.env.SITE_URL || '').replace(/\/$/, '');
+
+  const subject = `Inscripción a evento registrada — pendiente de pago — ${CLUB_NAME}`;
+  const html = `
+    <div style="font-family:system-ui,sans-serif;max-width:560px;color:#1e293b;line-height:1.5">
+      <h2 style="color:#1e3a8a;margin:0 0 12px">📋 Inscripción registrada</h2>
+      <p>Hola, <strong>${nombre}</strong>:</p>
+      <p>Tu inscripción al evento <strong>${eventTitle}</strong> del <strong>${CLUB_NAME}</strong> ha quedado registrada correctamente.</p>
+      <table style="background:#f8fafc;border-radius:8px;padding:12px 16px;margin:16px 0;width:100%">
+        <tr><td><strong>Evento:</strong></td><td>${eventTitle}</td></tr>
+        <tr><td><strong>Cuándo / dónde:</strong></td><td>${when}</td></tr>
+        <tr><td><strong>Plazas:</strong></td><td>${slots} (invitados: ${guests})</td></tr>
+        <tr><td><strong>Importe:</strong></td><td>${total}</td></tr>
+        <tr><td><strong>Estado del pago:</strong></td><td>Pendiente de validación</td></tr>
+      </table>
+      <p>Realiza el ingreso por <strong>transferencia o efectivo</strong> en el club. Cuenta del club:</p>
+      <p style="background:#eff6ff;padding:10px 12px;border-radius:8px;font-family:monospace;font-size:0.95rem">${bank}</p>
+      <p>El club validará tu pago y confirmará tu plaza.</p>
+      ${siteUrl ? `<p><a href="${escapeHtml(siteUrl)}" style="font-weight:700;color:#1d4ed8;">Ver la web del club</a></p>` : ''}
+      <p style="font-size:0.9rem;color:#64748b">Consultas: <a href="mailto:${contact}">${contact}</a></p>
+    </div>`;
+  const text =
+    `Hola, ${memberDisplayName(data)}.\n\n` +
+    `Tu inscripción al evento "${data.eventTitle || 'Evento'}" ha quedado registrada.\n` +
+    `Cuándo/dónde: ${formatEventWhen(data)}\n` +
+    `Plazas: ${data.slots != null ? data.slots : 1} (invitados: ${data.guestCount != null ? data.guestCount : 0})\n` +
+    `Importe: ${formatEurAmount(data.totalEur)}\n` +
+    `Estado: pendiente de pago (transferencia o efectivo).\n` +
+    `Cuenta: ${CLUB_BANK_ACCOUNT}\n\n` +
+    `Consultas: ${clubContactEmail()}\n`;
+  return { subject, html, text };
+}
+
+function buildEventRegistrationConfirmedContent(data) {
+  const nombre = escapeHtml(memberDisplayName(data));
+  const eventTitle = escapeHtml(String(data.eventTitle || data.title || 'Evento').trim());
+  const when = escapeHtml(formatEventWhen(data));
+  const total = escapeHtml(formatEurAmount(data.totalEur));
+  const slots = escapeHtml(String(data.slots != null ? data.slots : 1));
+  const guests = escapeHtml(String(data.guestCount != null ? data.guestCount : 0));
+  const payLabel = escapeHtml(formatEventPaymentLabel(data.paymentChannel || data.paymentMethod));
+  const contact = escapeHtml(clubContactEmail());
+  const siteUrl = String(process.env.SITE_URL || '').replace(/\/$/, '');
+
+  const subject = `Inscripción a evento confirmada — ${CLUB_NAME}`;
+  const html = `
+    <div style="font-family:system-ui,sans-serif;max-width:560px;color:#1e293b;line-height:1.5">
+      <h2 style="color:#059669;margin:0 0 12px">✅ Inscripción confirmada</h2>
+      <p>Hola, <strong>${nombre}</strong>:</p>
+      <p>Tu inscripción al evento <strong>${eventTitle}</strong> está <strong>confirmada</strong>.</p>
+      <table style="background:#ecfdf5;border-radius:8px;padding:12px 16px;margin:16px 0;width:100%">
+        <tr><td><strong>Evento:</strong></td><td>${eventTitle}</td></tr>
+        <tr><td><strong>Cuándo / dónde:</strong></td><td>${when}</td></tr>
+        <tr><td><strong>Plazas:</strong></td><td>${slots} (invitados: ${guests})</td></tr>
+        <tr><td><strong>Importe:</strong></td><td>${total}</td></tr>
+        <tr><td><strong>Pago:</strong></td><td>${payLabel} — correcto</td></tr>
+      </table>
+      <p>¡Te esperamos en el evento!</p>
+      ${siteUrl ? `<p><a href="${escapeHtml(siteUrl)}" style="font-weight:700;color:#1d4ed8;">Web del club</a></p>` : ''}
+      <p style="font-size:0.9rem;color:#64748b">Consultas: <a href="mailto:${contact}">${contact}</a></p>
+    </div>`;
+  const text =
+    `Hola, ${memberDisplayName(data)}.\n\n` +
+    `Tu inscripción al evento "${data.eventTitle || 'Evento'}" está CONFIRMADA.\n` +
+    `Cuándo/dónde: ${formatEventWhen(data)}\n` +
+    `Plazas: ${data.slots != null ? data.slots : 1} (invitados: ${data.guestCount != null ? data.guestCount : 0})\n` +
+    `Importe: ${formatEurAmount(data.totalEur)}\n` +
+    `Pago: ${formatEventPaymentLabel(data.paymentChannel || data.paymentMethod)} — correcto\n\n` +
+    `Consultas: ${clubContactEmail()}\n`;
+  return { subject, html, text };
+}
+
+async function sendEventRegistrationPendingEmail(data) {
+  const cfg = getEmailConfig();
+  if (!cfg.ok) return { sent: false, reason: cfg.error };
+  const email = String(data.email || '').trim().toLowerCase();
+  if (!email.includes('@')) return { sent: false, reason: 'email vacío' };
+  const content = buildEventRegistrationPendingContent(data);
+  try {
+    const result = await sendDirectToMemberEmail({
+      memberEmail: email,
+      subject: content.subject,
+      html: content.html,
+      text: content.text,
+      replyTo: clubContactEmail()
+    });
+    return { sent: true, to: result.to, bcc: result.bcc };
+  } catch (err) {
+    return { sent: false, reason: err.message || String(err) };
+  }
+}
+
+async function sendEventRegistrationConfirmedEmail(data) {
+  const cfg = getEmailConfig();
+  if (!cfg.ok) return { sent: false, reason: cfg.error };
+  const email = String(data.email || '').trim().toLowerCase();
+  if (!email.includes('@')) return { sent: false, reason: 'email vacío' };
+  const content = buildEventRegistrationConfirmedContent(data);
+  try {
+    const result = await sendDirectToMemberEmail({
+      memberEmail: email,
+      subject: content.subject,
+      html: content.html,
+      text: content.text,
+      replyTo: clubContactEmail()
+    });
+    return { sent: true, to: result.to, bcc: result.bcc };
+  } catch (err) {
+    return { sent: false, reason: err.message || String(err) };
+  }
+}
+
 async function sendPlayerPortalResetEmail(data) {
   const cfg = getEmailConfig();
   if (!cfg.ok) return { sent: false, reason: cfg.error };
@@ -254,5 +411,7 @@ module.exports = {
   sendMemberRegistrationEmail,
   sendMemberPaymentConfirmedEmail,
   sendPlayerApplicationApprovedEmail,
-  sendPlayerPortalResetEmail
+  sendPlayerPortalResetEmail,
+  sendEventRegistrationPendingEmail,
+  sendEventRegistrationConfirmedEmail
 };

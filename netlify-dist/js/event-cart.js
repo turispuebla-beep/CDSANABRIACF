@@ -28,6 +28,45 @@
     return 'cdsanabriafc@gmail.com';
   }
 
+  function buildEventEmailPayload(event, cart, registrant, total) {
+    const holder = cart.holder || {};
+    const guests = cart.guests || [];
+    const time =
+      [event.startTime, event.endTime].filter(Boolean).join(' — ') || event.time || '';
+    return {
+      email: registrant.email,
+      nombre: holder.nombre || holder.name || registrant.nombre || registrant.name,
+      apellidos: holder.apellidos || holder.surname || registrant.apellidos || registrant.surname,
+      eventTitle: event.title || event.name,
+      eventDate: event.date,
+      eventTime: time,
+      eventLocation: event.location,
+      totalEur: total,
+      slots: 1 + guests.length,
+      guestCount: guests.length
+    };
+  }
+
+  function notifyRegistrantEventPending(event, cart, registrant, total) {
+    if (!global.CdsanClubEmail || !global.CdsanClubEmail.sendEventRegistrationPending) return;
+    if (!registrant || !registrant.email) return;
+    global.CdsanClubEmail.sendEventRegistrationPending(buildEventEmailPayload(event, cart, registrant, total)).catch(
+      function (e) {
+        console.warn('Correo inscrito evento (pendiente):', e);
+      }
+    );
+  }
+
+  function notifyRegistrantEventConfirmed(event, cart, registrant, total, paymentChannel) {
+    if (!global.CdsanClubEmail || !global.CdsanClubEmail.sendEventRegistrationConfirmed) return;
+    if (!registrant || !registrant.email) return;
+    const payload = buildEventEmailPayload(event, cart, registrant, total);
+    payload.paymentChannel = paymentChannel || 'gratuito';
+    global.CdsanClubEmail.sendEventRegistrationConfirmed(payload).catch(function (e) {
+      console.warn('Correo inscrito evento (confirmado):', e);
+    });
+  }
+
   function notifyClubEventRegistration(event, cart, registrant, total, paymentChannel) {
     if (!global.CdsanClubEmail || !registrant || !registrant.email) return;
     const ch = paymentChannel === 'transfer' ? 'transferencia' : paymentChannel || 'transferencia';
@@ -558,7 +597,8 @@
         paid: true
       });
       clearCart(eventId);
-      alert('✅ Inscripción confirmada (gratuita).');
+      notifyRegistrantEventConfirmed(event, cart, registrant, 0, 'gratuito');
+      alert('✅ Inscripción confirmada (gratuita).\n\n📧 Te hemos enviado un correo de confirmación.');
       if (typeof global.showEventsInfo === 'function') global.showEventsInfo();
       return;
     }
@@ -575,8 +615,9 @@
       });
       clearCart(eventId);
       notifyClubEventRegistration(event, cart, registrant, total, 'transfer');
+      notifyRegistrantEventPending(event, cart, registrant, total);
       alert(
-        '✅ Inscripción registrada.\n\n🏦 Realiza el ingreso de ' +
+        '✅ Inscripción registrada.\n\n📧 Te hemos enviado un correo con los datos.\n\n🏦 Realiza el ingreso de ' +
           total.toFixed(2) +
           ' € por transferencia o efectivo. El club validará el pago.\n\nConsultas: ' +
           getClubPublicEmail()

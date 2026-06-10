@@ -6835,6 +6835,7 @@
                     const formatPrice = (value) => Number(value || 0) === 0 ? 'Gratuito' : `${Number(value || 0).toFixed(2)}€`;
                     const participantsCount = event.participants ? event.participants.length : 0;
                     const availableSpots = event.maxParticipants - participantsCount;
+                    const pendingEventPayments = countPendingEventPaymentBundles(event);
                     
                     html += `
                         <div style="border: 1px solid #e9ecef; border-radius: 10px; padding: 20px; margin-bottom: 15px; ${event.image ? 'display: flex; gap: 20px;' : ''}">
@@ -6864,6 +6865,7 @@
                                 <div style="display: flex; gap: 10px; margin-top: 15px;">
                                     <button onclick="viewEventDetails('${event.id}')" style="padding: 6px 12px; background: #6c757d; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 0.8rem;">👁️ Ver Detalles</button>
                                     <button onclick="manageEventParticipants('${event.id}')" style="padding: 6px 12px; background: #1e3a8a; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 0.8rem;">👥 Participantes</button>
+                                    ${pendingEventPayments > 0 ? `<button onclick="validateEventPaymentsMenu('${event.id}')" style="padding: 6px 12px; background: #059669; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 0.8rem;" title="Confirmar transferencia o efectivo recibido">✅ Validar pagos (${pendingEventPayments})</button>` : ''}
                                     <button onclick="exportEventParticipantsExcel('${event.id}')" style="padding: 6px 12px; background: #166534; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 0.8rem;">📊 Excel</button>
                                     <button onclick="exportEventParticipantsCSV('${event.id}')" style="padding: 6px 12px; background: #8b5cf6; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 0.8rem;">📄 CSV</button>
                                     <button onclick="exportEventParticipantsWord('${event.id}')" style="padding: 6px 12px; background: #0ea5e9; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 0.8rem;">📝 Word</button>
@@ -7100,7 +7102,253 @@
                 perfil += ` · alta: ${clubMembership}`;
             }
             if (p.playerCategory) perfil += ` · ${p.playerCategory}`;
-            return `${idx + 1}. ${fullName} | ${p.email || 'sin email'} | ${p.telefono || p.phone || 'sin teléfono'} | ${perfil} | ${price}`;
+            let pago = '';
+            if (!p.isGuest && eventParticipantPaymentPending(p)) {
+                pago = ' | 🏦 pago pendiente';
+            } else if (p.paid === true || String(p.paymentStatus || '').toLowerCase() === 'paid' || p.paidOnline) {
+                pago = ' | ✅ pagado';
+            }
+            return `${idx + 1}. ${fullName} | ${p.email || 'sin email'} | ${p.telefono || p.phone || 'sin teléfono'} | ${perfil} | ${price}${pago}`;
+        }
+
+        function eventParticipantPaymentPending(p) {
+            if (!p || p.isGuest) return false;
+            const status = String(p.paymentStatus || '').toLowerCase();
+            if (status === 'paid' || p.paid === true || p.paidOnline === true) return false;
+            if (status === 'pending_transfer') return true;
+            return String(p.paymentMethod || '').toLowerCase() === 'transfer' && p.paid !== true;
+        }
+
+        function groupPendingEventRegistrationBundles(participants) {
+            const list = Array.isArray(participants) ? participants : [];
+            const pendingHolders = list.filter((p) => eventParticipantPaymentPending(p) && !p.isGuest);
+            return pendingHolders.map((holder) => {
+                const email = String(holder.email || '').trim().toLowerCase();
+                const holderId = holder.id ? String(holder.id) : '';
+                const guests = list.filter((g) => {
+                    if (!g || !g.isGuest) return false;
+                    const guestPending =
+                        String(g.paymentStatus || '').toLowerCase() === 'pending_transfer' ||
+                        (String(g.paymentMethod || '').toLowerCase() === 'transfer' && g.paid !== true);
+                    if (!guestPending) return false;
+                    const byEmail = email && String(g.invitedByEmail || '').trim().toLowerCase() === email;
+                    const byId = holderId && g.invitedById && String(g.invitedById) === holderId;
+                    return byEmail || byId;
+                });
+                const records = [holder, ...guests];
+                const total = records.reduce((s, r) => s + Number(r.appliedPrice || 0), 0);
+                return {
+                    holder: holder,
+                    guests: guests,
+                    records: records,
+                    email: holder.email,
+                    total: Math.round(total * 100) / 100,
+                    slots: records.length,
+                    guestCount: guests.length
+                };
+            });
+        }
+
+        function countPendingEventPaymentBundles(event) {
+            const participants = Array.isArray(event.participants) ? event.participants : [];
+            return groupPendingEventRegistrationBundles(participants).length;
+        }
+
+        function adminPaymentChannelFromChoice(choice) {
+            const c = String(choice || '').trim();
+            if (c === '2') return 'efectivo';
+            if (c === '3') return 'otro';
+            return 'transferencia';
+        }
+
+        async function validateEventRegistrationPayment(eventId, holderEmail) {
+            try {
+                const events = JSON.parse(localStorage.getItem('clubEvents') || '[]');
+                const eventIndex = events.findIndex((e) => String(e.id) === String(eventId));
+                if (eventIndex < 0) {
+                    alert('❌ Evento no encontrado');
+                    return;
+                }
+                const event = events[eventIndex];
+                const participants = Array.isArray(event.participants) ? event.participants : [];
+                const bundles = groupPendingEventRegistrationBundles(participants);
+                const normEmail = String(holderEmail || '').trim().toLowerCase();
+                const bundle = bundles.find((b) => String(b.email || '').trim().toLowerCase() === normEmail);
+                if (!bundle) {
+                    alert('❌ Inscripción no encontrada o ya validada');
+                    return;
+                }
+
+                const holderName = [bundle.holder.nombre || bundle.holder.name, bundle.holder.apellidos || bundle.holder.surname]
+                    .filter(Boolean)
+                    .join(' ')
+                    .trim();
+                const choice = prompt(
+                    '¿Confirmas que has recibido el pago de esta inscripción?\n\n' +
+                    holderName +
+                    '\n' +
+                    bundle.email +
+                    '\nImporte: ' +
+                    bundle.total.toFixed(2) +
+                    ' €\nPlazas: ' +
+                    bundle.slots +
+                    (bundle.guestCount ? ' (incl. ' + bundle.guestCount + ' invitado(s))' : '') +
+                    '\n\n1 = Transferencia bancaria\n2 = Efectivo\n3 = Otro\n\nEscribe 1, 2 o 3:',
+                    '1'
+                );
+                if (choice === null) return;
+                if (!['1', '2', '3'].includes(String(choice).trim())) {
+                    alert('Operación cancelada.');
+                    return;
+                }
+                if (!confirm('¿Validar el pago y confirmar la inscripción al evento?')) return;
+
+                const currentAdmin = JSON.parse(localStorage.getItem('currentAdmin') || '{}');
+                const adminName = currentAdmin.name || currentAdmin.email || 'Administrador';
+                const payChannel = adminPaymentChannelFromChoice(choice);
+                const now = new Date().toISOString();
+                const bundleIds = new Set(bundle.records.map((r) => (r.id ? String(r.id) : '')).filter(Boolean));
+
+                event.participants = participants.map((p) => {
+                    const inBundle =
+                        (p.id && bundleIds.has(String(p.id))) ||
+                        (!p.isGuest && String(p.email || '').trim().toLowerCase() === normEmail && eventParticipantPaymentPending(p)) ||
+                        (p.isGuest &&
+                            String(p.invitedByEmail || '').trim().toLowerCase() === normEmail &&
+                            (String(p.paymentStatus || '').toLowerCase() === 'pending_transfer' ||
+                                (String(p.paymentMethod || '').toLowerCase() === 'transfer' && p.paid !== true)));
+                    if (!inBundle) return p;
+                    return {
+                        ...p,
+                        paymentStatus: 'paid',
+                        paid: true,
+                        paidAt: now,
+                        validatedDate: now,
+                        validatedBy: adminName,
+                        paymentMethod: payChannel === 'efectivo' ? 'cash' : payChannel === 'otro' ? 'other' : 'transfer'
+                    };
+                });
+                event.registeredMembers = event.participants;
+                event.updatedAt = now;
+                events[eventIndex] = event;
+                localStorage.setItem('clubEvents', JSON.stringify(events));
+
+                let firebaseSyncOk = false;
+                try {
+                    await persistRecordToFirebase('clubEvents', 'events', event);
+                    firebaseSyncOk = true;
+                } catch (syncErr) {
+                    console.warn('Validación evento guardada en local; error Firebase:', syncErr);
+                }
+
+                if (typeof ClubAccounting !== 'undefined' && bundle.total > 0) {
+                    const bucket = event.revenueDestination === 'B' ? 'B' : 'A';
+                    const hint = holderName || bundle.email;
+                    const row = ClubAccounting.recordEventIncome(
+                        bucket,
+                        bundle.total,
+                        event.id,
+                        event.name || event.title,
+                        hint
+                    );
+                    if (row && ClubAccounting.trySyncLedgerRow) {
+                        ClubAccounting.trySyncLedgerRow(row);
+                    }
+                }
+
+                if (bundle.email) {
+                    const eventTime = [event.startTime, event.endTime].filter(Boolean).join(' — ');
+                    fetch('/.netlify/functions/send-club-email', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            type: 'event_registration_confirmed',
+                            email: bundle.email,
+                            nombre: bundle.holder.nombre || bundle.holder.name,
+                            apellidos: bundle.holder.apellidos || bundle.holder.surname,
+                            eventTitle: event.name || event.title,
+                            eventDate: event.date,
+                            eventTime: eventTime,
+                            eventLocation: event.location,
+                            totalEur: bundle.total,
+                            slots: bundle.slots,
+                            guestCount: bundle.guestCount,
+                            paymentChannel: payChannel
+                        })
+                    })
+                        .then((r) => r.json())
+                        .then((r) => {
+                            if (!r.ok) console.warn('Email confirmación evento:', r.error);
+                        })
+                        .catch((e) => console.warn('Email confirmación evento:', e));
+                }
+
+                loadEventsList();
+                const syncMsg = firebaseSyncOk ? 'sincronizada' : 'guardada solo en este dispositivo';
+                alert(
+                    '✅ Pago validado. Inscripción confirmada (' +
+                        syncMsg +
+                        ').\n\n📧 Se enviará un correo de confirmación a ' +
+                        (bundle.email || '—') +
+                        '.'
+                );
+            } catch (error) {
+                console.error('❌ Error validando pago evento:', error);
+                alert('❌ Error al validar el pago: ' + (error.message || error));
+            }
+        }
+
+        function validateEventPaymentsMenu(eventId) {
+            const events = JSON.parse(localStorage.getItem('clubEvents') || '[]');
+            const event = events.find((e) => String(e.id) === String(eventId));
+            if (!event) {
+                alert('❌ Evento no encontrado');
+                return;
+            }
+            const bundles = groupPendingEventRegistrationBundles(
+                Array.isArray(event.participants) ? event.participants : []
+            );
+            if (!bundles.length) {
+                alert('ℹ️ No hay inscripciones con pago pendiente de validar en este evento.');
+                return;
+            }
+            const title = event.name || event.title || 'Evento';
+            const lines = bundles.map((b, i) => {
+                const name = [b.holder.nombre || b.holder.name, b.holder.apellidos || b.holder.surname]
+                    .filter(Boolean)
+                    .join(' ')
+                    .trim();
+                return (
+                    i +
+                    1 +
+                    '. ' +
+                    name +
+                    ' — ' +
+                    (b.email || 'sin email') +
+                    ' — ' +
+                    b.total.toFixed(2) +
+                    ' € (' +
+                    b.slots +
+                    ' plaza(s))'
+                );
+            });
+            const pick = prompt(
+                '🏦 PAGOS PENDIENTES — ' +
+                    title +
+                    '\n\n' +
+                    lines.join('\n') +
+                    '\n\nEscribe el número de la inscripción a validar (1-' +
+                    bundles.length +
+                    '):',
+                '1'
+            );
+            if (pick === null) return;
+            const ix = parseInt(String(pick).trim(), 10) - 1;
+            if (!Number.isFinite(ix) || ix < 0 || ix >= bundles.length) {
+                alert('Selección no válida.');
+                return;
+            }
+            validateEventRegistrationPayment(eventId, bundles[ix].email);
         }
 
         function buildParticipantExportRow(event, p) {
@@ -7151,11 +7399,13 @@
             }
 
             const lines = filtered.map((p, idx) => formatParticipantListLine(p, idx));
+            const pendingPay = countPendingEventPaymentBundles(event);
 
             const details = [
                 `👥 INSCRITOS EN: ${event.name || event.title || 'Evento'}`,
                 `Filtro: ${getEventParticipantsFilterSummary(filters)}`,
                 `Mostrando: ${filtered.length} de ${participants.length}`,
+                pendingPay > 0 ? `🏦 Pagos pendientes de validar: ${pendingPay} (usa «Validar pagos» en la lista del evento)` : '',
                 '',
                 ...lines,
                 '',

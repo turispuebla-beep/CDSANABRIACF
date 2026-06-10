@@ -277,6 +277,21 @@ async function completeEventPayment(payment) {
         { label: 'Pedido pasarela', value: payment.orderId }
       ]
     });
+    const { sendEventRegistrationConfirmedEmail } = require('./member-email');
+    const eventTime = [event.startTime, event.endTime].filter(Boolean).join(' — ');
+    await sendEventRegistrationConfirmedEmail({
+      email: payment.customerEmail || holder.email,
+      nombre: holder.nombre || holder.name,
+      apellidos: holder.apellidos || holder.surname,
+      eventTitle: eventTitle,
+      eventDate: event.date,
+      eventTime: eventTime,
+      eventLocation: event.location,
+      totalEur: totalEur,
+      slots: toAdd.length,
+      guestCount: guestCount,
+      paymentChannel: payCh
+    });
   } catch (mailErr) {
     console.warn('Email club evento pagado:', mailErr.message || mailErr);
   }

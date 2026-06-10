@@ -70,8 +70,45 @@
     });
   }
 
+  /** Confirmación al inscrito: evento registrado (pendiente transferencia/efectivo). */
+  function sendEventRegistrationPending(opts) {
+    return post({
+      type: 'event_registration_pending',
+      email: opts.email,
+      nombre: opts.nombre || opts.name,
+      apellidos: opts.apellidos || opts.surname,
+      eventTitle: opts.eventTitle || opts.title,
+      eventDate: opts.eventDate || opts.date,
+      eventTime: opts.eventTime || opts.time,
+      eventLocation: opts.eventLocation || opts.location,
+      totalEur: opts.totalEur,
+      slots: opts.slots,
+      guestCount: opts.guestCount
+    });
+  }
+
+  /** Confirmación al inscrito: evento confirmado (gratuito o pago OK). */
+  function sendEventRegistrationConfirmed(opts) {
+    return post({
+      type: 'event_registration_confirmed',
+      email: opts.email,
+      nombre: opts.nombre || opts.name,
+      apellidos: opts.apellidos || opts.surname,
+      eventTitle: opts.eventTitle || opts.title,
+      eventDate: opts.eventDate || opts.date,
+      eventTime: opts.eventTime || opts.time,
+      eventLocation: opts.eventLocation || opts.location,
+      totalEur: opts.totalEur,
+      slots: opts.slots,
+      guestCount: opts.guestCount,
+      paymentChannel: opts.paymentChannel || opts.paymentMethod
+    });
+  }
+
   global.CdsanClubEmail = {
     sendMemberRegistered: sendMemberRegistered,
-    sendClubAdminNotify: sendClubAdminNotify
+    sendClubAdminNotify: sendClubAdminNotify,
+    sendEventRegistrationPending: sendEventRegistrationPending,
+    sendEventRegistrationConfirmed: sendEventRegistrationConfirmed
   };
 })(typeof window !== 'undefined' ? window : globalThis);

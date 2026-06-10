@@ -4,7 +4,9 @@ const { getEmailConfig } = require('./lib/club-email');
 const {
   sendMemberRegistrationEmail,
   sendMemberPaymentConfirmedEmail,
-  sendPlayerApplicationApprovedEmail
+  sendPlayerApplicationApprovedEmail,
+  sendEventRegistrationPendingEmail,
+  sendEventRegistrationConfirmedEmail
 } = require('./lib/member-email');
 const { sendClubAdminNotification } = require('./lib/club-admin-notify-email');
 const { memberExistsForEmail } = require('./lib/firestore-admin');
@@ -138,6 +140,47 @@ exports.handler = async (event) => {
         numeroSocio: body.numeroSocio || body.memberNumber
       });
       return json(200, { ok: true, sent: result.sent }, origin);
+    }
+
+    if (type === 'event_registration_pending') {
+      const result = await sendEventRegistrationPendingEmail({
+        email,
+        nombre: body.nombre || body.name,
+        apellidos: body.apellidos || body.surname,
+        eventTitle: body.eventTitle || body.title,
+        eventDate: body.eventDate || body.date,
+        eventTime: body.eventTime || body.time,
+        eventLocation: body.eventLocation || body.location,
+        totalEur: body.totalEur,
+        slots: body.slots,
+        guestCount: body.guestCount
+      });
+      return json(
+        200,
+        { ok: true, sent: result.sent, to: result.to || email, error: result.reason || '' },
+        origin
+      );
+    }
+
+    if (type === 'event_registration_confirmed') {
+      const result = await sendEventRegistrationConfirmedEmail({
+        email,
+        nombre: body.nombre || body.name,
+        apellidos: body.apellidos || body.surname,
+        eventTitle: body.eventTitle || body.title,
+        eventDate: body.eventDate || body.date,
+        eventTime: body.eventTime || body.time,
+        eventLocation: body.eventLocation || body.location,
+        totalEur: body.totalEur,
+        slots: body.slots,
+        guestCount: body.guestCount,
+        paymentChannel: body.paymentChannel || body.paymentMethod
+      });
+      return json(
+        200,
+        { ok: true, sent: result.sent, to: result.to || email, error: result.reason || '' },
+        origin
+      );
     }
 
     return json(400, { ok: false, error: 'type no válido' }, origin);
