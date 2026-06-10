@@ -63,7 +63,10 @@ exports.handler = async (event) => {
       {
         ok: true,
         playerId: result.playerId,
-        application: result.application
+        application: result.application,
+        emailSent: !!result.emailSent,
+        emailTo: result.emailTo || '',
+        emailError: result.emailError || ''
       },
       origin
     );

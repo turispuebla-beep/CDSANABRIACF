@@ -634,9 +634,38 @@ async function approvePlayerApplication(applicationId, adminMeta) {
     { merge: true }
   );
 
+  let emailSent = false;
+  let emailTo = '';
+  let emailError = '';
+  try {
+    const { sendPlayerApplicationApprovedEmail } = require('./member-email');
+    const mail = await sendPlayerApplicationApprovedEmail({
+      email: app.email,
+      guardianEmail: app.guardianEmail,
+      nombre: app.name,
+      name: app.name,
+      apellidos: app.surname,
+      surname: app.surname,
+      season: app.season
+    });
+    emailSent = !!mail.sent;
+    emailTo =
+      mail.to ||
+      String(app.email || app.guardianEmail || '')
+        .trim()
+        .toLowerCase();
+    if (!mail.sent) emailError = mail.reason || 'no enviado';
+  } catch (mailErr) {
+    emailError = mailErr.message || String(mailErr);
+    console.warn('Email solicitud jugador aceptada:', mailErr);
+  }
+
   return {
     application: { id: snap.id, ...app, status: 'approved', playerId },
-    playerId
+    playerId,
+    emailSent,
+    emailTo,
+    emailError
   };
 }
 

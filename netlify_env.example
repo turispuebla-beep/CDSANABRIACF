@@ -46,8 +46,9 @@ CLUB_REPLY_EMAIL=cdsanabriafc@gmail.com
 
 CLUB_NOTIFY_EMAIL=cdsanabriafc@gmail.com
 
-# Todo el correo automático va al buzón del club (true por defecto).
-# Pon false solo si quieres enviar también al email personal del socio/jugador.
+# Avisos internos (registro socio, inscripción, pagos): solo al buzón del club (true por defecto).
+# Excepción automática: «Solicitud aceptada» y «Restablecer contraseña ficha» van DIRECTO al jugador/a
+# con copia oculta (BCC) en CLUB_NOTIFY_EMAIL.
 CLUB_EMAIL_ONLY=true
 
 
@@ -67,6 +68,10 @@ CLUB_EMAIL_ONLY=true
 
 
 # --- Firebase Admin (JSON en UNA sola línea) ---
+# Firebase Console → cdsanabriacf2026 → Configuración → Cuentas de servicio → Generar clave
+# Pegar el JSON completo en UNA línea (sin saltos). Obligatorio para:
+#   approve-player-application, submit-member-registration, submit-friend-registration,
+#   submit-player-application, submit-player-inscription, submit-club-record, Redsys.
 
 FIREBASE_SERVICE_ACCOUNT_JSON=
 

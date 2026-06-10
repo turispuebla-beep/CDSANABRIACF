@@ -132,6 +132,9 @@
 
     global.localStorage.setItem('clubPlayers', JSON.stringify(players));
     let firebaseOk = false;
+    let emailSent = false;
+    let emailTo = '';
+    let emailError = '';
     try {
       const res = await fetch('/.netlify/functions/approve-player-application', {
         method: 'POST',
@@ -162,6 +165,9 @@
           writeApplications(apps);
         }
         firebaseOk = true;
+        emailSent = !!json.emailSent;
+        emailTo = json.emailTo || '';
+        emailError = json.emailError || '';
       }
     } catch (_) {}
 
@@ -205,8 +211,18 @@
       }
     }
 
-    const mailtoOpened = offerPlayerApprovedMailto(apps[ix]);
-    return { application: apps[ix], player: player, mailtoOpened: mailtoOpened };
+    let mailtoOpened = false;
+    if (!emailSent) {
+      mailtoOpened = offerPlayerApprovedMailto(apps[ix]);
+    }
+    return {
+      application: apps[ix],
+      player: player,
+      mailtoOpened: mailtoOpened,
+      emailSent: emailSent,
+      emailTo: emailTo,
+      emailError: emailError
+    };
   }
 
   async function rejectApplication(applicationId, reason) {
@@ -305,11 +321,21 @@
       const result = await approveApplication(id);
       let msg =
         '✅ Solicitud aceptada. El jugador/a puede usar «Nuevo jugador/a» → «Finalizar ficha» (solo admitidos).';
-      if (result.mailtoOpened) {
-        msg += '\n\n📧 Se ha abierto el correo para avisar al jugador/a (pulsa Enviar en tu programa de correo).';
+      if (result.emailSent) {
+        msg +=
+          '\n\n📧 Correo automático enviado a ' +
+          (result.emailTo || result.application.email || 'el jugador/a') +
+          ' (copia en cdsanabriafc@gmail.com).';
+      } else if (result.mailtoOpened) {
+        msg +=
+          '\n\n⚠️ No se pudo enviar el correo automático' +
+          (result.emailError ? ' (' + result.emailError + ')' : '') +
+          '.\nSe ha abierto tu programa de correo: pulsa Enviar para avisar al jugador/a.';
       } else {
         msg +=
-          '\n\nPuedes avisar al jugador/a manualmente o volver a aceptar y elegir abrir el correo.';
+          '\n\n⚠️ No se pudo enviar el correo automático' +
+          (result.emailError ? ': ' + result.emailError : '') +
+          '.\nAvisa al jugador/a manualmente por email o teléfono.';
       }
       alert(msg);
       renderPlayerApplicationsAdmin();

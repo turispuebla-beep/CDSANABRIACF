@@ -105,11 +105,16 @@ exports.handler = async (event) => {
     if (type === 'player_application_approved') {
       const result = await sendPlayerApplicationApprovedEmail({
         email,
+        guardianEmail: body.guardianEmail,
         nombre: body.nombre || body.name,
         apellidos: body.apellidos || body.surname,
         season: body.season
       });
-      return json(200, { ok: true, sent: result.sent }, origin);
+      return json(
+        200,
+        { ok: true, sent: result.sent, to: result.to || email, error: result.reason || '' },
+        origin
+      );
     }
 
     if (type === 'member_registered') {

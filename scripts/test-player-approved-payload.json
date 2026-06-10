@@ -1,0 +1,7 @@
+{
+  "type": "player_application_approved",
+  "email": "jugador.prueba@example.com",
+  "nombre": "Jugador",
+  "apellidos": "Prueba",
+  "season": "2025-2026"
+}

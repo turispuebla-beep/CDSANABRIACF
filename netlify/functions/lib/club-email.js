@@ -206,6 +206,28 @@ async function sendViaSendGrid(payload) {
   return sendViaSendGridApi(cfg, payload);
 }
 
+/**
+ * Envío directo al socio/jugador (solicitud aceptada, restablecer contraseña).
+ * Siempre llega al email del destinatario; copia oculta al buzón del club.
+ */
+async function sendDirectToMemberEmail({ memberEmail, subject, html, text, replyTo }) {
+  const cfg = getEmailConfig();
+  if (!cfg.ok) throw new Error(cfg.error);
+  const to = String(memberEmail || '').trim().toLowerCase();
+  if (!to.includes('@')) throw new Error('email del destinatario vacío');
+  const clubCopy = clubNotifyRecipient(cfg);
+  const bcc = clubCopy && clubCopy.toLowerCase() !== to ? clubCopy : undefined;
+  await sendViaSendGrid({
+    to,
+    bcc,
+    subject,
+    html,
+    text,
+    replyTo: String(replyTo || cfg.replyTo || cfg.fromEmail || CLUB_EMAIL_DEFAULT).trim()
+  });
+  return { sent: true, to, bcc };
+}
+
 module.exports = {
   CLUB_EMAIL_DEFAULT,
   CLUB_EMAIL_PUBLIC_DEFAULT,
@@ -215,5 +237,6 @@ module.exports = {
   isClubEmailOnlyMode,
   resolveOutboundTo,
   withOriginalRecipientNotice,
-  sendViaSendGrid
+  sendViaSendGrid,
+  sendDirectToMemberEmail
 };

@@ -6,7 +6,8 @@ const {
   sendViaSendGrid,
   CLUB_EMAIL_PUBLIC_DEFAULT,
   resolveOutboundTo,
-  withOriginalRecipientNotice
+  withOriginalRecipientNotice,
+  sendDirectToMemberEmail
 } = require('./club-email');
 
 const CLUB_NAME = 'CD Sanabria CF';
@@ -141,36 +142,45 @@ function buildPlayerApplicationApprovedContent(data) {
       <p>Hola, <strong>${nombre}</strong>:</p>
       <p>El <strong>${CLUB_NAME}</strong> ha revisado tu solicitud para la temporada <strong>${season}</strong> y puedes continuar con la inscripción oficial.</p>
       ${linkBlock}
-      <p>Allí completarás tallas de ropa, cuotas y forma de pago. La primera vez deberás <strong>crear una contraseña de acceso</strong> a tu ficha (DNI + contraseña; recuperación por email si la olvidas).</p>
+      <p>Allí completarás tallas de ropa, cuotas y forma de pago. Accede con tu <strong>DNI</strong> y la <strong>contraseña</strong> que elegiste al enviar la solicitud (si la olvidas, puedes recuperarla por email desde la misma página).</p>
       <p style="font-size:0.9rem;color:#64748b">Consultas: <a href="mailto:${contact}">${contact}</a></p>
     </div>`;
   const text =
     `Hola, ${memberDisplayName(data)}.\n\n` +
     `Tu solicitud en ${CLUB_NAME} (temporada ${data.season || ''}) ha sido ACEPTADA.\n` +
     `Completa la inscripción en la web: Inscripción jugador/a → Ya soy jugador/a.\n` +
+    `Accede con tu DNI y la contraseña que elegiste al solicitar el alta.\n` +
     (siteUrl ? `${siteUrl}/inscripcion-jugador.html?flow=finalize\n\n` : '') +
     `Consultas: ${clubContactEmail()}\n`;
   return { subject, html, text };
 }
 
+function resolvePlayerNotifyEmail(data) {
+  const main = String(data.email || '').trim().toLowerCase();
+  if (main.includes('@')) return main;
+  const guardian = String(data.guardianEmail || '').trim().toLowerCase();
+  if (guardian.includes('@')) return guardian;
+  return '';
+}
+
 async function sendPlayerApplicationApprovedEmail(data) {
   const cfg = getEmailConfig();
   if (!cfg.ok) return { sent: false, reason: cfg.error };
-  const email = String(data.email || '').trim().toLowerCase();
+  const email = resolvePlayerNotifyEmail(data);
   if (!email) return { sent: false, reason: 'email vacío' };
-  const content = withOriginalRecipientNotice(
-    buildPlayerApplicationApprovedContent(data),
-    email,
-    'Jugador/a'
-  );
-  await sendViaSendGrid({
-    to: resolveOutboundTo(cfg, email),
-    subject: content.subject,
-    html: content.html,
-    text: content.text,
-    replyTo: email
-  });
-  return { sent: true };
+  const content = buildPlayerApplicationApprovedContent(data);
+  try {
+    const result = await sendDirectToMemberEmail({
+      memberEmail: email,
+      subject: content.subject,
+      html: content.html,
+      text: content.text,
+      replyTo: clubContactEmail()
+    });
+    return { sent: true, to: result.to, bcc: result.bcc };
+  } catch (err) {
+    return { sent: false, reason: err.message || String(err) };
+  }
 }
 
 async function sendMemberPaymentConfirmedEmail(data) {
@@ -223,21 +233,21 @@ function buildPlayerPortalResetContent(data) {
 async function sendPlayerPortalResetEmail(data) {
   const cfg = getEmailConfig();
   if (!cfg.ok) return { sent: false, reason: cfg.error };
-  const email = String(data.email || '').trim().toLowerCase();
+  const email = resolvePlayerNotifyEmail(data);
   if (!email) return { sent: false, reason: 'email vacío' };
-  const content = withOriginalRecipientNotice(
-    buildPlayerPortalResetContent(data),
-    email,
-    'Jugador/a'
-  );
-  await sendViaSendGrid({
-    to: resolveOutboundTo(cfg, email),
-    subject: content.subject,
-    html: content.html,
-    text: content.text,
-    replyTo: email
-  });
-  return { sent: true };
+  const content = buildPlayerPortalResetContent(data);
+  try {
+    const result = await sendDirectToMemberEmail({
+      memberEmail: email,
+      subject: content.subject,
+      html: content.html,
+      text: content.text,
+      replyTo: clubContactEmail()
+    });
+    return { sent: true, to: result.to, bcc: result.bcc };
+  } catch (err) {
+    return { sent: false, reason: err.message || String(err) };
+  }
 }
 
 module.exports = {
