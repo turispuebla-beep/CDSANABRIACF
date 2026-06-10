@@ -58,6 +58,35 @@ service cloud.firestore {
         && request.resource.data.appScope is string;
     }
 
+    function memberCreatePaymentSafe() {
+      return (!('pagado' in request.resource.data) || request.resource.data.pagado == false)
+        && (
+          !('status' in request.resource.data)
+          || request.resource.data.status in ['pending_validation', 'pending', 'expired']
+        )
+        && (
+          !('estado' in request.resource.data)
+          || request.resource.data.estado in ['pendiente', 'caducado', 'expirado']
+        );
+    }
+
+    function memberSelfEditableFieldsOnly() {
+      return request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+        'nombre', 'name', 'apellidos', 'surname', 'telefono', 'phone',
+        'direccion', 'address', 'sexo', 'genero', 'notificaciones',
+        'birthDate', 'fechaNacimiento', 'updatedAt', 'lastModified',
+        'consentimiento', 'proteccionDatos', 'consentimientoFecha'
+      ]);
+    }
+
+    function friendSelfEditableFieldsOnly() {
+      return request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+        'nombre', 'name', 'apellidos', 'surname', 'telefono', 'phone',
+        'direccion', 'address', 'updatedAt', 'lastModified',
+        'consentimiento', 'proteccionDatos', 'consentimientoFecha'
+      ]);
+    }
+
     function friendFieldTypesAreValid() {
       return request.resource.data.nombre is string
         && request.resource.data.apellidos is string
@@ -158,15 +187,19 @@ service cloud.firestore {
         && hasNoPlainPassword()
         && hasMemberRequiredFields()
         && memberFieldTypesAreValid()
+        && memberCreatePaymentSafe()
         && emailLooksValid()
         && dniLooksValid();
       allow update: if hasScope()
-        && (isAdmin() || isOwnIdentityDoc())
         && hasRequestedScope()
         && hasNoPlainPassword()
         && memberFieldTypesAreValid()
         && emailLooksValid()
-        && dniLooksValid();
+        && dniLooksValid()
+        && (
+          isAdmin()
+          || (isOwnIdentityDoc() && memberSelfEditableFieldsOnly())
+        );
       allow delete: if hasScope() && isAdmin();
     }
 
@@ -183,12 +216,15 @@ service cloud.firestore {
         && emailLooksValid()
         && dniLooksValid();
       allow update: if hasScope()
-        && (isAdmin() || isOwnIdentityDoc())
         && hasRequestedScope()
         && hasNoPlainPassword()
         && friendFieldTypesAreValid()
         && emailLooksValid()
-        && dniLooksValid();
+        && dniLooksValid()
+        && (
+          isAdmin()
+          || (isOwnIdentityDoc() && friendSelfEditableFieldsOnly())
+        );
       allow delete: if hasScope() && isAdmin();
     }
 
@@ -289,7 +325,7 @@ service cloud.firestore {
     }
     match /sanabria_audit_logs/{docId} {
       allow read: if hasScope() && isAdmin();
-      allow create: if hasRequestedScope() && isSignedIn();
+      allow create: if hasRequestedScope() && isAdmin();
       allow update, delete: if hasRequestedScope() && isAdmin();
     }
     match /sanabria_config/{docId} {

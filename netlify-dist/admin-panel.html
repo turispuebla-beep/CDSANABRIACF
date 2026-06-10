@@ -54,8 +54,10 @@
     <script src="js/admin-player-export-config.js"></script>
     <script src="js/admin-notifications.js"></script>
     <script type="module" src="js/firebase-config.js"></script>
+    <script src="js/cdsan-membership-env.js"></script>
     <script src="js/club-membership-season.js"></script>
     <script src="js/club-accounting.js"></script>
+    <script src="js/admin-api-auth.js"></script>
     <script src="js/support-mode.js" defer></script>
     
     <style>
@@ -4327,7 +4329,8 @@
                 return true;
             } catch (e) {
                 console.warn('verifyFirebaseAdminSession:', e);
-                return true;
+                showAdminSessionGate('No se pudo verificar la sesión de administrador en la nube.');
+                return false;
             }
         }
 
@@ -14543,21 +14546,30 @@
                     // Correo al socio: alta activa (transferencia/efectivo validado por admin)
                     const memberValidado = members[memberIndex];
                     if (memberValidado.email) {
-                        fetch('/.netlify/functions/send-club-email', {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({
-                                type: 'member_validated_manual',
-                                email: memberValidado.email,
-                                memberId: memberValidado.id,
-                                nombre: memberValidado.nombre || memberValidado.name,
-                                apellidos: memberValidado.apellidos || memberValidado.surname,
-                                numeroSocio: memberValidado.numeroSocio || memberValidado.memberNumber
-                            })
-                        })
-                        .then(r => r.json())
-                        .then(r => { if (!r.ok) console.warn('Email validación socio:', r.error); })
-                        .catch(e => console.warn('Email validación socio:', e));
+                        (async function () {
+                            try {
+                                const headers = { 'Content-Type': 'application/json' };
+                                if (window.CdsanAdminApiAuth && window.CdsanAdminApiAuth.getAdminAuthHeaders) {
+                                    Object.assign(headers, await window.CdsanAdminApiAuth.getAdminAuthHeaders());
+                                }
+                                const r = await fetch('/.netlify/functions/send-club-email', {
+                                    method: 'POST',
+                                    headers: headers,
+                                    body: JSON.stringify({
+                                        type: 'member_validated_manual',
+                                        email: memberValidado.email,
+                                        memberId: memberValidado.id,
+                                        nombre: memberValidado.nombre || memberValidado.name,
+                                        apellidos: memberValidado.apellidos || memberValidado.surname,
+                                        numeroSocio: memberValidado.numeroSocio || memberValidado.memberNumber
+                                    })
+                                });
+                                const data = await r.json().catch(function () { return {}; });
+                                if (!r.ok || !data.ok) console.warn('Email validación socio:', data.error || r.status);
+                            } catch (e) {
+                                console.warn('Email validación socio:', e);
+                            }
+                        })();
                     }
                 }
             } catch (error) {
@@ -15130,9 +15142,13 @@
         async function triggerAutomaticSeasonRenewal(options) {
             const silent = options && options.silent;
             try {
+                const headers = { 'Content-Type': 'application/json' };
+                if (window.CdsanAdminApiAuth && window.CdsanAdminApiAuth.getAdminAuthHeaders) {
+                    Object.assign(headers, await window.CdsanAdminApiAuth.getAdminAuthHeaders());
+                }
                 const res = await fetch('/.netlify/functions/member-season-renewal', {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: headers,
                     body: '{}'
                 });
                 const data = await res.json().catch(() => ({}));

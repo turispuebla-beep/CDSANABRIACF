@@ -10,36 +10,15 @@ const {
   sendEventRegistrationConfirmedEmail
 } = require('./lib/member-email');
 const { sendClubAdminNotification } = require('./lib/club-admin-notify-email');
-const { memberExistsForEmail } = require('./lib/firestore-admin');
+const { memberExistsForEmail, clubRecordExistsForNotify } = require('./lib/firestore-admin');
+const { verifyAdminRequest } = require('./lib/admin-auth');
+const { corsHeaders, jsonResponse } = require('./lib/http-cors');
 
-const MEMBER_TYPES = new Set(['member_registered', 'member_validated_manual']);
-
-const CORS_BASE = {
-  'Access-Control-Allow-Headers': 'Content-Type',
-  'Access-Control-Allow-Methods': 'POST, OPTIONS'
-};
-
-function corsHeaders(origin) {
-  const allowed = String(process.env.ALLOWED_ORIGINS || '')
-    .split(',')
-    .map((o) => o.trim())
-    .filter(Boolean);
-  const site = String(process.env.SITE_URL || '').replace(/\/$/, '');
-  const list = allowed.length ? allowed : site ? [site] : [];
-  const ok = !list.length || list.includes(origin);
-  return {
-    ...CORS_BASE,
-    'Access-Control-Allow-Origin': ok ? origin || list[0] || '*' : 'null'
-  };
-}
-
-function json(statusCode, body, origin) {
-  return {
-    statusCode,
-    headers: { ...corsHeaders(origin), 'Content-Type': 'application/json' },
-    body: JSON.stringify(body)
-  };
-}
+const ADMIN_ONLY_TYPES = new Set([
+  'member_validated_manual',
+  'player_application_approved',
+  'player_profile_update_confirmed'
+]);
 
 exports.handler = async (event) => {
   const origin = (event.headers && (event.headers.origin || event.headers.Origin)) || '';
@@ -48,23 +27,34 @@ exports.handler = async (event) => {
     return { statusCode: 204, headers: corsHeaders(origin), body: '' };
   }
   if (event.httpMethod !== 'POST') {
-    return json(405, { ok: false, error: 'Method not allowed' }, origin);
+    return jsonResponse(405, { ok: false, error: 'Method not allowed' }, origin);
   }
 
   const cfg = getEmailConfig();
   if (!cfg.ok) {
-    return json(503, { ok: false, error: 'Correo no configurado en el servidor' }, origin);
+    return jsonResponse(503, { ok: false, error: 'Correo no configurado en el servidor' }, origin);
   }
 
   try {
     const body = JSON.parse(event.body || '{}');
     const type = String(body.type || '').trim();
 
+    if (ADMIN_ONLY_TYPES.has(type)) {
+      const auth = await verifyAdminRequest(event);
+      if (!auth.ok) {
+        return jsonResponse(auth.statusCode || 401, { ok: false, error: auth.error }, origin);
+      }
+    }
+
     const email = String(body.requesterEmail || body.email || '').trim().toLowerCase();
 
     if (type === 'club_admin_notify') {
       if (!email || !email.includes('@')) {
-        return json(400, { ok: false, error: 'email del solicitante inválido' }, origin);
+        return jsonResponse(400, { ok: false, error: 'email del solicitante inválido' }, origin);
+      }
+      const known = await clubRecordExistsForNotify(body);
+      if (!known) {
+        return jsonResponse(404, { ok: false, error: 'No hay registro del club para este aviso' }, origin);
       }
       const result = await sendClubAdminNotification({
         kind: body.kind,
@@ -91,18 +81,42 @@ exports.handler = async (event) => {
         numeroAmigo: body.numeroAmigo || body.friendNumber,
         friendNumber: body.friendNumber || body.numeroAmigo
       });
-      return json(200, { ok: true, sent: result.sent }, origin);
+      return jsonResponse(200, { ok: true, sent: result.sent }, origin);
     }
 
     if (!email || !email.includes('@')) {
-      return json(400, { ok: false, error: 'email inválido' }, origin);
+      return jsonResponse(400, { ok: false, error: 'email inválido' }, origin);
     }
 
-    if (MEMBER_TYPES.has(type)) {
+    if (type === 'member_registered') {
       const exists = await memberExistsForEmail(email, body.memberId);
       if (!exists) {
-        return json(404, { ok: false, error: 'Socio no encontrado' }, origin);
+        return jsonResponse(404, { ok: false, error: 'Socio no encontrado' }, origin);
       }
+      const nextStep = body.nextStep === 'card' ? 'card' : 'transfer';
+      const result = await sendMemberRegistrationEmail({
+        email,
+        nombre: body.nombre || body.name,
+        apellidos: body.apellidos || body.surname,
+        numeroSocio: body.numeroSocio || body.memberNumber,
+        cuota: body.cuota,
+        nextStep
+      });
+      return jsonResponse(200, { ok: true, sent: result.sent }, origin);
+    }
+
+    if (type === 'member_validated_manual') {
+      const exists = await memberExistsForEmail(email, body.memberId);
+      if (!exists) {
+        return jsonResponse(404, { ok: false, error: 'Socio no encontrado' }, origin);
+      }
+      const result = await sendMemberPaymentConfirmedEmail({
+        email,
+        nombre: body.nombre || body.name,
+        apellidos: body.apellidos || body.surname,
+        numeroSocio: body.numeroSocio || body.memberNumber
+      });
+      return jsonResponse(200, { ok: true, sent: result.sent }, origin);
     }
 
     if (type === 'player_application_approved') {
@@ -113,7 +127,7 @@ exports.handler = async (event) => {
         apellidos: body.apellidos || body.surname,
         season: body.season
       });
-      return json(
+      return jsonResponse(
         200,
         { ok: true, sent: result.sent, to: result.to || email, error: result.reason || '' },
         origin
@@ -128,62 +142,42 @@ exports.handler = async (event) => {
         apellidos: body.apellidos || body.surname,
         diff: body.diff
       });
-      return json(
+      return jsonResponse(
         200,
         { ok: true, sent: result.sent, to: result.to || email, error: result.reason || '' },
         origin
       );
     }
 
-    if (type === 'member_registered') {
-      const nextStep = body.nextStep === 'card' ? 'card' : 'transfer';
-      const result = await sendMemberRegistrationEmail({
-        email,
-        nombre: body.nombre || body.name,
-        apellidos: body.apellidos || body.surname,
-        numeroSocio: body.numeroSocio || body.memberNumber,
-        cuota: body.cuota,
-        nextStep
-      });
-      return json(200, { ok: true, sent: result.sent }, origin);
-    }
-
-    if (type === 'member_validated_manual') {
-      const result = await sendMemberPaymentConfirmedEmail({
-        email,
-        nombre: body.nombre || body.name,
-        apellidos: body.apellidos || body.surname,
-        numeroSocio: body.numeroSocio || body.memberNumber
-      });
-      return json(200, { ok: true, sent: result.sent }, origin);
-    }
-
-    if (type === 'event_registration_pending') {
-      const result = await sendEventRegistrationPendingEmail({
-        email,
-        nombre: body.nombre || body.name,
-        apellidos: body.apellidos || body.surname,
-        eventTitle: body.eventTitle || body.title,
-        eventDate: body.eventDate || body.date,
-        eventTime: body.eventTime || body.time,
-        eventLocation: body.eventLocation || body.location,
-        totalEur: body.totalEur,
-        slots: body.slots,
-        guestCount: body.guestCount
-      });
-      return json(
-        200,
-        { ok: true, sent: result.sent, to: result.to || email, error: result.reason || '' },
-        origin
-      );
-    }
-
-    if (type === 'event_registration_confirmed') {
+    if (type === 'event_registration_pending' || type === 'event_registration_confirmed') {
+      const title = String(body.eventTitle || body.title || '').trim();
+      if (!title) {
+        return jsonResponse(400, { ok: false, error: 'eventTitle requerido' }, origin);
+      }
+      if (type === 'event_registration_pending') {
+        const result = await sendEventRegistrationPendingEmail({
+          email,
+          nombre: body.nombre || body.name,
+          apellidos: body.apellidos || body.surname,
+          eventTitle: title,
+          eventDate: body.eventDate || body.date,
+          eventTime: body.eventTime || body.time,
+          eventLocation: body.eventLocation || body.location,
+          totalEur: body.totalEur,
+          slots: body.slots,
+          guestCount: body.guestCount
+        });
+        return jsonResponse(
+          200,
+          { ok: true, sent: result.sent, to: result.to || email, error: result.reason || '' },
+          origin
+        );
+      }
       const result = await sendEventRegistrationConfirmedEmail({
         email,
         nombre: body.nombre || body.name,
         apellidos: body.apellidos || body.surname,
-        eventTitle: body.eventTitle || body.title,
+        eventTitle: title,
         eventDate: body.eventDate || body.date,
         eventTime: body.eventTime || body.time,
         eventLocation: body.eventLocation || body.location,
@@ -192,16 +186,16 @@ exports.handler = async (event) => {
         guestCount: body.guestCount,
         paymentChannel: body.paymentChannel || body.paymentMethod
       });
-      return json(
+      return jsonResponse(
         200,
         { ok: true, sent: result.sent, to: result.to || email, error: result.reason || '' },
         origin
       );
     }
 
-    return json(400, { ok: false, error: 'type no válido' }, origin);
+    return jsonResponse(400, { ok: false, error: 'type no válido' }, origin);
   } catch (err) {
     console.error('send-club-email:', err);
-    return json(500, { ok: false, error: err.message || 'Error interno' }, origin);
+    return jsonResponse(500, { ok: false, error: err.message || 'Error interno' }, origin);
   }
 };

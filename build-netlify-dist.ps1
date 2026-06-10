@@ -46,6 +46,31 @@ if (Test-Path $jsSrc) {
     Write-Host '      + js/' -ForegroundColor Gray
 }
 
+# Config temporada socios (cliente) alineada con MEMBERSHIP_* / netlify.toml
+function Get-MembershipEnvVal($name, $default) {
+    $v = [Environment]::GetEnvironmentVariable($name)
+    if ([string]::IsNullOrWhiteSpace($v)) { return $default }
+    return $v
+}
+$mClose = Get-MembershipEnvVal 'MEMBERSHIP_SEASON_CLOSE_MONTH' '5'
+$mDay = Get-MembershipEnvVal 'MEMBERSHIP_SEASON_CLOSE_DAY' '31'
+$mDays = Get-MembershipEnvVal 'MEMBERSHIP_PAYMENT_DEADLINE_DAYS' '7'
+$mYear = Get-MembershipEnvVal 'MEMBERSHIP_SEASON_FIRST_CLOSE_YEAR' '2027'
+$membershipEnvJs = @"
+/** Generado por build-netlify-dist.ps1 — alineado con variables MEMBERSHIP_* de Netlify. */
+window.CDSAN_MEMBERSHIP_SEASON = {
+  closeMonth: $mClose,
+  closeDay: $mDay,
+  paymentDeadlineDays: $mDays,
+  firstCloseYear: $mYear
+};
+"@
+$membershipEnvRoot = Join-Path $jsSrc 'cdsan-membership-env.js'
+$membershipEnvDist = Join-Path $jsDest 'cdsan-membership-env.js'
+Set-Content -Path $membershipEnvRoot -Value $membershipEnvJs -Encoding UTF8
+Set-Content -Path $membershipEnvDist -Value $membershipEnvJs -Encoding UTF8
+Write-Host '      + js/cdsan-membership-env.js (MEMBERSHIP_*)' -ForegroundColor Gray
+
 # Escudos e imágenes del club (carpeta assets/)
 $assetsSrc = Join-Path $root 'assets'
 if (-not (Test-Path $assetsSrc)) { New-Item -ItemType Directory -Path $assetsSrc | Out-Null }

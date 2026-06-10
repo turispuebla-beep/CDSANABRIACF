@@ -1247,12 +1247,33 @@ async function setupRealtimeSync() {
       console.log('Sincronizacion socios/amigos en tiempo real: solo con sesion admin Firebase');
     }
     
+    function stripSensitivePlayerFields(data, adminUser) {
+      const row = { ...(data || {}) };
+      if (!adminUser) {
+        delete row.portalPasswordHash;
+        delete row.passwordHash;
+        delete row.password;
+        delete row.plainPassword;
+      }
+      return row;
+    }
+
+    function stripSensitiveCoachFields(data, adminUser) {
+      const row = { ...(data || {}) };
+      if (!adminUser) {
+        delete row.passwordHash;
+        delete row.password;
+        delete row.plainPassword;
+      }
+      return row;
+    }
+
     const playersListener = onSnapshot(collection(db, 'sanabria_players'), (snapshot) => {
       const players = [];
       snapshot.forEach((doc) => {
         players.push({
           id: doc.id,
-          ...doc.data()
+          ...stripSensitivePlayerFields(doc.data(), isAdminUser)
         });
       });
       
@@ -1365,7 +1386,7 @@ async function setupRealtimeSync() {
     const coachesListener = onSnapshot(collection(db, 'sanabria_coaches'), (snapshot) => {
       const coaches = [];
       snapshot.forEach((doc) => {
-        const data = doc.data();
+        const data = stripSensitiveCoachFields(doc.data(), isAdminUser);
         coaches.push({
           id: doc.id,
           ...data,

@@ -136,9 +136,13 @@
     let emailTo = '';
     let emailError = '';
     try {
+      const headers = { 'Content-Type': 'application/json' };
+      if (global.CdsanAdminApiAuth && global.CdsanAdminApiAuth.getAdminAuthHeaders) {
+        Object.assign(headers, await global.CdsanAdminApiAuth.getAdminAuthHeaders());
+      }
       const res = await fetch('/.netlify/functions/approve-player-application', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: headers,
         body: JSON.stringify({
           applicationId: applicationId,
           validatedBy: adminUser

@@ -12,6 +12,8 @@
   MEMBERSHIP_SEASON_CLOSE_DAY = "31"
   MEMBERSHIP_PAYMENT_DEADLINE_DAYS = "7"
   MEMBERSHIP_SEASON_FIRST_CLOSE_YEAR = "2027"
+  # Opcional: Bearer para pruebas manuales de member-season-renewal (el cron usa cabecera Netlify)
+  # NETLIFY_CRON_SECRET = "..."
 
 [[redirects]]
   from = "/*"

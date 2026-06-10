@@ -86,21 +86,58 @@ function settingsRef() {
 
 const DEFAULT_MEMBERSHIP_PRICING = { cuotaMenor: 10, cuotaMayor: 25, edadMaxMenor: 17 };
 
+function parseMembershipPricingDoc(d) {
+  if (!d || typeof d !== 'object') return null;
+  return {
+    cuotaMenor: Number(d.cuotaMenor) || DEFAULT_MEMBERSHIP_PRICING.cuotaMenor,
+    cuotaMayor: Number(d.cuotaMayor) || DEFAULT_MEMBERSHIP_PRICING.cuotaMayor,
+    edadMaxMenor: Number(d.edadMaxMenor) || DEFAULT_MEMBERSHIP_PRICING.edadMaxMenor
+  };
+}
+
+/** Panel guarda en cfg_clubMembershipPricing; legacy clubMembershipPricing. */
 async function readMembershipPricing() {
-  try {
-    const snap = await settingsRef().doc('clubMembershipPricing').get();
-    if (snap.exists) {
-      const d = snap.data() || {};
-      return {
-        cuotaMenor: Number(d.cuotaMenor) || DEFAULT_MEMBERSHIP_PRICING.cuotaMenor,
-        cuotaMayor: Number(d.cuotaMayor) || DEFAULT_MEMBERSHIP_PRICING.cuotaMayor,
-        edadMaxMenor: Number(d.edadMaxMenor) || DEFAULT_MEMBERSHIP_PRICING.edadMaxMenor
-      };
+  const docIds = ['cfg_clubMembershipPricing', 'clubMembershipPricing'];
+  for (let i = 0; i < docIds.length; i++) {
+    try {
+      const snap = await settingsRef().doc(docIds[i]).get();
+      if (snap.exists) {
+        const parsed = parseMembershipPricingDoc(snap.data());
+        if (parsed) return parsed;
+      }
+    } catch (e) {
+      console.warn('readMembershipPricing:', docIds[i], e.message);
     }
-  } catch (e) {
-    console.warn('readMembershipPricing:', e.message);
   }
   return { ...DEFAULT_MEMBERSHIP_PRICING };
+}
+
+function memberDocIsActive(data) {
+  const st = String((data && data.status) || '').toLowerCase();
+  if (st === 'active') return true;
+  const est = String((data && data.estado) || '').toLowerCase();
+  return !st && (est === 'activo' || est === 'activa');
+}
+
+/** Comprueba que el aviso al club corresponde a un registro real reciente. */
+async function clubRecordExistsForNotify(opts) {
+  const email = String(opts.email || opts.requesterEmail || '').trim().toLowerCase();
+  const dni = normalizeDni(opts.dni);
+  if (email) {
+    const mq = await membersRef().where('email', '==', email).limit(1).get();
+    if (!mq.empty) return true;
+    const fq = await friendsRef().where('email', '==', email).limit(1).get();
+    if (!fq.empty) return true;
+  }
+  if (dni) {
+    const mq = await membersRef().where('dni', '==', dni).limit(1).get();
+    if (!mq.empty) return true;
+    const fq = await friendsRef().where('dni', '==', dni).limit(1).get();
+    if (!fq.empty) return true;
+    const pq = await playersRef().where('dni', '==', dni).limit(1).get();
+    if (!pq.empty) return true;
+  }
+  return false;
 }
 
 /**
@@ -127,7 +164,25 @@ async function applyAutomaticSeasonRenewal(options = {}) {
   const refLabel = membershipSeason.cierreRefLabel(anioRef);
   const ts = now.toISOString();
 
-  const q = await membersRef().where('status', '==', 'active').get();
+  const [qActive, qLegacy] = await Promise.all([
+    membersRef().where('status', '==', 'active').get(),
+    membersRef().where('estado', '==', 'activo').get()
+  ]);
+  const seen = new Set();
+  const docs = [];
+  qActive.docs.forEach((d) => {
+    if (!seen.has(d.id)) {
+      seen.add(d.id);
+      docs.push(d);
+    }
+  });
+  qLegacy.docs.forEach((d) => {
+    if (!seen.has(d.id) && memberDocIsActive(d.data())) {
+      seen.add(d.id);
+      docs.push(d);
+    }
+  });
+
   let updated = 0;
   const batchSize = 400;
   let batch = initAdmin().batch();
@@ -140,7 +195,7 @@ async function applyAutomaticSeasonRenewal(options = {}) {
     ops = 0;
   }
 
-  for (const doc of q.docs) {
+  for (const doc of docs) {
     const data = doc.data() || {};
     const cuota = membershipSeason.cuotaSegunMiembro(data, anioRef, pricing);
     batch.set(
@@ -1797,6 +1852,7 @@ module.exports = {
   completeEventPayment,
   completePlayerInscription,
   memberExistsForEmail,
+  clubRecordExistsForNotify,
   applicationsRef,
   normalizeDni,
   findApplicationByDniSeason,

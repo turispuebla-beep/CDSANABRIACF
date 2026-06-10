@@ -197,7 +197,13 @@ Sustituye `https://www.cdsanabriacf.com` por tu dominio:
 
 ## 3. Reglas Firestore (si cambiaste `firestore.rules`)
 
-Copia el contenido de `firestore.rules` en Firebase Console → Firestore → Reglas → Publicar.
+**Obligatorio tras cambios de seguridad en reglas.** Copia el contenido de `firestore.rules` en Firebase Console → Firestore → Reglas → Publicar.
+
+O desde la raíz del repo (con Firebase CLI enlazado a `cdsanabriacf2026`):
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File ".\scripts\publish-firestore-rules.ps1"
+```
 
 Incluye bloqueo de altas públicas cuando **modo actualización** está ON (`sanabria_config/sitePublicMode.actionsDisabled == true`).
 
