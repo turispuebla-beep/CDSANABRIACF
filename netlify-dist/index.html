@@ -2447,13 +2447,19 @@
                 <p style="color:#64748b;margin-bottom:12px;">Temporada <strong id="qjSeasonLabel">2026-2027</strong></p>
                 <div style="display:flex;flex-direction:column;gap:12px;">
                     <div>
-                        <button type="button" class="cta-button" style="margin:0;background:#1e3a8a;width:100%;" onclick="goYaSoyJugadorInscripcion()">Ya soy jugador/a</button>
+                        <button type="button" class="cta-button" style="margin:0;background:#1e3a8a;width:100%;" onclick="goYaSoyJugadorInscripcion()">Nueva inscripción</button>
                         <p style="margin:6px 0 0;font-size:0.78rem;text-align:center;"><strong style="text-transform:uppercase;color:#1e3a8a;">Jugué en la temporada 2025-2026</strong></p>
                     </div>
                     <div>
                         <button type="button" class="cta-button" style="margin:0;background:#059669;width:100%;" onclick="openNuevoJugadorIntroModal()">Nuevo jugador/a</button>
                         <p style="margin:6px 0 0;font-size:0.78rem;text-align:center;"><strong style="text-transform:uppercase;color:#1e3a8a;">Jugadores que NO PERTENECIERON AL CLUB en la temporada 2025-2026</strong></p>
                     </div>
+                </div>
+                <div style="margin-top:18px;padding-top:14px;border-top:1px solid #e2e8f0;text-align:center;">
+                    <button type="button" onclick="goBuscarMiFicha()" style="margin:0;padding:6px 10px;background:none;border:none;cursor:pointer;color:#64748b;line-height:1.2;" aria-label="Buscar mi ficha">
+                        <span style="display:block;font-size:1.35rem;line-height:1;" aria-hidden="true">🔍</span>
+                        <span style="display:block;font-size:0.72rem;margin-top:4px;color:#64748b;">Buscar mi ficha</span>
+                    </button>
                 </div>
             </div>
         </div>
@@ -3879,6 +3885,12 @@
             closeQuieresJugarModal();
             window.location.href = 'inscripcion-jugador.html?flow=finalize';
         }
+        function goBuscarMiFicha() {
+            if (window.SiteUpdateMode && !SiteUpdateMode.guard()) return;
+            closeQuieresJugarModal();
+            closeNuevoJugadorIntroModal();
+            window.location.href = 'inscripcion-jugador.html?flow=lookup';
+        }
         function onAppBirthChange() {
             const bd = document.getElementById('appBirth');
             const block = document.getElementById('appGuardianBlock');
@@ -4266,6 +4278,10 @@
                         <div class="form-group">
                             <label for="coachPassword">🔒 Clave de acceso:</label>
                             <input type="password" id="coachPassword" name="password" placeholder="Clave asignada por admin" required>
+                        </div>
+                        <div class="form-group" style="display: flex; align-items: flex-start; gap: 8px; margin: 15px 0;">
+                            <input type="checkbox" id="coachRememberSession" style="width: auto; margin: 4px 0 0;">
+                            <label for="coachRememberSession" style="margin: 0; font-size: 0.9rem; color: #666; line-height: 1.4;">🔐 Recordar sesión y recibir notificaciones</label>
                         </div>
                         <div class="form-buttons">
                             <button type="submit" class="btn-primary">Acceder</button>
@@ -7986,17 +8002,76 @@
                 }
             }
             
-            // Login exitoso
-            localStorage.setItem('currentCoach', JSON.stringify(coach));
+            const rememberSession = document.getElementById('coachRememberSession')
+                ? document.getElementById('coachRememberSession').checked
+                : false;
+
+            const coachSession = {
+                ...coach,
+                loginTime: new Date().toISOString(),
+                rememberSession: rememberSession,
+                receiveNotifications: rememberSession
+            };
+            delete coachSession.password;
+
+            localStorage.setItem('currentCoach', JSON.stringify(coachSession));
+            if (rememberSession) {
+                sessionStorage.setItem('rememberedCoach', JSON.stringify(coachSession));
+            } else {
+                sessionStorage.removeItem('rememberedCoach');
+            }
+
+            if (rememberSession) {
+                await activateCoachNotifications(coachSession);
+            }
+
             addCoachActivity({ action: 'login_success', coachId: coach.id, team: coach.team });
             closeLoginModal();
             alert(`✅ ¡Bienvenido de vuelta! Acceso concedido como entrenador.\n\n👨‍🏫 ${coach.name} ${coach.surname}\n⚽ Equipo: ${coach.team}`);
             
             // Actualizar estado de login en la página principal
             updateLoginStatus();
+            updateUserInterface();
             
             // Abrir panel real de entrenador
             showCoachPanel();
+        }
+
+        async function activateCoachNotifications(coach) {
+            if (!coach || !coach.email) return;
+            if (window.clubNotificationSystem && typeof window.clubNotificationSystem.setCurrentUser === 'function') {
+                window.clubNotificationSystem.setCurrentUser({
+                    id: coach.id,
+                    email: coach.email,
+                    name: coach.name || coach.nombre || '',
+                    role: 'coach'
+                });
+            }
+            if (
+                window.clubNotificationSystem &&
+                typeof window.clubNotificationSystem.solicitarPermisoNotificacionesNavegador === 'function'
+            ) {
+                try {
+                    await window.clubNotificationSystem.solicitarPermisoNotificacionesNavegador();
+                } catch (e) {
+                    console.warn('Notificaciones entrenador:', e);
+                }
+            }
+        }
+
+        function syncCoachNotificationSession() {
+            try {
+                const coach = JSON.parse(localStorage.getItem('currentCoach') || 'null');
+                if (!coach || !coach.email || !coach.receiveNotifications) return;
+                if (window.clubNotificationSystem && typeof window.clubNotificationSystem.setCurrentUser === 'function') {
+                    window.clubNotificationSystem.setCurrentUser({
+                        id: coach.id,
+                        email: coach.email,
+                        name: coach.name || coach.nombre || '',
+                        role: 'coach'
+                    });
+                }
+            } catch (_) {}
         }
 
         function getCoachSession() {
@@ -8630,6 +8705,7 @@
         function logoutCoachSession() {
             if (!confirm('¿Seguro que quieres cerrar sesión como entrenador?')) return;
             localStorage.removeItem('currentCoach');
+            sessionStorage.removeItem('rememberedCoach');
             backToMainFromCoach();
             updateLoginStatus();
             updateUserInterface();
@@ -9189,6 +9265,7 @@
             // Limpiar sesiones recordadas
             sessionStorage.removeItem('rememberedSocio');
             sessionStorage.removeItem('rememberedAmigo');
+            sessionStorage.removeItem('rememberedCoach');
             
             // Actualizar estado de login
             updateLoginStatus();
@@ -9352,6 +9429,41 @@
                     console.error('❌ Error al restaurar sesión de amigo:', error);
                     sessionStorage.removeItem('rememberedAmigo');
                 }
+            }
+
+            const rememberedCoach = sessionStorage.getItem('rememberedCoach');
+            if (rememberedCoach) {
+                try {
+                    const coachData = JSON.parse(rememberedCoach);
+                    if (coachData.rememberSession) {
+                        const currentCoaches = JSON.parse(localStorage.getItem('clubCoaches') || '[]');
+                        const updatedCoach = currentCoaches.find(function (c) {
+                            return String(c.email || '').trim().toLowerCase() === String(coachData.email || '').trim().toLowerCase();
+                        });
+                        if (updatedCoach && updatedCoach.status === 'active') {
+                            const updatedSessionData = {
+                                ...updatedCoach,
+                                loginTime: coachData.loginTime,
+                                rememberSession: true,
+                                receiveNotifications: !!coachData.receiveNotifications
+                            };
+                            delete updatedSessionData.password;
+                            localStorage.setItem('currentCoach', JSON.stringify(updatedSessionData));
+                            sessionStorage.setItem('rememberedCoach', JSON.stringify(updatedSessionData));
+                            syncCoachNotificationSession();
+                            console.log('✅ Sesión de entrenador restaurada automáticamente');
+                        } else {
+                            sessionStorage.removeItem('rememberedCoach');
+                            localStorage.removeItem('currentCoach');
+                            console.log('⚠️ Sesión de entrenador eliminada - usuario no encontrado o inactivo');
+                        }
+                    }
+                } catch (error) {
+                    console.error('❌ Error al restaurar sesión de entrenador:', error);
+                    sessionStorage.removeItem('rememberedCoach');
+                }
+            } else {
+                syncCoachNotificationSession();
             }
         }
 

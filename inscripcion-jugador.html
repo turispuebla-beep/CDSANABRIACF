@@ -277,6 +277,11 @@
                 <strong style="display:block;color:#1e3a8a;margin-bottom:6px;">Finalizar ficha — Solo admitidos</strong>
                 Identifícate con tu DNI y contraseña. Si el club te ha admitido, podrás completar categoría, ropa y pago.
             </p>
+            <p id="inscEditIntro" class="muted" style="display:none;margin:0 0 14px;text-align:center;font-size:0.9rem;line-height:1.45;">
+                <strong style="display:block;color:#1e3a8a;margin-bottom:6px;">Buscar mi ficha</strong>
+                Consulta o corrige los datos que ya enviaste. Accede con <strong>DNI + contraseña</strong> (o nombre + apellidos + contraseña si aún no tienes DNI).
+            </p>
+            <div id="insEditProfileBanner" class="insc-locked-banner" style="display:none;margin-bottom:14px;" role="status"></div>
             <div id="inscPasswordOnlyBanner" class="insc-locked-banner" style="display:none;" role="status"></div>
             <div id="inscClosedWrap" class="closed" style="display:none;">
                 <p id="inscClosedMsg">Las inscripciones no están abiertas.</p>
@@ -299,6 +304,7 @@
                             <a href="#" id="insPortalForgotLink" style="color:#1d4ed8;font-weight:600;">¿Olvidaste tu contraseña?</a> — escribe al club y te la restablecerán.
                         </p>
                         <button type="button" class="btn btn-primary" id="insLookupBtn" style="margin:0;">Acceder y continuar inscripción</button>
+                        <p class="muted" id="insLookupMinorHint" style="display:none;font-size:0.85rem;margin:10px 0 0;">Si eres menor y aún no tienes DNI, deja el DNI en blanco e indica nombre y apellidos.</p>
                     </div>
                     <div id="insLookupAuthWrap" style="display:none;margin-top:14px;padding-top:14px;border-top:1px solid #e2e8f0;">
                         <p id="insLookupAuthHint" class="muted" style="margin-bottom:10px;"></p>
@@ -447,7 +453,7 @@
                     </label>
                 </div>
 
-                <section class="card">
+                <section class="card" id="insKitSection">
                     <h2>Ropa entreno</h2>
                     <table class="insc-size-guide" aria-label="Guía de tallas">
                         <thead>
@@ -481,13 +487,20 @@
                     <label class="fee-line"><input type="checkbox" id="insPhotoConsent"> Consentimiento para aparecer en fotos y vídeos del club *</label>
                 </section>
 
-                <section class="card">
+                <section class="card" id="insPaymentSection">
                     <h2>Resumen del pago</h2>
                     <div id="cartLines"></div>
                     <div class="cart-total">Total a pagar: <span id="cartTotal">0,00 €</span></div>
                     <div id="payCardBlock"><button type="button" class="btn btn-card" id="btnPayCard">💳 Pagar con tarjeta o Bizum</button></div>
                     <div id="payBizumBlock"><button type="button" class="btn btn-bizum" id="btnPayBizum">📱 Pagar con Bizum</button></div>
                     <div id="payTransferBlock"><button type="button" class="btn btn-transfer" id="btnPayTransfer">🏦 Solicitar inscripción por transferencia, efectivo o TPV</button></div>
+                </section>
+
+                <section class="card" id="insSaveProfileSection" style="display:none;">
+                    <h2>Guardar cambios</h2>
+                    <p class="muted" style="margin-top:0;">Los cambios se envían al club. No incluye pago ni ropa.</p>
+                    <button type="button" class="btn btn-primary" id="insSaveProfileBtn" style="margin:0;">Guardar cambios en mi ficha</button>
+                    <p id="insSaveProfileMsg" class="muted" style="margin:10px 0 0;"></p>
                 </section>
             </div>
         </div>

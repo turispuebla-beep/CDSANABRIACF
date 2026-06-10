@@ -5160,6 +5160,9 @@
                             const isMinorIcon = player.age < 18 ? '👶' : '👤';
                             const seasonTag = player.inscriptionSeason ? ` · 🗓️ ${player.inscriptionSeason}` : '';
                             const portalPwdSet = !!(player.portalPasswordHash && String(player.portalPasswordHash).trim());
+                            const selfUpdateAt = player.playerUpdatedBySelfAt
+                                ? new Date(player.playerUpdatedBySelfAt).toLocaleString('es-ES')
+                                : '';
                             
                             html += `
                                 <div style="display: flex; justify-content: space-between; align-items: center; padding: 15px; border-bottom: 1px solid #eee; background: #f8f9fa; margin-bottom: 10px; border-radius: 8px;">
@@ -5181,6 +5184,7 @@
                                             📊 PJ: ${player.matches || 0} | ⚽ Goles: ${player.goals || 0} | 🎯 Asist: ${player.assists || 0} | 🟨 ${player.yellowCards || 0} | 🟥 ${player.redCards || 0}
                                         </div>
                                         ${player.age < 18 ? `<div style="font-size: 0.8em; color: #f59e0b; margin-top: 3px;">👨‍👩‍👧‍👦 Tutor: ${player.guardianName} (${player.guardianPhone})</div>` : ''}
+                                        ${selfUpdateAt ? `<div style="font-size: 0.8em; color: #7c3aed; margin-top: 4px; font-weight: 600;">📝 Ficha actualizada por el jugador el ${selfUpdateAt}</div>` : ''}
                                     </div>
                                     <div style="display: flex; gap: 5px;">
                                         <button onclick="viewPlayerDetails('${player.id}')" style="padding: 5px 10px; font-size: 0.8rem; background: #6c757d; color: white; border: none; border-radius: 4px; cursor: pointer;">👁️ Ver</button>

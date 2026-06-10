@@ -890,6 +890,228 @@ async function checkPlayerPortalAccess(dni, name, surname, season) {
   };
 }
 
+function isPlayerInscriptionPaid(p) {
+  if (!p) return false;
+  return (
+    !!p.inscriptionPaid ||
+    String(p.paymentStatus || '').toLowerCase() === 'paid' ||
+    String(p.inscriptionStatus || '').toLowerCase() === 'paid'
+  );
+}
+
+function isPlayerProfileReadOnly(p) {
+  if (!p) return true;
+  const st = String(p.status || p.estado || '').toLowerCase();
+  const ins = String(p.inscriptionStatus || '').toLowerCase();
+  return st === 'rejected' || st === 'inactive' || st === 'baja' || ins === 'rejected';
+}
+
+function sanitizePlayerForPortalEdit(data) {
+  if (!data) return null;
+  const base = sanitizePlayerForPortal(data);
+  if (!base) return null;
+  return {
+    ...base,
+    domicilio: data.domicilio || data.address || data.direccion || '',
+    localidad: data.localidad || data.town || '',
+    provincia: data.provincia || data.province || 'Zamora',
+    bloodGroup: data.bloodGroup || '',
+    injuries: data.injuries || '',
+    injuriesYear: data.injuriesYear || '',
+    allergyIllness: data.allergyIllness || '',
+    observations: data.observations || '',
+    guardianDomicilio: data.guardianDomicilio || '',
+    guardianLocalidad: data.guardianLocalidad || '',
+    guardianProvincia: data.guardianProvincia || 'Zamora',
+    guardianSameDomicilio: data.guardianSameDomicilio !== false,
+    playerUpdatedBySelfAt: data.playerUpdatedBySelfAt || null,
+    inscriptionPaid: isPlayerInscriptionPaid(data),
+    profileReadOnly: isPlayerProfileReadOnly(data)
+  };
+}
+
+function profileDiffValue(obj, key) {
+  if (!obj) return '';
+  if (key === 'phone') return String(obj.phone || obj.telefono || '').trim();
+  if (key === 'name') return String(obj.name || obj.nombre || '').trim();
+  if (key === 'surname') return String(obj.surname || obj.apellidos || '').trim();
+  if (key === 'birthDate') return String(obj.birthDate || obj.fechaNacimiento || '').trim();
+  if (key === 'category') return String(obj.category || obj.categoria || '').trim();
+  if (key === 'dni') return String(obj.dni || '').trim();
+  return String(obj[key] == null ? '' : obj[key]).trim();
+}
+
+function computePlayerProfileDiff(before, after) {
+  const pairs = [
+    ['name', 'Nombre'],
+    ['surname', 'Apellidos'],
+    ['dni', 'DNI'],
+    ['email', 'Email'],
+    ['phone', 'Teléfono'],
+    ['domicilio', 'Domicilio'],
+    ['localidad', 'Localidad'],
+    ['provincia', 'Provincia'],
+    ['birthDate', 'Fecha nacimiento'],
+    ['category', 'Categoría'],
+    ['position', 'Posición'],
+    ['bloodGroup', 'Grupo sanguíneo'],
+    ['allergyIllness', 'Alergias / enfermedad'],
+    ['injuries', 'Lesiones'],
+    ['observations', 'Observaciones'],
+    ['guardianName', 'Tutor/a'],
+    ['guardianDNI', 'DNI tutor/a'],
+    ['guardianPhone', 'Tel. tutor/a'],
+    ['guardianEmail', 'Email tutor/a']
+  ];
+  const changes = [];
+  pairs.forEach(function (pair) {
+    const key = pair[0];
+    const label = pair[1];
+    const b = profileDiffValue(before, key);
+    const a = profileDiffValue(after, key);
+    if (b !== a) {
+      changes.push({ label: label, before: b || '—', after: a || '—' });
+    }
+  });
+  return changes;
+}
+
+function buildPortalProfilePatch(existing, incoming, paid) {
+  const src = incoming && typeof incoming === 'object' ? incoming : {};
+  const out = {};
+  const allowAlways = [
+    'phone',
+    'telefono',
+    'email',
+    'domicilio',
+    'localidad',
+    'provincia',
+    'address',
+    'direccion',
+    'bloodGroup',
+    'allergyIllness',
+    'injuries',
+    'injuriesYear',
+    'observations',
+    'position',
+    'posicion',
+    'weightKg',
+    'heightCm',
+    'guardianName',
+    'guardianPhone',
+    'guardianEmail',
+    'guardianDomicilio',
+    'guardianLocalidad',
+    'guardianProvincia',
+    'guardianAddress',
+    'guardianSameDomicilio'
+  ];
+  const allowIfNotPaid = [
+    'name',
+    'nombre',
+    'surname',
+    'apellidos',
+    'dni',
+    'birthDate',
+    'fechaNacimiento',
+    'category',
+    'categoria',
+    'guardianDNI',
+    'guardianDni'
+  ];
+  allowAlways.forEach(function (k) {
+    if (src[k] !== undefined) out[k] = src[k];
+  });
+  if (!paid) {
+    allowIfNotPaid.forEach(function (k) {
+      if (src[k] !== undefined) out[k] = src[k];
+    });
+  }
+  return out;
+}
+
+async function verifyPlayerPortalLoginById(playerId, password) {
+  const snap = await playersRef().doc(String(playerId)).get();
+  if (!snap.exists) return { ok: false, error: 'not_found' };
+  const data = { id: snap.id, ...snap.data() };
+  const hash = String(data.portalPasswordHash || data.passwordHash || '').trim();
+  if (!hash) return { ok: false, error: 'no_password' };
+  if (hashPortalPassword(password) !== hash) return { ok: false, error: 'bad_password' };
+  return { ok: true, player: data };
+}
+
+async function loginPlayerForProfileEdit(dni, password, season, name, surname) {
+  const result = await verifyPlayerPortalLogin(dni, password, season, name, surname);
+  if (!result.ok) return result;
+  const snap = await playersRef().doc(String(result.player.id)).get();
+  if (!snap.exists) return { ok: false, error: 'not_found' };
+  return {
+    ok: true,
+    player: sanitizePlayerForPortalEdit({ id: snap.id, ...snap.data() })
+  };
+}
+
+async function updatePlayerProfileByPortal(opts) {
+  const playerId = String(opts.playerId || '').trim();
+  const password = String(opts.password || '');
+  const season = String(opts.season || '').trim();
+  let auth;
+  if (playerId) {
+    auth = await verifyPlayerPortalLoginById(playerId, password);
+  } else {
+    auth = await verifyPlayerPortalLogin(
+      opts.dni,
+      password,
+      season,
+      opts.name || opts.nombre,
+      opts.surname || opts.apellidos
+    );
+  }
+  if (!auth.ok) return auth;
+
+  const id = String(auth.player.id || playerId);
+  const ref = playersRef().doc(id);
+  const snap = await ref.get();
+  if (!snap.exists) return { ok: false, error: 'not_found' };
+  const existing = { id: snap.id, ...snap.data() };
+
+  if (isPlayerProfileReadOnly(existing)) {
+    return { ok: false, error: 'profile_locked' };
+  }
+
+  const paid = isPlayerInscriptionPaid(existing);
+  const patch = buildPortalProfilePatch(existing, opts.incoming || {}, paid);
+  const mergedPreview = Object.assign({}, existing, patch);
+  const diff = computePlayerProfileDiff(existing, mergedPreview);
+  if (!diff.length) return { ok: false, error: 'sin_cambios' };
+
+  const now = new Date().toISOString();
+  const logEntry = { at: now, by: 'jugador_portal', changes: diff };
+  const merged = normalizePlayerRecordFields(
+    Object.assign({}, existing, patch, {
+      playerUpdatedBySelfAt: now,
+      playerChangeLog: []
+        .concat(Array.isArray(existing.playerChangeLog) ? existing.playerChangeLog : [])
+        .concat([logEntry])
+        .slice(-25)
+    })
+  );
+
+  await ref.set(merged, { merge: true });
+
+  let savedMember = null;
+  if (playerInscriptionLinksSocioFromReg(merged)) {
+    savedMember = await upsertMemberSocioJugadorFromPlayer(Object.assign({}, merged, { id }));
+    if (savedMember && savedMember.id) {
+      await ref.set({ linkedMemberId: savedMember.id, updatedAt: now }, { merge: true });
+      merged.linkedMemberId = savedMember.id;
+    }
+  }
+
+  const playerOut = sanitizePlayerForPortalEdit(Object.assign({}, merged, { id }));
+  return { ok: true, player: playerOut, diff: diff, member: savedMember, paid: paid };
+}
+
 function normalizePlayerRecordFields(raw) {
   const p = raw && typeof raw === 'object' ? { ...raw } : {};
   const name = String(p.name || p.nombre || '').trim();
@@ -1470,6 +1692,12 @@ module.exports = {
   createPlayerPortalResetToken,
   resetPlayerPortalPasswordWithToken,
   checkPlayerPortalAccess,
+  isPlayerInscriptionPaid,
+  isPlayerProfileReadOnly,
+  sanitizePlayerForPortalEdit,
+  computePlayerProfileDiff,
+  loginPlayerForProfileEdit,
+  updatePlayerProfileByPortal,
   normalizePlayerRecordFields,
   upsertPlayerInscriptionRecord,
   upsertMemberSocioJugadorFromPlayer,

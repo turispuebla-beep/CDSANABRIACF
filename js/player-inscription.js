@@ -550,6 +550,56 @@
     return result.player;
   }
 
+  async function persistProfileUpdateViaNetlify(opts) {
+    const payload = opts && typeof opts === 'object' ? opts : {};
+    const incoming = normalizePlayerDualFields(payload.incoming || {});
+    delete incoming.photo;
+    delete incoming.portalPasswordHash;
+    const res = await fetch('/.netlify/functions/update-player-profile', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        playerId: payload.playerId,
+        dni: payload.dni,
+        name: payload.name,
+        surname: payload.surname,
+        password: payload.password,
+        season: payload.season,
+        incoming: incoming
+      })
+    });
+    const json = await res.json().catch(function () {
+      return { ok: false };
+    });
+    if (!res.ok || !json.ok) {
+      const err = new Error(
+        json.error === 'bad_password'
+          ? 'Contraseña incorrecta.'
+          : json.error === 'profile_locked'
+            ? 'Tu ficha no admite cambios (rechazada o de baja).'
+            : json.error === 'sin_cambios'
+              ? 'No hay cambios que guardar.'
+              : json.error ||
+                'No se pudieron guardar los cambios. Reintenta o contacta con el club.'
+      );
+      err.code = json.error;
+      throw err;
+    }
+    const remotePlayer = json.player || null;
+    const remoteMember = json.member || null;
+    let savedPlayer = remotePlayer;
+    if (remotePlayer) {
+      savedPlayer = syncLocalPlayerAfterRemote(
+        { id: payload.playerId, ...(payload.incoming || {}) },
+        remotePlayer
+      );
+    }
+    if (remoteMember) {
+      syncLocalMemberAfterRemote(null, remoteMember);
+    }
+    return { player: savedPlayer, diff: json.diff || [], member: remoteMember };
+  }
+
   async function persistPlayerFirebase(player, opts) {
     const normalized = normalizePlayerDualFields(player);
     const requireCloud =
@@ -1040,6 +1090,7 @@
     needsPaymentValidation: needsPaymentValidation,
     savePending: savePending,
     loadPending: loadPending,
+    persistProfileUpdateViaNetlify: persistProfileUpdateViaNetlify,
     PENDING_KEY: PENDING_KEY
   };
 })(typeof window !== 'undefined' ? window : globalThis);

@@ -452,6 +452,69 @@ async function sendEventRegistrationConfirmedEmail(data) {
   }
 }
 
+function buildPlayerProfileUpdateConfirmedContent(data) {
+  const nombre = escapeHtml(memberDisplayName(data));
+  const diff = Array.isArray(data.diff) ? data.diff : [];
+  const rows = diff.length
+    ? diff
+        .map(function (c) {
+          return (
+            '<tr><td style="padding:6px 12px 6px 0;color:#64748b;vertical-align:top"><strong>' +
+            escapeHtml(c.label || '') +
+            '</strong></td><td style="padding:6px 0">' +
+            escapeHtml(String(c.before || '—')) +
+            ' → <strong>' +
+            escapeHtml(String(c.after || '—')) +
+            '</strong></td></tr>'
+          );
+        })
+        .join('')
+    : '<tr><td colspan="2" style="padding:8px 0;color:#64748b">Datos actualizados correctamente.</td></tr>';
+  const subject = `Actualización de ficha recibida — ${CLUB_NAME}`;
+  const html = `
+    <div style="font-family:system-ui,sans-serif;max-width:560px;color:#1e293b;line-height:1.5">
+      <h2 style="color:#1e3a8a;margin:0 0 12px">Ficha actualizada</h2>
+      <p>Hola, <strong>${nombre}</strong>:</p>
+      <p>Hemos recibido los cambios en tu ficha de jugador/a del <strong>${CLUB_NAME}</strong>.</p>
+      <table style="width:100%;border-collapse:collapse;margin:16px 0;background:#f8fafc;border-radius:8px;padding:8px 12px">
+        ${rows}
+      </table>
+      <p style="font-size:0.9rem;color:#64748b">Si no has sido tú, contacta con el club de inmediato.</p>
+      <p style="font-size:0.9rem;color:#64748b">Consultas: <a href="mailto:${escapeHtml(clubContactEmail())}">${escapeHtml(clubContactEmail())}</a></p>
+    </div>`;
+  const textLines = [
+    `Hola, ${memberDisplayName(data)}.`,
+    '',
+    `Hemos recibido los cambios en tu ficha de jugador/a del ${CLUB_NAME}.`,
+    ''
+  ];
+  diff.forEach(function (c) {
+    textLines.push((c.label || 'Campo') + ': ' + (c.before || '—') + ' → ' + (c.after || '—'));
+  });
+  textLines.push('', 'Si no has sido tú, contacta con el club.', 'Consultas: ' + clubContactEmail());
+  return { subject, html, text: textLines.join('\n') };
+}
+
+async function sendPlayerProfileUpdateConfirmedEmail(data) {
+  const cfg = getEmailConfig();
+  if (!cfg.ok) return { sent: false, reason: cfg.error };
+  const email = resolvePlayerNotifyEmail(data);
+  if (!email) return { sent: false, reason: 'email vacío' };
+  const content = buildPlayerProfileUpdateConfirmedContent(data);
+  try {
+    const result = await sendDirectToMemberEmail({
+      memberEmail: email,
+      subject: content.subject,
+      html: content.html,
+      text: content.text,
+      replyTo: clubContactEmail()
+    });
+    return { sent: true, to: result.to, bcc: result.bcc };
+  } catch (err) {
+    return { sent: false, reason: err.message || String(err) };
+  }
+}
+
 async function sendPlayerPortalResetEmail(data) {
   const cfg = getEmailConfig();
   if (!cfg.ok) return { sent: false, reason: cfg.error };
@@ -477,6 +540,7 @@ module.exports = {
   sendMemberPaymentConfirmedEmail,
   sendPlayerApplicationApprovedEmail,
   sendPlayerPortalResetEmail,
+  sendPlayerProfileUpdateConfirmedEmail,
   sendEventRegistrationPendingEmail,
   sendEventRegistrationConfirmedEmail,
   sendTorneoPreinscripcionConfirmedEmail

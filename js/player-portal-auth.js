@@ -70,6 +70,22 @@
     return out;
   }
 
+  function isPlayerInscriptionPaid(p) {
+    if (!p) return false;
+    return (
+      !!p.inscriptionPaid ||
+      String(p.paymentStatus || '').toLowerCase() === 'paid' ||
+      String(p.inscriptionStatus || '').toLowerCase() === 'paid'
+    );
+  }
+
+  function isPlayerProfileReadOnly(p) {
+    if (!p) return true;
+    const st = String(p.status || p.estado || '').toLowerCase();
+    const ins = String(p.inscriptionStatus || '').toLowerCase();
+    return st === 'rejected' || st === 'inactive' || st === 'baja' || ins === 'rejected';
+  }
+
   function sanitizePlayerForPortal(p) {
     if (!p) return null;
     return {
@@ -102,9 +118,30 @@
       applicationId: p.applicationId || null,
       status: p.status || '',
       paymentStatus: p.paymentStatus || '',
-      inscriptionPaid: !!p.inscriptionPaid,
+      inscriptionPaid: isPlayerInscriptionPaid(p),
       portalPasswordHash: p.portalPasswordHash || ''
     };
+  }
+
+  function sanitizePlayerForPortalEdit(p) {
+    const base = sanitizePlayerForPortal(p);
+    if (!base) return null;
+    return Object.assign({}, base, {
+      domicilio: p.domicilio || p.address || p.direccion || '',
+      localidad: p.localidad || p.town || '',
+      provincia: p.provincia || p.province || 'Zamora',
+      bloodGroup: p.bloodGroup || '',
+      injuries: p.injuries || '',
+      injuriesYear: p.injuriesYear || '',
+      allergyIllness: p.allergyIllness || '',
+      observations: p.observations || '',
+      guardianDomicilio: p.guardianDomicilio || '',
+      guardianLocalidad: p.guardianLocalidad || '',
+      guardianProvincia: p.guardianProvincia || 'Zamora',
+      guardianSameDomicilio: p.guardianSameDomicilio !== false,
+      playerUpdatedBySelfAt: p.playerUpdatedBySelfAt || null,
+      profileReadOnly: isPlayerProfileReadOnly(p)
+    });
   }
 
   function isServerUnavailableError(err) {
@@ -205,6 +242,25 @@
       if (e.code === 'bad_password' || e.code === 'not_found' || e.code === 'no_password') throw e;
       if (!isServerUnavailableError(e)) throw e;
       return loginLocal(opts);
+    }
+  }
+
+  async function loginForEdit(opts) {
+    try {
+      const data = await postJson({
+        action: 'login_edit',
+        dni: normalizeDni(opts.dni),
+        name: opts.name || '',
+        surname: opts.surname || '',
+        password: opts.password || '',
+        season: opts.season || ''
+      });
+      return data.player || null;
+    } catch (e) {
+      if (e.code === 'bad_password' || e.code === 'not_found' || e.code === 'no_password') throw e;
+      if (!isServerUnavailableError(e)) throw e;
+      const p = await loginLocal(opts);
+      return sanitizePlayerForPortalEdit(p);
     }
   }
 
@@ -314,6 +370,7 @@
     normalizeDni: normalizeDni,
     checkAccess: checkAccess,
     login: login,
+    loginForEdit: loginForEdit,
     setupPassword: setupPassword,
     requestPasswordReset: requestPasswordReset,
     resetPasswordWithToken: resetPasswordWithToken,

@@ -3,6 +3,7 @@
 const {
   checkPlayerPortalAccess,
   verifyPlayerPortalLogin,
+  loginPlayerForProfileEdit,
   setupPlayerPortalPassword,
   findPlayerForPortalLookup,
   emailMatchesPlayer,
@@ -86,6 +87,28 @@ exports.handler = async (event) => {
       );
       if (!result.ok) {
         const code = result.error === 'bad_password' ? 401 : 404;
+        return json(code, { ok: false, error: result.error }, origin);
+      }
+      return json(200, { ok: true, player: result.player }, origin);
+    }
+
+    if (action === 'login_edit') {
+      const pwdErr = validatePassword(body.password);
+      if (pwdErr) return json(400, { ok: false, error: pwdErr }, origin);
+      const result = await loginPlayerForProfileEdit(
+        dni,
+        body.password,
+        season,
+        body.name || body.nombre,
+        body.surname || body.apellidos
+      );
+      if (!result.ok) {
+        const code =
+          result.error === 'bad_password'
+            ? 401
+            : result.error === 'no_password'
+              ? 403
+              : 404;
         return json(code, { ok: false, error: result.error }, origin);
       }
       return json(200, { ok: true, player: result.player }, origin);
