@@ -3,10 +3,7 @@
 const {
   escapeHtml,
   getEmailConfig,
-  sendViaSendGrid,
   CLUB_EMAIL_PUBLIC_DEFAULT,
-  resolveOutboundTo,
-  withOriginalRecipientNotice,
   sendDirectToMemberEmail
 } = require('./club-email');
 
@@ -112,15 +109,19 @@ async function sendMemberRegistrationEmail(data) {
   if (!cfg.ok) return { sent: false, reason: cfg.error };
   const email = String(data.email || '').trim().toLowerCase();
   if (!email) return { sent: false, reason: 'email vacío' };
-  const content = withOriginalRecipientNotice(buildRegistrationContent(data), email, 'Socio/a');
-  await sendViaSendGrid({
-    to: resolveOutboundTo(cfg, email),
-    subject: content.subject,
-    html: content.html,
-    text: content.text,
-    replyTo: email
-  });
-  return { sent: true };
+  const content = buildRegistrationContent(data);
+  try {
+    const result = await sendDirectToMemberEmail({
+      memberEmail: email,
+      subject: content.subject,
+      html: content.html,
+      text: content.text,
+      replyTo: clubContactEmail()
+    });
+    return { sent: true, to: result.to, bcc: result.bcc };
+  } catch (err) {
+    return { sent: false, reason: err.message || String(err) };
+  }
 }
 
 function buildPlayerApplicationApprovedContent(data) {
@@ -188,15 +189,19 @@ async function sendMemberPaymentConfirmedEmail(data) {
   if (!cfg.ok) return { sent: false, reason: cfg.error };
   const email = String(data.email || '').trim().toLowerCase();
   if (!email) return { sent: false, reason: 'email vacío' };
-  const content = withOriginalRecipientNotice(buildPaymentConfirmedContent(data), email, 'Socio/a');
-  await sendViaSendGrid({
-    to: resolveOutboundTo(cfg, email),
-    subject: content.subject,
-    html: content.html,
-    text: content.text,
-    replyTo: email
-  });
-  return { sent: true };
+  const content = buildPaymentConfirmedContent(data);
+  try {
+    const result = await sendDirectToMemberEmail({
+      memberEmail: email,
+      subject: content.subject,
+      html: content.html,
+      text: content.text,
+      replyTo: clubContactEmail()
+    });
+    return { sent: true, to: result.to, bcc: result.bcc };
+  } catch (err) {
+    return { sent: false, reason: err.message || String(err) };
+  }
 }
 
 function buildPlayerPortalResetContent(data) {
@@ -515,6 +520,62 @@ async function sendPlayerProfileUpdateConfirmedEmail(data) {
   }
 }
 
+function buildPlayerInscriptionPaymentConfirmedContent(data) {
+  const nombre = escapeHtml(memberDisplayName(data));
+  const season = escapeHtml(String(data.season || '').trim() || '—');
+  const category = escapeHtml(String(data.category || data.categoria || '—').trim());
+  const total = escapeHtml(formatEurAmount(data.totalEur));
+  const payLabel = escapeHtml(formatEventPaymentLabel(data.paymentChannel || data.paymentMethod));
+  const contact = escapeHtml(clubContactEmail());
+  const siteUrl = String(process.env.SITE_URL || '').replace(/\/$/, '');
+
+  const subject = `Inscripción pagada — ${CLUB_NAME}`;
+  const html = `
+    <div style="font-family:system-ui,sans-serif;max-width:560px;color:#1e293b;line-height:1.5">
+      <h2 style="color:#059669;margin:0 0 12px">✅ Inscripción pagada correctamente</h2>
+      <p>Hola, <strong>${nombre}</strong>:</p>
+      <p>Hemos recibido el pago de tu inscripción como jugador/a en <strong>${CLUB_NAME}</strong>.</p>
+      <table style="background:#ecfdf5;border-radius:8px;padding:12px 16px;margin:16px 0;width:100%">
+        <tr><td><strong>Temporada:</strong></td><td>${season}</td></tr>
+        <tr><td><strong>Categoría:</strong></td><td>${category}</td></tr>
+        <tr><td><strong>Importe:</strong></td><td>${total}</td></tr>
+        <tr><td><strong>Pago:</strong></td><td>${payLabel} — correcto</td></tr>
+      </table>
+      <p>Tu ficha queda registrada con el pago confirmado.</p>
+      ${siteUrl ? `<p><a href="${escapeHtml(siteUrl)}/inscripcion-jugador.html" style="font-weight:700;color:#1d4ed8;">Ver inscripción jugador/a</a></p>` : ''}
+      <p style="font-size:0.9rem;color:#64748b">Consultas: <a href="mailto:${contact}">${contact}</a></p>
+    </div>`;
+  const text =
+    `Hola, ${memberDisplayName(data)}.\n\n` +
+    `Tu inscripción en ${CLUB_NAME} está PAGADA y confirmada.\n` +
+    `Temporada: ${data.season || '—'}\n` +
+    `Categoría: ${data.category || data.categoria || '—'}\n` +
+    `Importe: ${formatEurAmount(data.totalEur)}\n` +
+    `Pago: ${formatEventPaymentLabel(data.paymentChannel || data.paymentMethod)} — correcto\n\n` +
+    `Consultas: ${clubContactEmail()}\n`;
+  return { subject, html, text };
+}
+
+async function sendPlayerInscriptionPaymentConfirmedEmail(data) {
+  const cfg = getEmailConfig();
+  if (!cfg.ok) return { sent: false, reason: cfg.error };
+  const email = resolvePlayerNotifyEmail(data);
+  if (!email) return { sent: false, reason: 'email vacío' };
+  const content = buildPlayerInscriptionPaymentConfirmedContent(data);
+  try {
+    const result = await sendDirectToMemberEmail({
+      memberEmail: email,
+      subject: content.subject,
+      html: content.html,
+      text: content.text,
+      replyTo: clubContactEmail()
+    });
+    return { sent: true, to: result.to, bcc: result.bcc };
+  } catch (err) {
+    return { sent: false, reason: err.message || String(err) };
+  }
+}
+
 async function sendPlayerPortalResetEmail(data) {
   const cfg = getEmailConfig();
   if (!cfg.ok) return { sent: false, reason: cfg.error };
@@ -538,6 +599,7 @@ async function sendPlayerPortalResetEmail(data) {
 module.exports = {
   sendMemberRegistrationEmail,
   sendMemberPaymentConfirmedEmail,
+  sendPlayerInscriptionPaymentConfirmedEmail,
   sendPlayerApplicationApprovedEmail,
   sendPlayerPortalResetEmail,
   sendPlayerProfileUpdateConfirmedEmail,

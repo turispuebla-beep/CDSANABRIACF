@@ -665,6 +665,17 @@ async function completePlayerInscription(payment) {
         { label: 'Pedido pasarela', value: payment.orderId }
       ]
     });
+    const { sendPlayerInscriptionPaymentConfirmedEmail } = require('./member-email');
+    await sendPlayerInscriptionPaymentConfirmedEmail({
+      email: reg.email || payment.customerEmail,
+      guardianEmail: reg.guardianEmail,
+      nombre: reg.name || reg.nombre,
+      apellidos: reg.surname || reg.apellidos,
+      season,
+      category: reg.category || reg.categoria,
+      totalEur: total,
+      paymentChannel: payCh
+    });
   } catch (mailErr) {
     console.warn('Email club inscripción pagada:', mailErr.message || mailErr);
   }

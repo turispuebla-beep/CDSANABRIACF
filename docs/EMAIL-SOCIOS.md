@@ -44,22 +44,27 @@ Los formularios públicos abren **mailto** hacia ese buzón. El email del solici
 
 |---------|--------------|
 
-| Registro socio/a | **Buzón del club** (`CLUB_NOTIFY_EMAIL`) |
+| Solicitud «Nuevo jugador/a» (alta inicial) | **Buzón del club** (`CLUB_NOTIFY_EMAIL`) |
 
-| Pago tarjeta OK (Redsys) | **Buzón del club** |
+| Aviso interno (transferencia pendiente, etc.) | **Buzón del club** |
 
-| Solicitud «Nuevo jugador/a» (alta inicial) | **Buzón del club** |
+| **Registro socio/a** (`member_registered`) | **Email del socio/a** + copia BCC al club |
+
+| **Cuota socio pagada** (tarjeta/Bizum o validación manual) | **Email del socio/a** + copia BCC al club |
+
+| **Inscripción jugador/a pagada** (pasarela) | **Email del jugador/a o tutor** + copia BCC al club |
 
 | **Solicitud aceptada** (admin pulsa ✅ Aceptar) | **Email del jugador/a** + copia BCC al club |
 
 | Restablecer contraseña ficha jugador/a | **Email del jugador/a** + copia BCC al club |
 
 | Inscripción a evento (transferencia, pendiente) | **Inscrito/a** + aviso al club |
-| Inscripción a evento (gratuita o pagada) | **Inscrito/a** + aviso al club |
-| Preinscripción torneo Fútbol 7 (web) | **Contacto del equipo** + aviso al club |
-| Otros avisos internos (registro socio, etc.) | **Buzón del club** |
 
-Por defecto (`CLUB_EMAIL_ONLY=true`) los avisos internos van solo al club. Las excepciones anteriores **sí llegan al jugador/a** porque necesitan el enlace de la web.
+| Inscripción a evento (gratuita o pagada por pasarela) | **Inscrito/a** + aviso al club |
+
+| Preinscripción torneo Fútbol 7 (web) | **Contacto del equipo** + aviso al club |
+
+Con `CLUB_EMAIL_ONLY=true` (recomendado), los avisos **internos** van solo al buzón del club. Las filas marcadas en negrita **llegan siempre al usuario** (con copia oculta al club cuando aplica).
 
 
 

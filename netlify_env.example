@@ -46,9 +46,14 @@ CLUB_REPLY_EMAIL=cdsanabriafc@gmail.com
 
 CLUB_NOTIFY_EMAIL=cdsanabriafc@gmail.com
 
-# Avisos internos (registro socio, inscripción, pagos): solo al buzón del club (true por defecto).
-# Excepción automática: «Solicitud aceptada» y «Restablecer contraseña ficha» van DIRECTO al jugador/a
-# con copia oculta (BCC) en CLUB_NOTIFY_EMAIL.
+# Avisos internos (solicitud nuevo jugador, transferencias pendientes, etc.): solo al buzón del club (true por defecto).
+# Excepciones (van DIRECTO al usuario con copia BCC al club):
+#   - Confirmación registro socio (member_registered)
+#   - Cuota socio pagada (pasarela o validación manual)
+#   - Inscripción jugador/a pagada (pasarela)
+#   - Solicitud aceptada al jugador/a
+#   - Restablecer contraseña de ficha
+#   - Inscripción / pago de eventos al inscrito
 CLUB_EMAIL_ONLY=true
 
 
