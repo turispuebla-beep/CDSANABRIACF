@@ -1282,6 +1282,73 @@ async function upsertFriendRegistrationRecord(friend) {
   return { id: friendId, ...(snap.exists ? snap.data() : patch) };
 }
 
+function torneoPreinscripcionesRef() {
+  return initAdmin().collection('sanabria_torneo_preinscripciones');
+}
+
+const TORNEO_CATEGORY_LABELS = {
+  prebenjamin: 'Prebenjamín',
+  benjamin: 'Benjamín',
+  alevin: 'Alevín',
+  infantil: 'Infantil',
+  cadete: 'Cadete',
+  juvenil: 'Juvenil',
+  senior: 'Aficionado',
+  aficionado: 'Aficionado'
+};
+
+function torneoCategoryLabels(ids) {
+  return (Array.isArray(ids) ? ids : [])
+    .map((id) => TORNEO_CATEGORY_LABELS[String(id || '').trim().toLowerCase()] || String(id || '').trim())
+    .filter(Boolean);
+}
+
+function normalizeTorneoPreinscripcionFields(raw) {
+  const d = raw && typeof raw === 'object' ? { ...raw } : {};
+  const categories = Array.isArray(d.categories)
+    ? d.categories.map((c) => String(c || '').trim().toLowerCase()).filter(Boolean)
+    : [];
+  const playerCount = parseInt(d.playerCount, 10);
+  const now = new Date().toISOString();
+  return {
+    eventName: String(d.eventName || 'Torneo Fútbol 7 — 2026').trim(),
+    teamName: String(d.teamName || '').trim(),
+    playerCount: Number.isFinite(playerCount) && playerCount > 0 ? playerCount : 0,
+    town: String(d.town || '').trim(),
+    categories,
+    categoryLabels: torneoCategoryLabels(categories),
+    contactName: String(d.contactName || '').trim(),
+    contactEmail: String(d.contactEmail || '').trim().toLowerCase(),
+    contactPhone: String(d.contactPhone || '').trim(),
+    status: String(d.status || 'preinscripcion_enviada').trim(),
+    source: String(d.source || 'web').trim(),
+    localId: d.localId ? String(d.localId) : null,
+    appScope: APP_SCOPE,
+    createdAt: d.createdAt || now,
+    updatedAt: now
+  };
+}
+
+/** Preinscripción torneo F7 desde la web pública. */
+async function createTorneoPreinscripcionRecord(raw) {
+  const patch = normalizeTorneoPreinscripcionFields(raw);
+  if (!patch.teamName) throw new Error('Nombre del equipo obligatorio');
+  if (!patch.playerCount) throw new Error('Número de jugadores obligatorio');
+  if (!patch.town) throw new Error('Población obligatoria');
+  if (!patch.categories.length) throw new Error('Selecciona al menos una categoría');
+  if (!patch.contactName) throw new Error('Nombre de contacto obligatorio');
+  if (!patch.contactEmail || !patch.contactEmail.includes('@')) {
+    throw new Error('Email de contacto no válido');
+  }
+  if (!patch.contactPhone) throw new Error('Teléfono de contacto obligatorio');
+
+  const ref = torneoPreinscripcionesRef().doc();
+  const id = ref.id;
+  await ref.set({ ...patch, id }, { merge: true });
+  const snap = await ref.get();
+  return { id, ...(snap.exists ? snap.data() : patch) };
+}
+
 function coachesRef() {
   return initAdmin().collection('sanabria_coaches');
 }
@@ -1413,6 +1480,9 @@ module.exports = {
   normalizeFriendRecordFields,
   upsertFriendRegistrationRecord,
   findFriendDocByIdentity,
+  torneoPreinscripcionesRef,
+  torneoCategoryLabels,
+  createTorneoPreinscripcionRecord,
   coachesRef,
   normalizeCoachRecordFields,
   findCoachDocByIdentity,

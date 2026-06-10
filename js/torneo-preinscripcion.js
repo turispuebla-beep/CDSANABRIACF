@@ -1,11 +1,13 @@
 /**
- * Preinscripción Torneo Fútbol 7 — público, sin login (mailto al club).
+ * Preinscripción Torneo Fútbol 7 — público, sin login.
+ * Guarda en Firebase (función Netlify) y envía correos automáticos al club y al contacto.
  */
 (function (global) {
   'use strict';
 
   const STORAGE_KEY = 'clubTorneoPreinscripciones';
   const EVENT_NAME = 'Torneo Fútbol 7 — 2026';
+  const API = '/.netlify/functions/submit-torneo-preinscripcion';
 
   const TORNEO_CATEGORIES = [
     { id: 'benjamin', label: 'Benjamín' },
@@ -30,6 +32,10 @@
 
   function writeAll(list) {
     global.localStorage.setItem(STORAGE_KEY, JSON.stringify(list || []));
+  }
+
+  function isLocalFile() {
+    return global.location && global.location.protocol === 'file:';
   }
 
   function getClubNotifyEmail() {
@@ -135,7 +141,7 @@
     ].join('\r\n');
   }
 
-  function savePreinscripcion(data) {
+  function savePreinscripcionLocal(data) {
     const entry = {
       id: 'tp_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8),
       eventName: EVENT_NAME,
@@ -152,8 +158,17 @@
     const list = readAll();
     list.push(entry);
     writeAll(list);
-    syncPreinscripcionToFirestore(entry);
     return entry;
+  }
+
+  function updateLocalEntry(localId, patch) {
+    const list = readAll();
+    const ix = list.findIndex(function (e) {
+      return String(e.id) === String(localId);
+    });
+    if (ix < 0) return;
+    list[ix] = Object.assign({}, list[ix], patch || {});
+    writeAll(list);
   }
 
   function syncPreinscripcionToFirestore(entry) {
@@ -171,7 +186,7 @@
         contactEmail: String(entry.contactEmail || '').trim().toLowerCase(),
         contactPhone: String(entry.contactPhone || '').trim(),
         status: entry.status || 'preinscripcion_enviada',
-        source: 'web_mailto',
+        source: 'web_fallback',
         localId: entry.id
       })
       .catch(function (err) {
@@ -179,14 +194,67 @@
       });
   }
 
-  function submitPreinscripcion(formData) {
+  async function submitPreinscripcionToServer(formData, localEntry) {
+    const res = await fetch(API, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        preinscripcion: Object.assign({}, formData, {
+          eventName: EVENT_NAME,
+          localId: localEntry.id
+        })
+      })
+    });
+    const data = await res.json().catch(function () {
+      return {};
+    });
+    if (!res.ok || !data.ok) {
+      throw new Error(data.error || 'No se pudo registrar la preinscripción en el servidor');
+    }
+    return data;
+  }
+
+  async function submitPreinscripcion(formData) {
     const err = validate(formData);
     if (err) throw new Error(err);
-    const saved = savePreinscripcion(formData);
-    return {
-      entry: saved,
-      mailtoUrl: buildClubNotifyMailto(formData)
-    };
+    const saved = savePreinscripcionLocal(formData);
+
+    if (isLocalFile()) {
+      syncPreinscripcionToFirestore(saved);
+      return {
+        entry: saved,
+        serverOk: false,
+        emailContactSent: false,
+        emailClubSent: false,
+        mailtoUrl: buildClubNotifyMailto(formData)
+      };
+    }
+
+    try {
+      const result = await submitPreinscripcionToServer(formData, saved);
+      updateLocalEntry(saved.id, {
+        firestoreId: result.id,
+        status: 'preinscripcion_enviada'
+      });
+      return {
+        entry: Object.assign({}, saved, { firestoreId: result.id }),
+        serverOk: true,
+        emailContactSent: !!result.emailContactSent,
+        emailClubSent: !!result.emailClubSent,
+        preinscripcion: result.preinscripcion || null
+      };
+    } catch (serverErr) {
+      console.warn('[TorneoPreinscripcion] servidor:', serverErr);
+      await syncPreinscripcionToFirestore(saved);
+      return {
+        entry: saved,
+        serverOk: false,
+        emailContactSent: false,
+        emailClubSent: false,
+        mailtoUrl: buildClubNotifyMailto(formData),
+        error: serverErr.message || String(serverErr)
+      };
+    }
   }
 
   function buildClubNotifyMailto(data) {

@@ -2567,13 +2567,13 @@
             <div class="modal-content" style="max-width: 480px;">
                 <span class="close" onclick="closeTorneoPreinscripcionSuccessModal()" aria-label="Cerrar">&times;</span>
                 <h2 id="tpSuccessTitle">✅ Preinscripción registrada</h2>
-                <p style="color:#334155;line-height:1.55;margin:0 0 16px;">
-                    Los datos de tu equipo quedan guardados en este navegador y el club los revisará. Más adelante pediremos la ficha de cada jugador.
+                <p id="tpSuccessMainText" style="color:#334155;line-height:1.55;margin:0 0 16px;">
+                    Hemos guardado los datos de tu equipo. Más adelante pediremos la ficha de cada jugador.
                 </p>
-                <p style="color:#64748b;font-size:0.92rem;line-height:1.5;margin:0 0 20px;">
-                    Para que llegue al club, pulsa el botón y envía el correo a <strong class="club-email-notify">cdsanabriafc@gmail.com</strong>. Mensaje ya rellenado con todos los datos del formulario.
+                <p id="tpSuccessEmailText" style="color:#64748b;font-size:0.92rem;line-height:1.5;margin:0 0 20px;">
+                    📧 Te enviaremos un correo de confirmación y el club recibirá el aviso automáticamente.
                 </p>
-                <a id="tpMailtoClubBtn" class="btn-primary" href="#" style="display:inline-block;text-align:center;text-decoration:none;margin-bottom:10px;width:100%;box-sizing:border-box;">📧 Enviar aviso al club por correo</a>
+                <a id="tpMailtoClubBtn" class="btn-primary" href="#" style="display:none;text-align:center;text-decoration:none;margin-bottom:10px;width:100%;box-sizing:border-box;">📧 Enviar aviso al club por correo (respaldo)</a>
                 <button type="button" class="btn-secondary" style="width:100%;" onclick="closeTorneoPreinscripcionSuccessModal()">Cerrar</button>
             </div>
         </div>
@@ -4394,34 +4394,60 @@
             };
         }
 
-        function showTorneoPreinscripcionSuccessModal(mailData) {
+        function showTorneoPreinscripcionSuccessModal(result) {
             const btn = document.getElementById('tpMailtoClubBtn');
+            const mainText = document.getElementById('tpSuccessMainText');
+            const emailText = document.getElementById('tpSuccessEmailText');
+            const mailData = Object.assign({}, result || {}, result.entry || {});
             let mailtoUrl = '';
-            if (window.TorneoPreinscripcion && window.TorneoPreinscripcion.buildClubNotifyMailto) {
-                mailtoUrl = window.TorneoPreinscripcion.buildClubNotifyMailto(mailData) || '';
-            }
-            if (btn) {
-                if (mailtoUrl) {
-                    btn.href = mailtoUrl;
-                    btn.style.display = 'inline-block';
-                    btn.onclick = function (e) {
-                        e.preventDefault();
+
+            if (result && result.serverOk) {
+                if (mainText) {
+                    mainText.textContent =
+                        'Hemos guardado los datos de tu equipo en el club. Más adelante pediremos la ficha de cada jugador.';
+                }
+                if (emailText) {
+                    emailText.textContent = result.emailContactSent
+                        ? '📧 Te hemos enviado un correo de confirmación. El club también ha recibido el aviso.'
+                        : '📧 Preinscripción guardada. Si no recibes correo en unos minutos, revisa spam o contacta con cdsanabriafc@gmail.com.';
+                }
+                if (btn) btn.style.display = 'none';
+            } else {
+                if (mainText) {
+                    mainText.textContent =
+                        'Los datos quedan guardados, pero no se pudo enviar el correo automático. Usa el botón de respaldo para avisar al club.';
+                }
+                if (emailText) {
+                    emailText.textContent =
+                        'Si tu cliente de correo no se abrió solo, pulsa el botón inferior para enviar el aviso a cdsanabriafc@gmail.com.';
+                }
+                if (window.TorneoPreinscripcion && window.TorneoPreinscripcion.buildClubNotifyMailto) {
+                    mailtoUrl = window.TorneoPreinscripcion.buildClubNotifyMailto(mailData) || result.mailtoUrl || '';
+                }
+                if (btn) {
+                    if (mailtoUrl) {
+                        btn.href = mailtoUrl;
+                        btn.style.display = 'inline-block';
+                        btn.onclick = function (e) {
+                            e.preventDefault();
+                            if (window.TorneoPreinscripcion && window.TorneoPreinscripcion.openMailto) {
+                                window.TorneoPreinscripcion.openMailto(mailtoUrl);
+                            }
+                        };
                         if (window.TorneoPreinscripcion && window.TorneoPreinscripcion.openMailto) {
                             window.TorneoPreinscripcion.openMailto(mailtoUrl);
                         }
-                    };
-                    if (window.TorneoPreinscripcion && window.TorneoPreinscripcion.openMailto) {
-                        window.TorneoPreinscripcion.openMailto(mailtoUrl);
+                    } else {
+                        btn.style.display = 'none';
                     }
-                } else {
-                    btn.style.display = 'none';
                 }
             }
+
             const m = document.getElementById('torneoPreinscripcionSuccessModal');
             if (m) m.style.display = 'block';
         }
 
-        function submitTorneoPreinscripcion(ev) {
+        async function submitTorneoPreinscripcion(ev) {
             if (ev) ev.preventDefault();
             if (window.SiteUpdateMode && !SiteUpdateMode.guard()) return;
             if (!window.TorneoPreinscripcion) {
@@ -4429,17 +4455,23 @@
                 return;
             }
             const data = getTorneoPreinscripcionFormData();
+            const submitBtn = document.querySelector('#torneoPreinscripcionForm button[type="submit"]');
+            if (submitBtn) {
+                submitBtn.disabled = true;
+                submitBtn.textContent = 'Enviando…';
+            }
             try {
-                const result = window.TorneoPreinscripcion.submitPreinscripcion(data);
+                const result = await window.TorneoPreinscripcion.submitPreinscripcion(data);
                 closeTorneoPreinscripcionModal();
                 document.getElementById('torneoPreinscripcionForm').reset();
-                const mailData = Object.assign({}, data, result.entry || {});
-                showTorneoPreinscripcionSuccessModal(mailData);
-                if (result.mailtoUrl && window.TorneoPreinscripcion.openMailto) {
-                    window.TorneoPreinscripcion.openMailto(result.mailtoUrl);
-                }
+                showTorneoPreinscripcionSuccessModal(Object.assign({ entry: result.entry }, result));
             } catch (err) {
                 alert(err.message || 'No se pudo guardar la preinscripción.');
+            } finally {
+                if (submitBtn) {
+                    submitBtn.disabled = false;
+                    submitBtn.textContent = 'Enviar preinscripción';
+                }
             }
         }
 

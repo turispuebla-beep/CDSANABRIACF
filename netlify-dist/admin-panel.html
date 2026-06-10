@@ -1539,7 +1539,7 @@
                     <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;margin-bottom:12px;">
                         <div>
                             <h3 style="margin:0;">🏆 Preinscripciones torneo</h3>
-                            <p style="color:#64748b;font-size:0.92rem;margin:6px 0 0;">Solicitudes del formulario público (Torneo Fútbol 7). Se guardan en Firestore al enviar; el correo sigue yendo por mailto.</p>
+                            <p style="color:#64748b;font-size:0.92rem;margin:6px 0 0;">Solicitudes del formulario público (Torneo Fútbol 7). Correo automático al club y al contacto; datos en Firestore. También en pestaña Competiciones.</p>
                         </div>
                         <button type="button" class="btn btn-success" onclick="loadTorneoPreinscripcionesAdmin()">🔄 Actualizar listado</button>
                     </div>
@@ -1985,6 +1985,21 @@
                             <button type="button" id="competitionRegenerateBracketBtn" class="btn" onclick="regenerateCompetitionBracketFromEditForm()" style="display:none; margin-right: 10px; background:#1d4ed8; color:#fff;">🧩 Regenerar cuadro</button>
                             <button type="button" class="btn" onclick="cancelAddCompetition()">❌ Cancelar</button>
                         </div>
+                    </div>
+                </div>
+
+                <!-- Preinscripciones torneo F7 (Firestore) -->
+                <div class="section" style="background:#eff6ff;padding:20px;border-radius:12px;border:2px solid #93c5fd;margin-bottom:24px;">
+                    <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;margin-bottom:12px;">
+                        <div>
+                            <h3 style="margin:0;">🏆 Preinscripciones torneo Fútbol 7</h3>
+                            <p style="color:#64748b;font-size:0.92rem;margin:6px 0 0;">Equipos preinscritos desde la web. Puedes añadirlos al cuadro de una competición con «Añadir a competición».</p>
+                        </div>
+                        <button type="button" class="btn btn-success" onclick="loadTorneoPreinscripcionesAdmin()">🔄 Actualizar listado</button>
+                    </div>
+                    <p style="margin:0 0 12px;font-size:0.9rem;"><strong>Total:</strong> <span id="torneoPreinscripcionesCompCount">0</span></p>
+                    <div id="torneoPreinscripcionesCompList">
+                        <p style="color:#64748b;margin:0;">Pulsa «Actualizar listado» para cargar desde Firestore.</p>
                     </div>
                 </div>
 
@@ -20832,7 +20847,7 @@ th,td{border:1px solid #ccc;padding:5px 7px;text-align:left;white-space:nowrap;}
                 if (typeof loadColaboradorFormConfigAdmin === 'function') loadColaboradorFormConfigAdmin();
             }
 
-            if (tabName === 'eventos') {
+            if (tabName === 'eventos' || tabName === 'competiciones') {
                 if (typeof loadTorneoPreinscripcionesAdmin === 'function') loadTorneoPreinscripcionesAdmin();
             }
 

@@ -56,6 +56,7 @@ Los formularios públicos abren **mailto** hacia ese buzón. El email del solici
 
 | Inscripción a evento (transferencia, pendiente) | **Inscrito/a** + aviso al club |
 | Inscripción a evento (gratuita o pagada) | **Inscrito/a** + aviso al club |
+| Preinscripción torneo Fútbol 7 (web) | **Contacto del equipo** + aviso al club |
 | Otros avisos internos (registro socio, etc.) | **Buzón del club** |
 
 Por defecto (`CLUB_EMAIL_ONLY=true`) los avisos internos van solo al club. Las excepciones anteriores **sí llegan al jugador/a** porque necesitan el enlace de la web.

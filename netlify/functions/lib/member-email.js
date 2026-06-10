@@ -367,6 +367,71 @@ async function sendEventRegistrationPendingEmail(data) {
   }
 }
 
+function formatTorneoCategoryList(data) {
+  const labels = Array.isArray(data.categoryLabels) ? data.categoryLabels : [];
+  if (labels.length) return labels.join(', ');
+  const ids = Array.isArray(data.categories) ? data.categories : [];
+  return ids.join(', ') || '—';
+}
+
+function buildTorneoPreinscripcionConfirmedContent(data) {
+  const nombre = escapeHtml(String(data.contactName || '').trim() || 'Contacto');
+  const eventName = escapeHtml(String(data.eventName || 'Torneo Fútbol 7 — 2026').trim());
+  const teamName = escapeHtml(String(data.teamName || '').trim());
+  const town = escapeHtml(String(data.town || '').trim());
+  const cats = escapeHtml(formatTorneoCategoryList(data));
+  const players = escapeHtml(String(data.playerCount != null ? data.playerCount : '—'));
+  const contact = escapeHtml(clubContactEmail());
+  const siteUrl = String(process.env.SITE_URL || '').replace(/\/$/, '');
+
+  const subject = `Preinscripción registrada — ${data.eventName || 'Torneo'} — ${CLUB_NAME}`;
+  const html = `
+    <div style="font-family:system-ui,sans-serif;max-width:560px;color:#1e293b;line-height:1.5">
+      <h2 style="color:#1e3a8a;margin:0 0 12px">🏆 Preinscripción registrada</h2>
+      <p>Hola, <strong>${nombre}</strong>:</p>
+      <p>Hemos recibido la preinscripción de tu equipo para <strong>${eventName}</strong> del <strong>${CLUB_NAME}</strong>.</p>
+      <table style="background:#f8fafc;border-radius:8px;padding:12px 16px;margin:16px 0;width:100%">
+        <tr><td><strong>Equipo:</strong></td><td>${teamName}</td></tr>
+        <tr><td><strong>Población:</strong></td><td>${town}</td></tr>
+        <tr><td><strong>Categorías:</strong></td><td>${cats}</td></tr>
+        <tr><td><strong>Jugadores (aprox.):</strong></td><td>${players}</td></tr>
+      </table>
+      <p>Esta es una <strong>preinscripción</strong>. Más adelante el club solicitará los datos completos de los integrantes del equipo.</p>
+      ${siteUrl ? `<p><a href="${escapeHtml(siteUrl)}" style="font-weight:700;color:#1d4ed8;">Web del club</a></p>` : ''}
+      <p style="font-size:0.9rem;color:#64748b">Consultas: <a href="mailto:${contact}">${contact}</a></p>
+    </div>`;
+  const text =
+    `Hola, ${String(data.contactName || '').trim() || 'Contacto'}.\n\n` +
+    `Preinscripción registrada para ${data.eventName || 'Torneo'}.\n` +
+    `Equipo: ${data.teamName || ''}\n` +
+    `Población: ${data.town || ''}\n` +
+    `Categorías: ${formatTorneoCategoryList(data)}\n` +
+    `Jugadores (aprox.): ${data.playerCount != null ? data.playerCount : '—'}\n\n` +
+    `Más adelante pediremos la ficha de cada jugador.\n` +
+    `Consultas: ${clubContactEmail()}\n`;
+  return { subject, html, text };
+}
+
+async function sendTorneoPreinscripcionConfirmedEmail(data) {
+  const cfg = getEmailConfig();
+  if (!cfg.ok) return { sent: false, reason: cfg.error };
+  const email = String(data.contactEmail || data.email || '').trim().toLowerCase();
+  if (!email.includes('@')) return { sent: false, reason: 'email vacío' };
+  const content = buildTorneoPreinscripcionConfirmedContent(data);
+  try {
+    const result = await sendDirectToMemberEmail({
+      memberEmail: email,
+      subject: content.subject,
+      html: content.html,
+      text: content.text,
+      replyTo: clubContactEmail()
+    });
+    return { sent: true, to: result.to, bcc: result.bcc };
+  } catch (err) {
+    return { sent: false, reason: err.message || String(err) };
+  }
+}
+
 async function sendEventRegistrationConfirmedEmail(data) {
   const cfg = getEmailConfig();
   if (!cfg.ok) return { sent: false, reason: cfg.error };
@@ -413,5 +478,6 @@ module.exports = {
   sendPlayerApplicationApprovedEmail,
   sendPlayerPortalResetEmail,
   sendEventRegistrationPendingEmail,
-  sendEventRegistrationConfirmedEmail
+  sendEventRegistrationConfirmedEmail,
+  sendTorneoPreinscripcionConfirmedEmail
 };
