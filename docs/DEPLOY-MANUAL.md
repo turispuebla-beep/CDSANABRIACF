@@ -3,7 +3,37 @@
 Guía de 1 página para subir la web sin depender del agente de IA.
 
 **Proyecto Firebase:** `cdsanabriacf2026` · **Scope:** `cdsanabriacf`  
-**Hosting:** Netlify (subida manual del contenido de `netlify-dist/`)
+**Hosting:** Netlify · **Sitio:** `cdsanabriacf` → https://www.cdsanabriacf.com
+
+> **Este sitio NO tiene deploy automático desde GitHub.**  
+> Subir código a GitHub **no** actualiza la web. Siempre hay que desplegar a mano con la CLI (sección 2b).
+
+---
+
+## Flujo habitual (cada vez que cambies código)
+
+Orden recomendado:
+
+1. **Probar en local** (abrir `index.html` / panel o probar en borrador con `netlify deploy` sin `--prod`).
+2. **Desplegar a producción** (web + funciones Netlify):
+
+   ```powershell
+   powershell -NoProfile -ExecutionPolicy Bypass -File ".\scripts\deploy-netlify-prod.ps1"
+   ```
+
+   O desde la raíz: `.\deploy-netlify-prod.ps1` · o `npm run deploy:prod`
+
+3. **Commit y push a GitHub** (copia de seguridad e historial; **no** sustituye el paso 2):
+
+   ```powershell
+   git add …
+   git commit -m "…"
+   git push origin master
+   ```
+
+**Resumen:** Producción = CLI · GitHub = respaldo del código.
+
+Comprobar tras el deploy: https://www.cdsanabriacf.com/deploy-version.json (fecha reciente).
 
 ---
 
@@ -79,6 +109,12 @@ Copia la plantilla de `netlify_env.example`. Mínimo recomendado:
 | `FIREBASE_SERVICE_ACCOUNT_JSON` | Solicitudes jugador, inscripción, aprobar, portal contraseña |
 | `SMTP_*` + `CLUB_*` | Correo automático (`send-club-email`) — ver `docs/EMAIL-SOCIOS.md` |
 | `REDSYS_*` | Pagos tarjeta/Bizum (opcional hasta que tengáis claves) |
+| `MEMBERSHIP_SEASON_CLOSE_MONTH` | Cierre temporada socios (`5` = mayo) |
+| `MEMBERSHIP_SEASON_CLOSE_DAY` | Día de cierre (`31`) |
+| `MEMBERSHIP_PAYMENT_DEADLINE_DAYS` | Plazo pago offline alta nueva (`7`) |
+| `MEMBERSHIP_SEASON_FIRST_CLOSE_YEAR` | Primer año de referencia edad/cuota (`2027`) |
+
+También están en `netlify.toml` → `[build.environment]`; en el panel de Netlify deben coincidir (ya configuradas en el sitio `cdsanabriacf`).
 
 **`FIREBASE_SERVICE_ACCOUNT_JSON` (una sola línea):**
 
@@ -99,10 +135,10 @@ Tras guardar variables, hace falta **un deploy con CLI** (paso C) para que las f
 **Atajo recomendado** (desde la raíz `CDSANABRIACF1`):
 
 ```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File ".\deploy-netlify-prod.ps1"
+powershell -NoProfile -ExecutionPolicy Bypass -File ".\scripts\deploy-netlify-prod.ps1"
 ```
 
-O con npm: `npm run deploy:prod`
+O desde la raíz: `.\deploy-netlify-prod.ps1` · o `npm run deploy:prod`
 
 Equivalente manual:
 
@@ -144,6 +180,7 @@ Sustituye `https://www.cdsanabriacf.com` por tu dominio:
 | `submit-player-inscription` | Igual |
 | `approve-player-application` | Igual + admin en panel |
 | `player-portal-auth` | Igual |
+| `member-season-renewal` | `FIREBASE_SERVICE_ACCOUNT_JSON` + `MEMBERSHIP_*` (renovación tras 31/05) |
 | Redsys / Bizum | `REDSYS_MERCHANT_CODE`, `REDSYS_SECRET_KEY`, etc. |
 
 #### E) Errores frecuentes CLI
@@ -204,8 +241,10 @@ Marca en local (o en producción justo después de subir):
 
 ## 7. Git y archivos legacy
 
-- **Versionar:** `index.html`, `admin-panel.html`, `js/`, `assets/`, `sw.js`, `firestore.rules`, scripts de build.
-- **No versionar:** `netlify-dist/` (se genera siempre con el script).
+- **Versionar:** `index.html`, `admin-panel.html`, `js/`, `assets/`, `sw.js`, `firestore.rules`, `netlify.toml`, `netlify/functions/`, scripts de build.
+- **`netlify-dist/`:** en `.gitignore` (se regenera con `build-netlify-dist.ps1`). No hace falta subirlo a mano si usas `deploy-netlify-prod.ps1`.
+- **GitHub no despliega:** sin enlace Git→Netlify, el push solo guarda el código; el paso de producción sigue siendo la CLI.
+- **No versionar:** `CDSANABRIACF-netlify-dist.zip`, secretos (`.env`, JSON de cuenta de servicio).
 - Legacy archivado en `archive/` (p. ej. `index_live.html` — otro proyecto, no mezclar con el club).
 
 ---
