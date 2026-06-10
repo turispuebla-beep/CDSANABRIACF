@@ -9,6 +9,7 @@ const {
   amountToCents
 } = require('./lib/redsys');
 const { savePendingPayment } = require('./lib/firestore-admin');
+const { assertPublicActionsAllowed, isSiteUpdateModeError } = require('./lib/site-public-mode');
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -29,6 +30,8 @@ exports.handler = async (event) => {
     if (!cfg.ok) {
       return { statusCode: 503, headers: CORS, body: JSON.stringify({ ok: false, error: cfg.error }) };
     }
+
+    await assertPublicActionsAllowed();
 
     const body = JSON.parse(event.body || '{}');
     const type = String(body.type || '').trim();
@@ -114,6 +117,13 @@ exports.handler = async (event) => {
       body: JSON.stringify({ ok: true, orderId, redirect: form })
     };
   } catch (err) {
+    if (isSiteUpdateModeError(err)) {
+      return {
+        statusCode: 503,
+        headers: CORS,
+        body: JSON.stringify({ ok: false, error: err.message, code: 'site_update_mode' })
+      };
+    }
     console.error('redsys-create-payment:', err);
     return {
       statusCode: 500,

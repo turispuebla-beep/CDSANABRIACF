@@ -1,6 +1,7 @@
 'use strict';
 
 const { upsertMemberRegistrationRecord } = require('./lib/firestore-admin');
+const { assertPublicActionsAllowed, isSiteUpdateModeError } = require('./lib/site-public-mode');
 
 const CORS_BASE = {
   'Access-Control-Allow-Headers': 'Content-Type',
@@ -40,6 +41,7 @@ exports.handler = async (event) => {
   }
 
   try {
+    await assertPublicActionsAllowed();
     const body = JSON.parse(event.body || '{}');
     const member = body.member;
     if (!member || typeof member !== 'object') {
@@ -48,6 +50,9 @@ exports.handler = async (event) => {
     const saved = await upsertMemberRegistrationRecord(member);
     return json(200, { ok: true, memberId: saved.id, member: saved }, origin);
   } catch (err) {
+    if (isSiteUpdateModeError(err)) {
+      return json(503, { ok: false, error: err.message, code: 'site_update_mode' }, origin);
+    }
     console.error('submit-member-registration:', err);
     return json(500, { ok: false, error: err.message || 'Error interno' }, origin);
   }

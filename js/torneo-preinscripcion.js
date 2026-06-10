@@ -209,17 +209,27 @@
       return {};
     });
     if (!res.ok || !data.ok) {
-      throw new Error(data.error || 'No se pudo registrar la preinscripción en el servidor');
+      const blocked = new Error(data.error || 'No se pudo registrar la preinscripción en el servidor');
+      if (res.status === 503 && data.code === 'site_update_mode') {
+        blocked.code = 'site_update_mode';
+      }
+      throw blocked;
     }
     return data;
   }
 
   async function submitPreinscripcion(formData) {
+    if (global.SiteUpdateMode && global.SiteUpdateMode.isActive && global.SiteUpdateMode.isActive()) {
+      throw new Error(global.SiteUpdateMode.getMessage());
+    }
     const err = validate(formData);
     if (err) throw new Error(err);
     const saved = savePreinscripcionLocal(formData);
 
     if (isLocalFile()) {
+      if (global.SiteUpdateMode && global.SiteUpdateMode.isEnabledGlobally && global.SiteUpdateMode.isEnabledGlobally()) {
+        throw new Error(global.SiteUpdateMode.getMessage());
+      }
       syncPreinscripcionToFirestore(saved);
       return {
         entry: saved,
@@ -244,6 +254,12 @@
         preinscripcion: result.preinscripcion || null
       };
     } catch (serverErr) {
+      if (serverErr && serverErr.code === 'site_update_mode') {
+        throw serverErr;
+      }
+      if (global.SiteUpdateMode && global.SiteUpdateMode.isEnabledGlobally && global.SiteUpdateMode.isEnabledGlobally()) {
+        throw new Error(global.SiteUpdateMode.getMessage());
+      }
       console.warn('[TorneoPreinscripcion] servidor:', serverErr);
       await syncPreinscripcionToFirestore(saved);
       return {

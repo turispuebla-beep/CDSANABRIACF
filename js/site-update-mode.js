@@ -59,7 +59,7 @@
     });
     renderBanner();
     renderAdminControls();
-    applyTorneoFormLock();
+    applyPublicFormsLock();
     global.dispatchEvent(new CustomEvent('siteUpdateModeChanged', { detail: getPublicState() }));
   }
 
@@ -107,6 +107,72 @@
     if (action === 'view_tienda' || action === 'view_torneo') return true;
     notifyBlocked();
     return false;
+  }
+
+  const BLOCKED_FORM_IDS = ['sociosForm', 'amigosForm', 'nuevoJugadorForm', 'torneoPreinscripcionForm'];
+
+  function lockFormElement(form, locked) {
+    if (!form) return;
+    form.querySelectorAll('input, select, textarea, button').forEach(function (el) {
+      if (locked) {
+        el.disabled = true;
+        if (el.type !== 'button' && el.type !== 'submit') {
+          el.readOnly = true;
+          el.setAttribute('aria-readonly', 'true');
+        }
+      } else {
+        el.disabled = false;
+        el.readOnly = false;
+        el.removeAttribute('aria-readonly');
+      }
+    });
+  }
+
+  function applyPublicFormsLock() {
+    const locked = isActive();
+    BLOCKED_FORM_IDS.forEach(function (id) {
+      lockFormElement(global.document.getElementById(id), locked);
+    });
+    applyTorneoFormLock();
+  }
+
+  function bindGlobalPublicActionBlock() {
+    if (global.document.documentElement.dataset.siteUpdateBound) return;
+    global.document.documentElement.dataset.siteUpdateBound = '1';
+    global.document.addEventListener(
+      'submit',
+      function (ev) {
+        if (!isActive()) return;
+        const form = ev.target;
+        if (!form || form.tagName !== 'FORM') return;
+        const id = form.id || '';
+        if (BLOCKED_FORM_IDS.indexOf(id) >= 0) {
+          ev.preventDefault();
+          ev.stopImmediatePropagation();
+          notifyBlocked();
+        }
+      },
+      true
+    );
+  }
+
+  /** Bloquea inscripción jugador (continue/finalize). Permite lookup y reset contraseña. */
+  function isInscriptionFlowBlocked(flow, portalResetToken) {
+    if (!isActive()) return false;
+    if (portalResetToken) return false;
+    if (flow === 'lookup') return false;
+    return true;
+  }
+
+  function blockInscriptionPageIfNeeded(flow, portalResetToken) {
+    if (!isInscriptionFlowBlocked(flow, portalResetToken)) return false;
+    const wrap = global.document.getElementById('inscFormWrap');
+    const closed = global.document.getElementById('inscClosedWrap');
+    const msg = global.document.getElementById('inscClosedMsg');
+    if (wrap) wrap.style.display = 'none';
+    if (closed) closed.style.display = 'block';
+    if (msg) msg.textContent = getMessage();
+    return true;
   }
 
   function renderBanner() {
@@ -262,7 +328,8 @@
   function initDom() {
     renderBanner();
     renderAdminControls();
-    applyTorneoFormLock();
+    applyPublicFormsLock();
+    bindGlobalPublicActionBlock();
 
     const toggleBtn = global.document.getElementById('siteUpdateToggleBtn');
     const editBtn = global.document.getElementById('siteUpdateEditMsgBtn');
@@ -273,7 +340,7 @@
       if (ev.key === 'currentAdmin' || ev.key === 'adminUser') {
         renderBanner();
         renderAdminControls();
-        applyTorneoFormLock();
+        applyPublicFormsLock();
       }
     });
   }
@@ -300,8 +367,11 @@
     refreshUi: function () {
       renderBanner();
       renderAdminControls();
-      applyTorneoFormLock();
+      applyPublicFormsLock();
     },
+    applyPublicFormsLock: applyPublicFormsLock,
+    isInscriptionFlowBlocked: isInscriptionFlowBlocked,
+    blockInscriptionPageIfNeeded: blockInscriptionPageIfNeeded,
     toggleActive: toggleActive,
     editMessage: editMessage
   };

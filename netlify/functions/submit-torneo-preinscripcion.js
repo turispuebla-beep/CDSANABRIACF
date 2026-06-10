@@ -4,6 +4,7 @@ const { getEmailConfig } = require('./lib/club-email');
 const { sendClubAdminNotification } = require('./lib/club-admin-notify-email');
 const { sendTorneoPreinscripcionConfirmedEmail } = require('./lib/member-email');
 const { createTorneoPreinscripcionRecord, torneoCategoryLabels } = require('./lib/firestore-admin');
+const { assertPublicActionsAllowed, isSiteUpdateModeError } = require('./lib/site-public-mode');
 
 const CORS_BASE = {
   'Access-Control-Allow-Headers': 'Content-Type',
@@ -43,6 +44,7 @@ exports.handler = async (event) => {
   }
 
   try {
+    await assertPublicActionsAllowed();
     const body = JSON.parse(event.body || '{}');
     const raw = body.preinscripcion && typeof body.preinscripcion === 'object' ? body.preinscripcion : body;
     const saved = await createTorneoPreinscripcionRecord({
@@ -107,6 +109,9 @@ exports.handler = async (event) => {
       origin
     );
   } catch (err) {
+    if (isSiteUpdateModeError(err)) {
+      return json(503, { ok: false, error: err.message, code: 'site_update_mode' }, origin);
+    }
     console.error('submit-torneo-preinscripcion:', err);
     return json(500, { ok: false, error: err.message || 'Error interno' }, origin);
   }

@@ -8,6 +8,7 @@ const {
   createPlayerApplication,
   applicationsRef
 } = require('./lib/firestore-admin');
+const { assertPublicActionsAllowed, isSiteUpdateModeError } = require('./lib/site-public-mode');
 
 const CORS_BASE = {
   'Access-Control-Allow-Headers': 'Content-Type',
@@ -73,6 +74,7 @@ exports.handler = async (event) => {
   }
 
   try {
+    await assertPublicActionsAllowed();
     const body = JSON.parse(event.body || '{}');
     const season = String(body.season || getActiveSeasonIso()).trim();
     const name = String(body.name || '').trim();
@@ -167,6 +169,9 @@ exports.handler = async (event) => {
 
     return json(200, { ok: true, application }, origin);
   } catch (err) {
+    if (isSiteUpdateModeError(err)) {
+      return json(503, { ok: false, error: err.message, code: 'site_update_mode' }, origin);
+    }
     console.error('submit-player-application:', err);
     return json(500, { ok: false, error: err.message || 'Error interno' }, origin);
   }

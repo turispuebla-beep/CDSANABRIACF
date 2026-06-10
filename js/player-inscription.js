@@ -1001,6 +1001,9 @@
   }
 
   async function submitCheckout(registration, payMethod) {
+    if (global.SiteUpdateMode && global.SiteUpdateMode.isActive && global.SiteUpdateMode.isActive()) {
+      throw new Error(global.SiteUpdateMode.getMessage());
+    }
     const cart = registration.chargeBreakdown
       ? {
           total: registration.chargeBreakdown.total,

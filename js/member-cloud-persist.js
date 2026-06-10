@@ -42,6 +42,9 @@
   }
 
   async function persistMemberViaNetlify(member) {
+    if (global.SiteUpdateMode && global.SiteUpdateMode.isActive && global.SiteUpdateMode.isActive()) {
+      throw new Error(global.SiteUpdateMode.getMessage());
+    }
     const res = await fetch('/.netlify/functions/submit-member-registration', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -55,7 +58,7 @@
         json.error ||
           'No se pudo registrar el socio en la nube. Reintenta o contacta con el club (cdsanabriafc@gmail.com).'
       );
-      err.code = 'member_persist_failed';
+      err.code = json.code || '';
       throw err;
     }
     const remote = json.member || { id: json.memberId, ...member };
@@ -90,6 +93,9 @@
   }
 
   async function persistFriendViaNetlify(friend) {
+    if (global.SiteUpdateMode && global.SiteUpdateMode.isActive && global.SiteUpdateMode.isActive()) {
+      throw new Error(global.SiteUpdateMode.getMessage());
+    }
     const res = await fetch('/.netlify/functions/submit-friend-registration', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -103,7 +109,7 @@
         json.error ||
           'No se pudo registrar el amigo/a en la nube. Reintenta o contacta con el club (cdsanabriafc@gmail.com).'
       );
-      err.code = 'friend_persist_failed';
+      err.code = json.code || '';
       throw err;
     }
     const remote = json.friend || { id: json.friendId, ...friend };
