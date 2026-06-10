@@ -1,6 +1,13 @@
 'use strict';
 
-const { escapeHtml, getEmailConfig, sendViaSendGrid, CLUB_EMAIL_PUBLIC_DEFAULT } = require('./club-email');
+const {
+  escapeHtml,
+  getEmailConfig,
+  sendViaSendGrid,
+  CLUB_EMAIL_PUBLIC_DEFAULT,
+  resolveOutboundTo,
+  withOriginalRecipientNotice
+} = require('./club-email');
 
 const CLUB_NAME = 'CD Sanabria CF';
 
@@ -104,14 +111,13 @@ async function sendMemberRegistrationEmail(data) {
   if (!cfg.ok) return { sent: false, reason: cfg.error };
   const email = String(data.email || '').trim().toLowerCase();
   if (!email) return { sent: false, reason: 'email vacío' };
-  const content = buildRegistrationContent(data);
-  const bcc = cfg.notifyEmail && cfg.notifyEmail !== email ? cfg.notifyEmail : undefined;
+  const content = withOriginalRecipientNotice(buildRegistrationContent(data), email, 'Socio/a');
   await sendViaSendGrid({
-    to: email,
+    to: resolveOutboundTo(cfg, email),
     subject: content.subject,
     html: content.html,
     text: content.text,
-    bcc
+    replyTo: email
   });
   return { sent: true };
 }
@@ -152,12 +158,17 @@ async function sendPlayerApplicationApprovedEmail(data) {
   if (!cfg.ok) return { sent: false, reason: cfg.error };
   const email = String(data.email || '').trim().toLowerCase();
   if (!email) return { sent: false, reason: 'email vacío' };
-  const content = buildPlayerApplicationApprovedContent(data);
+  const content = withOriginalRecipientNotice(
+    buildPlayerApplicationApprovedContent(data),
+    email,
+    'Jugador/a'
+  );
   await sendViaSendGrid({
-    to: email,
+    to: resolveOutboundTo(cfg, email),
     subject: content.subject,
     html: content.html,
-    text: content.text
+    text: content.text,
+    replyTo: email
   });
   return { sent: true };
 }
@@ -167,12 +178,13 @@ async function sendMemberPaymentConfirmedEmail(data) {
   if (!cfg.ok) return { sent: false, reason: cfg.error };
   const email = String(data.email || '').trim().toLowerCase();
   if (!email) return { sent: false, reason: 'email vacío' };
-  const content = buildPaymentConfirmedContent(data);
+  const content = withOriginalRecipientNotice(buildPaymentConfirmedContent(data), email, 'Socio/a');
   await sendViaSendGrid({
-    to: email,
+    to: resolveOutboundTo(cfg, email),
     subject: content.subject,
     html: content.html,
-    text: content.text
+    text: content.text,
+    replyTo: email
   });
   return { sent: true };
 }
@@ -213,12 +225,17 @@ async function sendPlayerPortalResetEmail(data) {
   if (!cfg.ok) return { sent: false, reason: cfg.error };
   const email = String(data.email || '').trim().toLowerCase();
   if (!email) return { sent: false, reason: 'email vacío' };
-  const content = buildPlayerPortalResetContent(data);
+  const content = withOriginalRecipientNotice(
+    buildPlayerPortalResetContent(data),
+    email,
+    'Jugador/a'
+  );
   await sendViaSendGrid({
-    to: email,
+    to: resolveOutboundTo(cfg, email),
     subject: content.subject,
     html: content.html,
-    text: content.text
+    text: content.text,
+    replyTo: email
   });
   return { sent: true };
 }

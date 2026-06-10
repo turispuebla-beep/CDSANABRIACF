@@ -20,9 +20,9 @@ ALLOWED_ORIGINS=https://www.cdsanabriacf.com,https://cdsanabriacf.com,https://cd
 
 # --- Gmail SMTP — buzón único del club ---
 
-# Cuenta: cdsanabriacf@gmail.com
+# Cuenta: cdsanabriafc@gmail.com
 
-CLUB_PUBLIC_EMAIL=cdsanabriacf@gmail.com
+CLUB_PUBLIC_EMAIL=cdsanabriafc@gmail.com
 
 # 1) Verificación en 2 pasos en esa cuenta Google
 
@@ -34,17 +34,21 @@ SMTP_HOST=smtp.gmail.com
 
 SMTP_PORT=587
 
-SMTP_USER=cdsanabriacf@gmail.com
+SMTP_USER=cdsanabriafc@gmail.com
 
 SMTP_PASS=xxxx-xxxx-xxxx-xxxx
 
-SMTP_FROM_EMAIL=cdsanabriacf@gmail.com
+SMTP_FROM_EMAIL=cdsanabriafc@gmail.com
 
 SMTP_FROM_NAME=CD Sanabria CF
 
-CLUB_REPLY_EMAIL=cdsanabriacf@gmail.com
+CLUB_REPLY_EMAIL=cdsanabriafc@gmail.com
 
-CLUB_NOTIFY_EMAIL=cdsanabriacf@gmail.com
+CLUB_NOTIFY_EMAIL=cdsanabriafc@gmail.com
+
+# Todo el correo automático va al buzón del club (true por defecto).
+# Pon false solo si quieres enviar también al email personal del socio/jugador.
+CLUB_EMAIL_ONLY=true
 
 
 
@@ -52,13 +56,13 @@ CLUB_NOTIFY_EMAIL=cdsanabriacf@gmail.com
 
 # SENDGRID_API_KEY=SG.xxx...
 
-# SENDGRID_FROM_EMAIL=cdsanabriacf@gmail.com
+# SENDGRID_FROM_EMAIL=cdsanabriafc@gmail.com
 
 # SENDGRID_FROM_NAME=CD Sanabria CF
 
-# CLUB_REPLY_EMAIL=cdsanabriacf@gmail.com
+# CLUB_REPLY_EMAIL=cdsanabriafc@gmail.com
 
-# CLUB_NOTIFY_EMAIL=cdsanabriacf@gmail.com
+# CLUB_NOTIFY_EMAIL=cdsanabriafc@gmail.com
 
 
 

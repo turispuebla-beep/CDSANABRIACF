@@ -526,7 +526,7 @@
     if (!res.ok || !json.ok) {
       const err = new Error(
         json.error ||
-          'No se pudo registrar la inscripción en la nube. Reintenta o contacta con el club (cdsanabriacf@gmail.com).'
+          'No se pudo registrar la inscripción en la nube. Reintenta o contacta con el club (cdsanabriafc@gmail.com).'
       );
       err.code = 'firebase_persist_failed';
       throw err;

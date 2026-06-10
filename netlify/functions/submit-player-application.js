@@ -47,12 +47,9 @@ function getActiveSeasonIso() {
 function buildNotifyFields(app) {
   return [
     { label: 'Temporada', value: app.season },
-    { label: 'Nombre', value: `${app.name} ${app.surname}`.trim() },
-    { label: 'DNI', value: app.dni },
-    { label: 'Email', value: app.email },
-    { label: 'Teléfono', value: app.phone },
-    { label: 'Nacimiento', value: app.birthDate },
     { label: 'Categoría sugerida', value: app.category },
+    { label: 'Domicilio', value: app.address || app.direccion },
+    { label: 'Dirección tutor/a', value: app.guardianAddress },
     app.isMinor
       ? {
           label: 'Tutor/a',
@@ -60,6 +57,7 @@ function buildNotifyFields(app) {
         }
       : null,
     { label: 'Estado', value: 'Pendiente de revisión en el panel de administración' },
+    { label: 'ID solicitud', value: app.id || '—' },
     app.photoDataUrl ? { label: 'Foto', value: 'Incluida en la solicitud (panel admin)' } : null
   ].filter(Boolean);
 }
@@ -153,7 +151,14 @@ exports.handler = async (event) => {
           title: 'Nueva solicitud de jugador/a',
           subject: `Nueva solicitud jugador/a — ${application.name} ${application.surname} (${application.season})`,
           requesterEmail: application.email,
-          fields: buildNotifyFields(application)
+          nombre: application.name,
+          apellidos: application.surname,
+          dni: application.dni,
+          telefono: application.phone,
+          email: application.email,
+          fechaNacimiento: application.birthDate,
+          direccion: application.address || application.direccion,
+          fields: buildNotifyFields({ ...application, id: application.id })
         });
       } catch (mailErr) {
         console.warn('submit-player-application email:', mailErr);

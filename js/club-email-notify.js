@@ -50,7 +50,23 @@
       paymentChannel: opts.paymentChannel,
       paymentMethod: opts.paymentMethod,
       fields: opts.fields,
-      requesterEmail: opts.requesterEmail
+      requesterEmail: opts.requesterEmail,
+      email: opts.email || opts.requesterEmail,
+      nombre: opts.nombre || opts.name,
+      apellidos: opts.apellidos || opts.surname,
+      dni: opts.dni,
+      sexo: opts.sexo,
+      fechaNacimiento: opts.fechaNacimiento || opts.birthDate,
+      direccion: opts.direccion || opts.address || opts.domicilio,
+      localidad: opts.localidad,
+      provincia: opts.provincia,
+      codigoPostal: opts.codigoPostal || opts.postalCode || opts.cp,
+      telefono: opts.telefono || opts.phone,
+      phone: opts.phone || opts.telefono,
+      numeroSocio: opts.numeroSocio || opts.memberNumber,
+      memberNumber: opts.memberNumber || opts.numeroSocio,
+      numeroAmigo: opts.numeroAmigo || opts.friendNumber,
+      friendNumber: opts.friendNumber || opts.numeroAmigo
     });
   }
 

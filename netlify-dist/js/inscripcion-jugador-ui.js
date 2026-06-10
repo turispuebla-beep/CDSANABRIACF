@@ -274,7 +274,7 @@
       const clubEm =
         (global.ClubContactDefaults && global.ClubContactDefaults.getNotifyEmail && global.ClubContactDefaults.getNotifyEmail()) ||
         (global.ClubMailto && global.ClubMailto.getClubNotifyEmail && global.ClubMailto.getClubNotifyEmail()) ||
-        'cdsanabriacf@gmail.com';
+        'cdsanabriafc@gmail.com';
       msg.textContent = 'No se pudo abrir el correo. Escribe a ' + clubEm + ' con tu DNI.';
     }
   }
@@ -1255,11 +1255,8 @@
       : '—';
     const cb = reg.chargeBreakdown || {};
     return [
-      { label: 'Nombre', value: reg.name || reg.nombre },
-      { label: 'Apellidos', value: reg.surname || reg.apellidos },
-      { label: 'DNI', value: reg.dni },
-      { label: 'Email', value: reg.email },
-      { label: 'Teléfono', value: reg.phone || reg.telefono },
+      { label: 'ID ficha', value: reg.id || '—' },
+      { label: 'Nº socio vinculado', value: reg.numeroSocio || reg.memberNumber || '—' },
       { label: 'Temporada', value: reg.inscriptionSeason || reg.temporada },
       { label: 'Categoría', value: reg.category || reg.categoria },
       { label: 'Fecha nacimiento', value: reg.birthDate || reg.fechaNacimiento },
@@ -1311,6 +1308,17 @@
       subject: 'Inscripción jugador — ' + offlinePaymentSubjectLabel(ch),
       paymentChannel: ch,
       requesterEmail: reg.email,
+      nombre: reg.name || reg.nombre,
+      apellidos: reg.surname || reg.apellidos,
+      dni: reg.dni,
+      fechaNacimiento: reg.birthDate || reg.fechaNacimiento,
+      direccion: reg.domicilio || reg.address,
+      localidad: reg.localidad,
+      provincia: reg.provincia,
+      telefono: reg.phone || reg.telefono,
+      email: reg.email,
+      numeroSocio: reg.numeroSocio || reg.memberNumber,
+      memberNumber: reg.numeroSocio || reg.memberNumber,
       fields: buildPlayerClubNotifyFields(reg)
     }).catch(function (e) {
       console.warn('Correo aviso club inscripción:', e);

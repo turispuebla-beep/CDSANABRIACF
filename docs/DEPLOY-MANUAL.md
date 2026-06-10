@@ -184,7 +184,7 @@ Incluye bloqueo de altas públicas cuando **modo actualización** está ON (`san
 | Email/teléfono del club | `js/club-contact-defaults.js` + Admin → contacto del club |
 | Cartel torneo | `assets/torneo-futbol-7-2026.jpeg` |
 
-Contacto del club (web y SMTP): **cdsanabriacf@gmail.com** (`js/club-contact-defaults.js`).
+Contacto del club (web y SMTP): **cdsanabriafc@gmail.com** (`js/club-contact-defaults.js`).
 
 ---
 

@@ -1,19 +1,18 @@
 /**
  * Datos de contacto del club — valores por defecto y sincronización localStorage.
  *
- * Buzón único: cdsanabriacf@gmail.com (web, modales, SMTP y avisos).
+ * Buzón único: cdsanabriafc@gmail.com (web, modales, SMTP y avisos).
  */
 (function (global) {
   'use strict';
 
   const STORAGE_KEY = 'clubContactInfo';
 
-  const CLUB_EMAIL = 'cdsanabriacf@gmail.com';
+  const CLUB_EMAIL = 'cdsanabriafc@gmail.com';
 
   const LEGACY_CLUB_EMAILS = [
-    'cdsanabriafc@gmail.com',
-    'cdsanabriacf*@gmail.com',
-    'cdsanabriacf@gmail.com'
+    'cdsanabriacf@gmail.com',
+    'cdsanabriacf*@gmail.com'
   ];
 
   const DEFAULT_CLUB_CONTACT_INFO = {

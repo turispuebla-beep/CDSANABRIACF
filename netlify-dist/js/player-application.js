@@ -225,7 +225,7 @@
     }
     return (
       (global.ClubContactDefaults && global.ClubContactDefaults.CLUB_EMAIL_NOTIFY) ||
-      'cdsanabriacf@gmail.com'
+      'cdsanabriafc@gmail.com'
     );
   }
 

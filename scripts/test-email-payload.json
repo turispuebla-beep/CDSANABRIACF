@@ -1,0 +1,10 @@
+{
+  "type": "club_admin_notify",
+  "kind": "prueba_smtp",
+  "title": "Prueba correo",
+  "subject": "Prueba SMTP CD Sanabria CF",
+  "requesterEmail": "test@example.com",
+  "fields": [
+    { "label": "Mensaje", "value": "Prueba sin registro socio/jugador" }
+  ]
+}

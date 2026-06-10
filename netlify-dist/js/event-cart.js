@@ -15,7 +15,7 @@
     if (global.ClubContactDefaults && global.ClubContactDefaults.getPublicEmail) {
       return global.ClubContactDefaults.getPublicEmail();
     }
-    return 'cdsanabriacf@gmail.com';
+    return 'cdsanabriafc@gmail.com';
   }
 
   function getClubNotifyEmail() {
@@ -25,7 +25,7 @@
     if (global.ClubMailto && global.ClubMailto.getClubNotifyEmail) {
       return global.ClubMailto.getClubNotifyEmail();
     }
-    return 'cdsanabriacf@gmail.com';
+    return 'cdsanabriafc@gmail.com';
   }
 
   function notifyClubEventRegistration(event, cart, registrant, total, paymentChannel) {
@@ -33,16 +33,31 @@
     const ch = paymentChannel === 'transfer' ? 'transferencia' : paymentChannel || 'transferencia';
     const holder = cart.holder || {};
     const guests = cart.guests || [];
+    const tier = getRegistrantEventTier(registrant);
+    const tierLabel =
+      typeof global.formatRegistrantTierLabel === 'function'
+        ? global.formatRegistrantTierLabel(tier)
+        : tier;
     global.CdsanClubEmail.sendClubAdminNotify({
       kind: 'evento_inscripcion',
       title: 'Nueva inscripción a evento (pendiente de pago)',
       subject: 'Inscripción evento — ' + (event.title || event.name || 'CD Sanabria CF'),
       paymentChannel: ch,
       requesterEmail: registrant.email,
+      nombre: holder.nombre || holder.name || registrant.nombre || registrant.name,
+      apellidos: holder.apellidos || holder.surname || registrant.apellidos || registrant.surname,
+      dni: holder.dni || registrant.dni,
+      direccion: holder.direccion || holder.address || registrant.direccion || registrant.address,
+      telefono: holder.telefono || holder.phone || registrant.telefono || registrant.phone,
+      email: registrant.email,
+      numeroSocio: registrant.numeroSocio || registrant.memberNumber,
+      memberNumber: registrant.numeroSocio || registrant.memberNumber,
+      numeroAmigo: registrant.numeroAmigo || registrant.friendNumber,
+      friendNumber: registrant.numeroAmigo || registrant.friendNumber,
       fields: [
+        { label: 'Perfil inscrito', value: tierLabel },
         { label: 'Evento', value: event.title || event.name },
         { label: 'Titular', value: [holder.nombre || holder.name, holder.apellidos || holder.surname].filter(Boolean).join(' ') },
-        { label: 'Email', value: registrant.email },
         { label: 'Plazas', value: String(1 + guests.length) },
         { label: 'Invitados', value: String(guests.length) },
         { label: 'Importe (€)', value: total != null ? Number(total).toFixed(2) : '—' }

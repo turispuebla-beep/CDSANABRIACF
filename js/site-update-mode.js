@@ -114,14 +114,10 @@
     const text = global.document.getElementById('siteUpdateBannerText');
     if (!banner || !text) return;
     if (state.active) {
-      text.textContent = canBypass()
-        ? getMessage() + ' (Modo actualización activo — tú puedes probar con normalidad.)'
-        : getMessage();
+      text.textContent = getMessage();
       banner.hidden = false;
-      banner.classList.toggle('site-update-banner--admin', canBypass());
     } else {
       banner.hidden = true;
-      banner.classList.remove('site-update-banner--admin');
     }
   }
 

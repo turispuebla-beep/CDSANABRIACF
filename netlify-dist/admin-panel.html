@@ -33,6 +33,7 @@
     <script src="js/protocol-guard.js"></script>
     <script src="js/admin-session.js"></script>
     <script src="js/club-member-numbers.js"></script>
+    <script src="js/club-friend-numbers.js"></script>
     <script src="js/club-member-card.js"></script>
     <script src="js/club-role-links.js"></script>
     <script src="js/club-inscription-config.js"></script>
@@ -46,6 +47,8 @@
     <script src="js/admin-torneo-preinscripciones.js"></script>
     <script src="js/admin-player-applications.js"></script>
     <script src="js/player-inscription.js"></script>
+    <script src="js/member-cloud-persist.js"></script>
+    <script src="js/admin-cloud-persist.js"></script>
     <script src="js/club-player-export-config.js"></script>
     <script src="js/player-export.js"></script>
     <script src="js/admin-player-export-config.js"></script>
@@ -638,7 +641,7 @@
                     <div style="flex: 1; min-width: 220px;">
                         <strong style="color: #9a3412;">📌 Recordatorio: nueva temporada de cuotas</strong>
                         <p style="margin: 6px 0 0 0; font-size: 0.95rem; color: #7c2d12;">
-                            Tras el cierre del <span id="cuotaRenewalCierreLabel">31 de agosto</span>, puedes <strong>marcar como pendientes de pago</strong> a los socios activos (nueva temporada). La <strong>validación</strong> es siempre <strong>una a una</strong>, cuando veas el ingreso en la cuenta bancaria. Contacto club: <a href="mailto:cdsanabriacf@gmail.com">cdsanabriacf@gmail.com</a>
+                            Tras el cierre del <span id="cuotaRenewalCierreLabel">31 de agosto</span>, puedes <strong>marcar como pendientes de pago</strong> a los socios activos (nueva temporada). La <strong>validación</strong> es siempre <strong>una a una</strong>, cuando veas el ingreso en la cuenta bancaria. Contacto club: <a href="mailto:cdsanabriafc@gmail.com">cdsanabriafc@gmail.com</a>
                         </p>
                     </div>
                     <div style="display: flex; flex-wrap: wrap; gap: 8px;">
@@ -3404,7 +3407,7 @@
                                 ⚠️ <strong>El socio tiene 7 días para realizar el ingreso</strong> tras registrarse. Tú <strong>no valides en bloque</strong>: usa <strong>«Validar pago»</strong> en cada uno cuando veas el abono en la cuenta del club.
                             </p>
                             <p style="margin: 5px 0; font-size: 0.9em;">
-                                📧 Contacto del club: <strong>cdsanabriacf@gmail.com</strong> · Podéis coordinar avisos también por <strong>notificaciones</strong> si el socio las activa en la web.
+                                📧 Contacto del club: <strong>cdsanabriafc@gmail.com</strong> · Podéis coordinar avisos también por <strong>notificaciones</strong> si el socio las activa en la web.
                             </p>
                             <p style="margin: 5px 0; font-size: 0.9em;">
                                 🗑️ Si no se paga en plazo, el alta caduca y puede eliminarse al limpiar pendientes caducados.
@@ -3459,7 +3462,7 @@
                         <button class="btn" onclick="cleanExpiredMembers()" style="background: #dc2626;">🗑️ Limpiar Socios Caducados</button>
                     </div>
                     <p style="text-align: center; color: #475569; font-size: 0.9rem; max-width: 760px; margin: 0 auto 18px auto; line-height: 1.45;">
-                        <strong>Validación de pagos:</strong> siempre individual. Pulsa <strong>«Validar pago»</strong> en cada socio cuando compruebes el ingreso en la cuenta. No se usa validación masiva. Contacto interno: <a href="mailto:cdsanabriacf@gmail.com">cdsanabriacf@gmail.com</a> · Los socios pueden activar <strong>notificaciones</strong> en la web para avisos del club.
+                        <strong>Validación de pagos:</strong> siempre individual. Pulsa <strong>«Validar pago»</strong> en cada socio cuando compruebes el ingreso en la cuenta. No se usa validación masiva. Contacto interno: <a href="mailto:cdsanabriafc@gmail.com">cdsanabriafc@gmail.com</a> · Los socios pueden activar <strong>notificaciones</strong> en la web para avisos del club.
                     </p>
                 </div>
 
@@ -4019,12 +4022,12 @@
                 <div class="section">
                     <h3>📞 Datos de Contacto</h3>
                     <p><strong>Información de contacto del club</strong> (se muestra en la web y en los avisos por correo de solicitudes de jugador).</p>
-                    <p style="font-size:0.9rem;color:#64748b;margin:0 0 12px;">Email del club: <strong>cdsanabriacf@gmail.com</strong> (web, formularios y SMTP en Netlify). Pulsa <strong>Guardar contacto</strong> para fijarlo en la nube.</p>
+                    <p style="font-size:0.9rem;color:#64748b;margin:0 0 12px;">Email del club: <strong>cdsanabriafc@gmail.com</strong> (web, formularios y SMTP en Netlify). Pulsa <strong>Guardar contacto</strong> para fijarlo en la nube.</p>
                     
                     <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin: 20px 0;">
                         <div>
                             <label style="display: block; margin-bottom: 5px; font-weight: bold;">📧 Email del Club</label>
-                            <input type="email" id="clubEmail" placeholder="cdsanabriacf@gmail.com" value="cdsanabriacf@gmail.com" style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 8px;">
+                            <input type="email" id="clubEmail" placeholder="cdsanabriafc@gmail.com" value="cdsanabriafc@gmail.com" style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 8px;">
                         </div>
                         <div>
                             <label style="display: block; margin-bottom: 5px; font-weight: bold;">📱 Teléfono</label>
@@ -4362,7 +4365,7 @@
                 const adminInfo = document.getElementById('currentAdminInfo');
                 if (adminInfo) {
                     const isPrincipal = currentAdmin.email === 'amco@gmx.es';
-                    const isSecondAdmin = currentAdmin.email === 'cdsanabriacf@gmail.com';
+                    const isSecondAdmin = currentAdmin.email === 'cdsanabriafc@gmail.com';
                     
                     // Ocultar información del administrador principal
                     if (isPrincipal) {
@@ -4584,7 +4587,7 @@
                 const secondAdmin = {
                     id: 'ADMIN_SECONDARY',
                     name: 'Administrador Secundario',
-                    email: 'cdsanabriacf@gmail.com',
+                    email: 'cdsanabriafc@gmail.com',
                     role: 'super_admin',
                     status: 'active'
                 };
@@ -5010,6 +5013,8 @@
                     number: document.getElementById('playerNumber').value,
                     position: document.getElementById('playerPosition').value,
                     license: document.getElementById('playerLicense').value.trim(),
+                    appScope: 'cdsanabriacf',
+                    registrationSource: 'admin_panel',
                     // Estadísticas deportivas
                     matches: parseInt(document.getElementById('playerMatches').value) || 0,
                     goals: parseInt(document.getElementById('playerGoals').value) || 0,
@@ -12512,8 +12517,30 @@
                     registrationDate: new Date().toISOString(),
                     validatedBy: null,
                     validatedDate: null,
-                    memberNumber: null // Se asignará al validar
+                    memberNumber: null,
+                    appScope: 'cdsanabriacf',
+                    registrationSource: 'admin_panel'
                 };
+
+                if (email && password && window.cdsanClubAuth && window.firebaseAuth && !window.firebaseAuth.isSimulation) {
+                    try {
+                        const reg = await window.cdsanClubAuth.registerEmail(String(email).trim().toLowerCase(), password);
+                        if (!reg.simulation && reg.uid) {
+                            newMember.authUid = reg.uid;
+                            newMember.uid = reg.uid;
+                        }
+                    } catch (e) {
+                        console.error('saveMember Firebase Auth:', e);
+                        if (e && e.code === 'auth/email-already-in-use') {
+                            alert('❌ Ese correo ya tiene cuenta Firebase. El socio puede iniciar sesión con su contraseña.');
+                        } else {
+                            alert('❌ No se pudo crear la cuenta de acceso del socio en Firebase.');
+                        }
+                        return;
+                    }
+                } else if (password && typeof window.hashClubAccessKey === 'function') {
+                    newMember.passwordHash = await window.hashClubAccessKey(password);
+                }
 
                 // Agregar a la lista
                 if (typeof window.applyClubRoleFlagsToMember === 'function') {
@@ -12529,7 +12556,7 @@
                 updateMemberCounts();
                 updateDashboardCounts();
 
-                alert('✅ Socio registrado.\n\n⚠️ Tiene 7 días para ingresar la cuota. Un administrador lo validará al ver el pago en la cuenta (cdsanabriacf@gmail.com).');
+                alert('✅ Socio registrado.\n\n⚠️ Tiene 7 días para ingresar la cuota. Un administrador lo validará al ver el pago en la cuenta (cdsanabriafc@gmail.com).');
                 console.log('👤 Nuevo socio registrado:', newMember.name + ' ' + newMember.surname);
 
             } catch (error) {
@@ -12750,8 +12777,21 @@
                     window.applyClubRoleFlagsToMember(member);
                 }
                 const payload = buildMemberFirebasePayload(member);
+                const merged = { ...member, ...payload, appScope: 'cdsanabriacf', registrationSource: member.registrationSource || 'admin_panel' };
+
+                if (window.AdminClubCloudPersist && typeof window.AdminClubCloudPersist.persistMember === 'function') {
+                    try {
+                        return await window.AdminClubCloudPersist.persistMember(merged);
+                    } catch (netlifyErr) {
+                        console.warn('Netlify socio (admin):', netlifyErr);
+                        if (window.AdminClubCloudPersist.cloudRequired && window.AdminClubCloudPersist.cloudRequired()) {
+                            throw netlifyErr;
+                        }
+                    }
+                }
+
                 if (String(member.id).startsWith('MEMBER_') && typeof window.createDocument === 'function') {
-                    const newId = await window.createDocument('members', { ...member, ...payload });
+                    const newId = await window.createDocument('members', merged);
                     const all = JSON.parse(localStorage.getItem('clubMembers') || '[]');
                     const ix = all.findIndex(m => m.id === member.id);
                     if (ix >= 0) {
@@ -13218,8 +13258,21 @@
             if (!friend || !friend.id) return;
             try {
                 const payload = buildFriendFirebasePayload(friend);
+                const merged = { ...friend, ...payload, appScope: 'cdsanabriacf', registrationSource: friend.registrationSource || 'admin_panel' };
+
+                if (window.AdminClubCloudPersist && typeof window.AdminClubCloudPersist.persistFriend === 'function') {
+                    try {
+                        return await window.AdminClubCloudPersist.persistFriend(merged);
+                    } catch (netlifyErr) {
+                        console.warn('Netlify amigo (admin):', netlifyErr);
+                        if (window.AdminClubCloudPersist.cloudRequired && window.AdminClubCloudPersist.cloudRequired()) {
+                            throw netlifyErr;
+                        }
+                    }
+                }
+
                 if (String(friend.id).startsWith('FRIEND_') && typeof window.createDocument === 'function') {
-                    const newId = await window.createDocument('friends', { ...friend, ...payload });
+                    const newId = await window.createDocument('friends', merged);
                     const all = JSON.parse(localStorage.getItem('clubFriends') || '[]');
                     const ix = all.findIndex(f => f.id === friend.id);
                     if (ix >= 0) {
@@ -13266,6 +13319,38 @@
 
         async function persistRecordToFirebase(localKey, collectionKey, record) {
             if (!record || typeof record !== 'object') return null;
+
+            const netlifyMap = {
+                members: 'member',
+                friends: 'friend',
+                players: 'player',
+                coaches: 'coach'
+            };
+            const netlifyKind = netlifyMap[collectionKey];
+            if (netlifyKind && window.AdminClubCloudPersist && typeof window.AdminClubCloudPersist.persist === 'function') {
+                try {
+                    const saved = await window.AdminClubCloudPersist.persist(netlifyKind, {
+                        ...record,
+                        appScope: 'cdsanabriacf',
+                        registrationSource: record.registrationSource || 'admin_panel'
+                    });
+                    if (saved && saved.id && localKey) {
+                        const list = JSON.parse(localStorage.getItem(localKey) || '[]');
+                        const ix = list.findIndex((x) => x && x.id === record.id);
+                        if (ix >= 0) {
+                            list[ix] = { ...list[ix], ...saved };
+                            localStorage.setItem(localKey, JSON.stringify(list));
+                        }
+                    }
+                    return saved || record;
+                } catch (netlifyErr) {
+                    console.warn('Netlify persist (' + collectionKey + '):', netlifyErr);
+                    if (window.AdminClubCloudPersist.cloudRequired && window.AdminClubCloudPersist.cloudRequired()) {
+                        throw netlifyErr;
+                    }
+                }
+            }
+
             if (typeof window.createDocument !== 'function' || typeof window.updateDocument !== 'function') return record;
 
             const localId = record.id;
@@ -14569,7 +14654,7 @@
 
         /** Política del club: nunca validación masiva; solo al ver el pago en cuenta. */
         function validateAllPendingMembers() {
-            alert('No está disponible la validación masiva.\n\nValida cada socio con «Validar pago» cuando hayas comprobado el ingreso en la cuenta bancaria.\n\nContacto: cdsanabriacf@gmail.com');
+            alert('No está disponible la validación masiva.\n\nValida cada socio con «Validar pago» cuando hayas comprobado el ingreso en la cuenta bancaria.\n\nContacto: cdsanabriafc@gmail.com');
         }
 
         /**
@@ -14936,11 +15021,29 @@
                     email: email,
                     status: 'active',
                     registrationDate: new Date().toISOString(),
+                    appScope: 'cdsanabriacf',
+                    registrationSource: 'admin_panel',
                     lastAccess: null,
                     accessCount: 0
                 };
 
-                if (password && window.firebaseAuth && window.firebaseAuth.isSimulation && typeof window.hashClubAccessKey === 'function') {
+                if (password && window.cdsanClubAuth && window.firebaseAuth && !window.firebaseAuth.isSimulation) {
+                    try {
+                        const reg = await window.cdsanClubAuth.registerEmail(String(email).trim().toLowerCase(), password);
+                        if (!reg.simulation && reg.uid) {
+                            newFriend.authUid = reg.uid;
+                            newFriend.uid = reg.uid;
+                        }
+                    } catch (e) {
+                        console.error('saveFriend Firebase Auth:', e);
+                        if (e && e.code === 'auth/email-already-in-use') {
+                            alert('❌ Ese correo ya tiene cuenta. El amigo puede usar «Olvidé mi contraseña» o registrarse en la web.');
+                        } else {
+                            alert('❌ No se pudo crear la cuenta de acceso del amigo en Firebase.');
+                        }
+                        return;
+                    }
+                } else if (password && typeof window.hashClubAccessKey === 'function') {
                     newFriend.passwordHash = await window.hashClubAccessKey(password);
                 }
 
@@ -15512,8 +15615,10 @@
                     team: team,
                     license: license,
                     experience: experience ? parseInt(experience) : 0,
-                    status: 'pending', // Estado pendiente hasta validación del administrador
+                    status: 'pending',
                     registrationDate: new Date().toISOString(),
+                    registrationSource: 'admin_panel',
+                    appScope: 'cdsanabriacf',
                     lastAccess: null,
                     accessCount: 0,
                     passwordHash: passwordHash,
@@ -15780,6 +15885,13 @@
 
                 const updatedCoaches = coaches.filter(c => c.id !== coachId);
                 localStorage.setItem('clubCoaches', JSON.stringify(updatedCoaches));
+                if (window.AdminClubCloudPersist && typeof window.AdminClubCloudPersist.deleteCoach === 'function' && !String(coachId).startsWith('COACH_') && !/^\d{12,}$/.test(String(coachId))) {
+                    try {
+                        await window.AdminClubCloudPersist.deleteCoach(coachId);
+                    } catch (e) {
+                        console.warn('Netlify delete coach:', e);
+                    }
+                }
                 await deleteRecordFromFirebase('coaches', coachId);
                 await refreshLinkedMemberRoles(coach.dni, coach.name, coach.surname);
                 
@@ -16402,10 +16514,16 @@
 
         function mapSocioExportRow(raw) {
             const m = typeof normalizeClubMember === 'function' ? normalizeClubMember(raw) : raw;
+            const numDisplay =
+                window.ClubMemberNumbers && m.memberNumber
+                    ? window.ClubMemberNumbers.formatMemberLabel(m)
+                    : m.memberNumber || m.numeroSocio || '';
             return {
-                'Nº socio': m.memberNumber || m.numeroSocio || '',
+                'Nº socio': numDisplay,
                 Nombre: m.name || m.nombre || '',
                 Apellidos: m.surname || m.apellidos || '',
+                Sexo: m.sexo || '',
+                'Fecha nacimiento': formatExportDate(m.birthDate || m.fechaNacimiento),
                 DNI: m.dni || '',
                 Email: m.email || '',
                 Teléfono: m.phone || m.telefono || '',
@@ -16419,7 +16537,12 @@
         }
 
         function mapAmigoExportRow(a) {
+            const numDisplay =
+                window.ClubFriendNumbers && (a.numeroAmigo || a.friendNumber)
+                    ? window.ClubFriendNumbers.formatFriendLabel(a)
+                    : a.numeroAmigo || a.friendNumber || '';
             return {
+                'Nº amigo/a': numDisplay,
                 Nombre: a.nombre || a.name || '',
                 Apellidos: a.apellidos || a.surname || '',
                 DNI: a.dni || '',
@@ -16427,7 +16550,8 @@
                 Teléfono: a.telefono || a.phone || '',
                 Dirección: a.direccion || a.address || '',
                 Estado: memberStatusExportLabel(a.status || a.estado),
-                'Fecha registro': formatExportDate(a.fechaRegistro || a.registrationDate)
+                'Fecha registro': formatExportDate(a.fechaRegistro || a.registrationDate),
+                'Notificaciones push': a.notificaciones ? 'Sí' : 'No'
             };
         }
 
@@ -17608,7 +17732,7 @@ th,td{border:1px solid #ccc;padding:5px 7px;text-align:left;white-space:nowrap;}
             try {
                 let email = document.getElementById('clubEmail').value.trim();
                 if (!email || !email.includes('@')) {
-                    email = 'cdsanabriacf@gmail.com';
+                    email = 'cdsanabriafc@gmail.com';
                     document.getElementById('clubEmail').value = email;
                 }
                 const contactInfo = {
@@ -17641,7 +17765,7 @@ th,td{border:1px solid #ccc;padding:5px 7px;text-align:left;white-space:nowrap;}
                 } else {
                     contactInfo = JSON.parse(localStorage.getItem('clubContactInfo') || 'null');
                     if (contactInfo) {
-                        document.getElementById('clubEmail').value = contactInfo.email || 'cdsanabriacf@gmail.com';
+                        document.getElementById('clubEmail').value = contactInfo.email || 'cdsanabriafc@gmail.com';
                         document.getElementById('clubPhone').value = contactInfo.phone || '';
                         document.getElementById('clubAddress').value = contactInfo.address || '';
                         document.getElementById('clubWebsite').value = contactInfo.website || '';

@@ -169,13 +169,19 @@ async function completeMembershipPayment(payment, redsysParams) {
       subject: `Cuota socio pagada — ${payCh === 'bizum' ? 'Bizum' : 'Tarjeta'}`,
       paymentChannel: payCh,
       requesterEmail: d.email || payment.customerEmail,
+      nombre: d.nombre || d.name,
+      apellidos: d.apellidos || d.surname,
+      dni: d.dni,
+      sexo: d.sexo,
+      fechaNacimiento: d.fechaNacimiento || d.birthDate,
+      direccion: d.direccion || d.address,
+      telefono: d.telefono || d.phone,
+      email: d.email || payment.customerEmail,
+      numeroSocio: d.numeroSocio || d.memberNumber,
+      memberNumber: d.numeroSocio || d.memberNumber,
       fields: [
-        { label: 'Nombre completo', value: nombre || '—' },
-        { label: 'Email', value: d.email || payment.customerEmail },
-        { label: 'DNI', value: d.dni },
-        { label: 'Teléfono', value: d.telefono || d.phone },
-        { label: 'Nº socio', value: d.numeroSocio || d.memberNumber },
         { label: 'Cuota (€)', value: d.cuota != null ? d.cuota : payment.amountEur },
+        { label: 'Estado', value: 'Activo (pago confirmado)' },
         { label: 'Pedido pasarela', value: payment.orderId }
       ]
     });
@@ -253,10 +259,18 @@ async function completeEventPayment(payment) {
       subject: `Evento pagado — ${eventTitle}`,
       paymentChannel: payCh,
       requesterEmail: payment.customerEmail || holder.email,
+      nombre: holder.nombre || holder.name,
+      apellidos: holder.apellidos || holder.surname,
+      dni: holder.dni,
+      direccion: holder.direccion || holder.address,
+      telefono: holder.telefono || holder.phone,
+      email: payment.customerEmail || holder.email,
+      numeroSocio: holder.numeroSocio || holder.memberNumber,
+      memberNumber: holder.numeroSocio || holder.memberNumber,
+      numeroAmigo: holder.numeroAmigo || holder.friendNumber,
+      friendNumber: holder.numeroAmigo || holder.friendNumber,
       fields: [
         { label: 'Evento', value: eventTitle },
-        { label: 'Titular', value: [holder.nombre || holder.name, holder.apellidos || holder.surname].filter(Boolean).join(' ') },
-        { label: 'Email', value: payment.customerEmail || holder.email },
         { label: 'Plazas', value: String(toAdd.length) },
         { label: 'Invitados', value: String(guestCount) },
         { label: 'Importe (€)', value: totalEur },
@@ -444,7 +458,6 @@ async function completePlayerInscription(payment) {
   try {
     const { sendClubAdminNotification } = require('./club-admin-notify-email');
     const payCh = payment.payMethod === 'bizum' ? 'bizum' : 'tarjeta';
-    const nombre = [reg.name || reg.nombre, reg.surname || reg.apellidos].filter(Boolean).join(' ').trim();
     const kit = reg.kit && reg.kit.items ? reg.kit.items : reg.kitOrder || [];
     const kitTxt = Array.isArray(kit)
       ? kit.map((k) => `${k.garment || k.prenda || ''} ${k.size || k.talla || ''}`.trim()).filter(Boolean).join('; ')
@@ -456,16 +469,21 @@ async function completePlayerInscription(payment) {
       subject: `Inscripción pagada — ${payCh === 'bizum' ? 'Bizum' : 'Tarjeta'}`,
       paymentChannel: payCh,
       requesterEmail: reg.email || payment.customerEmail,
+      nombre: reg.name || reg.nombre,
+      apellidos: reg.surname || reg.apellidos,
+      dni: reg.dni,
+      fechaNacimiento: reg.birthDate || reg.fechaNacimiento,
+      direccion: reg.domicilio || reg.address,
+      localidad: reg.localidad,
+      provincia: reg.provincia,
+      telefono: reg.phone || reg.telefono,
+      email: reg.email || payment.customerEmail,
+      numeroSocio: reg.numeroSocio || reg.memberNumber,
+      memberNumber: reg.numeroSocio || reg.memberNumber,
       fields: [
-        { label: 'Nombre completo', value: nombre || '—' },
-        { label: 'DNI', value: reg.dni },
-        { label: 'Email', value: reg.email || payment.customerEmail },
-        { label: 'Teléfono', value: reg.phone || reg.telefono },
+        { label: 'ID ficha', value: reg.id || '—' },
         { label: 'Temporada', value: season },
         { label: 'Categoría', value: reg.category || reg.categoria },
-        { label: 'Domicilio', value: reg.domicilio || reg.address },
-        { label: 'Localidad', value: reg.localidad },
-        { label: 'Provincia', value: reg.provincia },
         { label: 'Ropa entreno', value: kitTxt || '—' },
         { label: 'Importe total (€)', value: total },
         { label: 'Pedido pasarela', value: payment.orderId }
@@ -1140,6 +1158,7 @@ function normalizeFriendRecordFields(raw) {
   delete f.portalPassword;
   const status = String(f.status || f.estado || 'active').trim() || 'active';
   const estado = String(f.estado || (status === 'active' ? 'activo' : f.estado) || 'activo').trim() || 'activo';
+  const numeroAmigoRaw = String(f.numeroAmigo || f.friendNumber || '').trim();
   return {
     ...f,
     appScope: APP_SCOPE,
@@ -1151,6 +1170,8 @@ function normalizeFriendRecordFields(raw) {
     phone: telefono,
     email: String(f.email || '').trim().toLowerCase(),
     dni: normalizeDni(f.dni),
+    numeroAmigo: numeroAmigoRaw || undefined,
+    friendNumber: numeroAmigoRaw || undefined,
     status,
     estado,
     updatedAt: new Date().toISOString()
@@ -1188,6 +1209,12 @@ async function upsertFriendRegistrationRecord(friend) {
     throw new Error('Nombre y apellidos obligatorios en alta de amigo/a');
   }
 
+  if (!patch.numeroAmigo && !patch.friendNumber) {
+    const provisional = 'AMIG' + String(Date.now()).slice(-6);
+    patch.numeroAmigo = provisional;
+    patch.friendNumber = provisional;
+  }
+
   const existing = await findFriendDocByIdentity(patch);
   let friendId;
   if (existing) {
@@ -1209,6 +1236,102 @@ async function upsertFriendRegistrationRecord(friend) {
   }
   const snap = await friendsRef().doc(String(friendId)).get();
   return { id: friendId, ...(snap.exists ? snap.data() : patch) };
+}
+
+function coachesRef() {
+  return initAdmin().collection('sanabria_coaches');
+}
+
+function normalizeCoachRecordFields(raw) {
+  const c = raw && typeof raw === 'object' ? { ...raw } : {};
+  const name = String(c.name || c.nombre || '').trim();
+  const surname = String(c.surname || c.apellidos || '').trim();
+  const phone = String(c.phone || c.telefono || '').trim();
+  delete c.password;
+  delete c.pass;
+  delete c.plainPassword;
+  delete c.portalPassword;
+  const patch = {
+    ...c,
+    appScope: APP_SCOPE,
+    name,
+    nombre: name,
+    surname,
+    apellidos: surname,
+    phone,
+    telefono: phone,
+    email: String(c.email || '').trim().toLowerCase(),
+    dni: normalizeDni(c.dni),
+    team: String(c.team || '').trim(),
+    license: String(c.license || c.licencia || '').trim(),
+    status: String(c.status || 'pending').trim(),
+    updatedAt: new Date().toISOString()
+  };
+  if (c.passwordHash) patch.passwordHash = String(c.passwordHash);
+  return patch;
+}
+
+async function findCoachDocByIdentity(coach) {
+  const email = String(coach.email || '').trim().toLowerCase();
+  if (email) {
+    const q = await coachesRef().where('email', '==', email).limit(1).get();
+    if (!q.empty) {
+      const doc = q.docs[0];
+      return { ref: doc.ref, data: { id: doc.id, ...doc.data() } };
+    }
+  }
+  const dni = normalizeDni(coach.dni);
+  if (dni) {
+    const q = await coachesRef().where('dni', '==', dni).limit(1).get();
+    if (!q.empty) {
+      const doc = q.docs[0];
+      return { ref: doc.ref, data: { id: doc.id, ...doc.data() } };
+    }
+  }
+  const coachId = coach.id ? String(coach.id).trim() : '';
+  if (coachId && !coachId.startsWith('COACH_') && !/^\d{12,}$/.test(coachId)) {
+    const snap = await coachesRef().doc(coachId).get();
+    if (snap.exists) return { ref: snap.ref, data: { id: snap.id, ...snap.data() } };
+  }
+  return null;
+}
+
+/** Alta/actualización de entrenador (panel admin — clave asignada por el club, solo hash). */
+async function upsertCoachRecord(coach) {
+  const patch = normalizeCoachRecordFields(coach);
+  if (!patch.email) throw new Error('Email ausente en alta de entrenador');
+
+  const existing = await findCoachDocByIdentity(patch);
+  let coachId;
+  if (existing) {
+    coachId = existing.data.id;
+    await existing.ref.set(patch, { merge: true });
+  } else {
+    if (!patch.passwordHash) {
+      throw new Error('passwordHash obligatorio al crear entrenador');
+    }
+    const ref = coachesRef().doc();
+    coachId = ref.id;
+    const now = patch.updatedAt || new Date().toISOString();
+    await ref.set(
+      {
+        ...patch,
+        id: coachId,
+        registrationDate: patch.registrationDate || now,
+        registrationSource: patch.registrationSource || 'admin_panel'
+      },
+      { merge: true }
+    );
+  }
+  const snap = await coachesRef().doc(String(coachId)).get();
+  return { id: coachId, ...(snap.exists ? snap.data() : patch) };
+}
+
+async function deleteCoachRecord(coachId) {
+  const id = String(coachId || '').trim();
+  if (!id) throw new Error('ID de entrenador ausente');
+  await coachesRef().doc(id).delete();
+  return { deleted: true, id };
 }
 
 module.exports = {
@@ -1245,5 +1368,10 @@ module.exports = {
   findMemberDocByIdentity,
   normalizeFriendRecordFields,
   upsertFriendRegistrationRecord,
-  findFriendDocByIdentity
+  findFriendDocByIdentity,
+  coachesRef,
+  normalizeCoachRecordFields,
+  findCoachDocByIdentity,
+  upsertCoachRecord,
+  deleteCoachRecord
 };

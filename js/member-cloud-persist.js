@@ -53,7 +53,7 @@
     if (!res.ok || !json.ok) {
       const err = new Error(
         json.error ||
-          'No se pudo registrar el socio en la nube. Reintenta o contacta con el club (cdsanabriacf@gmail.com).'
+          'No se pudo registrar el socio en la nube. Reintenta o contacta con el club (cdsanabriafc@gmail.com).'
       );
       err.code = 'member_persist_failed';
       throw err;
@@ -101,7 +101,7 @@
     if (!res.ok || !json.ok) {
       const err = new Error(
         json.error ||
-          'No se pudo registrar el amigo/a en la nube. Reintenta o contacta con el club (cdsanabriacf@gmail.com).'
+          'No se pudo registrar el amigo/a en la nube. Reintenta o contacta con el club (cdsanabriafc@gmail.com).'
       );
       err.code = 'friend_persist_failed';
       throw err;

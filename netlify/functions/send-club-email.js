@@ -70,7 +70,23 @@ exports.handler = async (event) => {
         paymentChannel: body.paymentChannel || body.paymentMethod,
         paymentMethod: body.paymentMethod || body.paymentChannel,
         fields: body.fields,
-        requesterEmail: email
+        requesterEmail: email,
+        email: body.email || email,
+        nombre: body.nombre || body.name,
+        apellidos: body.apellidos || body.surname,
+        dni: body.dni,
+        sexo: body.sexo,
+        fechaNacimiento: body.fechaNacimiento || body.birthDate,
+        direccion: body.direccion || body.address || body.domicilio,
+        localidad: body.localidad,
+        provincia: body.provincia,
+        codigoPostal: body.codigoPostal || body.postalCode || body.cp,
+        telefono: body.telefono || body.phone,
+        phone: body.phone || body.telefono,
+        numeroSocio: body.numeroSocio || body.memberNumber,
+        memberNumber: body.memberNumber || body.numeroSocio,
+        numeroAmigo: body.numeroAmigo || body.friendNumber,
+        friendNumber: body.friendNumber || body.numeroAmigo
       });
       return json(200, { ok: true, sent: result.sent }, origin);
     }

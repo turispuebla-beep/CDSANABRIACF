@@ -23,7 +23,7 @@ Para pruebas en tu PC, opcionalmente puedes usar `scripts/serve-local.ps1` en es
 |-------|-----|----------------------|
 | **amco@gmx.es** | **Super administrador** del club | «Acceso administrador» → panel completo + funciones solo super admin |
 | **alarico1963@gmail.com** | **Usuario normal** (socio / amigo / jugador) | **No** panel admin. **No** crear `sanabria_admins/3YvmxvrvPfOhSPmwSxirdgrnCeB2` |
-| **cdsanabriacf@gmail.com** | Administrador del club | Panel admin si existe documento `sanabria_admins/H15Is5zg6iegMX3Nnj8xMnKsjII2` |
+| **cdsanabriafc@gmail.com** | Administrador del club | Panel admin si existe documento `sanabria_admins/H15Is5zg6iegMX3Nnj8xMnKsjII2` |
 
 ### Aviso Firebase «Dynamic Links»
 
@@ -36,7 +36,7 @@ La web usa **email + contraseña** (`signInWithEmailAndPassword`), **no** enlace
 
 ---
 
-## Administrador del club: cdsanabriacf@gmail.com
+## Administrador del club: cdsanabriafc@gmail.com
 
 | Campo | Valor |
 |-------|--------|
@@ -49,7 +49,7 @@ La web usa **email + contraseña** (`signInWithEmailAndPassword`), **no** enlace
   "isAdmin": true,
   "isSuperAdmin": false,
   "role": "admin",
-  "email": "cdsanabriacf@gmail.com",
+  "email": "cdsanabriafc@gmail.com",
   "name": "CD Sanabria CF"
 }
 ```
@@ -60,7 +60,7 @@ En Authentication el usuario debe tener **contraseña** definida (restablecer si
 
 ## Seguridad: contraseñas de admin
 
-- El repositorio y la web **no contienen** las contraseñas de `amco@gmx.es` ni `cdsanabriacf@gmail.com`.
+- El repositorio y la web **no contienen** las contraseñas de `amco@gmx.es` ni `cdsanabriafc@gmail.com`.
 - El login admin envía la contraseña **solo a Firebase** (`signInWithEmailAndPassword`); no se guarda en `localStorage`.
 - Ver también: `docs/SEGURIDAD-CREDENCIALES.md`
 

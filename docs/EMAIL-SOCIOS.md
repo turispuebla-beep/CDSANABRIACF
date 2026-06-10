@@ -2,11 +2,11 @@
 
 
 
-Buzón único del club: **cdsanabriacf@gmail.com** (web, modales, SMTP, TPV y avisos).
+Buzón único del club: **cdsanabriafc@gmail.com** (web, modales, SMTP, TPV y avisos).
 
 
 
-Los formularios públicos abren **mailto** hacia ese buzón con **copia al solicitante** para que puedas responder directamente.
+Los formularios públicos abren **mailto** hacia ese buzón. El email del solicitante va en el cuerpo del mensaje (sin copia automática).
 
 
 
@@ -44,13 +44,17 @@ Los formularios públicos abren **mailto** hacia ese buzón con **copia al solic
 
 |---------|--------------|
 
-| Registro socio/a | Socio/a + copia al club (`CLUB_NOTIFY_EMAIL`) |
+| Registro socio/a | **Buzón del club** (`CLUB_NOTIFY_EMAIL`) |
 
-| Pago tarjeta OK (Redsys) | Socio/a |
+| Pago tarjeta OK (Redsys) | **Buzón del club** |
 
-| Solicitud «Inscripción jugador/a» | Club |
+| Solicitud «Inscripción jugador/a» | **Buzón del club** |
 
-| Validación manual (admin) | Socio/a |
+| Validación manual (admin) | **Buzón del club** |
+
+| Restablecer contraseña ficha | **Buzón del club** |
+
+Por defecto (`CLUB_EMAIL_ONLY=true`) **no** se envía al email personal del socio/jugador. El aviso incluye su correo en el asunto y cuerpo; usa **Responder** para escribirle.
 
 
 
@@ -70,7 +74,7 @@ Los formularios públicos abren **mailto** hacia ese buzón con **copia al solic
 
 - Sin cuota mensual ni prueba de 60 días como SendGrid.
 
-- El remitente será **cdsanabriacf@gmail.com**.
+- El remitente será **cdsanabriafc@gmail.com**.
 
 
 
@@ -78,7 +82,7 @@ Los formularios públicos abren **mailto** hacia ese buzón con **copia al solic
 
 
 
-1. Entra en la cuenta **cdsanabriacf@gmail.com**.
+1. Entra en la cuenta **cdsanabriafc@gmail.com**.
 
 2. **Seguridad Google** → activa **Verificación en 2 pasos** (obligatorio).
 
@@ -102,19 +106,19 @@ SMTP_HOST=smtp.gmail.com
 
 SMTP_PORT=587
 
-SMTP_USER=cdsanabriacf@gmail.com
+SMTP_USER=cdsanabriafc@gmail.com
 
 SMTP_PASS=la_contraseña_de_aplicación_16_caracteres
 
-SMTP_FROM_EMAIL=cdsanabriacf@gmail.com
+SMTP_FROM_EMAIL=cdsanabriafc@gmail.com
 
 SMTP_FROM_NAME=CD Sanabria CF
 
-CLUB_REPLY_EMAIL=cdsanabriacf@gmail.com
+CLUB_REPLY_EMAIL=cdsanabriafc@gmail.com
 
-CLUB_NOTIFY_EMAIL=cdsanabriacf@gmail.com
+CLUB_NOTIFY_EMAIL=cdsanabriafc@gmail.com
 
-CLUB_PUBLIC_EMAIL=cdsanabriacf@gmail.com
+CLUB_PUBLIC_EMAIL=cdsanabriafc@gmail.com
 
 
 
@@ -228,5 +232,5 @@ Archivos: `netlify/functions/lib/club-email.js`, `send-club-email.js`, `member-e
 
 
 
-**cdsanabriacf@gmail.com** — web, consultas, formularios y SMTP.
+**cdsanabriafc@gmail.com** — web, consultas, formularios y SMTP.
 

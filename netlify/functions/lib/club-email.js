@@ -3,8 +3,8 @@
 const nodemailer = require('nodemailer');
 
 /** Buzón único del club (Gmail): web, modales, SMTP y avisos. */
-const CLUB_EMAIL_DEFAULT = 'cdsanabriacf@gmail.com';
-const CLUB_EMAIL_PUBLIC_DEFAULT = 'cdsanabriacf@gmail.com';
+const CLUB_EMAIL_DEFAULT = 'cdsanabriafc@gmail.com';
+const CLUB_EMAIL_PUBLIC_DEFAULT = 'cdsanabriafc@gmail.com';
 
 function escapeHtml(value = '') {
   return String(value)
@@ -71,13 +71,52 @@ function getEmailConfig() {
   };
 }
 
+function clubNotifyRecipient(cfg) {
+  const notify = String(process.env.CLUB_NOTIFY_EMAIL || '').trim();
+  if (notify && notify.includes('@')) return notify;
+  return (
+    String(process.env.CLUB_REPLY_EMAIL || '').trim() ||
+    String(cfg?.fromEmail || '').trim() ||
+    String(process.env.SMTP_FROM_EMAIL || '').trim() ||
+    CLUB_EMAIL_DEFAULT
+  );
+}
+
+/** Por defecto true: todo el correo automático va al buzón del club. */
+function isClubEmailOnlyMode() {
+  const raw = String(process.env.CLUB_EMAIL_ONLY || 'true').trim().toLowerCase();
+  return raw !== 'false' && raw !== '0' && raw !== 'off';
+}
+
+function resolveOutboundTo(cfg, intendedEmail) {
+  const intended = String(intendedEmail || '').trim().toLowerCase();
+  if (!isClubEmailOnlyMode() && intended.includes('@')) return intended;
+  return clubNotifyRecipient(cfg);
+}
+
+function withOriginalRecipientNotice(content, intendedEmail, roleLabel) {
+  const em = String(intendedEmail || '').trim();
+  if (!isClubEmailOnlyMode() || !em.includes('@')) return content;
+  const label = String(roleLabel || 'Destinatario').trim();
+  const noteHtml =
+    `<p style="background:#fef3c7;border-left:4px solid #f59e0b;padding:10px 12px;margin:0 0 16px;font-size:0.9rem">` +
+    `<strong>${escapeHtml(label)}:</strong> <a href="mailto:${escapeHtml(em)}">${escapeHtml(em)}</a><br>` +
+    `<span style="color:#64748b">Este aviso va al buzón del club. Pulsa «Responder» para escribir al interesado.</span></p>`;
+  const noteText = `[${label}: ${em}]\n\n`;
+  return {
+    subject: `${content.subject} [${label}: ${em}]`,
+    html: noteHtml + content.html,
+    text: noteText + content.text
+  };
+}
+
 function normalizeRecipients(to) {
   return (Array.isArray(to) ? to : [to])
     .map((e) => String(e || '').trim().toLowerCase())
     .filter(Boolean);
 }
 
-async function sendViaSmtp(cfg, { to, subject, html, text, bcc, replyTo }) {
+async function sendViaSmtp(cfg, { to, subject, html, text, bcc, replyTo, attachments }) {
   const toList = normalizeRecipients(to);
   if (!toList.length) throw new Error('Destinatario vacío');
 
@@ -93,6 +132,14 @@ async function sendViaSmtp(cfg, { to, subject, html, text, bcc, replyTo }) {
 
   const bccList = normalizeRecipients(bcc);
   const reply = String(replyTo || cfg.replyTo || cfg.fromEmail || CLUB_EMAIL_DEFAULT).trim();
+  const mailAttachments =
+    Array.isArray(attachments) && attachments.length
+      ? attachments.map((a) => ({
+          filename: a.filename,
+          content: a.content,
+          contentType: a.type || 'application/octet-stream'
+        }))
+      : undefined;
   await transporter.sendMail({
     from: `"${cfg.fromName}" <${cfg.fromEmail}>`,
     replyTo: reply,
@@ -100,12 +147,13 @@ async function sendViaSmtp(cfg, { to, subject, html, text, bcc, replyTo }) {
     bcc: bccList.length ? bccList.join(', ') : undefined,
     subject,
     text,
-    html
+    html,
+    attachments: mailAttachments
   });
   return true;
 }
 
-async function sendViaSendGridApi(cfg, { to, subject, html, text, bcc, replyTo }) {
+async function sendViaSendGridApi(cfg, { to, subject, html, text, bcc, replyTo, attachments }) {
   const toList = normalizeRecipients(to).map((email) => ({ email }));
   if (!toList.length) throw new Error('Destinatario vacío');
 
@@ -124,6 +172,15 @@ async function sendViaSendGridApi(cfg, { to, subject, html, text, bcc, replyTo }
       { type: 'text/html', value: html }
     ]
   };
+
+  if (Array.isArray(attachments) && attachments.length) {
+    body.attachments = attachments.map((a) => ({
+      content: Buffer.from(String(a.content || ''), 'utf8').toString('base64'),
+      filename: a.filename,
+      type: a.type || 'application/octet-stream',
+      disposition: 'attachment'
+    }));
+  }
 
   const response = await fetch('https://api.sendgrid.com/v3/mail/send', {
     method: 'POST',
@@ -154,5 +211,9 @@ module.exports = {
   CLUB_EMAIL_PUBLIC_DEFAULT,
   escapeHtml,
   getEmailConfig,
+  clubNotifyRecipient,
+  isClubEmailOnlyMode,
+  resolveOutboundTo,
+  withOriginalRecipientNotice,
   sendViaSendGrid
 };

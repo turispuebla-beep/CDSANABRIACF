@@ -1,13 +1,13 @@
 /**
  * Correo mailto al club — formato unificado (CD Sanabria CF).
- * Para: cdsanabriacf@gmail.com (modales) · CC: email del solicitante.
+ * Para: cdsanabriafc@gmail.com (modales). El email del solicitante va solo en el cuerpo.
  */
 (function (global) {
   'use strict';
 
   const CLUB_EMAIL_NOTIFY_FALLBACK =
     (global.ClubContactDefaults && global.ClubContactDefaults.CLUB_EMAIL_NOTIFY) ||
-    'cdsanabriacf@gmail.com';
+    'cdsanabriafc@gmail.com';
   const BORDER = '══════════════════════════════════════════';
 
   function getClubNotifyEmail() {
@@ -46,7 +46,7 @@
       lines.push(String(ln));
     });
     if (opts.requesterEmail && String(opts.requesterEmail).includes('@')) {
-      lines.push('Email del solicitante (CC): ' + String(opts.requesterEmail).trim());
+      lines.push('Email del solicitante: ' + String(opts.requesterEmail).trim());
     }
     lines.push('Fecha: ' + new Date().toLocaleString('es-ES'));
     lines.push('Enviado desde la web del club.');
@@ -67,7 +67,7 @@
   }
 
   /**
-   * Mailto al club con CC al solicitante y cuerpo estructurado.
+   * Mailto al buzón del club (sin CC al solicitante; su email va en el cuerpo).
    */
   function buildNotifyClubMailto(opts) {
     const requesterEmail = String((opts && opts.requesterEmail) || '').trim();
@@ -81,7 +81,7 @@
       });
     return buildMailtoUrl(
       getClubNotifyEmail(),
-      requesterEmail,
+      '',
       opts.subject || 'Solicitud — CD Sanabria CF',
       body
     );
