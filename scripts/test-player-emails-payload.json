@@ -1,0 +1,160 @@
+[
+  {
+    "name": "nuevo_jugador_club",
+    "body": {
+      "type": "club_admin_notify",
+      "kind": "nuevo_jugador_PRUEBA",
+      "title": "[PRUEBA] Nueva solicitud de jugador/a",
+      "subject": "[PRUEBA] Nueva solicitud jugador/a — Ana García López (2026-2027)",
+      "paymentChannel": "consulta",
+      "requesterEmail": "cdsanabriafc@gmail.com",
+      "nombre": "Ana",
+      "apellidos": "García López",
+      "dni": "12345678Z",
+      "telefono": "666123456",
+      "email": "cdsanabriafc@gmail.com",
+      "fechaNacimiento": "2012-05-15",
+      "direccion": "Calle Mayor 12, Puebla de Sanabria",
+      "fields": [
+        { "label": "Temporada", "value": "2026-2027" },
+        { "label": "Categoría sugerida", "value": "Alevín" },
+        { "label": "Domicilio", "value": "Calle Mayor 12, Puebla de Sanabria" },
+        { "label": "Dirección tutor/a", "value": "Calle Mayor 12" },
+        { "label": "Tutor/a", "value": "María García López — DNI 87654321X — 666999888 — tutor@ejemplo.com" },
+        { "label": "Estado", "value": "PRUEBA — Pendiente de revisión (no guardado en Firebase)" },
+        { "label": "ID solicitud", "value": "PRUEBA-SOL-000" },
+        { "label": "Foto", "value": "Incluida en la solicitud (panel admin)" }
+      ]
+    }
+  },
+  {
+    "name": "inscripcion_jugador_club",
+    "body": {
+      "type": "club_admin_notify",
+      "kind": "inscripcion_jugador_PRUEBA",
+      "title": "[PRUEBA] Nueva inscripción jugador/a (pendiente de pago)",
+      "subject": "[PRUEBA] Inscripción jugador — transferencia",
+      "paymentChannel": "transferencia",
+      "requesterEmail": "cdsanabriafc@gmail.com",
+      "nombre": "Carlos",
+      "apellidos": "Martín Sanz",
+      "dni": "87654321B",
+      "telefono": "666555444",
+      "email": "cdsanabriafc@gmail.com",
+      "fechaNacimiento": "2010-03-20",
+      "direccion": "Av. del Deporte 5",
+      "localidad": "Puebla de Sanabria",
+      "provincia": "Zamora",
+      "numeroSocio": "SOC000142",
+      "fields": [
+        { "label": "ID ficha", "value": "PRUEBA-FICHA-001" },
+        { "label": "Nº socio vinculado", "value": "N.º SOC. 000142" },
+        { "label": "Temporada", "value": "2026-2027" },
+        { "label": "Categoría", "value": "Infantil" },
+        { "label": "Fecha nacimiento", "value": "2010-03-20" },
+        { "label": "Domicilio", "value": "Av. del Deporte 5" },
+        { "label": "Localidad", "value": "Puebla de Sanabria" },
+        { "label": "Provincia", "value": "Zamora" },
+        { "label": "Cuota ficha (€)", "value": "35" },
+        { "label": "Cuota socio (€)", "value": "25" },
+        { "label": "Ropa entreno (€)", "value": "45" },
+        { "label": "Total (€)", "value": "105" },
+        { "label": "Ropa (tallas)", "value": "Camiseta entreno M; Pantalón entreno M" },
+        { "label": "Tutor/a", "value": "—" },
+        { "label": "Autorización categoría superior", "value": "No" },
+        { "label": "Cuenta club", "value": "CAJA RURAL ES12 3085 0034 8222 5127 9226" },
+        { "label": "Aviso", "value": "PRUEBA — no se ha guardado ningún jugador real" }
+      ]
+    }
+  },
+  {
+    "name": "registro_socio_club",
+    "body": {
+      "type": "club_admin_notify",
+      "kind": "registro_socio_PRUEBA",
+      "title": "[PRUEBA] Nuevo registro de socio/a",
+      "subject": "[PRUEBA] Registro socio — transferencia",
+      "paymentChannel": "transferencia",
+      "requesterEmail": "cdsanabriafc@gmail.com",
+      "nombre": "Laura",
+      "apellidos": "Fernández Ruiz",
+      "dni": "11223344C",
+      "sexo": "Femenino",
+      "fechaNacimiento": "1985-07-12",
+      "direccion": "Plaza Mayor 3, Puebla de Sanabria",
+      "telefono": "666777888",
+      "email": "cdsanabriafc@gmail.com",
+      "numeroSocio": "SOC000089",
+      "fields": [
+        { "label": "Sexo", "value": "Femenino" },
+        { "label": "Fecha nacimiento", "value": "1985-07-12" },
+        { "label": "Cuota (€)", "value": "30" },
+        { "label": "Notificaciones push", "value": "Sí" },
+        { "label": "Estado", "value": "Pendiente validación de pago" },
+        { "label": "ID registro", "value": "PRUEBA-SOC-089" },
+        { "label": "Cuenta club", "value": "CAJA RURAL ES12 3085 0034 8222 5127 9226" }
+      ]
+    }
+  },
+  {
+    "name": "ficha_actualizada_club",
+    "body": {
+      "type": "club_admin_notify",
+      "kind": "jugador_ficha_actualizada_PRUEBA",
+      "title": "[PRUEBA] Ficha actualizada por el jugador/a",
+      "subject": "[PRUEBA] Ficha jugador/a actualizada — Ana García López",
+      "paymentChannel": "pendiente",
+      "requesterEmail": "cdsanabriafc@gmail.com",
+      "nombre": "Ana",
+      "apellidos": "García López",
+      "dni": "12345678Z",
+      "telefono": "666123456",
+      "email": "cdsanabriafc@gmail.com",
+      "fields": [
+        { "label": "ID ficha", "value": "PRUEBA-FICHA-000" },
+        { "label": "Temporada", "value": "2026-2027" },
+        { "label": "Estado inscripción", "value": "Pendiente / sin pagar" },
+        { "label": "Teléfono (antes → después)", "value": "666111222 → 666123456" },
+        { "label": "Email (antes → después)", "value": "ana.vieja@ejemplo.com → cdsanabriafc@gmail.com" },
+        { "label": "Domicilio (antes → después)", "value": "Calle Vieja 1 → Calle Mayor 12" },
+        { "label": "Aviso", "value": "PRUEBA — no se ha modificado ningún jugador real" }
+      ]
+    }
+  },
+  {
+    "name": "confirmacion_jugador_aprobado",
+    "body": {
+      "type": "player_application_approved",
+      "email": "cdsanabriafc@gmail.com",
+      "nombre": "Ana",
+      "apellidos": "García López",
+      "season": "2026-2027"
+    }
+  },
+  {
+    "name": "confirmacion_socio_registro",
+    "body": {
+      "type": "member_registered",
+      "email": "cdsanabriafc@gmail.com",
+      "nombre": "Laura",
+      "apellidos": "Fernández Ruiz",
+      "numeroSocio": "SOC000089",
+      "cuota": 30,
+      "nextStep": "transfer"
+    }
+  },
+  {
+    "name": "confirmacion_jugador_ficha_actualizada",
+    "body": {
+      "type": "player_profile_update_confirmed",
+      "email": "cdsanabriafc@gmail.com",
+      "nombre": "Ana",
+      "apellidos": "García López",
+      "diff": [
+        { "label": "Teléfono", "before": "666111222", "after": "666123456" },
+        { "label": "Email", "before": "ana.vieja@ejemplo.com", "after": "cdsanabriafc@gmail.com" },
+        { "label": "Domicilio", "before": "Calle Vieja 1", "after": "Calle Mayor 12" }
+      ]
+    }
+  }
+]

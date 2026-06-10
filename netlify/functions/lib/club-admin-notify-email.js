@@ -227,7 +227,7 @@ function buildClubAdminContent(data) {
   if (requester) textLines.push('', 'Correo solicitante: ' + requester);
   textLines.push('', 'Adjuntos: Excel (.csv) y Word (.doc)', 'Fecha: ' + new Date().toLocaleString('es-ES'));
 
-  return { subject, html, text, fields };
+  return { subject, html, text: textLines.join('\n'), fields };
 }
 
 async function sendClubAdminNotification(data) {
@@ -256,6 +256,7 @@ module.exports = {
   formatPaymentLabel,
   buildStandardIdentityFields,
   mergeNotifyFields,
+  buildClubAdminContent,
   buildExportAttachments,
   sendClubAdminNotification
 };

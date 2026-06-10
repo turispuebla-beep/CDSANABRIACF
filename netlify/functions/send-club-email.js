@@ -5,6 +5,7 @@ const {
   sendMemberRegistrationEmail,
   sendMemberPaymentConfirmedEmail,
   sendPlayerApplicationApprovedEmail,
+  sendPlayerProfileUpdateConfirmedEmail,
   sendEventRegistrationPendingEmail,
   sendEventRegistrationConfirmedEmail
 } = require('./lib/member-email');
@@ -111,6 +112,21 @@ exports.handler = async (event) => {
         nombre: body.nombre || body.name,
         apellidos: body.apellidos || body.surname,
         season: body.season
+      });
+      return json(
+        200,
+        { ok: true, sent: result.sent, to: result.to || email, error: result.reason || '' },
+        origin
+      );
+    }
+
+    if (type === 'player_profile_update_confirmed') {
+      const result = await sendPlayerProfileUpdateConfirmedEmail({
+        email,
+        guardianEmail: body.guardianEmail,
+        nombre: body.nombre || body.name,
+        apellidos: body.apellidos || body.surname,
+        diff: body.diff
       });
       return json(
         200,
