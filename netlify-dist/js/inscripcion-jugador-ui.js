@@ -1635,6 +1635,7 @@
   }
 
   async function submitTransferWithPicker() {
+    if (global.SiteUpdateMode && !global.SiteUpdateMode.guard()) return;
     const err = validateForm();
     if (err) {
       alert('❌ ' + err);
@@ -1856,6 +1857,15 @@
       $('inscClosedMsg').textContent = open.reason;
       return;
     }
+
+    const portalResetEarly = params.get('portalReset');
+    if (
+      global.SiteUpdateMode &&
+      global.SiteUpdateMode.blockInscriptionPageIfNeeded(flowParam, portalResetEarly)
+    ) {
+      return;
+    }
+
     show($('inscClosedWrap'), false);
     show($('inscFormWrap'), true);
     initCategoryUI();
@@ -1930,6 +1940,15 @@
         }
       });
     }
+
+    global.addEventListener('siteUpdateModeChanged', function () {
+      if (
+        global.SiteUpdateMode &&
+        global.SiteUpdateMode.blockInscriptionPageIfNeeded(flowParam, params.get('portalReset'))
+      ) {
+        return;
+      }
+    });
   }
 
   document.addEventListener('DOMContentLoaded', init);

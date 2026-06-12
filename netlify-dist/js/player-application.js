@@ -164,20 +164,29 @@
         return { ok: false, error: 'Respuesta no válida del servidor' };
       });
       if (!res.ok || !json.ok) {
+        if (res.status === 503 && json.code === 'site_update_mode') {
+          const blocked = new Error(json.error || 'Registros temporalmente desactivados.');
+          blocked.code = 'site_update_mode';
+          throw blocked;
+        }
         console.warn('submit-player-application:', json.error || res.status);
         return null;
       }
       return json.application || null;
     } catch (err) {
+      if (err && err.code === 'site_update_mode') throw err;
       console.warn('submit-player-application:', err);
       return null;
     }
   }
 
   /**
-   * Guarda la solicitud y prepara mailto al club (no depende de SMTP ni de que el servidor responda).
+   * Guarda la solicitud en el servidor (requerido). No usa mailto/local si el modo actualización está activo.
    */
   async function submitApplication(formData) {
+    if (global.SiteUpdateMode && global.SiteUpdateMode.isActive && global.SiteUpdateMode.isActive()) {
+      throw new Error(global.SiteUpdateMode.getMessage());
+    }
     const err = validateApplicationForm(formData);
     if (err) throw new Error(err);
 
@@ -199,12 +208,17 @@
     );
 
     const serverApp = await trySubmitApplicationServer(payload);
-    if (serverApp) {
-      application = Object.assign({}, application, serverApp);
+    if (!serverApp) {
+      if (global.SiteUpdateMode && global.SiteUpdateMode.isEnabledGlobally && global.SiteUpdateMode.isEnabledGlobally()) {
+        throw new Error(global.SiteUpdateMode.getMessage());
+      }
+      throw new Error(
+        'No se pudo enviar la solicitud al club. Comprueba la conexión o contacta con cdsanabriafc@gmail.com.'
+      );
     }
 
+    application = Object.assign({}, application, serverApp);
     application = upsertLocalApplication(application);
-    await syncApplicationToFirestore(application);
 
     return {
       ok: true,
