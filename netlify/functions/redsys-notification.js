@@ -10,7 +10,8 @@ const {
   updatePayment,
   completeMembershipPayment,
   completeEventPayment,
-  completePlayerInscription
+  completePlayerInscription,
+  completePlayerKitPurchase
 } = require('./lib/firestore-admin');
 
 function parseBody(event) {
@@ -86,6 +87,8 @@ exports.handler = async (event) => {
       await completeEventPayment(payment);
     } else if (payment.type === 'player_inscription') {
       await completePlayerInscription(payment);
+    } else if (payment.type === 'player_kit') {
+      await completePlayerKitPurchase(payment);
     }
 
     return { statusCode: 200, body: 'OK' };

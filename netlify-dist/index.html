@@ -4827,11 +4827,17 @@
             const ctaSection = document.getElementById('memberWelcomeSection');
             if (ctaSection) {
                 if (userStatus === 'socio') {
+                    const jugadorChip = currentSocio.isJugador && typeof formatClubRoleBadgesHtml === 'function'
+                        ? formatClubRoleBadgesHtml({ isJugador: true, playerCategory: currentSocio.playerCategory || '' })
+                        : '';
+                    const btnEquipacion = currentSocio.isJugador
+                        ? `<button class="cta-button" onclick="openEquipacionJugador()" style="background: #7c3aed; font-weight: 700;">👕 Equipación</button>`
+                        : '';
                     ctaSection.style.display = 'block';
                     ctaSection.innerHTML = `
                         <h2>¡Bienvenido/a, ${currentSocio.nombre}!</h2>
                         <p>🏷️ ${window.ClubMemberNumbers && currentSocio.numeroSocio && !String(currentSocio.numeroSocio).startsWith('SOC') ? window.ClubMemberNumbers.formatMemberBadge(currentSocio) : (currentSocio.numeroSocio ? 'N.º SOC. ' + String(currentSocio.numeroSocio).padStart(6,'0') : 'Socio/a')} — Acceso completo al club</p>
-                        
+                        ${jugadorChip ? '<div style="margin:8px 0 4px;">' + jugadorChip + '</div>' : ''}
                         <div class="download-section">
                             <button class="cta-button" onclick="openMiCarnetSocio()" style="background: #1e3a8a; font-weight: 700;">
                                 🎫 Mi carnet de socio
@@ -4839,6 +4845,7 @@
                             <button class="cta-button" onclick="showSocioInfo()" style="background: #059669;">
                                 👤 Mi Perfil
                             </button>
+                            ${btnEquipacion}
                             <button class="cta-button" onclick="logoutSocio()" style="background: #dc2626;">
                                 🚪 Cerrar Sesión
                             </button>
@@ -5053,6 +5060,19 @@
 
         // Login de amigo: implementación unificada más abajo (Firebase Auth + migración desde local).
 
+        function openEquipacionJugador() {
+            const currentSocio = JSON.parse(localStorage.getItem('currentSocio') || '{}');
+            if (!currentSocio.email || !currentSocio.isJugador) {
+                alert('❌ Solo los jugadores/as del club pueden comprar equipación.\n\nInicia sesión como socio/a jugador/a.');
+                return;
+            }
+            if (window.SiteUpdateMode && window.SiteUpdateMode.isActive && window.SiteUpdateMode.isActive()) {
+                window.SiteUpdateMode.notifyBlocked();
+                return;
+            }
+            window.location.href = 'inscripcion-jugador.html?flow=equipacion';
+        }
+
         // Función para mostrar información del socio
         function showSocioInfo() {
             const currentSocio = JSON.parse(localStorage.getItem('currentSocio') || '{}');
@@ -5060,6 +5080,26 @@
                 alert('❌ No hay información de socio disponible');
                 return;
             }
+
+            const jugadorBadge = currentSocio.isJugador && typeof formatClubRoleBadgesHtml === 'function'
+                ? formatClubRoleBadgesHtml({
+                    isJugador: true,
+                    playerCategory: currentSocio.playerCategory || ''
+                  })
+                : '';
+
+            const equipacionBlock = currentSocio.isJugador
+                ? `<div style="margin: 16px 0; padding: 16px; background: #eff6ff; border: 1px solid #93c5fd; border-radius: 10px; text-align: left;">
+                        <h4 style="margin: 0 0 8px; color: #1e3a8a; font-size: 1rem;">👕 Equipación del club</h4>
+                        <p style="margin: 0 0 12px; font-size: 0.88rem; color: #475569; line-height: 1.45;">
+                            Compra ropa de entreno y complementos. Pago solo con <strong>tarjeta o Bizum</strong>.
+                            El club recibirá tu pedido con tallas y datos por correo.
+                        </p>
+                        <button type="button" class="btn-primary" onclick="document.querySelector('.modal')?.remove(); openEquipacionJugador();" style="width: 100%; background: #1e3a8a; font-weight: 700;">
+                            👕 Comprar equipación
+                        </button>
+                   </div>`
+                : '';
             
             const socioInfo = `
                 <div style="text-align: center; padding: 20px;">
@@ -5068,11 +5108,13 @@
                         <h4 style="color: var(--text-color); margin-bottom: 10px;">Club Deportivo Sanabriacf</h4>
                         <div style="text-align: left;">
                             <p><strong>👤 ${currentSocio.nombre} ${currentSocio.apellidos}</strong></p>
+                            ${jugadorBadge}
                             <p>📧 ${currentSocio.email}</p>
                             <p>🏷️ ${(function(){ const n = currentSocio.numeroSocio; if (!n || String(n).startsWith('SOC')) return 'Registro pendiente'; if (window.ClubMemberNumbers) return window.ClubMemberNumbers.formatMemberBadge(currentSocio); return 'N.º SOC. ' + String(n).padStart(6,'0'); })()}</p>
                             <p>📅 Estado: ${currentSocio.estado || 'Activo'}</p>
                         </div>
                     </div>
+                    ${equipacionBlock}
                     <div style="text-align: left; max-width: 420px; margin: 0 auto; background: #fff; border: 1px solid #e5e7eb; border-radius: 10px; padding: 18px;">
                         <h4 style="margin: 0 0 10px 0; color: var(--primary-color);">🔒 Cambiar contraseña</h4>
                         <p style="font-size: 0.85rem; color: #6b7280; margin-bottom: 12px;">Si el club te asignó una contraseña temporal, puedes cambiarla aquí. Los campos se muestran como puntos al escribir.</p>

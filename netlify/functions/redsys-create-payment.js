@@ -39,7 +39,7 @@ exports.handler = async (event) => {
     const email = String(body.email || '').trim().toLowerCase();
     const description = String(body.description || 'Pago CD Sanabria CF').slice(0, 125);
 
-    if (!['membership_fee', 'event_registration', 'player_inscription'].includes(type)) {
+    if (!['membership_fee', 'event_registration', 'player_inscription', 'player_kit'].includes(type)) {
       return { statusCode: 400, headers: CORS, body: JSON.stringify({ ok: false, error: 'type inválido' }) };
     }
     if (!email) {
@@ -76,7 +76,8 @@ exports.handler = async (event) => {
       registrationBundle: body.registrationBundle || null,
       priceTier: body.priceTier || null,
       playerId: body.playerId || null,
-      playerRegistration: body.playerRegistration || null
+      playerRegistration: body.playerRegistration || null,
+      playerKitOrder: body.playerKitOrder || null
     };
 
     try {

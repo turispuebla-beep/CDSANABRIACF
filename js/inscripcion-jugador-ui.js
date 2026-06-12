@@ -11,6 +11,8 @@
     flowContinue: false,
     flowFinalize: false,
     flowEdit: false,
+    flowEquipacion: false,
+    equipacionPlayer: null,
     editProfileMode: false,
     viewOnlyProfile: false,
     editPortalPassword: '',
@@ -1297,24 +1299,34 @@
     const form = getFormData();
     const category = form.category || global.ClubInscriptionConfig.suggestCategoryFromBirthDate(form.birthDate);
     const kitItems = collectKitItems();
-    const payFees = !!category && inscriptionPaysCategoryFees();
+    const payFees = !state.flowEquipacion && !!category && inscriptionPaysCategoryFees();
     const payFicha = payFees && state.settings.chargeFicha !== false;
     const paySocio = payFees && state.settings.chargeSocio !== false;
-    const cart = global.PlayerInscription.computeCart(state.settings, category, kitItems, payFicha, paySocio);
+    const equipCategory =
+      state.flowEquipacion && state.equipacionPlayer
+        ? state.equipacionPlayer.category || state.equipacionPlayer.categoria
+        : category;
+    const cart = global.PlayerInscription.computeCart(
+      state.settings,
+      equipCategory,
+      kitItems,
+      payFicha,
+      paySocio
+    );
 
     const lines = $('cartLines');
     if (!lines) return;
     let html = '';
     let hasLines = false;
 
-    if (cart.fichaFee > 0) {
+    if (!state.flowEquipacion && cart.fichaFee > 0) {
       html +=
         '<div class="cart-line"><span>Cuota inscripción federativa</span><span>' +
         formatEur(cart.fichaFee) +
         '</span></div>';
       hasLines = true;
     }
-    if (cart.socioFee > 0) {
+    if (!state.flowEquipacion && cart.socioFee > 0) {
       html +=
         '<div class="cart-line"><span>Cuota socio del club</span><span>' +
         formatEur(cart.socioFee) +
@@ -1322,7 +1334,7 @@
       hasLines = true;
     }
     const feesSubtotal = (cart.fichaFee || 0) + (cart.socioFee || 0);
-    if (feesSubtotal > 0) {
+    if (!state.flowEquipacion && feesSubtotal > 0) {
       html +=
         '<div class="cart-subtotal"><span>Subtotal inscripción</span><span>' +
         formatEur(feesSubtotal) +
@@ -1475,16 +1487,8 @@
   }
 
   function buildPlayerClubNotifyFields(reg) {
-    const kit = (reg.kit && reg.kit.items) || reg.kitOrder || [];
-    const kitTxt = Array.isArray(kit)
-      ? kit
-          .map(function (k) {
-            return (k.garment || k.prenda || '') + ' ' + (k.size || k.talla || '');
-          })
-          .join('; ')
-      : '—';
     const cb = reg.chargeBreakdown || {};
-    return [
+    const base = [
       { label: 'ID ficha', value: reg.id || '—' },
       { label: 'Nº socio vinculado', value: reg.numeroSocio || reg.memberNumber || '—' },
       { label: 'Temporada', value: reg.inscriptionSeason || reg.temporada },
@@ -1495,11 +1499,11 @@
       { label: 'Provincia', value: reg.provincia },
       { label: 'Cuota ficha (€)', value: cb.ficha != null ? cb.ficha : reg.fichaFee },
       { label: 'Cuota socio (€)', value: cb.socio != null ? cb.socio : reg.socioFee },
-      { label: 'Ropa entreno (€)', value: cb.kit != null ? cb.kit : reg.kitTotal },
-      { label: 'Total (€)', value: cb.total != null ? cb.total : reg.totalCharge },
-      { label: 'Ropa (tallas)', value: kitTxt || '—' },
+      { label: 'Total inscripción (€)', value: cb.total != null ? cb.total : reg.totalCharge },
       { label: 'Tutor/a', value: reg.guardianName || '—' },
       { label: 'DNI tutor/a', value: reg.guardianDNI || reg.guardianDni || '—' },
+      { label: 'Teléfono tutor/a', value: reg.guardianPhone || '—' },
+      { label: 'Email tutor/a', value: reg.guardianEmail || '—' },
       {
         label: 'Autorización categoría superior',
         value: reg.categorySuperiorConsent ? 'Sí' : 'No'
@@ -1514,6 +1518,19 @@
       },
       { label: 'Cuenta club', value: 'CAJA RURAL ES12 3085 0034 8222 5127 9226' }
     ];
+    const kitFields =
+      global.PlayerExport && global.PlayerExport.buildKitNotifyFields
+        ? global.PlayerExport.buildKitNotifyFields(reg)
+        : [{ label: 'Pedido ropa (resumen)', value: '—' }];
+    const insertAt = base.findIndex(function (f) {
+      return f.label === 'Tutor/a';
+    });
+    if (insertAt >= 0) {
+      base.splice.apply(base, [insertAt, 0].concat(kitFields));
+    } else {
+      base.push.apply(base, kitFields);
+    }
+    return base;
   }
 
   function offlinePaymentSubjectLabel(ch) {
@@ -1661,11 +1678,33 @@
 
   function initPaymentButtons() {
     const pm = state.settings.paymentMethods || {};
-    show($('payCardBlock'), !!pm.card);
-    show($('payBizumBlock'), !!pm.bizum);
-    show($('payTransferBlock'), !!pm.transfer);
-    if ($('btnPayCard')) $('btnPayCard').onclick = guardPaymentAction(function () { submit('card'); });
-    if ($('btnPayBizum')) $('btnPayBizum').onclick = guardPaymentAction(function () { submit('bizum'); });
+    const onlineOnly = !!state.flowEquipacion;
+    show($('payCardBlock'), onlineOnly || !!pm.card);
+    show($('payBizumBlock'), onlineOnly || !!pm.bizum);
+    show($('payTransferBlock'), !onlineOnly && !!pm.transfer);
+    if ($('btnPayCard')) {
+      $('btnPayCard').textContent = onlineOnly ? '💳 Pagar equipación con tarjeta' : '💳 Pagar con tarjeta o Bizum';
+      if (onlineOnly) {
+        $('btnPayCard').onclick = function () {
+          submitEquipacion('card');
+        };
+      } else {
+        $('btnPayCard').onclick = guardPaymentAction(function () {
+          submit('card');
+        });
+      }
+    }
+    if ($('btnPayBizum')) {
+      if (onlineOnly) {
+        $('btnPayBizum').onclick = function () {
+          submitEquipacion('bizum');
+        };
+      } else {
+        $('btnPayBizum').onclick = guardPaymentAction(function () {
+          submit('bizum');
+        });
+      }
+    }
     if ($('btnPayTransfer')) {
       $('btnPayTransfer').onclick = guardPaymentAction(function () {
         submitTransferWithPicker();
@@ -1831,6 +1870,115 @@
     if (msg) msg.textContent = '';
   }
 
+  function findEquipacionPlayer(socio) {
+    const players = JSON.parse(global.localStorage.getItem('clubPlayers') || '[]');
+    if (socio.playerId) {
+      const byId = players.find(function (p) {
+        return p && String(p.id) === String(socio.playerId);
+      });
+      if (byId) return byId;
+    }
+    const dni = global.PlayerInscription.normalizeDni(socio.dni);
+    if (dni) {
+      const byDni = players.find(function (p) {
+        return global.PlayerInscription.normalizeDni(p.dni) === dni;
+      });
+      if (byDni) return byDni;
+    }
+    const em = String(socio.email || '').trim().toLowerCase();
+    if (em) {
+      return (
+        players.find(function (p) {
+          return String(p.email || '').trim().toLowerCase() === em;
+        }) || null
+      );
+    }
+    return null;
+  }
+
+  function applyEquipacionUi() {
+    if ($('inscPageTitle')) $('inscPageTitle').textContent = 'Equipación jugador/a';
+    show($('inscEquipacionIntro'), true);
+    show($('inscYaSoyIntro'), false);
+    show($('inscFinalizeIntro'), false);
+    show($('inscEditIntro'), false);
+    show($('insLookupBlock'), false);
+    show($('insCategorySection'), false);
+    show($('insPersonalSection'), false);
+    show($('guardianBlock'), false);
+    show($('insConsentSection'), false);
+    show($('insSaveProfileSection'), false);
+    const pwdBlock = $('insPortalPwdBlock');
+    if (pwdBlock) pwdBlock.style.display = 'none';
+    if ($('insPaymentSection') && $('insPaymentSection').querySelector('h2')) {
+      $('insPaymentSection').querySelector('h2').textContent = 'Pago equipación (tarjeta o Bizum)';
+    }
+    const p = state.equipacionPlayer;
+    const banner = $('insEquipacionPlayerBanner');
+    if (banner && p) {
+      const cat = p.category || p.categoria || '—';
+      banner.innerHTML =
+        '<p style="margin:0 0 6px;font-weight:700;color:#1e3a8a;">⚽ ' +
+        (p.name || p.nombre || '') +
+        ' ' +
+        (p.surname || p.apellidos || '') +
+        '</p>' +
+        '<p style="margin:0;font-size:0.9rem;color:#334155;">Categoría: <strong>' +
+        cat +
+        '</strong> · Temporada: <strong>' +
+        (p.inscriptionSeason || state.settings.season || '—') +
+        '</strong></p>' +
+        '<p style="margin:8px 0 0;font-size:0.85rem;color:#64748b;">Elige las tallas y paga online. El club recibirá el pedido por correo.</p>';
+      show(banner, true);
+    }
+    refreshCart();
+  }
+
+  function setupEquipacionFlow() {
+    const socio = JSON.parse(global.localStorage.getItem('currentSocio') || 'null');
+    if (!socio || !socio.email || !socio.isJugador) {
+      try {
+        global.sessionStorage.setItem('postLoginReturnUrl', 'inscripcion-jugador.html?flow=equipacion');
+      } catch (_) {}
+      global.alert('Debes iniciar sesión como socio/a jugador/a para comprar equipación.');
+      global.location.href = 'index.html';
+      return;
+    }
+    const player = findEquipacionPlayer(socio);
+    if (!player) {
+      global.alert('No se encontró tu ficha de jugador/a. Contacta con el club (cdsanabriafc@gmail.com).');
+      global.location.href = 'index.html';
+      return;
+    }
+    state.equipacionPlayer = player;
+    applyEquipacionUi();
+  }
+
+  async function submitEquipacion(payMethod) {
+    if (global.SiteUpdateMode && !global.SiteUpdateMode.guard()) return;
+    const kitItems = collectKitItems();
+    if (!kitItems.length) {
+      global.alert('❌ Selecciona al menos una prenda con talla.');
+      return;
+    }
+    const player = state.equipacionPlayer;
+    if (!player || !player.id) {
+      global.alert('❌ Ficha de jugador/a no disponible. Vuelve a iniciar sesión.');
+      return;
+    }
+    const category = player.category || player.categoria || '';
+    const cart = global.PlayerInscription.computeCart(state.settings, category, kitItems, false, false);
+    if (!cart.total || cart.total <= 0) {
+      global.alert('❌ El importe de la equipación debe ser mayor que 0 €.');
+      return;
+    }
+    try {
+      await global.PlayerInscription.submitKitCheckout(player, kitItems, cart, payMethod);
+    } catch (e) {
+      global.alert('❌ ' + (e.message || e));
+    }
+  }
+
   function init() {
     if (!global.ClubInscriptionConfig || !global.PlayerInscription) {
       $('inscClosedMsg').textContent = 'Error cargando módulos de inscripción.';
@@ -1841,6 +1989,7 @@
     state.flowFinalize = flowParam === 'finalize';
     state.flowContinue = flowParam === 'continue';
     state.flowEdit = flowParam === 'lookup';
+    state.flowEquipacion = flowParam === 'equipacion';
 
     state.settings = global.ClubInscriptionConfig.read();
     if (global.ClubInscriptionConfig.applyDefaultFeesIfEmpty) {
@@ -1851,7 +2000,7 @@
     }
     const open = global.ClubInscriptionConfig.isOpenNow(state.settings);
     if ($('inscSeasonLabel')) $('inscSeasonLabel').textContent = state.settings.season;
-    if (!open.ok) {
+    if (!open.ok && !state.flowEquipacion) {
       show($('inscFormWrap'), false);
       show($('inscClosedWrap'), true);
       $('inscClosedMsg').textContent = open.reason;
@@ -1872,13 +2021,15 @@
     renderKitSection();
     initPaymentButtons();
 
-    if (!state.flowFinalize && !state.flowContinue && !state.flowEdit) {
+    if (!state.flowFinalize && !state.flowContinue && !state.flowEdit && !state.flowEquipacion) {
       global.location.replace('index.html');
       return;
     }
     const portalReset = params.get('portalReset');
     if (portalReset) {
       setupPortalResetFromUrl(portalReset);
+    } else if (state.flowEquipacion) {
+      setupEquipacionFlow();
     } else if (state.flowEdit) {
       setupEditProfileFlow();
     } else if (state.flowContinue) {

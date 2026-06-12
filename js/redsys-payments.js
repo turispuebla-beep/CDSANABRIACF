@@ -134,6 +134,22 @@
     });
   }
 
+  async function payPlayerKit(opts) {
+    const amountEur = Number(opts.amountEur);
+    if (!Number.isFinite(amountEur) || amountEur <= 0) {
+      return null;
+    }
+    return startPayment({
+      type: 'player_kit',
+      payMethod: opts.payMethod || 'card',
+      amountEur: amountEur,
+      email: opts.email,
+      playerId: opts.playerId || null,
+      playerKitOrder: opts.playerKitOrder || null,
+      description: opts.description || 'Equipación jugador/a (' + amountEur + ' EUR)'
+    });
+  }
+
   async function payPlayerInscription(opts) {
     const amountEur = Number(opts.amountEur);
     if (!Number.isFinite(amountEur) || amountEur <= 0) {
@@ -180,6 +196,7 @@
     isBizumEnabled: isBizumEnabled,
     hasOnlinePayment: hasOnlinePayment,
     payMembership: payMembership,
+    payPlayerKit: payPlayerKit,
     payPlayerInscription: payPlayerInscription,
     payEventRegistration: payEventRegistration,
     getPaymentStatus: getPaymentStatus,

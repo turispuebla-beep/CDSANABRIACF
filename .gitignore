@@ -16,6 +16,9 @@ Thumbs.db
 # Build Netlify (generar siempre con build-netlify-dist.ps1)
 netlify-dist/
 
+# Manifiesto temporal del script verify-public-persist.cjs
+scripts/.verify-public-persist-manifest.json
+
 # Documentos Word locales (no versionar)
 *.docx
 *.doc

@@ -526,6 +526,7 @@ function buildPlayerInscriptionPaymentConfirmedContent(data) {
   const category = escapeHtml(String(data.category || data.categoria || '—').trim());
   const total = escapeHtml(formatEurAmount(data.totalEur));
   const payLabel = escapeHtml(formatEventPaymentLabel(data.paymentChannel || data.paymentMethod));
+  const kitSummary = escapeHtml(String(data.kitSummary || '').trim());
   const contact = escapeHtml(clubContactEmail());
   const siteUrl = String(process.env.SITE_URL || '').replace(/\/$/, '');
 
@@ -540,6 +541,7 @@ function buildPlayerInscriptionPaymentConfirmedContent(data) {
         <tr><td><strong>Categoría:</strong></td><td>${category}</td></tr>
         <tr><td><strong>Importe:</strong></td><td>${total}</td></tr>
         <tr><td><strong>Pago:</strong></td><td>${payLabel} — correcto</td></tr>
+        ${kitSummary && kitSummary !== '—' ? `<tr><td style="vertical-align:top"><strong>Ropa (tallas):</strong></td><td>${kitSummary}</td></tr>` : ''}
       </table>
       <p>Tu ficha queda registrada con el pago confirmado.</p>
       ${siteUrl ? `<p><a href="${escapeHtml(siteUrl)}/inscripcion-jugador.html" style="font-weight:700;color:#1d4ed8;">Ver inscripción jugador/a</a></p>` : ''}
@@ -551,9 +553,71 @@ function buildPlayerInscriptionPaymentConfirmedContent(data) {
     `Temporada: ${data.season || '—'}\n` +
     `Categoría: ${data.category || data.categoria || '—'}\n` +
     `Importe: ${formatEurAmount(data.totalEur)}\n` +
-    `Pago: ${formatEventPaymentLabel(data.paymentChannel || data.paymentMethod)} — correcto\n\n` +
-    `Consultas: ${clubContactEmail()}\n`;
+    `Pago: ${formatEventPaymentLabel(data.paymentChannel || data.paymentMethod)} — correcto\n` +
+    (data.kitSummary && String(data.kitSummary).trim() && String(data.kitSummary).trim() !== '—'
+      ? `Ropa (tallas): ${String(data.kitSummary).trim()}\n`
+      : '') +
+    `\nConsultas: ${clubContactEmail()}\n`;
   return { subject, html, text };
+}
+
+function buildPlayerKitPurchaseConfirmedContent(data) {
+  const nombre = escapeHtml(memberDisplayName(data));
+  const season = escapeHtml(String(data.season || '').trim() || '—');
+  const category = escapeHtml(String(data.category || data.categoria || '—').trim());
+  const total = escapeHtml(formatEurAmount(data.totalEur));
+  const payLabel = escapeHtml(formatEventPaymentLabel(data.paymentChannel || data.paymentMethod));
+  const kitSummary = escapeHtml(String(data.kitSummary || '').trim());
+  const contact = escapeHtml(clubContactEmail());
+
+  const subject = `Equipación pagada — ${CLUB_NAME}`;
+  const html = `
+    <div style="font-family:system-ui,sans-serif;max-width:560px;color:#1e293b;line-height:1.5">
+      <h2 style="color:#059669;margin:0 0 12px">✅ Equipación pagada correctamente</h2>
+      <p>Hola, <strong>${nombre}</strong>:</p>
+      <p>Hemos recibido el pago de tu <strong>equipación</strong> en <strong>${CLUB_NAME}</strong>.</p>
+      <table style="background:#ecfdf5;border-radius:8px;padding:12px 16px;margin:16px 0;width:100%">
+        <tr><td><strong>Temporada:</strong></td><td>${season}</td></tr>
+        <tr><td><strong>Categoría:</strong></td><td>${category}</td></tr>
+        <tr><td><strong>Importe ropa:</strong></td><td>${total}</td></tr>
+        <tr><td><strong>Pago:</strong></td><td>${payLabel} — correcto</td></tr>
+        ${kitSummary && kitSummary !== '—' ? `<tr><td style="vertical-align:top"><strong>Tallas pedidas:</strong></td><td>${kitSummary}</td></tr>` : ''}
+      </table>
+      <p>El club preparará tu pedido. Si tienes dudas, escríbenos.</p>
+      <p style="font-size:0.9rem;color:#64748b">Consultas: <a href="mailto:${contact}">${contact}</a></p>
+    </div>`;
+  const text =
+    `Hola, ${memberDisplayName(data)}.\n\n` +
+    `Tu compra de equipación en ${CLUB_NAME} está PAGADA y confirmada.\n` +
+    `Temporada: ${data.season || '—'}\n` +
+    `Categoría: ${data.category || data.categoria || '—'}\n` +
+    `Importe: ${formatEurAmount(data.totalEur)}\n` +
+    `Pago: ${formatEventPaymentLabel(data.paymentChannel || data.paymentMethod)} — correcto\n` +
+    (data.kitSummary && String(data.kitSummary).trim() && String(data.kitSummary).trim() !== '—'
+      ? `Tallas pedidas: ${String(data.kitSummary).trim()}\n`
+      : '') +
+    `\nConsultas: ${clubContactEmail()}\n`;
+  return { subject, html, text };
+}
+
+async function sendPlayerKitPurchaseConfirmedEmail(data) {
+  const cfg = getEmailConfig();
+  if (!cfg.ok) return { sent: false, reason: cfg.error };
+  const email = resolvePlayerNotifyEmail(data);
+  if (!email) return { sent: false, reason: 'email vacío' };
+  const content = buildPlayerKitPurchaseConfirmedContent(data);
+  try {
+    const result = await sendDirectToMemberEmail({
+      memberEmail: email,
+      subject: content.subject,
+      html: content.html,
+      text: content.text,
+      replyTo: clubContactEmail()
+    });
+    return { sent: true, to: result.to, bcc: result.bcc };
+  } catch (err) {
+    return { sent: false, reason: err.message || String(err) };
+  }
 }
 
 async function sendPlayerInscriptionPaymentConfirmedEmail(data) {
@@ -600,6 +664,7 @@ module.exports = {
   sendMemberRegistrationEmail,
   sendMemberPaymentConfirmedEmail,
   sendPlayerInscriptionPaymentConfirmedEmail,
+  sendPlayerKitPurchaseConfirmedEmail,
   sendPlayerApplicationApprovedEmail,
   sendPlayerPortalResetEmail,
   sendPlayerProfileUpdateConfirmedEmail,

@@ -633,11 +633,8 @@ async function completePlayerInscription(payment) {
 
   try {
     const { sendClubAdminNotification } = require('./club-admin-notify-email');
+    const { buildPlayerInscriptionNotifyFields, formatKitSummary } = require('./player-inscription-notify-fields');
     const payCh = payment.payMethod === 'bizum' ? 'bizum' : 'tarjeta';
-    const kit = reg.kit && reg.kit.items ? reg.kit.items : reg.kitOrder || [];
-    const kitTxt = Array.isArray(kit)
-      ? kit.map((k) => `${k.garment || k.prenda || ''} ${k.size || k.talla || ''}`.trim()).filter(Boolean).join('; ')
-      : '—';
     const total = reg.chargeBreakdown && reg.chargeBreakdown.total != null ? reg.chargeBreakdown.total : reg.totalCharge;
     await sendClubAdminNotification({
       kind: 'inscripcion_jugador_pagada',
@@ -656,14 +653,7 @@ async function completePlayerInscription(payment) {
       email: reg.email || payment.customerEmail,
       numeroSocio: reg.numeroSocio || reg.memberNumber,
       memberNumber: reg.numeroSocio || reg.memberNumber,
-      fields: [
-        { label: 'ID ficha', value: reg.id || '—' },
-        { label: 'Temporada', value: season },
-        { label: 'Categoría', value: reg.category || reg.categoria },
-        { label: 'Ropa entreno', value: kitTxt || '—' },
-        { label: 'Importe total (€)', value: total },
-        { label: 'Pedido pasarela', value: payment.orderId }
-      ]
+      fields: buildPlayerInscriptionNotifyFields(reg, { orderId: payment.orderId })
     });
     const { sendPlayerInscriptionPaymentConfirmedEmail } = require('./member-email');
     await sendPlayerInscriptionPaymentConfirmedEmail({
@@ -674,11 +664,119 @@ async function completePlayerInscription(payment) {
       season,
       category: reg.category || reg.categoria,
       totalEur: total,
-      paymentChannel: payCh
+      paymentChannel: payCh,
+      kitSummary: formatKitSummary(reg)
     });
   } catch (mailErr) {
     console.warn('Email club inscripción pagada:', mailErr.message || mailErr);
   }
+}
+
+/** Compra adicional de equipación (solo ropa) — socio-jugador logueado, tarjeta/Bizum. */
+async function completePlayerKitPurchase(payment) {
+  const kitPayload = payment.playerKitOrder || payment.playerRegistration;
+  if (!kitPayload || typeof kitPayload !== 'object') {
+    throw new Error('playerKitOrder ausente');
+  }
+  const playerId = payment.playerId || kitPayload.id;
+  if (!playerId) throw new Error('playerId ausente');
+
+  const now = new Date().toISOString();
+  const newItems = Array.isArray(kitPayload.kitOrder)
+    ? kitPayload.kitOrder
+    : kitPayload.kit && Array.isArray(kitPayload.kit.items)
+      ? kitPayload.kit.items
+      : [];
+  if (!newItems.length) throw new Error('Pedido de ropa vacío');
+
+  const ref = playersRef().doc(String(playerId));
+  const snap = await ref.get();
+  if (!snap.exists) throw new Error('Jugador no encontrado');
+  const existing = snap.data();
+
+  const totalEur =
+    kitPayload.chargeBreakdown && kitPayload.chargeBreakdown.total != null
+      ? Number(kitPayload.chargeBreakdown.total)
+      : Number(payment.amountEur);
+
+  const purchase = {
+    orderId: payment.orderId,
+    items: newItems,
+    totalEur: totalEur,
+    paidAt: now,
+    payMethod: payment.payMethod === 'bizum' ? 'redsys_bizum' : 'redsys_card'
+  };
+
+  const prevKit = Array.isArray(existing.kitOrder) ? existing.kitOrder : [];
+  const mergedKit = prevKit.concat(newItems);
+  const kitPurchases = Array.isArray(existing.kitPurchases)
+    ? existing.kitPurchases.concat([purchase])
+    : [purchase];
+
+  await ref.set(
+    {
+      kitOrder: mergedKit,
+      kit: { ...(existing.kit || {}), items: mergedKit },
+      kitPurchases,
+      lastKitPurchaseAt: now,
+      lastKitPurchaseOrderId: payment.orderId,
+      updatedAt: now
+    },
+    { merge: true }
+  );
+
+  const regForNotify = {
+    id: playerId,
+    ...existing,
+    ...kitPayload,
+    kitOrder: newItems,
+    kit: { items: newItems },
+    chargeBreakdown: kitPayload.chargeBreakdown || { kit: totalEur, ficha: 0, socio: 0, total: totalEur }
+  };
+
+  try {
+    const { sendClubAdminNotification } = require('./club-admin-notify-email');
+    const { buildPlayerInscriptionNotifyFields, formatKitSummary } = require('./player-inscription-notify-fields');
+    const payCh = payment.payMethod === 'bizum' ? 'bizum' : 'tarjeta';
+    await sendClubAdminNotification({
+      kind: 'player_kit_pagada',
+      title: 'Compra equipación jugador/a (pasarela)',
+      subject: `Equipación pagada — ${payCh === 'bizum' ? 'Bizum' : 'Tarjeta'}`,
+      paymentChannel: payCh,
+      requesterEmail: regForNotify.email || payment.customerEmail,
+      nombre: regForNotify.name || regForNotify.nombre,
+      apellidos: regForNotify.surname || regForNotify.apellidos,
+      dni: regForNotify.dni,
+      fechaNacimiento: regForNotify.birthDate || regForNotify.fechaNacimiento,
+      direccion: regForNotify.domicilio || regForNotify.address,
+      localidad: regForNotify.localidad,
+      provincia: regForNotify.provincia,
+      telefono: regForNotify.phone || regForNotify.telefono,
+      email: regForNotify.email || payment.customerEmail,
+      numeroSocio: regForNotify.numeroSocio || regForNotify.memberNumber,
+      memberNumber: regForNotify.numeroSocio || regForNotify.memberNumber,
+      fields: buildPlayerInscriptionNotifyFields(regForNotify, {
+        orderId: payment.orderId,
+        paymentNote: 'Compra equipación (solo ropa, socio-jugador)'
+      })
+    });
+    const { sendPlayerKitPurchaseConfirmedEmail } = require('./member-email');
+    await sendPlayerKitPurchaseConfirmedEmail({
+      email: regForNotify.email || payment.customerEmail,
+      guardianEmail: regForNotify.guardianEmail,
+      nombre: regForNotify.name || regForNotify.nombre,
+      apellidos: regForNotify.surname || regForNotify.apellidos,
+      season: regForNotify.inscriptionSeason || regForNotify.temporada,
+      category: regForNotify.category || regForNotify.categoria,
+      totalEur: totalEur,
+      paymentChannel: payCh,
+      kitSummary: formatKitSummary({ kitOrder: newItems })
+    });
+  } catch (mailErr) {
+    console.warn('Email equipación pagada:', mailErr.message || mailErr);
+  }
+
+  return { id: playerId, ...existing, kitOrder: mergedKit, kitPurchases };
 }
 
 async function findApplicationByDniSeason(dni, email, season) {
@@ -1862,6 +1960,7 @@ module.exports = {
   completeMembershipPayment,
   completeEventPayment,
   completePlayerInscription,
+  completePlayerKitPurchase,
   memberExistsForEmail,
   clubRecordExistsForNotify,
   applicationsRef,

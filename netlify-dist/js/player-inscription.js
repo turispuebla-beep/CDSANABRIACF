@@ -1069,6 +1069,52 @@
     return true;
   }
 
+  async function submitKitCheckout(player, kitItems, cart, payMethod) {
+    if (global.SiteUpdateMode && global.SiteUpdateMode.isActive && global.SiteUpdateMode.isActive()) {
+      throw new Error(global.SiteUpdateMode.getMessage());
+    }
+    if (!player || !player.id) throw new Error('Ficha de jugador no disponible.');
+    if (!kitItems || !kitItems.length) throw new Error('Selecciona al menos una prenda con talla.');
+    const total = Number(cart && cart.total);
+    if (!Number.isFinite(total) || total <= 0) {
+      throw new Error('El importe de la equipación debe ser mayor que 0 €.');
+    }
+    if (!global.CdsanRedsys) throw new Error('Pasarela de pago no disponible');
+
+    const kitOrder = (kitItems || []).map(function (it) {
+      return {
+        id: it.id,
+        label: it.label,
+        size: it.size,
+        price: Number(it.price || 0)
+      };
+    });
+
+    const payload = normalizePlayerDualFields(
+      Object.assign({}, player, {
+        kitOrder: kitOrder,
+        kit: { items: kitOrder },
+        chargeBreakdown: {
+          kit: cart.kitTotal,
+          ficha: 0,
+          socio: 0,
+          total: total
+        },
+        purchaseKind: 'player_kit_only'
+      })
+    );
+
+    await global.CdsanRedsys.payPlayerKit({
+      payMethod: payMethod,
+      amountEur: total,
+      email: payload.email,
+      playerId: payload.id,
+      playerKitOrder: payload,
+      description: 'Equipación ' + (payload.inscriptionSeason || '') + ' — CD Sanabria CF'
+    });
+    return { ok: true, redirect: true };
+  }
+
   global.PlayerInscription = {
     normalizeDni: normalizeDni,
     findPlayerForSeason: findPlayerForSeason,
@@ -1087,6 +1133,7 @@
     buildPlayerRecord: buildPlayerRecord,
     finalizeInscription: finalizeInscription,
     submitCheckout: submitCheckout,
+    submitKitCheckout: submitKitCheckout,
     finalizeFromPendingOrder: finalizeFromPendingOrder,
     markInscriptionPaidByAdmin: markInscriptionPaidByAdmin,
     getDisplayStatus: getDisplayStatus,

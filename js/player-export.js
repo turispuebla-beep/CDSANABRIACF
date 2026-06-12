@@ -106,17 +106,59 @@
     return [];
   }
 
+  function garmentLabel(it) {
+    if (!it) return 'Prenda';
+    return String(it.label || GARMENT_LABELS[it.id] || it.garment || it.prenda || it.id || 'Prenda').trim();
+  }
+
+  function garmentSize(it) {
+    return String((it && (it.size || it.talla)) || '—').trim() || '—';
+  }
+
   function formatKitSummary(player) {
     const items = getKitItems(player);
     if (!items.length) return '';
     return items
       .map(function (it) {
-        const label = it.label || GARMENT_LABELS[it.id] || it.id || 'Prenda';
         const price =
           it.price != null && Number(it.price) > 0 ? ' — ' + Number(it.price).toFixed(2) + ' €' : '';
-        return label + ': talla ' + (it.size || '—') + price;
+        return garmentLabel(it) + ': talla ' + garmentSize(it) + price;
       })
       .join(' | ');
+  }
+
+  /** Una línea por prenda (panel admin, alertas). */
+  function formatKitDetailLines(player) {
+    const items = getKitItems(player);
+    if (!items.length) return 'Sin pedido de ropa registrado';
+    return items
+      .map(function (it) {
+        const price =
+          it.price != null && Number(it.price) > 0 ? ' — ' + Number(it.price).toFixed(2) + ' €' : '';
+        return '• ' + garmentLabel(it) + ': talla ' + garmentSize(it) + price;
+      })
+      .join('\n');
+  }
+
+  /** Campos para correo al club (resumen + una fila por prenda/talla). */
+  function buildKitNotifyFields(playerOrReg) {
+    const items = getKitItems(playerOrReg);
+    const cb = (playerOrReg && playerOrReg.chargeBreakdown) || {};
+    const fields = [
+      { label: 'Pedido ropa (resumen)', value: items.length ? formatKitSummary(playerOrReg) : '—' }
+    ];
+    items.forEach(function (it) {
+      const price =
+        it.price != null && Number(it.price) > 0 ? ' — ' + Number(it.price).toFixed(2) + ' €' : '';
+      fields.push({
+        label: garmentLabel(it),
+        value: 'Talla ' + garmentSize(it) + price
+      });
+    });
+    if (cb.kit != null && Number(cb.kit) > 0) {
+      fields.push({ label: 'Subtotal ropa (€)', value: Number(cb.kit).toFixed(2) });
+    }
+    return fields;
   }
 
   function kitSizeFor(player, garmentId) {
@@ -313,7 +355,12 @@
     filterPlayers: filterPlayers,
     collectExportRows: collectExportRows,
     refreshSeasonSelect: refreshSeasonSelect,
-    isMinorPlayer: isMinorPlayer
+    isMinorPlayer: isMinorPlayer,
+    getKitItems: getKitItems,
+    formatKitSummary: formatKitSummary,
+    formatKitDetailLines: formatKitDetailLines,
+    buildKitNotifyFields: buildKitNotifyFields,
+    garmentLabel: garmentLabel
   };
 
   document.addEventListener('DOMContentLoaded', function () {

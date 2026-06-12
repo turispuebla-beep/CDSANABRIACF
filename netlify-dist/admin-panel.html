@@ -5194,6 +5194,11 @@
                                             📞 ${player.phone} | 🆔 ${player.dni} | 🎂 ${player.age} años | 🏃 Dorsal: ${player.number || 'Sin asignar'} | ⚽ ${player.position || 'Sin posición'}${seasonTag}
                                         </div>
                                         ${player.chargeBreakdown && player.chargeBreakdown.total > 0 ? `<div style="font-size:0.8em;color:#475569;margin-top:3px;">💶 Importe inscripción: ${Number(player.chargeBreakdown.total).toFixed(2)} € · ${player.paymentMethod || 'sin método'}</div>` : ''}
+                                        ${(function () {
+                                            if (!window.PlayerExport || !window.PlayerExport.formatKitSummary) return '';
+                                            const kitTxt = window.PlayerExport.formatKitSummary(player);
+                                            return kitTxt ? `<div style="font-size:0.8em;color:#1e3a8a;margin-top:3px;font-weight:600;">👕 Tallas: ${kitTxt}</div>` : '';
+                                        })()}
                                         <div style="font-size: 0.8em; color: #1e3a8a; margin-top: 3px;">
                                             📊 PJ: ${player.matches || 0} | ⚽ Goles: ${player.goals || 0} | 🎯 Asist: ${player.assists || 0} | 🟨 ${player.yellowCards || 0} | 🟥 ${player.redCards || 0}
                                         </div>
@@ -5308,8 +5313,17 @@
                     : { text: player.status };
                 details += `Estado: ${disp.text}\n`;
                 if (player.inscriptionSeason) details += `Temporada: ${player.inscriptionSeason}\n`;
-                if (player.chargeBreakdown) details += `Importe: ${player.chargeBreakdown.total || 0} €\n`;
+                if (player.chargeBreakdown) {
+                    details += `Importe total: ${player.chargeBreakdown.total || 0} €\n`;
+                    if (player.chargeBreakdown.ficha != null) details += `  · Cuota ficha: ${player.chargeBreakdown.ficha} €\n`;
+                    if (player.chargeBreakdown.socio != null) details += `  · Cuota socio: ${player.chargeBreakdown.socio} €\n`;
+                    if (player.chargeBreakdown.kit != null) details += `  · Ropa: ${player.chargeBreakdown.kit} €\n`;
+                }
                 details += `Pago: ${player.inscriptionPaid ? 'Pagado' : 'Pendiente'} (${player.inscriptionStatus || player.paymentStatus || '—'})\n`;
+                if (window.PlayerExport && window.PlayerExport.formatKitDetailLines) {
+                    const kitLines = window.PlayerExport.formatKitDetailLines(player);
+                    details += `\n👕 PEDIDO DE ROPA (tallas elegidas):\n${kitLines}\n`;
+                }
                 
                 if (isMinor) {
                     details += `\n👨‍👩‍👧‍👦 DATOS DEL TUTOR:\n`;
