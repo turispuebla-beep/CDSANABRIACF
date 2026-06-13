@@ -1,9 +1,12 @@
 /**
  * TPV virtual Caja Rural (Redsys) — CDSANABRIACF / cdsanabriacf2026
- * Tarjeta + Bizum (Bizum requiere REDSYS_BIZUM_ENABLED=true en Netlify).
+ * Tarjeta + Bizum (Bizum requiere REDSYS_BIZUM_ENABLED=true en Netlify y BIZUM_UI_ENABLED).
  */
 (function (global) {
   'use strict';
+
+  /** Mostrar Bizum en la web pública. Activar cuando Caja Rural confirme Bizum en el TPV. */
+  const BIZUM_UI_ENABLED = false;
 
   const API_CREATE = '/.netlify/functions/redsys-create-payment';
   const API_STATUS = '/.netlify/functions/redsys-payment-status';
@@ -56,6 +59,7 @@
   }
 
   function isBizumEnabled() {
+    if (!BIZUM_UI_ENABLED) return false;
     if (runtime.loaded) return runtime.bizumEnabled;
     return global.CDSAN_REDSYS_BIZUM_ENABLED === true;
   }

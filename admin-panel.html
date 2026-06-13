@@ -58,6 +58,7 @@
     <script src="js/club-membership-season.js"></script>
     <script src="js/club-accounting.js"></script>
     <script src="js/admin-api-auth.js"></script>
+    <script src="js/admin-paygold.js"></script>
     <script src="js/support-mode.js" defer></script>
     
     <style>
@@ -3534,6 +3535,88 @@
             <!-- Sección de Tienda -->
             <div id="tienda" class="tab-content">
                 <h2>🏪 Administración de Tienda</h2>
+
+                <div class="section" style="margin-bottom: 28px;">
+                    <h3>📱 PayGold — Cobro por SMS (Caja Rural)</h3>
+                    <p style="color:#64748b;margin-bottom:12px;line-height:1.5;">
+                        Genera un enlace de pago y Redsys lo envía por <strong>SMS</strong> al móvil del socio.
+                        Úsalo para cuota, ropa u otros conceptos. Tras la prueba del TPV normal y con la URL del comercio corregida en Caja Rural.
+                    </p>
+                    <div id="paygoldDisabledWarn" style="display:none;background:#fff7ed;border:1px solid #fdba74;border-radius:8px;padding:12px;margin-bottom:12px;color:#9a3412;font-size:0.9rem;">
+                        ⚠️ PayGold requiere TPV Redsys activo en Netlify. Completa primero la prueba del TPV y el deploy con funciones.
+                    </div>
+                    <div id="paygoldForm" style="background:#f8fafc;border:2px solid #e2e8f0;border-radius:10px;padding:20px;">
+                        <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px;">
+                            <div>
+                                <label for="paygoldMemberSelect" style="font-weight:600;display:block;margin-bottom:6px;">Socio (opcional)</label>
+                                <select id="paygoldMemberSelect" onchange="onPaygoldMemberChange()" style="width:100%;padding:10px;border:1px solid #cbd5e1;border-radius:6px;">
+                                    <option value="">— Sin vincular / manual —</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label for="paygoldCategory" style="font-weight:600;display:block;margin-bottom:6px;">Tipo de cobro</label>
+                                <select id="paygoldCategory" onchange="onPaygoldCategoryChange()" style="width:100%;padding:10px;border:1px solid #cbd5e1;border-radius:6px;">
+                                    <option value="membership">Cuota de socio/a</option>
+                                    <option value="kit">Ropa / equipación</option>
+                                    <option value="other">Otro</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div style="margin-bottom:14px;">
+                            <label for="paygoldConcept" style="font-weight:600;display:block;margin-bottom:6px;">Concepto *</label>
+                            <input type="text" id="paygoldConcept" maxlength="125" placeholder="Ej. Cuota socio temporada 2026" style="width:100%;padding:10px;border:1px solid #cbd5e1;border-radius:6px;">
+                        </div>
+                        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;margin-bottom:14px;">
+                            <div>
+                                <label for="paygoldAmount" style="font-weight:600;display:block;margin-bottom:6px;">Importe (€) *</label>
+                                <input type="number" id="paygoldAmount" min="0.01" step="0.01" placeholder="25.00" style="width:100%;padding:10px;border:1px solid #cbd5e1;border-radius:6px;">
+                            </div>
+                            <div>
+                                <label for="paygoldMobile" style="font-weight:600;display:block;margin-bottom:6px;">Móvil SMS *</label>
+                                <input type="tel" id="paygoldMobile" placeholder="666123456" autocomplete="tel" style="width:100%;padding:10px;border:1px solid #cbd5e1;border-radius:6px;">
+                                <small style="color:#64748b;">9 dígitos, sin +34</small>
+                            </div>
+                            <div>
+                                <label for="paygoldEmail" style="font-weight:600;display:block;margin-bottom:6px;">Email (opcional)</label>
+                                <input type="email" id="paygoldEmail" placeholder="socio@email.com" style="width:100%;padding:10px;border:1px solid #cbd5e1;border-radius:6px;">
+                            </div>
+                        </div>
+                        <div style="margin-bottom:14px;">
+                            <label for="paygoldBuyerName" style="font-weight:600;display:block;margin-bottom:6px;">Nombre del pagador</label>
+                            <input type="text" id="paygoldBuyerName" placeholder="Nombre y apellidos" style="width:100%;padding:10px;border:1px solid #cbd5e1;border-radius:6px;">
+                        </div>
+                        <div style="display:flex;flex-wrap:wrap;gap:16px;margin-bottom:16px;align-items:center;">
+                            <label style="display:flex;align-items:center;gap:8px;"><input type="checkbox" id="paygoldSendSms" checked> Enviar SMS (Redsys PayGold)</label>
+                            <label style="display:flex;align-items:center;gap:8px;"><input type="checkbox" id="paygoldSendEmail"> Enviar también por email (Redsys)</label>
+                        </div>
+                        <div style="display:flex;flex-wrap:wrap;gap:10px;">
+                            <button type="button" id="paygoldSendBtn" onclick="sendPaygoldLink()" style="background:#059669;color:#fff;border:none;padding:12px 20px;border-radius:8px;font-weight:700;cursor:pointer;">📱 Enviar enlace PayGold</button>
+                            <button type="button" onclick="copyPaygoldLinkFromStatus()" style="background:#3b82f6;color:#fff;border:none;padding:12px 16px;border-radius:8px;cursor:pointer;">📋 Copiar último enlace</button>
+                            <button type="button" id="paygoldRefreshHistory" onclick="loadPaygoldHistory()" style="background:#64748b;color:#fff;border:none;padding:12px 16px;border-radius:8px;cursor:pointer;">🔄 Actualizar historial</button>
+                        </div>
+                        <div id="paygoldStatus" style="display:none;margin-top:14px;padding:12px;border-radius:8px;font-size:0.9rem;line-height:1.45;"></div>
+                    </div>
+                    <div style="margin-top:20px;">
+                        <h4 style="margin-bottom:10px;">Historial PayGold (últimos 30)</h4>
+                        <div style="overflow-x:auto;">
+                            <table style="width:100%;border-collapse:collapse;background:#fff;border:1px solid #e2e8f0;border-radius:8px;">
+                                <thead>
+                                    <tr style="background:#f1f5f9;">
+                                        <th style="padding:8px;text-align:left;font-size:0.8rem;">Fecha</th>
+                                        <th style="padding:8px;text-align:left;font-size:0.8rem;">Pagador</th>
+                                        <th style="padding:8px;text-align:left;font-size:0.8rem;">Concepto</th>
+                                        <th style="padding:8px;text-align:left;font-size:0.8rem;">Importe</th>
+                                        <th style="padding:8px;text-align:left;font-size:0.8rem;">Estado</th>
+                                        <th style="padding:8px;text-align:left;font-size:0.8rem;">Enlace</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="paygoldHistoryBody">
+                                    <tr><td colspan="6" style="padding:12px;color:#64748b;">Abre esta pestaña para cargar el historial.</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
                 
                 <div class="section">
                     <h3>🛒 Gestión de Productos</h3>
@@ -20995,6 +21078,11 @@ th,td{border:1px solid #ccc;padding:5px 7px;text-align:left;white-space:nowrap;}
 
             if (tabName === 'contabilidad') {
                 loadContabilidadPanel();
+            }
+
+            if (tabName === 'tienda') {
+                if (typeof cargarConfiguracionTienda === 'function') cargarConfiguracionTienda();
+                if (typeof initPaygoldPanel === 'function') initPaygoldPanel();
             }
 
             if (tabName === 'publicidad') {

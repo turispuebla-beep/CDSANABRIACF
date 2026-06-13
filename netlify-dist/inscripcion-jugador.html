@@ -246,6 +246,38 @@
         }
         .insc-size-guide th { background: #f1f5f9; font-weight: 700; }
         .kit-label { font-weight: 600; min-width: 140px; }
+        .kit-order-summary {
+            margin-top: 14px;
+            padding: 12px 14px;
+            background: #f0fdf4;
+            border: 1px solid #86efac;
+            border-radius: 10px;
+        }
+        .kit-order-summary h3 {
+            margin: 0 0 8px;
+            font-size: 0.92rem;
+            color: #166534;
+        }
+        .kit-summary-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.9rem;
+        }
+        .kit-summary-table th,
+        .kit-summary-table td {
+            padding: 6px 8px;
+            border-bottom: 1px solid #bbf7d0;
+            text-align: left;
+        }
+        .kit-summary-table th { color: #166534; font-weight: 700; }
+        .kit-section-intro {
+            margin: 0 0 12px;
+            padding: 10px 12px;
+            background: #eff6ff;
+            border-radius: 8px;
+            font-size: 0.9rem;
+            color: #1e40af;
+        }
         .insc-medical-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
         @media (max-width: 600px) { .insc-medical-grid { grid-template-columns: 1fr; } }
         .insc-locked-banner {
@@ -278,7 +310,7 @@
                 Identifícate con tu DNI y contraseña. Si el club te ha admitido, podrás completar categoría, ropa y pago.
             </p>
             <p id="inscEquipacionIntro" class="muted" style="display:none;margin:0 0 14px;text-align:center;font-size:0.9rem;line-height:1.45;">
-                Compra <strong>equipación</strong> (solo ropa). Pago con <strong>tarjeta o Bizum</strong>. Solo jugadores/as del club con sesión iniciada.
+                Compra <strong>equipación</strong> (solo ropa). Pago con <strong>tarjeta</strong>. Solo jugadores/as del club con sesión iniciada.
             </p>
             <div id="insEquipacionPlayerBanner" class="card" style="display:none;margin-bottom:14px;padding:14px 16px;background:#eff6ff;border:1px solid #93c5fd;"></div>
             <p id="inscEditIntro" class="muted" style="display:none;margin:0 0 14px;text-align:center;font-size:0.9rem;line-height:1.45;">
@@ -458,7 +490,11 @@
                 </div>
 
                 <section class="card" id="insKitSection">
-                    <h2>Ropa entreno</h2>
+                    <h2>Pedido de ropa (equipación)</h2>
+                    <p class="kit-section-intro">
+                        Indica la <strong>talla de cada prenda</strong> que quieras comprar. La ropa de entreno es
+                        <strong>obligatoria</strong>. El club recibirá el detalle (prenda + talla + precio) en el correo y el Word adjunto.
+                    </p>
                     <table class="insc-size-guide" aria-label="Guía de tallas">
                         <thead>
                             <tr>
@@ -476,6 +512,7 @@
                         </tbody>
                     </table>
                     <div id="kitGarmentsWrap"></div>
+                    <div id="kitOrderSummary" class="kit-order-summary" aria-live="polite"></div>
                 </section>
 
                 <section class="card" id="insConsentSection">
@@ -495,8 +532,8 @@
                     <h2>Resumen del pago</h2>
                     <div id="cartLines"></div>
                     <div class="cart-total">Total a pagar: <span id="cartTotal">0,00 €</span></div>
-                    <div id="payCardBlock"><button type="button" class="btn btn-card" id="btnPayCard">💳 Pagar con tarjeta o Bizum</button></div>
-                    <div id="payBizumBlock"><button type="button" class="btn btn-bizum" id="btnPayBizum">📱 Pagar con Bizum</button></div>
+                    <div id="payCardBlock"><button type="button" class="btn btn-card" id="btnPayCard">💳 Pagar con tarjeta</button></div>
+                    <div id="payBizumBlock" hidden><button type="button" class="btn btn-bizum" id="btnPayBizum">📱 Pagar con Bizum</button></div>
                     <div id="payTransferBlock"><button type="button" class="btn btn-transfer" id="btnPayTransfer">🏦 Solicitar inscripción por transferencia, efectivo o TPV</button></div>
                 </section>
 

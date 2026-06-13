@@ -166,7 +166,14 @@
     if (e.isFreeEvent) return [];
     const out = [];
     if (e.paymentMethods.card) out.push('card');
-    if (e.paymentMethods.bizum) out.push('bizum');
+    if (
+      e.paymentMethods.bizum &&
+      global.CdsanRedsys &&
+      typeof global.CdsanRedsys.isBizumEnabled === 'function' &&
+      global.CdsanRedsys.isBizumEnabled()
+    ) {
+      out.push('bizum');
+    }
     if (e.paymentMethods.transfer) out.push('transfer');
     return out;
   }

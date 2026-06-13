@@ -84,15 +84,18 @@ FIREBASE_SERVICE_ACCOUNT_JSON=
 
 # --- Redsys / Caja Rural (pago cuota, inscripción jugador, eventos — TPV tarjeta/Bizum) ---
 
+# Clave SHA-256 del terminal (Ruralvía). Pegar tal cual; no usar SHA-512.
+REDSYS_SECRET_KEY=
+
 REDSYS_MERCHANT_CODE=
 
-REDSYS_TERMINAL=001
-
-REDSYS_SECRET_KEY=
+REDSYS_TERMINAL=101
 
 REDSYS_ENV=test
 
 REDSYS_BIZUM_ENABLED=false
+
+# PayGold SMS (panel admin). Desactivar sin quitar TPV: REDSYS_PAYGOLD_DISABLED=true
 
 
 
@@ -123,7 +126,7 @@ CLUB_EMAIL_ONLY=true
 # --- Redsys (pagos tarjeta/Bizum) — añadir cuando el club tenga claves TPV ---
 
 # REDSYS_MERCHANT_CODE=
-# REDSYS_TERMINAL=001
+# REDSYS_TERMINAL=101
 # REDSYS_SECRET_KEY=
 # REDSYS_ENV=test
 # REDSYS_BIZUM_ENABLED=false

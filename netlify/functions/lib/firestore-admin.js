@@ -351,6 +351,52 @@ async function completeMembershipPayment(payment, redsysParams) {
   }
 }
 
+/** PayGold (enlace SMS/email): cuota activa socio; ropa/otros avisan al club. */
+async function completePayGoldPayment(payment, redsysParams) {
+  const category = String(payment.conceptCategory || 'other').toLowerCase();
+  if (category === 'membership' || category === 'cuota' || category === 'socio') {
+    await completeMembershipPayment(payment, redsysParams);
+    return;
+  }
+
+  const { sendClubAdminNotification } = require('./club-admin-notify-email');
+  const payCh = 'paygold';
+  const concept = payment.conceptLabel || payment.description || 'Cobro PayGold';
+  const fields = [
+    { label: 'Concepto', value: concept },
+    { label: 'Importe (€)', value: payment.amountEur },
+    { label: 'Pedido', value: payment.orderId },
+    { label: 'Canal', value: payment.paygoldChannel || payment.delivery || 'paygold' }
+  ];
+
+  if (category === 'kit' || category === 'ropa' || category === 'equipacion') {
+    await sendClubAdminNotification({
+      kind: 'paygold_kit_paid',
+      title: 'Equipación / ropa pagada (PayGold SMS)',
+      subject: `Ropa pagada — PayGold — ${concept}`,
+      paymentChannel: payCh,
+      requesterEmail: payment.customerEmail,
+      email: payment.customerEmail,
+      telefono: payment.customerMobile,
+      nombre: payment.buyerName,
+      fields
+    });
+    return;
+  }
+
+  await sendClubAdminNotification({
+    kind: 'paygold_custom_paid',
+    title: 'Cobro PayGold confirmado',
+    subject: `Cobro PayGold — ${concept}`,
+    paymentChannel: payCh,
+    requesterEmail: payment.customerEmail,
+    email: payment.customerEmail,
+    telefono: payment.customerMobile,
+    nombre: payment.buyerName,
+    fields
+  });
+}
+
 async function completeEventPayment(payment) {
   const { eventId, participant, registrationBundle, guests } = payment;
   if (!eventId) throw new Error('eventId ausente');
@@ -1958,6 +2004,7 @@ module.exports = {
   getPayment,
   updatePayment,
   completeMembershipPayment,
+  completePayGoldPayment,
   completeEventPayment,
   completePlayerInscription,
   completePlayerKitPurchase,

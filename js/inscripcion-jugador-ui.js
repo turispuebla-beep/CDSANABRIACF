@@ -967,6 +967,8 @@
     toggleGuardianDomicilioFields();
     onBirthChange();
     updatePortalPasswordBlockUI();
+    applyKitPrefillFromPlayer(p);
+    refreshCart();
   }
 
   function hideInscriptionFormSections() {
@@ -1215,6 +1217,84 @@
     return items;
   }
 
+  function applyKitPrefillFromPlayer(player) {
+    if (!player) return;
+    const items =
+      global.PlayerExport && global.PlayerExport.getKitItems
+        ? global.PlayerExport.getKitItems(player)
+        : Array.isArray(player.kitOrder)
+          ? player.kitOrder
+          : [];
+    items.forEach(function (it) {
+      if (!it || !it.id) return;
+      const sel = document.querySelector('[data-kit-size="' + it.id + '"]');
+      const size = String(it.size || it.talla || '').trim();
+      if (sel && size) sel.value = size;
+    });
+  }
+
+  function updateKitOrderSummary(kitItems) {
+    const el = $('kitOrderSummary');
+    if (!el) return;
+    if (!kitItems.length) {
+      el.innerHTML =
+        '<h3>Tu pedido de ropa</h3>' +
+        '<p class="muted" style="margin:0;">Aún no has elegido ninguna prenda. Indica la talla en cada fila de arriba.</p>';
+      return;
+    }
+    let rows = '';
+    kitItems.forEach(function (it) {
+      const priceTxt = Number(it.price) > 0 ? formatEur(it.price) : '—';
+      rows +=
+        '<tr><td>' +
+        escapeHtml(it.label || it.id) +
+        '</td><td><strong>' +
+        escapeHtml(it.size) +
+        '</strong></td><td>' +
+        priceTxt +
+        '</td></tr>';
+    });
+    el.innerHTML =
+      '<h3>Tu pedido de ropa (resumen)</h3>' +
+      '<table class="kit-summary-table" aria-label="Resumen pedido ropa">' +
+      '<thead><tr><th>Prenda</th><th>Talla</th><th>Precio</th></tr></thead><tbody>' +
+      rows +
+      '</tbody></table>';
+  }
+
+  function escapeHtml(text) {
+    return String(text || '')
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;');
+  }
+
+  function validateKitForInscription() {
+    if (state.flowEdit || state.editProfileMode || state.viewOnlyProfile || state.passwordOnlyMode) {
+      return null;
+    }
+    if (state.flowEquipacion) return null;
+    const garments = global.ClubInscriptionConfig.getEnabledGarments(state.settings);
+    if (!garments.length) return null;
+    const kitItems = collectKitItems();
+    if (!kitItems.length) {
+      return 'Indica la talla de al menos una prenda en la sección «Pedido de ropa (equipación)».';
+    }
+    const trainKitEnabled = garments.some(function (g) {
+      return g.id === 'train_kit';
+    });
+    if (
+      trainKitEnabled &&
+      !kitItems.some(function (it) {
+        return it.id === 'train_kit';
+      })
+    ) {
+      return 'La ropa de entreno es obligatoria: elige su talla en el pedido de equipación.';
+    }
+    return null;
+  }
+
   function inscriptionPaysCategoryFees() {
     const s = state.settings || {};
     return !!(s.chargeFicha || s.chargeSocio);
@@ -1362,6 +1442,7 @@
 
     lines.innerHTML = html;
     if ($('cartTotal')) $('cartTotal').textContent = formatEur(cart.total);
+    updateKitOrderSummary(kitItems);
     state.lastCart = { kitItems: kitItems, cart: cart, category: category };
   }
 
@@ -1445,6 +1526,8 @@
 
     const pwdErr = validatePortalPasswordFields();
     if (pwdErr) return pwdErr;
+    const kitErr = validateKitForInscription();
+    if (kitErr) return kitErr;
     return null;
   }
 
@@ -1469,7 +1552,7 @@
   function buildRegistration() {
     const f = getFormData();
     f.category = f.category || global.ClubInscriptionConfig.suggestCategoryFromBirthDate(f.birthDate);
-    const kitItems = state.lastCart ? state.lastCart.kitItems : collectKitItems();
+    const kitItems = collectKitItems();
     const payFees = !!f.category && inscriptionPaysCategoryFees();
     const payFicha = payFees && state.settings.chargeFicha !== false;
     const paySocio = payFees && state.settings.chargeSocio !== false;
@@ -1679,11 +1762,19 @@
   function initPaymentButtons() {
     const pm = state.settings.paymentMethods || {};
     const onlineOnly = !!state.flowEquipacion;
+    const bizumUi =
+      global.CdsanRedsys &&
+      typeof global.CdsanRedsys.isBizumEnabled === 'function' &&
+      global.CdsanRedsys.isBizumEnabled();
     show($('payCardBlock'), onlineOnly || !!pm.card);
-    show($('payBizumBlock'), onlineOnly || !!pm.bizum);
+    show($('payBizumBlock'), bizumUi && (onlineOnly || !!pm.bizum));
     show($('payTransferBlock'), !onlineOnly && !!pm.transfer);
     if ($('btnPayCard')) {
-      $('btnPayCard').textContent = onlineOnly ? '💳 Pagar equipación con tarjeta' : '💳 Pagar con tarjeta o Bizum';
+      $('btnPayCard').textContent = onlineOnly
+        ? '💳 Pagar equipación con tarjeta'
+        : bizumUi
+          ? '💳 Pagar con tarjeta o Bizum'
+          : '💳 Pagar con tarjeta';
       if (onlineOnly) {
         $('btnPayCard').onclick = function () {
           submitEquipacion('card');
@@ -1712,9 +1803,12 @@
     }
     if (global.CdsanRedsys && global.CdsanRedsys.loadConfig) {
       global.CdsanRedsys.loadConfig().then(function () {
-        if ($('btnPayBizum') && !global.CdsanRedsys.isBizumEnabled()) {
-          $('btnPayBizum').disabled = true;
-          $('btnPayBizum').title = 'Bizum no activado en el club';
+        const bizumOn = global.CdsanRedsys.isBizumEnabled();
+        show($('payBizumBlock'), bizumOn && (onlineOnly || !!pm.bizum));
+        if ($('btnPayCard') && !onlineOnly) {
+          $('btnPayCard').textContent = bizumOn
+            ? '💳 Pagar con tarjeta o Bizum'
+            : '💳 Pagar con tarjeta';
         }
       });
     }
@@ -1911,7 +2005,10 @@
     const pwdBlock = $('insPortalPwdBlock');
     if (pwdBlock) pwdBlock.style.display = 'none';
     if ($('insPaymentSection') && $('insPaymentSection').querySelector('h2')) {
-      $('insPaymentSection').querySelector('h2').textContent = 'Pago equipación (tarjeta o Bizum)';
+      $('insPaymentSection').querySelector('h2').textContent =
+        global.CdsanRedsys && global.CdsanRedsys.isBizumEnabled && global.CdsanRedsys.isBizumEnabled()
+          ? 'Pago equipación (tarjeta o Bizum)'
+          : 'Pago equipación (tarjeta)';
     }
     const p = state.equipacionPlayer;
     const banner = $('insEquipacionPlayerBanner');
@@ -2019,6 +2116,7 @@
     show($('inscFormWrap'), true);
     initCategoryUI();
     renderKitSection();
+    updateKitOrderSummary([]);
     initPaymentButtons();
 
     if (!state.flowFinalize && !state.flowContinue && !state.flowEdit && !state.flowEquipacion) {

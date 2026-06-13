@@ -9,6 +9,7 @@ const {
   getPayment,
   updatePayment,
   completeMembershipPayment,
+  completePayGoldPayment,
   completeEventPayment,
   completePlayerInscription,
   completePlayerKitPurchase
@@ -39,13 +40,18 @@ exports.handler = async (event) => {
     }
 
     const body = parseBody(event);
-    const { Ds_MerchantParameters, Ds_Signature } = parseFormBody(body);
+    const { Ds_MerchantParameters, Ds_Signature, Ds_SignatureVersion } = parseFormBody(body);
 
     if (!Ds_MerchantParameters || !Ds_Signature) {
       return { statusCode: 400, body: 'Missing params' };
     }
 
-    const verified = verifyNotificationSignature(Ds_MerchantParameters, Ds_Signature, cfg.secretKey);
+    const verified = verifyNotificationSignature(
+      Ds_MerchantParameters,
+      Ds_Signature,
+      cfg.secretKey,
+      Ds_SignatureVersion
+    );
     if (!verified.ok) {
       console.warn('redsys-notification verify:', verified.error);
       return { statusCode: 400, body: 'Invalid signature' };
@@ -89,6 +95,8 @@ exports.handler = async (event) => {
       await completePlayerInscription(payment);
     } else if (payment.type === 'player_kit') {
       await completePlayerKitPurchase(payment);
+    } else if (payment.type === 'paygold_custom') {
+      await completePayGoldPayment(payment, params);
     }
 
     return { statusCode: 200, body: 'OK' };

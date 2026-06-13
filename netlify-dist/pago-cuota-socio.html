@@ -106,7 +106,7 @@
     </div>
     <div class="card">
         <h1>💳 Pagar cuota de socio/a</h1>
-        <p class="sub">TPV seguro del banco (Caja Rural · Redsys): tarjeta o Bizum. Necesitas haberte registrado antes en la web del club.</p>
+        <p class="sub">TPV seguro del banco (Caja Rural · Redsys): pago con tarjeta. Necesitas haberte registrado antes en la web del club.</p>
 
         <label for="payEmail">Correo con el que te registraste</label>
         <input type="email" id="payEmail" placeholder="tu@email.com" autocomplete="email">
@@ -119,7 +119,6 @@
             </div>
             <div class="pay-methods">
                 <button type="button" class="btn-pay" id="btnPayCard">Pagar con tarjeta</button>
-                <button type="button" class="btn-pay btn-pay--bizum" id="btnPayBizum">Pagar con Bizum</button>
             </div>
             <p id="payError" class="err" style="display:none;"></p>
         </div>
@@ -140,19 +139,14 @@
 
         function setPayButtonsForMember(cuota, pagado) {
             const btnCard = document.getElementById('btnPayCard');
-            const btnBizum = document.getElementById('btnPayBizum');
             pendingCuota = cuota;
             if (pagado) {
                 btnCard.disabled = true;
                 btnCard.textContent = 'Cuota ya registrada como pagada';
-                btnBizum.disabled = true;
-                btnBizum.textContent = 'Cuota ya registrada como pagada';
                 return;
             }
             btnCard.disabled = false;
             btnCard.textContent = 'Pagar ' + cuota.toFixed(2) + ' € con tarjeta';
-            btnBizum.disabled = false;
-            btnBizum.textContent = 'Pagar ' + cuota.toFixed(2) + ' € con Bizum';
         }
 
         function getCuotaPricing() {
@@ -211,7 +205,7 @@
 
         function applySiteUpdatePayLock() {
             if (!window.SiteUpdateMode || !window.SiteUpdateMode.isActive()) return;
-            ['btnLookup', 'btnPayCard', 'btnPayBizum'].forEach(function (id) {
+            ['btnLookup', 'btnPayCard'].forEach(function (id) {
                 const el = document.getElementById(id);
                 if (el) el.disabled = true;
             });
@@ -242,7 +236,7 @@
             showMember(member);
         }
 
-        async function pay(payMethod) {
+        async function pay() {
             if (blockIfSiteUpdate()) return;
             if (!selectedMember) return;
             const errEl = document.getElementById('payError');
@@ -250,7 +244,6 @@
             const cuota = pendingCuota || resolveCuota(selectedMember);
             const email = String(selectedMember.email || document.getElementById('payEmail').value).trim();
             const memberId = selectedMember.id;
-            const method = payMethod === 'bizum' ? 'bizum' : 'card';
 
             if (!window.CdsanRedsys) {
                 errEl.textContent = 'Pasarela de pago no cargada. Recarga la página o usa transferencia (cdsanabriafc@gmail.com).';
@@ -259,12 +252,10 @@
             }
 
             const btnCard = document.getElementById('btnPayCard');
-            const btnBizum = document.getElementById('btnPayBizum');
             try {
                 btnCard.disabled = true;
-                btnBizum.disabled = true;
                 await window.CdsanRedsys.payMembership({
-                    payMethod: method,
+                    payMethod: 'card',
                     amountEur: cuota,
                     email: email,
                     memberId: memberId,
@@ -272,15 +263,13 @@
                 });
             } catch (e) {
                 btnCard.disabled = false;
-                btnBizum.disabled = false;
                 errEl.textContent = e.message || String(e);
                 errEl.style.display = 'block';
             }
         }
 
         document.getElementById('btnLookup').addEventListener('click', lookup);
-        document.getElementById('btnPayCard').addEventListener('click', function () { pay('card'); });
-        document.getElementById('btnPayBizum').addEventListener('click', function () { pay('bizum'); });
+        document.getElementById('btnPayCard').addEventListener('click', function () { pay(); });
         document.getElementById('payEmail').addEventListener('keydown', function (ev) {
             if (ev.key === 'Enter') { ev.preventDefault(); lookup(); }
         });

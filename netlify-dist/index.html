@@ -2827,7 +2827,7 @@
                     <div class="socio-pago-cta">
                         <p class="socio-pago-btn-hint" style="margin-top:0;">¿Ya completaste el registro y solo falta pagar?</p>
                         <button type="button" class="socio-pago-btn" onclick="abrirPaginaPagoCuotaDesdeRegistro()">
-                            <span aria-hidden="true">💳</span> Ir a pagar la cuota (tarjeta o Bizum)
+                            <span aria-hidden="true">💳</span> Ir a pagar la cuota (tarjeta)
                         </button>
                         <button type="button" class="socio-pago-btn socio-pago-btn--transfer" onclick="solicitarRegistroSocioTransferencia()">
                             <span aria-hidden="true">🏦</span> Solicitar registro por transferencia, efectivo o TPV
@@ -5092,7 +5092,7 @@
                 ? `<div style="margin: 16px 0; padding: 16px; background: #eff6ff; border: 1px solid #93c5fd; border-radius: 10px; text-align: left;">
                         <h4 style="margin: 0 0 8px; color: #1e3a8a; font-size: 1rem;">👕 Equipación del club</h4>
                         <p style="margin: 0 0 12px; font-size: 0.88rem; color: #475569; line-height: 1.45;">
-                            Compra ropa de entreno y complementos. Pago solo con <strong>tarjeta o Bizum</strong>.
+                            Compra ropa de entreno y complementos. Pago solo con <strong>tarjeta</strong>.
                             El club recibirá tu pedido con tallas y datos por correo.
                         </p>
                         <button type="button" class="btn-primary" onclick="document.querySelector('.modal')?.remove(); openEquipacionJugador();" style="width: 100%; background: #1e3a8a; font-weight: 700;">
@@ -10569,7 +10569,7 @@
                 notifyClubSocioRegistration(formData, 'gateway_pending');
                 closeSociosModal();
                 alert(
-                    `✅ Registro guardado en la nube del club.\n\n📋 ${formatNumeroSocioDisplay(formData.numeroSocio)}\n💰 Cuota: ${cuota}€${perfilRegistroMsg}\n\nEn la siguiente pantalla elige pagar con tarjeta o Bizum. Si el pago es correcto, tu alta quedará activa al instante.${mensajeNotificaciones}`
+                    `✅ Registro guardado en la nube del club.\n\n📋 ${formatNumeroSocioDisplay(formData.numeroSocio)}\n💰 Cuota: ${cuota}€${perfilRegistroMsg}\n\nEn la siguiente pantalla paga con tarjeta. Si el pago es correcto, tu alta quedará activa al instante.${mensajeNotificaciones}`
                 );
                 window.location.href = 'pago-cuota-socio.html?email=' + encodeURIComponent(formData.email);
                 return;

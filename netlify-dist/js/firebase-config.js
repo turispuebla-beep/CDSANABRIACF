@@ -132,7 +132,8 @@ const DB_COLLECTIONS = {
   FCM_TOKENS: 'sanabria_fcm_tokens',        // Tokens de dispositivos
   AUDIT_LOGS: 'sanabria_audit_logs',        // Logs de auditorÃ­a
   SETTINGS: 'sanabria_config',              // Configuraciones
-  STATS: 'sanabria_statistics'              // EstadÃ­sticas
+  STATS: 'sanabria_statistics',             // EstadÃ­sticas
+  PAYMENTS: 'sanabria_payments'             // Pagos TPV / PayGold
 };
 
 const APP_SCOPE = 'cdsanabriacf';
@@ -183,7 +184,9 @@ function normalizeCollectionName(rawName) {
     teamsettings: DB_COLLECTIONS.SETTINGS,
     teamadmins: DB_COLLECTIONS.ADMINS,
     cdsanabriacfteamadmins: DB_COLLECTIONS.ADMINS,
-    audit_logs: DB_COLLECTIONS.AUDIT_LOGS
+    audit_logs: DB_COLLECTIONS.AUDIT_LOGS,
+    payments: DB_COLLECTIONS.PAYMENTS,
+    sanabria_payments: DB_COLLECTIONS.PAYMENTS
   };
   return aliases[name] || name;
 }
