@@ -147,6 +147,14 @@
     await postPayload({ kind: 'coach', action: 'delete', id: coachId });
   }
 
+  async function deleteMember(memberId) {
+    await postPayload({ kind: 'member', action: 'delete', id: memberId });
+  }
+
+  async function deleteFriend(friendId) {
+    await postPayload({ kind: 'friend', action: 'delete', id: friendId });
+  }
+
   async function persist(kind, record) {
     if (kind === 'member') return persistMember(record);
     if (kind === 'friend') return persistFriend(record);
@@ -162,6 +170,8 @@
     persistPlayer: persistPlayer,
     persistCoach: persistCoach,
     deleteCoach: deleteCoach,
+    deleteMember: deleteMember,
+    deleteFriend: deleteFriend,
     cloudRequired: cloudRequired
   };
 })(typeof window !== 'undefined' ? window : globalThis);

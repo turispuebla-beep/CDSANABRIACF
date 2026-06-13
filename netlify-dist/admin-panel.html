@@ -13224,6 +13224,10 @@
             if (!memberId) return;
             const id = String(memberId).trim();
             if (!id || id.startsWith('MEMBER_')) return;
+            if (window.AdminClubCloudPersist && typeof window.AdminClubCloudPersist.deleteMember === 'function') {
+                await window.AdminClubCloudPersist.deleteMember(id);
+                return;
+            }
             if (typeof window.deleteDocument !== 'function') {
                 throw new Error('La nube no está disponible: no se puede eliminar en el servidor');
             }
@@ -13320,8 +13324,8 @@
             for (const dup of duplicates) {
                 try {
                     if (!dup.duplicateId || dup.duplicateId === dup.keeperId) continue;
-                    if (!dryRun && typeof window.deleteDocument === 'function') {
-                        await window.deleteDocument('members', dup.duplicateId, 'admin');
+                    if (!dryRun) {
+                        await removeMemberFromCloudIfNeeded(dup.duplicateId);
                     }
                     deleted += 1;
                 } catch (e) {
@@ -13705,6 +13709,10 @@
             if (!friendId) return;
             const id = String(friendId).trim();
             if (!id || id.startsWith('FRIEND_')) return;
+            if (window.AdminClubCloudPersist && typeof window.AdminClubCloudPersist.deleteFriend === 'function') {
+                await window.AdminClubCloudPersist.deleteFriend(id);
+                return;
+            }
             if (typeof window.deleteDocument !== 'function') {
                 throw new Error('La nube no está disponible: no se puede eliminar en el servidor');
             }

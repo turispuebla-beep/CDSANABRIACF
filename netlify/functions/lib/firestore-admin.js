@@ -1999,6 +1999,20 @@ async function deleteCoachRecord(coachId) {
   return { deleted: true, id };
 }
 
+async function deleteMemberRecord(memberId) {
+  const id = String(memberId || '').trim();
+  if (!id) throw new Error('ID de socio ausente');
+  await membersRef().doc(id).delete();
+  return { deleted: true, id };
+}
+
+async function deleteFriendRecord(friendId) {
+  const id = String(friendId || '').trim();
+  if (!id) throw new Error('ID de amigo ausente');
+  await friendsRef().doc(id).delete();
+  return { deleted: true, id };
+}
+
 module.exports = {
   savePendingPayment,
   getPayment,
@@ -2051,5 +2065,7 @@ module.exports = {
   normalizeCoachRecordFields,
   findCoachDocByIdentity,
   upsertCoachRecord,
-  deleteCoachRecord
+  deleteCoachRecord,
+  deleteMemberRecord,
+  deleteFriendRecord
 };

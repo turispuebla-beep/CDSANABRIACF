@@ -5,7 +5,9 @@ const {
   upsertFriendRegistrationRecord,
   upsertPlayerInscriptionRecord,
   upsertCoachRecord,
-  deleteCoachRecord
+  deleteCoachRecord,
+  deleteMemberRecord,
+  deleteFriendRecord
 } = require('./lib/firestore-admin');
 const { verifyAdminRequest } = require('./lib/admin-auth');
 const { corsHeaders, jsonResponse } = require('./lib/http-cors');
@@ -38,12 +40,20 @@ exports.handler = async (event) => {
     const record = body.record;
 
     if (action === 'delete') {
-      if (kind !== 'coach') {
-        return jsonResponse(400, { ok: false, error: 'delete solo soportado para coach' }, origin);
+      const recordId = body.id || (record && record.id);
+      if (kind === 'coach') {
+        await deleteCoachRecord(recordId);
+        return jsonResponse(200, { ok: true, deleted: true, coachId: recordId }, origin);
       }
-      const coachId = body.id || (record && record.id);
-      await deleteCoachRecord(coachId);
-      return jsonResponse(200, { ok: true, deleted: true, coachId }, origin);
+      if (kind === 'member') {
+        await deleteMemberRecord(recordId);
+        return jsonResponse(200, { ok: true, deleted: true, memberId: recordId }, origin);
+      }
+      if (kind === 'friend') {
+        await deleteFriendRecord(recordId);
+        return jsonResponse(200, { ok: true, deleted: true, friendId: recordId }, origin);
+      }
+      return jsonResponse(400, { ok: false, error: 'delete no soportado para kind: ' + kind }, origin);
     }
 
     if (!record || typeof record !== 'object') {
