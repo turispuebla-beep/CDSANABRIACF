@@ -4393,6 +4393,17 @@
                 );
                 return false;
             }
+
+            if (
+                !window.AdminSession
+                || typeof window.AdminSession.isAdminAuthenticated !== 'function'
+                || !window.AdminSession.isAdminAuthenticated()
+            ) {
+                showAdminSessionGate(
+                    'Acceso al panel solo tras iniciar sesión con contraseña en la web principal (botón Admin).'
+                );
+                return false;
+            }
             try {
                 const { doc, getDoc } = await import('https://www.gstatic.com/firebasejs/10.12.3/firebase-firestore.js');
                 const col = (window.DB_COLLECTIONS && window.DB_COLLECTIONS.ADMINS) || 'sanabria_admins';

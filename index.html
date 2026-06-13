@@ -4194,6 +4194,9 @@
                     localStorage.setItem('currentAdmin', JSON.stringify(adminSession));
                     localStorage.setItem('isAdmin', 'true');
                 }
+                if (window.AdminSession && window.AdminSession.markAdminAuthenticated) {
+                    window.AdminSession.markAdminAuthenticated();
+                }
 
                 closeAdminModal();
                 console.log('✅ Autenticación admin por Firebase correcta');
@@ -9220,25 +9223,20 @@
         // ===== FUNCIONES PARA MODAL DE ADMINISTRACIÓN =====
         
         function openAdminModal() {
-            const session =
-                window.AdminSession && window.AdminSession.getStoredAdminSession
-                    ? window.AdminSession.getStoredAdminSession()
-                    : null;
-            if (session) {
-                const opened =
-                    window.AdminSession && window.AdminSession.openAdminPanelWindow
-                        ? window.AdminSession.openAdminPanelWindow()
-                        : !!window.open('admin-panel.html', '_blank');
-                if (!opened) {
-                    alert('Permite ventanas emergentes para abrir el panel de administración.');
-                }
-                return;
-            }
             document.getElementById('adminModal').style.display = 'block';
             const msg = document.getElementById('adminMessage');
             if (msg) msg.style.display = 'none';
             const emailEl = document.getElementById('adminEmail');
-            if (emailEl) emailEl.focus();
+            const passwordEl = document.getElementById('adminPassword');
+            if (passwordEl) passwordEl.value = '';
+            const session =
+                window.AdminSession && window.AdminSession.getStoredAdminSession
+                    ? window.AdminSession.getStoredAdminSession()
+                    : null;
+            if (emailEl) {
+                emailEl.value = session && session.email ? session.email : '';
+                emailEl.focus();
+            }
         }
 
         function closeAdminModal() {
