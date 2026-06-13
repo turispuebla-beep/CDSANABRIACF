@@ -13230,13 +13230,14 @@
             }
         }
 
-        /** Borra el socio en Firestore. IDs locales MEMBER_* (aún no creados en nube): solo se quita en local. */
-        async function removeMemberFromCloudIfNeeded(memberId) {
+        /** Borra el socio en Firestore (ID + email/DNI por si hay duplicados o ID distinto). */
+        async function removeMemberFromCloudIfNeeded(memberId, identity) {
             if (!memberId) return;
             const id = String(memberId).trim();
             if (!id || id.startsWith('MEMBER_')) return;
+            const ident = identity && typeof identity === 'object' ? identity : {};
             if (window.AdminClubCloudPersist && typeof window.AdminClubCloudPersist.deleteMember === 'function') {
-                await window.AdminClubCloudPersist.deleteMember(id);
+                await window.AdminClubCloudPersist.deleteMember(id, ident);
                 return;
             }
             if (typeof window.deleteDocument !== 'function') {
@@ -13336,7 +13337,10 @@
                 try {
                     if (!dup.duplicateId || dup.duplicateId === dup.keeperId) continue;
                     if (!dryRun) {
-                        await removeMemberFromCloudIfNeeded(dup.duplicateId);
+                        await removeMemberFromCloudIfNeeded(dup.duplicateId, {
+                            email: dup.merged && dup.merged.email,
+                            dni: dup.merged && dup.merged.dni
+                        });
                     }
                     deleted += 1;
                 } catch (e) {
@@ -14767,7 +14771,7 @@
                 const failed = [];
                 for (const r of toRemove) {
                     try {
-                        await removeMemberFromCloudIfNeeded(r.id);
+                        await removeMemberFromCloudIfNeeded(r.id, { email: r.email, dni: r.dni });
                     } catch (e) {
                         console.warn('Auto-limpieza caducados: Firebase', r.id, e);
                         failed.push(r);
@@ -15072,7 +15076,10 @@
                 const memberToDelete = members.find(m => String(m.id) === String(memberId));
                 if (!memberToDelete) return;
                 try {
-                    await removeMemberFromCloudIfNeeded(memberToDelete.id);
+                    await removeMemberFromCloudIfNeeded(memberToDelete.id, {
+                        email: memberToDelete.email,
+                        dni: memberToDelete.dni
+                    });
                 } catch (syncErr) {
                     console.error('❌ Error eliminando socio en Firebase:', syncErr);
                     alert('❌ No se pudo eliminar en el servidor (nube).\n\nLa lista se sincroniza en tiempo real: si no se borra en la nube, el socio volverá a aparecer.\n\nComprueba conexión, permisos de administrador y acceso a la nube.\n\n' + (syncErr.message || String(syncErr)));
@@ -15303,7 +15310,7 @@
                 const failed = [];
                 for (const m of expiredMembers) {
                     try {
-                        await removeMemberFromCloudIfNeeded(m.id);
+                        await removeMemberFromCloudIfNeeded(m.id, { email: m.email, dni: m.dni });
                     } catch (e) {
                         console.warn('No se pudo eliminar en Firebase:', m.id, e);
                         failed.push(m);

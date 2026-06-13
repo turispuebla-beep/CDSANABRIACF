@@ -1999,11 +1999,57 @@ async function deleteCoachRecord(coachId) {
   return { deleted: true, id };
 }
 
-async function deleteMemberRecord(memberId) {
+async function deleteMemberRecord(memberId, identity) {
+  const deletedIds = new Set();
   const id = String(memberId || '').trim();
-  if (!id) throw new Error('ID de socio ausente');
-  await membersRef().doc(id).delete();
-  return { deleted: true, id };
+  const ident = identity && typeof identity === 'object' ? identity : {};
+
+  if (id) {
+    const ref = membersRef().doc(id);
+    const snap = await ref.get();
+    if (snap.exists) {
+      const data = snap.data() || {};
+      await ref.delete();
+      deletedIds.add(id);
+      if (!ident.email && data.email) ident.email = data.email;
+      if (!ident.dni && data.dni) ident.dni = data.dni;
+    }
+  }
+
+  const email = String(ident.email || '').trim().toLowerCase();
+  const dniNorm = normalizeDni(ident.dni);
+  const dniVariants = [];
+  if (dniNorm) {
+    dniVariants.push(dniNorm);
+    const lower = String(ident.dni || '').trim().toLowerCase();
+    if (lower && lower !== dniNorm.toLowerCase()) dniVariants.push(lower);
+    if (dniNorm.toLowerCase() !== dniNorm) dniVariants.push(dniNorm.toLowerCase());
+  }
+
+  if (email) {
+    const q = await membersRef().where('email', '==', email).get();
+    for (const docSnap of q.docs) {
+      if (!deletedIds.has(docSnap.id)) {
+        await docSnap.ref.delete();
+        deletedIds.add(docSnap.id);
+      }
+    }
+  }
+
+  for (const dniVal of dniVariants) {
+    const q = await membersRef().where('dni', '==', dniVal).get();
+    for (const docSnap of q.docs) {
+      if (!deletedIds.has(docSnap.id)) {
+        await docSnap.ref.delete();
+        deletedIds.add(docSnap.id);
+      }
+    }
+  }
+
+  if (deletedIds.size === 0) {
+    throw new Error('No se encontró el socio en la nube (ID, email o DNI)');
+  }
+  return { deleted: true, ids: [...deletedIds] };
 }
 
 async function deleteFriendRecord(friendId) {

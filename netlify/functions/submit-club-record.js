@@ -46,7 +46,7 @@ exports.handler = async (event) => {
         return jsonResponse(200, { ok: true, deleted: true, coachId: recordId }, origin);
       }
       if (kind === 'member') {
-        await deleteMemberRecord(recordId);
+        await deleteMemberRecord(recordId, { email: body.email, dni: body.dni });
         return jsonResponse(200, { ok: true, deleted: true, memberId: recordId }, origin);
       }
       if (kind === 'friend') {
