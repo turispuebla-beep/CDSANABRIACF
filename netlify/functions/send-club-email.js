@@ -6,6 +6,8 @@ const {
   sendMemberPaymentConfirmedEmail,
   sendPlayerApplicationApprovedEmail,
   sendPlayerProfileUpdateConfirmedEmail,
+  sendPlayerInscriptionPendingEmail,
+  sendPlayerInscriptionPaymentConfirmedEmail,
   sendEventRegistrationPendingEmail,
   sendEventRegistrationConfirmedEmail
 } = require('./lib/member-email');
@@ -141,6 +143,56 @@ exports.handler = async (event) => {
         nombre: body.nombre || body.name,
         apellidos: body.apellidos || body.surname,
         diff: body.diff
+      });
+      return jsonResponse(
+        200,
+        { ok: true, sent: result.sent, to: result.to || email, error: result.reason || '' },
+        origin
+      );
+    }
+
+    if (type === 'player_inscription_pending') {
+      const known = await clubRecordExistsForNotify(body);
+      if (!known) {
+        return jsonResponse(404, { ok: false, error: 'No hay registro del jugador/a para este aviso' }, origin);
+      }
+      const result = await sendPlayerInscriptionPendingEmail({
+        email,
+        guardianEmail: body.guardianEmail,
+        nombre: body.nombre || body.name,
+        apellidos: body.apellidos || body.surname,
+        season: body.season || body.inscriptionSeason,
+        inscriptionSeason: body.inscriptionSeason || body.season,
+        category: body.category || body.categoria,
+        categoria: body.categoria || body.category,
+        totalEur: body.totalEur,
+        paymentChannel: body.paymentChannel || body.paymentMethod,
+        paymentMethod: body.paymentMethod || body.paymentChannel,
+        kitSummary: body.kitSummary
+      });
+      return jsonResponse(
+        200,
+        { ok: true, sent: result.sent, to: result.to || email, error: result.reason || '' },
+        origin
+      );
+    }
+
+    if (type === 'player_inscription_payment_confirmed') {
+      const known = await clubRecordExistsForNotify(body);
+      if (!known) {
+        return jsonResponse(404, { ok: false, error: 'No hay registro del jugador/a para este aviso' }, origin);
+      }
+      const result = await sendPlayerInscriptionPaymentConfirmedEmail({
+        email,
+        guardianEmail: body.guardianEmail,
+        nombre: body.nombre || body.name,
+        apellidos: body.apellidos || body.surname,
+        season: body.season || body.inscriptionSeason,
+        category: body.category || body.categoria,
+        totalEur: body.totalEur,
+        paymentChannel: body.paymentChannel || body.paymentMethod,
+        paymentMethod: body.paymentMethod || body.paymentChannel,
+        kitSummary: body.kitSummary
       });
       return jsonResponse(
         200,

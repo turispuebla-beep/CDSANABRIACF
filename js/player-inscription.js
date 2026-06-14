@@ -307,6 +307,7 @@
         }) ||
         '',
       categorySuperiorConsent: !!form.categorySuperiorConsent,
+      clubRulesAccepted: !!form.clubRulesAccepted,
       playerConsent: !!form.playerConsent,
       photoConsent: !!form.photoConsent,
       photo: form.photoData || existing?.photo || null,
@@ -968,6 +969,50 @@
     return saved;
   }
 
+  function playerPaymentChannelLabel(player, adminMeta) {
+    const offline = String(player.offlinePaymentChannel || '').trim().toLowerCase();
+    if (offline === 'efectivo') return 'efectivo';
+    if (offline === 'tpv') return 'tpv';
+    if (offline === 'transferencia') return 'transferencia';
+    const choice = String(adminMeta?.methodChoice || '').trim();
+    if (choice === '2') return 'efectivo';
+    if (choice === '1') return 'transferencia';
+    const method = String(adminMeta?.method || '').toLowerCase();
+    if (method.indexOf('cash') >= 0) return 'efectivo';
+    if (method.indexOf('transfer') >= 0) return 'transferencia';
+    return 'transferencia';
+  }
+
+  function playerInscriptionKitSummary(player) {
+    if (global.PlayerExport && global.PlayerExport.formatKitSummary) {
+      const summary = global.PlayerExport.formatKitSummary(player);
+      return summary && summary !== '—' ? summary : '';
+    }
+    return '';
+  }
+
+  function notifyPlayerInscriptionPaymentConfirmed(player, adminMeta) {
+    if (!global.CdsanClubEmail || !global.CdsanClubEmail.sendPlayerInscriptionPaymentConfirmed || !player) {
+      return Promise.resolve();
+    }
+    const cb = player.chargeBreakdown || {};
+    const total = cb.total != null ? cb.total : player.totalCharge;
+    return global.CdsanClubEmail.sendPlayerInscriptionPaymentConfirmed({
+      email: player.email,
+      guardianEmail: player.guardianEmail,
+      dni: player.dni,
+      nombre: player.name || player.nombre,
+      apellidos: player.surname || player.apellidos,
+      season: player.inscriptionSeason || player.temporada,
+      category: player.category || player.categoria,
+      totalEur: total,
+      paymentChannel: playerPaymentChannelLabel(player, adminMeta),
+      kitSummary: playerInscriptionKitSummary(player)
+    }).catch(function (e) {
+      console.warn('Correo confirmación pago inscripción jugador:', e);
+    });
+  }
+
   /** Validación manual por administrador (transferencia, efectivo, etc.) */
   async function markInscriptionPaidByAdmin(playerId, adminMeta) {
     const players = readPlayers();
@@ -978,11 +1023,13 @@
     if (adminMeta?.methodChoice) {
       method = methodMap[String(adminMeta.methodChoice)] || method;
     }
-    return finalizeInscription(players[ix], {
+    const saved = await finalizeInscription(players[ix], {
       paid: true,
       method: method,
       validatedBy: adminMeta?.validatedBy || 'admin'
     });
+    await notifyPlayerInscriptionPaymentConfirmed(saved, adminMeta);
+    return saved;
   }
 
   function savePending(registration) {
@@ -1022,8 +1069,9 @@
     const total = Number(registration.chargeBreakdown?.total ?? cart.total);
 
     if (total <= 0) {
-      await finalizeInscription(registration, { paid: true, method: 'free' });
-      return { ok: true, free: true };
+      throw new Error(
+        'El importe de la inscripción debe ser mayor que 0 €. Si crees que es un error, contacta con el club.'
+      );
     }
 
     if (payMethod === 'transfer') {
@@ -1042,27 +1090,36 @@
 
     if (!global.CdsanRedsys) throw new Error('Pasarela de pago no disponible');
 
-    const saved = await finalizeInscription(registration, { paid: false, method: 'gateway_pending' }, { keepPending: true });
-    savePending(saved);
+    if (!registration.id) {
+      registration.id = 'PENDING_' + Date.now();
+    }
+    registration.registrationDate = registration.registrationDate || new Date().toISOString();
+    savePending({
+      registration: registration,
+      payMethod: payMethod,
+      savedAt: new Date().toISOString()
+    });
 
     await global.CdsanRedsys.payPlayerInscription({
       payMethod: payMethod,
       amountEur: total,
-      email: saved.email,
-      playerId: saved.id,
-      playerRegistration: saved,
-      description: 'Inscripción ' + saved.inscriptionSeason + ' — CD Sanabria CF'
+      email: registration.email,
+      playerId: registration.id,
+      playerRegistration: registration,
+      description: 'Inscripción ' + registration.inscriptionSeason + ' — CD Sanabria CF'
     });
     return { ok: true, redirect: true };
   }
 
-  /** Tras vuelta OK de Redsys (cliente) */
+  /** Tras vuelta OK de Redsys (cliente) — sincroniza local; la nube se activa en el webhook Redsys. */
   async function finalizeFromPendingOrder(orderId) {
     const pending = loadPending();
     if (!pending || !pending.registration) return false;
+    const payMethod = String(pending.payMethod || 'card').toLowerCase();
+    const method = payMethod === 'bizum' ? 'redsys_bizum' : 'redsys_card';
     await finalizeInscription(pending.registration, {
       paid: true,
-      method: 'redsys_card',
+      method: method,
       orderId: orderId,
       validatedBy: 'redsys_auto'
     });

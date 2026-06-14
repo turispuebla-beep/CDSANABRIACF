@@ -51,6 +51,35 @@
     return v === true || v === 'true' || v === 1 ? 'Sí' : v === false || v === 'false' || v === 0 ? 'No' : '';
   }
 
+  function consentYesNo(flag, acceptedAt) {
+    if (flag === true || flag === 'true' || flag === 1) return 'Sí';
+    if (acceptedAt) return 'Sí';
+    if (flag === false || flag === 'false' || flag === 0) return 'No';
+    return 'No';
+  }
+
+  function buildConsentNotifyFields(p) {
+    const reg = p || {};
+    return [
+      {
+        label: 'Normas inscripción CD Sanabria CF',
+        value: consentYesNo(reg.clubRulesAccepted, reg.clubRulesAcceptedAt)
+      },
+      {
+        label: 'Consent. jugador/a CD Sanabria CF',
+        value: yesNo(reg.playerConsent) || 'No'
+      },
+      {
+        label: 'Consent. fotos y vídeos del club',
+        value: yesNo(reg.photoConsent) || 'No'
+      },
+      {
+        label: 'Autorización categoría superior',
+        value: consentYesNo(reg.categorySuperiorConsent, reg.categorySuperiorConsentAt)
+      }
+    ];
+  }
+
   function categoryLabel(cat) {
     const k = String(cat || '').toLowerCase();
     return CATEGORY_LABELS[k] || cat || '';
@@ -240,8 +269,10 @@
       tutor_telefono: p.guardianPhone || '',
       tutor_email: p.guardianEmail || '',
       tutor_direccion: p.guardianAddress || '',
-      consent_jugador: yesNo(p.playerConsent),
-      consent_imagen: yesNo(p.photoConsent),
+      consent_normas: consentYesNo(p.clubRulesAccepted, p.clubRulesAcceptedAt),
+      consent_jugador: yesNo(p.playerConsent) || 'No',
+      consent_imagen: yesNo(p.photoConsent) || 'No',
+      consent_categoria_superior: consentYesNo(p.categorySuperiorConsent, p.categorySuperiorConsentAt),
       partidos: p.matches != null ? p.matches : '',
       goles: p.goals != null ? p.goals : '',
       asistencias: p.assists != null ? p.assists : '',
@@ -360,6 +391,8 @@
     formatKitSummary: formatKitSummary,
     formatKitDetailLines: formatKitDetailLines,
     buildKitNotifyFields: buildKitNotifyFields,
+    buildConsentNotifyFields: buildConsentNotifyFields,
+    consentYesNo: consentYesNo,
     garmentLabel: garmentLabel
   };
 

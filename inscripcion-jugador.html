@@ -290,6 +290,37 @@
             font-size: 0.9rem;
             line-height: 1.45;
         }
+        /* Modal selector: transferencia / efectivo / TPV */
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 10050;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(15, 23, 42, 0.55);
+            overflow: auto;
+        }
+        .modal-content {
+            background: #fff;
+            margin: 8% auto;
+            padding: 24px;
+            border-radius: 12px;
+            width: 90%;
+            max-width: 420px;
+            box-shadow: 0 20px 50px rgba(0, 0, 0, 0.2);
+            position: relative;
+        }
+        .modal .close {
+            color: #94a3b8;
+            float: right;
+            font-size: 1.5rem;
+            font-weight: bold;
+            cursor: pointer;
+            line-height: 1;
+        }
+        .modal .close:hover { color: #0f172a; }
     </style>
 </head>
 <body>
@@ -346,8 +377,8 @@
                         <p id="insLookupAuthHint" class="muted" style="margin-bottom:10px;"></p>
                         <div id="insPortalLoginBlock" style="display:none;"></div>
                         <div id="insPortalSetupBlock" style="display:none;">
-                            <p class="muted" style="font-size:0.9rem;margin-bottom:10px;">Primera vez: confirma el email de la ficha y elige una contraseña (mín. 6 caracteres). Si no se puede guardar, el club la asignará desde el panel de administración.</p>
-                            <label for="insPortalSetupEmail">Email de la ficha *</label>
+                            <p class="muted" style="font-size:0.9rem;margin-bottom:10px;">Primera vez: confirma el <strong>email del jugador/a</strong> (no el del tutor/a) y elige una contraseña (mín. 6 caracteres). Si no se puede guardar, el club la asignará desde el panel de administración.</p>
+                            <label for="insPortalSetupEmail">Email del jugador/a *</label>
                             <input type="email" id="insPortalSetupEmail" autocomplete="email" style="margin-bottom:8px;">
                             <label for="insPortalSetupPwd">Nueva contraseña *</label>
                             <input type="password" id="insPortalSetupPwd" autocomplete="new-password" style="margin-bottom:8px;">
@@ -358,7 +389,7 @@
                         </div>
                         <div id="insPortalResetBlock" style="display:none;">
                             <p class="muted" style="font-size:0.9rem;margin-bottom:10px;">Si no recuerdas la contraseña, escribe al club con tu DNI y email. Te la restablecerán desde el panel de administración (no hace falta contraseña de Gmail del club).</p>
-                            <label for="insPortalResetEmail">Tu email (opcional, para el mensaje)</label>
+                            <label for="insPortalResetEmail">Email del jugador/a (opcional, para el mensaje)</label>
                             <input type="email" id="insPortalResetEmail" autocomplete="email" style="margin-bottom:8px;">
                             <button type="button" class="btn btn-primary" id="insPortalResetMailtoBtn" style="margin:0 0 8px;">📧 Escribir al club para recuperar acceso</button>
                             <button type="button" class="btn" id="insPortalResetBtn" style="margin:0 0 8px;display:none;">Enviar enlace automático</button>
@@ -461,7 +492,7 @@
                 <div id="guardianBlock" style="display:none;">
                     <h2>Tutor/a (menor de edad)</h2>
                     <div class="grid2">
-                        <div><label for="insGuardianName">Nombre tutor/a *</label><input id="insGuardianName"></div>
+                        <div><label for="insGuardianName">Nombre y apellidos tutor/a *</label><input id="insGuardianName"></div>
                         <div><label for="insGuardianDni">DNI tutor/a *</label><input id="insGuardianDni"></div>
                     </div>
                     <div class="grid2">
@@ -483,7 +514,7 @@
                     <label class="fee-line" style="margin:12px 0 0;align-items:flex-start;">
                         <input type="checkbox" id="insCategorySuperiorConsent" style="margin-top:4px;">
                         <span>
-                            He leído y acepto la autorización de categoría superior *
+                            He leído y acepto la autorización de categoría superior (opcional)
                             <button type="button" class="ins-legal-link" id="insOpenCategoryAuthBtn" style="display:inline-block;margin-top:6px;">CATEGORÍA</button>
                         </span>
                     </label>
@@ -492,8 +523,9 @@
                 <section class="card" id="insKitSection">
                     <h2>Pedido de ropa (equipación)</h2>
                     <p class="kit-section-intro">
-                        Indica la <strong>talla de cada prenda</strong> que quieras comprar. La ropa de entreno es
-                        <strong>obligatoria</strong>. El club recibirá el detalle (prenda + talla + precio) en el correo y el Word adjunto.
+                        Indica la <strong>talla de cada prenda</strong> que quieras comprar esta temporada.
+                        Si ya tienes ropa de entreno u otras prendas de años anteriores, <strong>no es obligatorio</strong> pedirlas de nuevo.
+                        El club recibirá el detalle (prenda + talla + precio) en el correo y el Word adjunto.
                     </p>
                     <table class="insc-size-guide" aria-label="Guía de tallas">
                         <thead>
@@ -553,9 +585,13 @@
                 <button type="button" class="ins-modal-close" data-ins-pay-warning-close aria-label="Cerrar">&times;</button>
             </div>
             <div class="ins-modal-body" style="padding-top:8px;">
-                <p style="margin:0;line-height:1.55;font-weight:600;color:#b91c1c;">
+                <p style="margin:0 0 16px;line-height:1.55;font-weight:600;color:#b91c1c;">
                     Si no jugaste con nosotros durante la temporada 2025-2026 <strong>NO</strong> realices tu inscripción aquí; hazla en <strong>Nuevo jugador/a</strong>. <strong>NO SERÁ VÁLIDA</strong>.
                 </p>
+            </div>
+            <div class="ins-modal-foot" style="display:flex;gap:10px;flex-wrap:wrap;justify-content:flex-end;">
+                <button type="button" class="btn" data-ins-pay-warning-close style="margin:0;">Cancelar</button>
+                <button type="button" class="btn btn-primary" id="insPayWarningContinueBtn" style="margin:0;">Continuar al pago</button>
             </div>
         </div>
     </div>

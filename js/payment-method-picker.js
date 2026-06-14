@@ -13,9 +13,12 @@
     var wrap = global.document.createElement('div');
     wrap.id = MODAL_ID;
     wrap.className = 'modal';
-    wrap.style.cssText = 'display:none;z-index:10050;';
+    wrap.style.cssText =
+      'display:none;position:fixed;z-index:10050;left:0;top:0;width:100%;height:100%;' +
+      'background-color:rgba(15,23,42,0.55);overflow:auto;';
     wrap.innerHTML =
-      '<div class="modal-content" style="max-width:420px;margin:8% auto;padding:24px;border-radius:12px;">' +
+      '<div class="modal-content" style="background:#fff;max-width:420px;margin:8% auto;padding:24px;' +
+      'border-radius:12px;box-shadow:0 20px 50px rgba(0,0,0,0.2);position:relative;">' +
       '<span class="close" id="paymentOfflinePickerClose" style="cursor:pointer;font-size:1.5rem;">&times;</span>' +
       '<h2 style="margin:0 0 12px;font-size:1.15rem;color:#1e3a8a;">Forma de pago</h2>' +
       '<p style="margin:0 0 16px;font-size:0.9rem;color:#64748b;line-height:1.45;">Indica cómo vas a pagar. Marca una opción:</p>' +
@@ -30,8 +33,12 @@
       '<span><strong>TPV</strong><br><small style="color:#64748b">Pago con datáfono en el club</small></span></label>' +
       '<p id="paymentOfflinePickerErr" style="display:none;color:#dc2626;font-size:0.85rem;margin:8px 0 0;"></p>' +
       '<div style="margin-top:18px;display:flex;gap:10px;flex-wrap:wrap;">' +
-      '<button type="button" id="paymentOfflinePickerConfirm" class="btn-primary" style="flex:1;min-width:140px;">Enviar solicitud</button>' +
-      '<button type="button" id="paymentOfflinePickerCancel" class="btn-secondary" style="flex:1;min-width:100px;">Cancelar</button>' +
+      '<button type="button" id="paymentOfflinePickerConfirm" style="flex:1;min-width:140px;padding:12px 16px;' +
+      'border:none;border-radius:10px;font-size:0.95rem;font-weight:700;cursor:pointer;' +
+      'background:linear-gradient(180deg,#10b981,#059669);color:#fff;">Enviar solicitud</button>' +
+      '<button type="button" id="paymentOfflinePickerCancel" style="flex:1;min-width:100px;padding:12px 16px;' +
+      'border:none;border-radius:10px;font-size:0.95rem;font-weight:600;cursor:pointer;' +
+      'background:#e2e8f0;color:#334155;">Cancelar</button>' +
       '</div></div>';
     global.document.body.appendChild(wrap);
 

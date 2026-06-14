@@ -5429,8 +5429,15 @@
                 }
                 
                 details += `\n✅ CONSENTIMIENTOS:\n`;
-                details += `Jugador del equipo: ${player.playerConsent ? 'Sí' : 'No'}\n`;
-                details += `Fotos y videos: ${player.photoConsent ? 'Sí' : 'No'}\n`;
+                const consentLine = function (label, yes) {
+                    return `${label}: ${yes ? 'Sí' : 'No'}\n`;
+                };
+                const rulesOk = !!(player.clubRulesAccepted || player.clubRulesAcceptedAt);
+                const catSupOk = !!(player.categorySuperiorConsent || player.categorySuperiorConsentAt);
+                details += consentLine('Normas inscripción CD Sanabria CF', rulesOk);
+                details += consentLine('Consent. jugador/a CD Sanabria CF', !!player.playerConsent);
+                details += consentLine('Consent. fotos y vídeos del club', !!player.photoConsent);
+                details += consentLine('Autorización categoría superior', catSupOk);
                 details += `\nFecha de registro: ${new Date(player.registrationDate).toLocaleDateString()}`;
                 
                 alert(details);
@@ -5485,7 +5492,7 @@
                 loadPlayersList();
                 loadMembersList();
                 updateDashboardCounts();
-                alert('✅ Pago validado. El jugador/a queda ACTIVO y pagado en el sistema.\n\nSi la inscripción incluía cuota de socio/a, comprueba también en Socios que el alta esté activa.');
+                alert('✅ Pago validado. El jugador/a queda ACTIVO y pagado en el sistema.\n\n📧 Se ha enviado un correo de confirmación al jugador/a.\n\nSi la inscripción incluía cuota de socio/a, comprueba también en Socios que el alta esté activa.');
             } catch (error) {
                 console.error('❌ Error validando pago inscripción:', error);
                 alert('❌ Error al validar el pago: ' + (error.message || error));

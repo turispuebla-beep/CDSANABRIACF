@@ -62,12 +62,8 @@
   }
 
   function playerPortalEmails(player) {
-    const out = [];
     const main = String(player.email || '').trim().toLowerCase();
-    const guardian = String(player.guardianEmail || '').trim().toLowerCase();
-    if (main) out.push(main);
-    if (guardian && guardian !== main) out.push(guardian);
-    return out;
+    return main ? [main] : [];
   }
 
   function isPlayerInscriptionPaid(p) {

@@ -57,6 +57,35 @@ function buildKitNotifyFields(reg) {
   return fields;
 }
 
+function consentYesNo(flag, acceptedAt) {
+  if (flag === true || flag === 'true' || flag === 1) return 'Sí';
+  if (acceptedAt) return 'Sí';
+  if (flag === false || flag === 'false' || flag === 0) return 'No';
+  return 'No';
+}
+
+function buildConsentNotifyFields(reg) {
+  const r = reg || {};
+  return [
+    {
+      label: 'Normas inscripción CD Sanabria CF',
+      value: consentYesNo(r.clubRulesAccepted, r.clubRulesAcceptedAt)
+    },
+    {
+      label: 'Consent. jugador/a CD Sanabria CF',
+      value: r.playerConsent ? 'Sí' : 'No'
+    },
+    {
+      label: 'Consent. fotos y vídeos del club',
+      value: r.photoConsent ? 'Sí' : 'No'
+    },
+    {
+      label: 'Autorización categoría superior',
+      value: consentYesNo(r.categorySuperiorConsent, r.categorySuperiorConsentAt)
+    }
+  ];
+}
+
 function buildPlayerInscriptionNotifyFields(reg, opts) {
   const extra = opts && typeof opts === 'object' ? opts : {};
   const cb = (reg && reg.chargeBreakdown) || {};
@@ -78,11 +107,8 @@ function buildPlayerInscriptionNotifyFields(reg, opts) {
     { label: 'DNI tutor/a', value: reg.guardianDNI || reg.guardianDni || '—' },
     { label: 'Teléfono tutor/a', value: reg.guardianPhone || '—' },
     { label: 'Email tutor/a', value: reg.guardianEmail || '—' },
-    {
-      label: 'Autorización categoría superior',
-      value: reg.categorySuperiorConsent ? 'Sí' : 'No'
-    },
-    { label: 'Domicilio tutor/a', value: reg.guardianAddress || '—' }
+    { label: 'Domicilio tutor/a', value: reg.guardianAddress || '—' },
+    ...buildConsentNotifyFields(reg)
   ];
   if (extra.orderId) fields.push({ label: 'Pedido pasarela', value: extra.orderId });
   if (extra.paymentNote) fields.push({ label: 'Nota pago', value: extra.paymentNote });
@@ -96,5 +122,6 @@ module.exports = {
   getKitItems,
   formatKitSummary,
   buildKitNotifyFields,
+  buildConsentNotifyFields,
   buildPlayerInscriptionNotifyFields
 };

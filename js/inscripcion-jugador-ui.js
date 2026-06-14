@@ -464,7 +464,7 @@
         msg.style.color = '#dc2626';
         msg.textContent =
           e.code === 'email_mismatch'
-            ? 'El email no coincide con el de la ficha. Usa el mismo correo del jugador/a o del tutor/a.'
+            ? 'El email no coincide con el del jugador/a en la ficha. Usa el correo del jugador/a, no el del tutor/a.'
             : e.code === 'already_set'
               ? 'Esta ficha ya tiene contraseña. Inicia sesión o recupérala por email.'
               : e.message || 'No se pudo crear la contraseña.';
@@ -600,7 +600,7 @@
 
     showPortalAuthBlock(
       'insPortalSetupBlock',
-      'Crea tu contraseña de acceso. Debe coincidir el email de la ficha' +
+      'Crea tu contraseña de acceso. Debe coincidir el email del jugador/a' +
         (check.maskedEmail ? ' (' + check.maskedEmail + ').' : '.')
     );
     if (msg) msg.textContent = '';
@@ -1176,12 +1176,10 @@
       row.className = 'kit-row';
       const priceHint =
         Number(g.price) > 0 ? ' <span class="muted">(' + formatEur(g.price) + ')</span>' : '';
-      const mandatoryHint =
-        g.id === 'train_kit'
-          ? ' <span class="kit-mandatory-hint">Obligatoria en los entrenamientos</span>'
-          : '';
       const optionalHint =
-        g.id === 'cazadora' ? ' <span class="kit-optional-hint">Opcional</span>' : '';
+        g.id === 'train_kit' || g.id === 'cazadora'
+          ? ' <span class="kit-optional-hint">Opcional</span>'
+          : '';
       row.innerHTML =
         '<span class="kit-label">' +
         g.label +
@@ -1192,7 +1190,6 @@
         '" class="kit-size"><option value="">Talla</option>' +
         sizeOptionsHtml() +
         '</select>' +
-        mandatoryHint +
         optionalHint;
       wrap.appendChild(row);
       const sel = row.querySelector('[data-kit-size]');
@@ -1239,7 +1236,7 @@
     if (!kitItems.length) {
       el.innerHTML =
         '<h3>Tu pedido de ropa</h3>' +
-        '<p class="muted" style="margin:0;">Aún no has elegido ninguna prenda. Indica la talla en cada fila de arriba.</p>';
+        '<p class="muted" style="margin:0;">Aún no has elegido ninguna prenda. Si ya tienes ropa de temporadas anteriores, puedes dejar las tallas en blanco.</p>';
       return;
     }
     let rows = '';
@@ -1277,21 +1274,6 @@
     if (state.flowEquipacion) return null;
     const garments = global.ClubInscriptionConfig.getEnabledGarments(state.settings);
     if (!garments.length) return null;
-    const kitItems = collectKitItems();
-    if (!kitItems.length) {
-      return 'Indica la talla de al menos una prenda en la sección «Pedido de ropa (equipación)».';
-    }
-    const trainKitEnabled = garments.some(function (g) {
-      return g.id === 'train_kit';
-    });
-    if (
-      trainKitEnabled &&
-      !kitItems.some(function (it) {
-        return it.id === 'train_kit';
-      })
-    ) {
-      return 'La ropa de entreno es obligatoria: elige su talla en el pedido de equipación.';
-    }
     return null;
   }
 
@@ -1499,9 +1481,6 @@
         if (clubEmailsEqual(f.email, f.guardianEmail)) {
           return 'El menor no puede usar el mismo correo que su padre o tutor/a. Indica un email distinto para el jugador/a.';
         }
-        if (!f.categorySuperiorConsent) {
-          return 'Para menores, debes leer y aceptar la autorización de categoría superior (CATEGORÍA).';
-        }
       }
     }
 
@@ -1564,8 +1543,14 @@
     }
     const member = global.PlayerInscription.findMemberByDni(f.dni);
     if (member && member.id) player.linkedMemberId = member.id;
-    if (f.clubRulesAccepted) player.clubRulesAcceptedAt = new Date().toISOString();
-    if (f.categorySuperiorConsent) player.categorySuperiorConsentAt = new Date().toISOString();
+    if (f.clubRulesAccepted) {
+      player.clubRulesAccepted = true;
+      player.clubRulesAcceptedAt = new Date().toISOString();
+    }
+    if (f.categorySuperiorConsent) {
+      player.categorySuperiorConsent = true;
+      player.categorySuperiorConsentAt = new Date().toISOString();
+    }
     return player;
   }
 
@@ -1588,10 +1573,6 @@
       { label: 'Teléfono tutor/a', value: reg.guardianPhone || '—' },
       { label: 'Email tutor/a', value: reg.guardianEmail || '—' },
       {
-        label: 'Autorización categoría superior',
-        value: reg.categorySuperiorConsent ? 'Sí' : 'No'
-      },
-      {
         label: 'Domicilio tutor/a',
         value: reg.guardianAddress || composeGuardianAddress({
           domicilio: reg.guardianDomicilio,
@@ -1601,6 +1582,35 @@
       },
       { label: 'Cuenta club', value: 'CAJA RURAL ES12 3085 0034 8222 5127 9226' }
     ];
+    const consentFields =
+      global.PlayerExport && global.PlayerExport.buildConsentNotifyFields
+        ? global.PlayerExport.buildConsentNotifyFields(reg)
+        : [
+            {
+              label: 'Normas inscripción CD Sanabria CF',
+              value: reg.clubRulesAccepted || reg.clubRulesAcceptedAt ? 'Sí' : 'No'
+            },
+            {
+              label: 'Consent. jugador/a CD Sanabria CF',
+              value: reg.playerConsent ? 'Sí' : 'No'
+            },
+            {
+              label: 'Consent. fotos y vídeos del club',
+              value: reg.photoConsent ? 'Sí' : 'No'
+            },
+            {
+              label: 'Autorización categoría superior',
+              value: reg.categorySuperiorConsent ? 'Sí' : 'No'
+            }
+          ];
+    const cuentaIdx = base.findIndex(function (f) {
+      return f.label === 'Cuenta club';
+    });
+    if (cuentaIdx >= 0) {
+      base.splice.apply(base, [cuentaIdx, 0].concat(consentFields));
+    } else {
+      base.push.apply(base, consentFields);
+    }
     const kitFields =
       global.PlayerExport && global.PlayerExport.buildKitNotifyFields
         ? global.PlayerExport.buildKitNotifyFields(reg)
@@ -1655,6 +1665,37 @@
     });
   }
 
+  function playerInscriptionKitSummary(reg) {
+    if (global.PlayerExport && global.PlayerExport.formatKitSummary) {
+      const summary = global.PlayerExport.formatKitSummary(reg);
+      return summary && summary !== '—' ? summary : '';
+    }
+    return '';
+  }
+
+  function notifyPlayerInscriptionPending(reg, paymentChannel) {
+    if (!global.CdsanClubEmail || !global.CdsanClubEmail.sendPlayerInscriptionPending || !reg) return;
+    const ch =
+      paymentChannel === 'efectivo' ? 'efectivo' : paymentChannel === 'tpv' ? 'tpv' : 'transferencia';
+    const cb = reg.chargeBreakdown || {};
+    const total = cb.total != null ? cb.total : reg.totalCharge;
+    global.CdsanClubEmail.sendPlayerInscriptionPending({
+      email: reg.email,
+      guardianEmail: reg.guardianEmail,
+      dni: reg.dni,
+      nombre: reg.name || reg.nombre,
+      apellidos: reg.surname || reg.apellidos,
+      season: reg.inscriptionSeason || reg.temporada,
+      inscriptionSeason: reg.inscriptionSeason || reg.temporada,
+      category: reg.category || reg.categoria,
+      totalEur: total,
+      paymentChannel: ch,
+      kitSummary: playerInscriptionKitSummary(reg)
+    }).catch(function (e) {
+      console.warn('Correo confirmación jugador inscripción pendiente:', e);
+    });
+  }
+
   function openInsPayWarningModal() {
     const m = $('insPayWarningModal');
     if (m) {
@@ -1669,7 +1710,19 @@
       m.style.display = 'none';
       global.document.body.style.overflow = '';
     }
+    state.pendingPaymentAction = null;
+  }
+
+  function continueInsPayWarningModal() {
     state.payWarningAcknowledged = true;
+    const m = $('insPayWarningModal');
+    if (m) {
+      m.style.display = 'none';
+      global.document.body.style.overflow = '';
+    }
+    const run = state.pendingPaymentAction;
+    state.pendingPaymentAction = null;
+    if (run) run();
   }
 
   function bindInsPayWarningModal() {
@@ -1678,6 +1731,11 @@
       el.dataset.boundPayWarn = '1';
       el.addEventListener('click', closeInsPayWarningModal);
     });
+    const cont = $('insPayWarningContinueBtn');
+    if (cont && !cont.dataset.bound) {
+      cont.dataset.bound = '1';
+      cont.addEventListener('click', continueInsPayWarningModal);
+    }
     const m = $('insPayWarningModal');
     if (m && !m.dataset.bound) {
       m.dataset.bound = '1';
@@ -1689,9 +1747,14 @@
 
   function guardPaymentAction(fn) {
     return function () {
-      if (state.payWarningAcknowledged) {
-        return fn.apply(this, arguments);
+      const self = this;
+      const args = arguments;
+      if (!state.flowContinue || state.payWarningAcknowledged) {
+        return fn.apply(self, args);
       }
+      state.pendingPaymentAction = function () {
+        return fn.apply(self, args);
+      };
       openInsPayWarningModal();
     };
   }
@@ -1712,18 +1775,16 @@
         reg.portalPasswordSetAt = new Date().toISOString();
       }
       const result = await global.PlayerInscription.submitCheckout(reg, method);
-      if (result.free) {
-        alert('✅ Inscripción completada (importe 0 €). Tu ficha queda activa.');
-        global.location.href = 'index.html';
-      } else if (result.transfer) {
+      if (result.transfer) {
         const ch = result.offlineChannel || offlineChannel || 'transferencia';
         notifyClubPlayerInscription(reg, ch);
+        notifyPlayerInscriptionPending(reg, ch);
         alert(
           '✅ Inscripción registrada con estado PENDIENTE DE PAGO (' +
             offlinePaymentSubjectLabel(ch) +
             ').\n\nRealiza el pago por ' +
             offlinePaymentUserHint(ch) +
-            '. Un administrador validará el ingreso y activará tu ficha.\n\n📧 Hemos enviado un aviso al club con tus datos.'
+            '. Un administrador validará el ingreso y activará tu ficha.\n\nPuedes volver a buscar tu ficha con DNI + contraseña.\n\n📧 Hemos enviado un aviso al club y un correo de confirmación a tu email.'
         );
         global.location.href = 'index.html';
       } else if (result.redirect) {

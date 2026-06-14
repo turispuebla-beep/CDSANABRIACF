@@ -239,10 +239,12 @@ const CLUB_BANK_ACCOUNT = 'CAJA RURAL ES12 3085 0034 8222 5127 9226';
 
 function formatEventPaymentLabel(channel) {
   const c = String(channel || '').trim().toLowerCase();
-  if (c === 'transferencia' || c === 'transfer' || c === 'pending_transfer') return 'Transferencia bancaria';
-  if (c === 'efectivo' || c === 'cash') return 'Efectivo en el club';
+  if (c === 'transferencia' || c === 'transfer' || c === 'pending_transfer' || c === 'transfer_manual')
+    return 'Transferencia bancaria';
+  if (c === 'efectivo' || c === 'cash' || c === 'cash_manual') return 'Efectivo en el club';
+  if (c === 'tpv' || c === 'pending_tpv') return 'TPV (datáfono en el club)';
   if (c === 'bizum' || c === 'redsys_bizum') return 'Bizum';
-  if (c === 'tarjeta' || c === 'card' || c === 'redsys_card') return 'Tarjeta';
+  if (c === 'tarjeta' || c === 'card' || c === 'redsys_card' || c === 'redsys_caja_rural') return 'Tarjeta';
   if (c === 'gratuito' || c === 'free') return 'Gratuito';
   if (c) return c;
   return '—';
@@ -520,6 +522,108 @@ async function sendPlayerProfileUpdateConfirmedEmail(data) {
   }
 }
 
+function offlineInscriptionPaymentHint(channel) {
+  const c = String(channel || '').trim().toLowerCase();
+  if (c === 'efectivo' || c === 'cash' || c === 'cash_manual') {
+    return 'Realiza el pago en <strong>efectivo</strong> en el club. Un administrador validará tu inscripción al recibirlo.';
+  }
+  if (c === 'tpv' || c === 'pending_tpv') {
+    return 'Realiza el pago con <strong>TPV (datáfono)</strong> en el club. Un administrador validará tu inscripción.';
+  }
+  return (
+    'Realiza el ingreso por <strong>transferencia bancaria</strong> a la cuenta del club. ' +
+    'Un administrador validará tu inscripción al ver el pago.'
+  );
+}
+
+function offlineInscriptionPaymentHintText(channel) {
+  const c = String(channel || '').trim().toLowerCase();
+  if (c === 'efectivo' || c === 'cash' || c === 'cash_manual') {
+    return 'Realiza el pago en efectivo en el club. Un administrador validará tu inscripción al recibirlo.';
+  }
+  if (c === 'tpv' || c === 'pending_tpv') {
+    return 'Realiza el pago con TPV (datáfono) en el club. Un administrador validará tu inscripción.';
+  }
+  return 'Realiza el ingreso por transferencia bancaria a la cuenta del club. Un administrador validará tu inscripción al ver el pago.';
+}
+
+function buildPlayerInscriptionPendingContent(data) {
+  const nombre = escapeHtml(memberDisplayName(data));
+  const season = escapeHtml(String(data.season || data.inscriptionSeason || '').trim() || '—');
+  const category = escapeHtml(String(data.category || data.categoria || '—').trim());
+  const total = escapeHtml(formatEurAmount(data.totalEur));
+  const payLabel = escapeHtml(formatEventPaymentLabel(data.paymentChannel || data.paymentMethod));
+  const kitSummary = escapeHtml(String(data.kitSummary || '').trim());
+  const contact = escapeHtml(clubContactEmail());
+  const bank = escapeHtml(CLUB_BANK_ACCOUNT);
+  const siteUrl = String(process.env.SITE_URL || '').replace(/\/$/, '');
+  const ch = String(data.paymentChannel || data.paymentMethod || '').trim().toLowerCase();
+  const showBank =
+    ch === 'transferencia' || ch === 'transfer' || ch === 'pending_transfer' || !ch || ch === 'transfer_manual';
+  const payHint = offlineInscriptionPaymentHint(data.paymentChannel || data.paymentMethod);
+
+  const subject = `Inscripción registrada — pendiente de pago — ${CLUB_NAME}`;
+  const html = `
+    <div style="font-family:system-ui,sans-serif;max-width:560px;color:#1e293b;line-height:1.5">
+      <h2 style="color:#1e3a8a;margin:0 0 12px">📋 Inscripción registrada</h2>
+      <p>Hola, <strong>${nombre}</strong>:</p>
+      <p>Tu inscripción como jugador/a en <strong>${CLUB_NAME}</strong> ha quedado registrada correctamente.</p>
+      <table style="background:#f8fafc;border-radius:8px;padding:12px 16px;margin:16px 0;width:100%">
+        <tr><td><strong>Temporada:</strong></td><td>${season}</td></tr>
+        <tr><td><strong>Categoría:</strong></td><td>${category}</td></tr>
+        <tr><td><strong>Importe:</strong></td><td>${total}</td></tr>
+        <tr><td><strong>Forma de pago:</strong></td><td>${payLabel}</td></tr>
+        <tr><td><strong>Estado:</strong></td><td>Pendiente de validación</td></tr>
+        ${kitSummary && kitSummary !== '—' ? `<tr><td style="vertical-align:top"><strong>Ropa (tallas):</strong></td><td>${kitSummary}</td></tr>` : ''}
+      </table>
+      <p>${payHint}</p>
+      <p>Tienes <strong>7 días</strong> para completar el pago. El club validará tu ficha al confirmar el ingreso.</p>
+      ${
+        showBank
+          ? `<p style="background:#eff6ff;padding:10px 12px;border-radius:8px;font-family:monospace;font-size:0.95rem">Cuenta del club: ${bank}</p>`
+          : ''
+      }
+      ${siteUrl ? `<p><a href="${escapeHtml(siteUrl)}/inscripcion-jugador.html?flow=lookup" style="font-weight:700;color:#1d4ed8;">Consultar mi ficha</a></p>` : ''}
+      <p style="font-size:0.9rem;color:#64748b">Consultas: <a href="mailto:${contact}">${contact}</a></p>
+    </div>`;
+  const text =
+    `Hola, ${memberDisplayName(data)}.\n\n` +
+    `Tu inscripción en ${CLUB_NAME} ha quedado registrada.\n` +
+    `Temporada: ${data.season || data.inscriptionSeason || '—'}\n` +
+    `Categoría: ${data.category || data.categoria || '—'}\n` +
+    `Importe: ${formatEurAmount(data.totalEur)}\n` +
+    `Forma de pago: ${formatEventPaymentLabel(data.paymentChannel || data.paymentMethod)}\n` +
+    `Estado: pendiente de validación.\n` +
+    (data.kitSummary && String(data.kitSummary).trim() && String(data.kitSummary).trim() !== '—'
+      ? `Ropa (tallas): ${String(data.kitSummary).trim()}\n`
+      : '') +
+    `\n${offlineInscriptionPaymentHintText(data.paymentChannel || data.paymentMethod)}\n` +
+    `Tienes 7 días para completar el pago.\n` +
+    (showBank ? `Cuenta del club: ${CLUB_BANK_ACCOUNT}\n` : '') +
+    `\nConsultas: ${clubContactEmail()}\n`;
+  return { subject, html, text };
+}
+
+async function sendPlayerInscriptionPendingEmail(data) {
+  const cfg = getEmailConfig();
+  if (!cfg.ok) return { sent: false, reason: cfg.error };
+  const email = resolvePlayerNotifyEmail(data);
+  if (!email) return { sent: false, reason: 'email vacío' };
+  const content = buildPlayerInscriptionPendingContent(data);
+  try {
+    const result = await sendDirectToMemberEmail({
+      memberEmail: email,
+      subject: content.subject,
+      html: content.html,
+      text: content.text,
+      replyTo: clubContactEmail()
+    });
+    return { sent: true, to: result.to, bcc: result.bcc };
+  } catch (err) {
+    return { sent: false, reason: err.message || String(err) };
+  }
+}
+
 function buildPlayerInscriptionPaymentConfirmedContent(data) {
   const nombre = escapeHtml(memberDisplayName(data));
   const season = escapeHtml(String(data.season || '').trim() || '—');
@@ -663,6 +767,7 @@ async function sendPlayerPortalResetEmail(data) {
 module.exports = {
   sendMemberRegistrationEmail,
   sendMemberPaymentConfirmedEmail,
+  sendPlayerInscriptionPendingEmail,
   sendPlayerInscriptionPaymentConfirmedEmail,
   sendPlayerKitPurchaseConfirmedEmail,
   sendPlayerApplicationApprovedEmail,

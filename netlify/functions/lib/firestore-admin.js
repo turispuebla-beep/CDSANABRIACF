@@ -1032,18 +1032,14 @@ function normalizeEmail(v) {
 }
 
 function playerPortalEmails(player) {
-  const emails = [];
   const main = normalizeEmail(player.email);
-  const guardian = normalizeEmail(player.guardianEmail);
-  if (main) emails.push(main);
-  if (guardian && guardian !== main) emails.push(guardian);
-  return emails;
+  return main ? [main] : [];
 }
 
 function emailMatchesPlayer(player, email) {
   const e = normalizeEmail(email);
   if (!e) return false;
-  return playerPortalEmails(player).includes(e);
+  return normalizeEmail(player.email) === e;
 }
 
 function normalizeNamePart(v) {

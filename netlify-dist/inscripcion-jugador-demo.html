@@ -108,7 +108,7 @@
             <div id="guardianBlock" style="display:none;">
                 <h2>Tutor/a (menor de edad)</h2>
                 <div class="grid2">
-                    <div><label for="insGuardianName">Nombre tutor/a *</label><input id="insGuardianName"></div>
+                    <div><label for="insGuardianName">Nombre y apellidos tutor/a *</label><input id="insGuardianName"></div>
                     <div><label for="insGuardianDni">DNI tutor/a *</label><input id="insGuardianDni"></div>
                 </div>
                 <div class="grid2">
@@ -238,8 +238,7 @@
         ? '<label><input type="checkbox" data-kit-id="' + g.id + '"> ' + g.label + ' (' + formatEur(g.price) + ')</label>'
         : '<span>' + g.label + ' (' + formatEur(g.price) + ')</span>') +
         '<select data-kit-size="' + g.id + '" class="kit-size"' + (per ? ' disabled' : '') + '><option value="">Talla</option>' + sizes + '</select>' +
-        (g.id === 'train_kit' ? ' <span class="kit-mandatory-hint">Obligatoria en los entrenamientos</span>' : '') +
-        (g.id === 'cazadora' ? ' <span class="kit-optional-hint">Opcional</span>' : '');
+        (g.id === 'train_kit' || g.id === 'cazadora' ? ' <span class="kit-optional-hint">Opcional</span>' : '');
       wrap.appendChild(row);
       var cb = row.querySelector('[data-kit-id]');
       var sel = row.querySelector('[data-kit-size]');

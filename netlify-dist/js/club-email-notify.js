@@ -105,10 +105,54 @@
     });
   }
 
+  /** Confirmación al jugador/a: inscripción registrada (pendiente transferencia/efectivo/TPV). */
+  function sendPlayerInscriptionPending(opts) {
+    return post({
+      type: 'player_inscription_pending',
+      email: opts.email,
+      requesterEmail: opts.email,
+      guardianEmail: opts.guardianEmail,
+      dni: opts.dni,
+      nombre: opts.nombre || opts.name,
+      apellidos: opts.apellidos || opts.surname,
+      season: opts.season || opts.inscriptionSeason,
+      inscriptionSeason: opts.inscriptionSeason || opts.season,
+      category: opts.category || opts.categoria,
+      categoria: opts.categoria || opts.category,
+      totalEur: opts.totalEur,
+      paymentChannel: opts.paymentChannel || opts.paymentMethod,
+      paymentMethod: opts.paymentMethod || opts.paymentChannel,
+      kitSummary: opts.kitSummary
+    });
+  }
+
+  /** Confirmación al jugador/a: inscripción pagada y validada. */
+  function sendPlayerInscriptionPaymentConfirmed(opts) {
+    return post({
+      type: 'player_inscription_payment_confirmed',
+      email: opts.email,
+      requesterEmail: opts.email,
+      guardianEmail: opts.guardianEmail,
+      dni: opts.dni,
+      nombre: opts.nombre || opts.name,
+      apellidos: opts.apellidos || opts.surname,
+      season: opts.season || opts.inscriptionSeason,
+      inscriptionSeason: opts.inscriptionSeason || opts.season,
+      category: opts.category || opts.categoria,
+      categoria: opts.categoria || opts.category,
+      totalEur: opts.totalEur,
+      paymentChannel: opts.paymentChannel || opts.paymentMethod,
+      paymentMethod: opts.paymentMethod || opts.paymentChannel,
+      kitSummary: opts.kitSummary
+    });
+  }
+
   global.CdsanClubEmail = {
     sendMemberRegistered: sendMemberRegistered,
     sendClubAdminNotify: sendClubAdminNotify,
     sendEventRegistrationPending: sendEventRegistrationPending,
-    sendEventRegistrationConfirmed: sendEventRegistrationConfirmed
+    sendEventRegistrationConfirmed: sendEventRegistrationConfirmed,
+    sendPlayerInscriptionPending: sendPlayerInscriptionPending,
+    sendPlayerInscriptionPaymentConfirmed: sendPlayerInscriptionPaymentConfirmed
   };
 })(typeof window !== 'undefined' ? window : globalThis);
