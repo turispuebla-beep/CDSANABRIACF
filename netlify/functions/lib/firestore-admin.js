@@ -248,20 +248,35 @@ async function applyAutomaticSeasonRenewal(options = {}) {
   return { ok: true, renewalKey, updated, anioRef, temporada };
 }
 
-/** Localiza el documento del socio por id de pedido o, en su defecto, por email. */
+/** Localiza el documento del socio por id, bundle de registro o email (sin mezclar socio-jugador del hijo). */
 async function resolveMemberDoc(payment) {
   const memberId = payment.memberId ? String(payment.memberId).trim() : '';
   if (memberId) {
     const ref = membersRef().doc(memberId);
     const snap = await ref.get();
-    if (snap.exists) return { ref, data: snap.data() };
+    if (snap.exists) return { ref, data: { id: snap.id, ...snap.data() } };
   }
+
+  const bundleMember = payment.registrationBundle && payment.registrationBundle.member;
+  if (bundleMember) {
+    const patch = normalizeMemberRecordFields(bundleMember);
+    const found = await findMemberDocForAdultSocioRegistration(patch);
+    if (found) return found;
+    return null;
+  }
+
   const email = String(payment.customerEmail || '').trim().toLowerCase();
   if (!email) return null;
-  const q = await membersRef().where('email', '==', email).limit(1).get();
+  const q = await membersRef().where('email', '==', email).limit(20).get();
   if (q.empty) return null;
+  for (const doc of q.docs) {
+    const data = doc.data();
+    if (!data.socioJugador && !data.playerId) {
+      return { ref: doc.ref, data: { id: doc.id, ...data } };
+    }
+  }
   const doc = q.docs[0];
-  return { ref: doc.ref, data: doc.data() };
+  return { ref: doc.ref, data: { id: doc.id, ...doc.data() } };
 }
 
 /**

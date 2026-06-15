@@ -170,13 +170,23 @@
         function findMemberByEmail(email) {
             const norm = String(email || '').trim().toLowerCase();
             const keys = ['clubMembers', 'members', 'socios'];
+            let matches = [];
             for (let i = 0; i < keys.length; i++) {
                 try {
                     const list = JSON.parse(localStorage.getItem(keys[i]) || '[]');
-                    const found = list.find((m) => String(m.email || '').toLowerCase() === norm);
-                    if (found) return found;
+                    matches = matches.concat(
+                        list.filter(function (m) {
+                            return String(m.email || '').trim().toLowerCase() === norm;
+                        })
+                    );
                 } catch (_) {}
             }
+            if (!matches.length) return null;
+            const adult = matches.find(function (m) {
+                return !m.socioJugador && !m.isJugador && !m.playerId;
+            });
+            if (adult) return adult;
+            if (matches.length === 1) return matches[0];
             return null;
         }
 
@@ -224,13 +234,21 @@
             if (!member && typeof window.getDocuments === 'function') {
                 try {
                     const all = await window.getDocuments('members');
-                    member = (all || []).find((m) => String(m.email || '').toLowerCase() === email.toLowerCase());
+                    const cloudMatches = (all || []).filter(function (m) {
+                        return String(m.email || '').trim().toLowerCase() === email.toLowerCase();
+                    });
+                    member =
+                        cloudMatches.find(function (m) {
+                            return !m.socioJugador && !m.isJugador && !m.playerId;
+                        }) || (cloudMatches.length === 1 ? cloudMatches[0] : null);
                 } catch (e) {
                     console.warn(e);
                 }
             }
             if (!member) {
-                alert('No encontramos un socio con ese email. Regístrate primero o comprueba el correo.');
+                alert(
+                    'No encontramos un socio con ese email. Regístrate primero, comprueba el correo o contacta con cdsanabriafc@gmail.com si compartes email con un jugador/a.'
+                );
                 return;
             }
             showMember(member);

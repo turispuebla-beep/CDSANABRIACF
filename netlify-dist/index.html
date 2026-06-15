@@ -2706,6 +2706,12 @@
             <div class="modal-content">
                 <span class="close" onclick="closeSociosModal()">&times;</span>
                 <h2>👨‍👩‍👧‍👦 Registro de Socio/a</h2>
+                <div class="socio-pago-card socio-pago-card--card" id="socioCardPayInfo">
+                    <span class="socio-pago-badge">Recomendado</span>
+                    <h3 class="socio-pago-title">💳 Pagar con tarjeta (TPV Caja Rural)</h3>
+                    <p class="socio-pago-text">Completa el formulario y pulsa <strong>«Registrarse y pagar con tarjeta»</strong>. Serás redirigido al TPV seguro de Redsys. Tu alta queda <strong>activa al instante</strong> cuando el banco confirme el pago.</p>
+                    <p id="socioCardPayWarn" class="socio-pago-text" style="display:none;color:#b45309;margin-top:8px;font-weight:600;"></p>
+                </div>
                 <div class="socio-pago-card socio-pago-card--transfer">
                     <h3 class="socio-pago-title socio-pago-title--warn">🏦 Transferencia o efectivo</h3>
                     <p class="socio-pago-text socio-pago-text--warn" style="font-weight: 600; margin-bottom: 4px;">Si prefieres no pagar con tarjeta en la web:</p>
@@ -2821,7 +2827,7 @@
                     </div>
                     
                     <div class="form-buttons">
-                        <button type="submit" class="btn-primary">Registrarse como Socio/a</button>
+                        <button type="submit" class="btn-primary" id="socioSubmitCardBtn">Registrarse y pagar con tarjeta</button>
                         <button type="button" class="btn-secondary" onclick="closeSociosModal()">Cancelar</button>
                     </div>
                     <div class="socio-pago-cta">
@@ -4319,6 +4325,40 @@
             if (window.SiteUpdateMode && !SiteUpdateMode.guard()) return;
             const modal = document.getElementById('sociosModal');
             if (modal) modal.style.display = 'block';
+            refreshSocioCardPayUi();
+            if (window.CdsanRedsys && window.CdsanRedsys.loadConfig) {
+                window.CdsanRedsys.loadConfig().then(refreshSocioCardPayUi).catch(refreshSocioCardPayUi);
+            }
+        }
+
+        function refreshSocioCardPayUi() {
+            const submitBtn = document.getElementById('socioSubmitCardBtn');
+            const warnEl = document.getElementById('socioCardPayWarn');
+            const cuotaInput = document.getElementById('socioCuota');
+            const cuota = cuotaInput ? Number(cuotaInput.value) || 0 : 0;
+            const enabled = !!(window.CdsanRedsys && window.CdsanRedsys.isEnabled && window.CdsanRedsys.isEnabled());
+            if (submitBtn) {
+                if (cuota <= 0) {
+                    submitBtn.disabled = false;
+                    submitBtn.textContent = 'Registrarse como Socio/a';
+                } else if (enabled) {
+                    submitBtn.disabled = false;
+                    submitBtn.textContent = 'Registrarse y pagar con tarjeta';
+                } else {
+                    submitBtn.disabled = true;
+                    submitBtn.textContent = 'Pago con tarjeta no disponible';
+                }
+            }
+            if (warnEl) {
+                if (cuota > 0 && !enabled) {
+                    warnEl.style.display = 'block';
+                    warnEl.textContent =
+                        'El TPV con tarjeta no está disponible ahora. Usa la opción de transferencia, efectivo o TPV más abajo, o inténtalo más tarde.';
+                } else {
+                    warnEl.style.display = 'none';
+                    warnEl.textContent = '';
+                }
+            }
         }
 
         function openAmigoRegistroModal() {
@@ -7674,6 +7714,7 @@
                 rM.checked = esMenor;
                 rY.checked = !esMenor;
             }
+            if (typeof refreshSocioCardPayUi === 'function') refreshSocioCardPayUi();
         }
 
         function seleccionarCuotaDesdeRadio(tipo) {
@@ -7681,6 +7722,7 @@
             const cuotaInput = document.getElementById('socioCuota');
             const v = tipo === 'menor' ? p.cuotaMenor : p.cuotaMayor;
             cuotaInput.value = v;
+            if (typeof refreshSocioCardPayUi === 'function') refreshSocioCardPayUi();
         }
 
         function seleccionarCuotaManual(monto) {
@@ -10467,6 +10509,26 @@
             const rolesRegistro = applyClubRoleFlagsToMember(formData);
             const perfilRegistroMsg = formatClubRoleMessage(rolesRegistro);
 
+            const cuota = Number(formData.cuota) || 0;
+            const modoPago = window._socioRegistroModoPago === 'transfer' ? 'transfer' : 'card';
+            window._socioRegistroModoPago = null;
+
+            if (modoPago === 'card' && cuota > 0) {
+                if (!window.CdsanRedsys) {
+                    alert('❌ La pasarela de pago no está disponible. Recarga la página o contacta con cdsanabriafc@gmail.com.');
+                    return;
+                }
+                await window.CdsanRedsys.loadConfig();
+                if (!window.CdsanRedsys.isEnabled()) {
+                    alert(
+                        '❌ El pago con tarjeta no está disponible en este momento.\n\n' +
+                            'Usa «Solicitar registro por transferencia, efectivo o TPV» o inténtalo más tarde.\n\n' +
+                            'Consultas: cdsanabriafc@gmail.com'
+                    );
+                    return;
+                }
+            }
+
             const pwdRegistro = String(formData.password);
             if (window.cdsanClubAuth && window.firebaseAuth && !window.firebaseAuth.isSimulation) {
                 try {
@@ -10494,10 +10556,6 @@
                 delete formData.password;
             }
 
-            const cuota = Number(formData.cuota) || 0;
-            const modoPago = window._socioRegistroModoPago === 'transfer' ? 'transfer' : 'card';
-            window._socioRegistroModoPago = null;
-
             // Tarjeta/Bizum: no registrar ni enviar datos hasta que el banco confirme el pago (webhook Redsys).
             if (modoPago === 'card' && cuota > 0) {
                 window._socioOfflinePaymentChannel = null;
@@ -10506,10 +10564,6 @@
                         const { signOut } = await import('https://www.gstatic.com/firebasejs/10.12.3/firebase-auth.js');
                         await signOut(window.firebaseAuth);
                     } catch (e) { console.warn('signOut tras registro socio:', e); }
-                }
-                if (!window.CdsanRedsys) {
-                    alert('❌ La pasarela de pago no está disponible. Recarga la página o contacta con cdsanabriafc@gmail.com.');
-                    return;
                 }
                 closeSociosModal();
                 try {
@@ -10569,7 +10623,9 @@
             }
 
             const synced = JSON.parse(localStorage.getItem('clubMembers') || '[]');
-            const saved = synced.find((s) => String(s.email || '').toLowerCase() === String(formData.email || '').toLowerCase());
+            const saved = synced.find(function (s) {
+                return clubMembersSameIdentity(s, formData);
+            });
             if (saved) Object.assign(formData, saved);
 
             if (formData.notificaciones) {
@@ -10579,8 +10635,9 @@
             const mensajeNotificaciones = formData.notificaciones
                 ? '\n\n🔔 Notificaciones push activadas - Recibirás información del club'
                 : '\n\n📧 Recibirás información por email';
-            const syncedMember = JSON.parse(localStorage.getItem('clubMembers') || '[]')
-                .find((s) => String(s.email || '').toLowerCase() === String(formData.email || '').toLowerCase());
+            const syncedMember = JSON.parse(localStorage.getItem('clubMembers') || '[]').find(function (s) {
+                return clubMembersSameIdentity(s, formData);
+            });
             const memberId = (syncedMember && syncedMember.id) || formData.id;
 
             if (modoPago === 'transfer') {
