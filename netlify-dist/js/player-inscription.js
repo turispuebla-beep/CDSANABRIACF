@@ -13,6 +13,10 @@
       .replace(/[^0-9A-Z]/g, '');
   }
 
+  function normalizeFullName(name, surname) {
+    return `${String(name || '').trim()} ${String(surname || '').trim()}`.trim().toLowerCase();
+  }
+
   function composeAddress(parts) {
     const domicilio = String(parts?.domicilio || '').trim();
     const localidad = String(parts?.localidad || parts?.town || '').trim();
@@ -268,7 +272,7 @@
       dni: form.dni ? normalizeDni(form.dni) : '',
       phone: form.phone,
       telefono: form.phone,
-      email: String(form.email || '').trim().toLowerCase(),
+      email: String(form.email || form.guardianEmail || '').trim().toLowerCase(),
       domicilio: form.domicilio || '',
       localidad: form.localidad || '',
       provincia: form.provincia || 'Zamora',
@@ -392,12 +396,38 @@
   function upsertPlayerLocal(player) {
     const players = readPlayers();
     const dni = normalizeDni(player.dni);
-    const season = String(player.inscriptionSeason || '');
-    let idx = players.findIndex(
-      (p) => normalizeDni(p.dni) === dni && String(p.inscriptionSeason || '') === season
-    );
-    if (idx < 0) {
+    const season = String(player.inscriptionSeason || player.temporada || '').trim();
+    const email = String(player.email || '').trim().toLowerCase();
+    const fullName = [player.name || player.nombre, player.surname || player.apellidos]
+      .filter(Boolean)
+      .join(' ')
+      .trim()
+      .toLowerCase();
+    let idx = -1;
+    if (dni && season) {
+      idx = players.findIndex(
+        (p) => normalizeDni(p.dni) === dni && String(p.inscriptionSeason || p.temporada || '') === season
+      );
+    }
+    if (idx < 0 && dni) {
       idx = players.findIndex((p) => normalizeDni(p.dni) === dni);
+    }
+    if (idx < 0 && email && season) {
+      idx = players.findIndex(
+        (p) =>
+          String(p.email || '').trim().toLowerCase() === email &&
+          String(p.inscriptionSeason || p.temporada || '') === season
+      );
+    }
+    if (idx < 0 && email) {
+      idx = players.findIndex((p) => String(p.email || '').trim().toLowerCase() === email);
+    }
+    if (idx < 0 && fullName && season) {
+      idx = players.findIndex(
+        (p) =>
+          [p.name || p.nombre, p.surname || p.apellidos].filter(Boolean).join(' ').trim().toLowerCase() ===
+            fullName && String(p.inscriptionSeason || p.temporada || '') === season
+      );
     }
     if (idx >= 0) {
       players[idx] = {
@@ -453,6 +483,16 @@
       p.guardianDni = gDni;
     }
     p.appScope = p.appScope || 'cdsanabriacf';
+    if (global.ClubPlayerMemberSync && global.ClubPlayerMemberSync.ensurePlayerCategoryFields) {
+      return global.ClubPlayerMemberSync.ensurePlayerCategoryFields(p);
+    }
+    const catNorm = String(category || '').trim();
+    if (catNorm) {
+      p.category = catNorm;
+      p.categoria = catNorm;
+      p.playerCategory = catNorm;
+      p.categoriaJugador = catNorm;
+    }
     return p;
   }
 
@@ -460,12 +500,44 @@
     const players = readPlayers();
     const normDni = normalizeDni(player.dni);
     const email = String(player.email || '').trim().toLowerCase();
-    let ix = players.findIndex(function (p) {
-      return p.id === player.id || (normDni && normalizeDni(p.dni) === normDni);
-    });
+    const season = String(player.inscriptionSeason || player.temporada || '').trim();
+    const fullName = [player.name || player.nombre, player.surname || player.apellidos]
+      .filter(Boolean)
+      .join(' ')
+      .trim()
+      .toLowerCase();
+    let ix = -1;
+    if (player && player.id) {
+      ix = players.findIndex(function (p) {
+        return p.id === player.id;
+      });
+    }
+    if (ix < 0 && normDni && season) {
+      ix = players.findIndex(function (p) {
+        return normalizeDni(p.dni) === normDni && String(p.inscriptionSeason || p.temporada || '') === season;
+      });
+    }
+    if (ix < 0 && normDni) {
+      ix = players.findIndex(function (p) {
+        return normalizeDni(p.dni) === normDni;
+      });
+    }
+    if (ix < 0 && email && season) {
+      ix = players.findIndex(function (p) {
+        return String(p.email || '').trim().toLowerCase() === email && String(p.inscriptionSeason || p.temporada || '') === season;
+      });
+    }
     if (ix < 0 && email) {
       ix = players.findIndex(function (p) {
         return String(p.email || '').trim().toLowerCase() === email;
+      });
+    }
+    if (ix < 0 && fullName && season) {
+      ix = players.findIndex(function (p) {
+        return (
+          [p.name || p.nombre, p.surname || p.apellidos].filter(Boolean).join(' ').trim().toLowerCase() ===
+            fullName && String(p.inscriptionSeason || p.temporada || '') === season
+        );
       });
     }
     const merged = { ...(ix >= 0 ? players[ix] : player), ...player, ...(remotePlayer || {}) };
@@ -660,7 +732,68 @@
 
   /** Inscripción web: el socio es el propio jugador/a (menor o mayor), nunca el tutor por inscripción. */
   function playerInscriptionLinksSocio(player) {
-    return String(player.registrationSource || '') === 'web_inscription';
+    if (!player) return false;
+    if (String(player.registrationSource || '') === 'web_inscription') return true;
+    if (player.socioJugador || player.isJugador) return true;
+    const season = String(player.inscriptionSeason || player.temporada || '').trim();
+    const hasName = !!String(player.name || player.nombre || '').trim();
+    return !!(season && hasName);
+  }
+
+  function normalizePlayerFullName(name, surname) {
+    return `${String(name || '').trim()} ${String(surname || '').trim()}`.trim().toLowerCase();
+  }
+
+  /** Socio-jugador vinculado a esta ficha (nombre/DNI del jugador, nunca del tutor). */
+  function socioJugadorMemberMatchesPlayer(member, player) {
+    if (!member || !player) return false;
+    if (!(member.socioJugador || member.isJugador || member.playerId)) return false;
+
+    const playerId = String(player.id || '').trim();
+    if (playerId && member.playerId && String(member.playerId) === playerId) return true;
+
+    const linkedId = String(player.linkedMemberId || '').trim();
+    if (linkedId && String(member.id) === linkedId) return true;
+
+    const playerName = normalizePlayerFullName(player.name || player.nombre, player.surname || player.apellidos);
+    const memberName = normalizePlayerFullName(member.nombre || member.name, member.apellidos || member.surname);
+    if (!playerName || !memberName || playerName !== memberName) return false;
+
+    const playerDni = normalizeDni(player.dni);
+    const memberDni = normalizeDni(member.dni);
+    if (playerDni && memberDni && playerDni !== memberDni) return false;
+
+    return true;
+  }
+
+  function findSocioJugadorMemberForPlayer(members, player) {
+    const list = Array.isArray(members) ? members : [];
+    const linkedId = String(player.linkedMemberId || '').trim();
+    if (linkedId) {
+      const byLink = list.find(function (m) {
+        return String(m.id) === linkedId;
+      });
+      if (byLink && socioJugadorMemberMatchesPlayer(byLink, player)) return byLink;
+    }
+    const playerId = String(player.id || '').trim();
+    if (playerId) {
+      const byPlayerId = list.find(function (m) {
+        return String(m.playerId || '') === playerId && socioJugadorMemberMatchesPlayer(m, player);
+      });
+      if (byPlayerId) return byPlayerId;
+    }
+    const playerDni = normalizeDni(player.dni);
+    if (playerDni) {
+      const byDni = list.find(function (m) {
+        return normalizeDni(m.dni) === playerDni && socioJugadorMemberMatchesPlayer(m, player);
+      });
+      if (byDni) return byDni;
+    }
+    return (
+      list.find(function (m) {
+        return socioJugadorMemberMatchesPlayer(m, player);
+      }) || null
+    );
   }
 
   function resolveSocioCuotaFromPlayer(player) {
@@ -680,8 +813,32 @@
     return Number.isFinite(total) && total > 0 ? total : null;
   }
 
+  function isPlayerInscriptionPaid(player, paymentMeta) {
+    if (paymentMeta && paymentMeta.paid) return true;
+    if (!player) return false;
+    if (player.inscriptionPaid === true || player.pagado === true) return true;
+    if (String(player.paymentStatus || '').toLowerCase() === 'paid') return true;
+    if (String(player.inscriptionStatus || '').toLowerCase() === 'paid') return true;
+    const method = String(player.paymentMethod || '').toLowerCase();
+    if (method.indexOf('redsys') >= 0 && String(player.status || '').toLowerCase() === 'active') {
+      return true;
+    }
+    if (String(player.status || '').toLowerCase() === 'active' && player.validatedDate) {
+      const ins = String(player.inscriptionStatus || '').toLowerCase();
+      if (
+        ins !== 'pending_payment' &&
+        ins !== 'pending_transfer' &&
+        ins !== 'pending_cash' &&
+        ins !== 'pending_tpv'
+      ) {
+        return true;
+      }
+    }
+    return false;
+  }
+
   function applyMemberPaymentStateFromPlayer(member, player, paymentMeta) {
-    const paid = !!(paymentMeta && paymentMeta.paid);
+    const paid = isPlayerInscriptionPaid(player, paymentMeta);
     const cuota = resolveSocioCuotaFromPlayer(player);
     if (cuota != null) member.cuota = cuota;
 
@@ -691,10 +848,18 @@
       member.status = 'active';
       member.estado = 'activo';
       member.pendingReason = null;
-      member.inscriptionSeasonSocio = player.inscriptionSeason;
-      member.validatedDate = paymentMeta.validatedAt || new Date().toISOString();
-      member.validatedBy = paymentMeta.validatedBy || member.validatedBy || 'inscripcion_jugador';
-      if (paymentMeta.orderId) member.paymentOrderId = paymentMeta.orderId;
+      member.fechaLimitePago = null;
+      member.inscriptionSeasonSocio = player.inscriptionSeason || player.temporada;
+      member.validatedDate = (paymentMeta && paymentMeta.validatedAt) || player.validatedDate || new Date().toISOString();
+      member.validatedBy =
+        (paymentMeta && paymentMeta.validatedBy) || player.validatedBy || member.validatedBy || 'inscripcion_jugador';
+      if (paymentMeta && paymentMeta.orderId) member.paymentOrderId = paymentMeta.orderId;
+      else if (player.paymentOrderId) member.paymentOrderId = player.paymentOrderId;
+      if (!member.cuotaVigenteHasta && typeof global.proximoCierreTemporada === 'function') {
+        try {
+          member.cuotaVigenteHasta = global.proximoCierreTemporada().toISOString();
+        } catch (_) {}
+      }
       return;
     }
 
@@ -709,35 +874,14 @@
     member.inscriptionSeasonSocio = player.inscriptionSeason;
   }
 
-  function upsertMemberSocioJugador(player, paymentMeta) {
-    if (!playerInscriptionLinksSocio(player)) return null;
+  function upsertMemberSocioJugador(player, paymentMeta, opts) {
+    const force = !!(opts && opts.force);
+    if (!force && !playerInscriptionLinksSocio(player)) return null;
 
     const members = readMembers();
     const playerDni = normalizeDni(player.dni);
     const now = new Date().toISOString();
-    let member = null;
-
-    if (playerDni) {
-      member = members.find((m) => normalizeDni(m.dni) === playerDni);
-    }
-    if (!member && player.id) {
-      member = members.find((m) => m.playerId === player.id);
-    }
-    if (!member && player.email && playerDni) {
-      const em = String(player.email).trim().toLowerCase();
-      member = members.find(
-        (m) => String(m.email || '').trim().toLowerCase() === em && normalizeDni(m.dni) === playerDni
-      );
-    }
-    if (!member && player.email) {
-      const em = String(player.email).trim().toLowerCase();
-      member = members.find(function (m) {
-        return (
-          String(m.email || '').trim().toLowerCase() === em &&
-          (m.socioJugador || m.isJugador || m.playerId === player.id)
-        );
-      });
-    }
+    let member = findSocioJugadorMemberForPlayer(members, player);
 
     if (member) {
       member.isJugador = true;
@@ -751,7 +895,9 @@
       member.surname = player.surname || player.apellidos;
       member.telefono = player.telefono || player.phone || member.telefono;
       member.phone = player.phone || player.telefono || member.phone;
-      if (player.email) member.email = String(player.email).trim().toLowerCase();
+      member.email = String(player.email || player.guardianEmail || member.email || '')
+        .trim()
+        .toLowerCase();
       member.address = player.address || player.domicilio || member.address;
       member.direccion = player.direccion || player.address || member.direccion;
       member.domicilio = player.domicilio || member.domicilio;
@@ -786,7 +932,7 @@
         dni: playerDni || '',
         phone: player.phone || '',
         telefono: player.phone || '',
-        email: String(player.email || '').trim().toLowerCase(),
+        email: String(player.email || player.guardianEmail || '').trim().toLowerCase(),
         address: player.address || player.domicilio || '',
         direccion: player.direccion || player.address || '',
         domicilio: player.domicilio || '',
@@ -946,15 +1092,22 @@
     });
     if (member) {
       saved.linkedMemberId = member.id;
+      saved.socioJugador = true;
+      saved.isJugador = true;
       const players = readPlayers();
       const pix = players.findIndex((p) => p.id === saved.id);
       if (pix >= 0) {
         players[pix].linkedMemberId = member.id;
+        players[pix].socioJugador = true;
+        players[pix].isJugador = true;
         global.localStorage.setItem('clubPlayers', JSON.stringify(players));
       }
     }
 
     await persistPlayerFirebase(saved, { requireCloud: true });
+    if (member && paid) {
+      await persistMemberFirebase(member);
+    }
 
     if (typeof global.refreshMembersRoleFlagsForIdentity === 'function') {
       await refreshMemberRoles(saved.dni, saved.name, saved.surname);
@@ -991,30 +1144,41 @@
     return '';
   }
 
+  function playerInscriptionNotifyFields(player, opts) {
+    if (global.PlayerExport && global.PlayerExport.buildInscriptionNotifyFields) {
+      return global.PlayerExport.buildInscriptionNotifyFields(player, opts || {});
+    }
+    return [];
+  }
+
   function notifyPlayerInscriptionPaymentConfirmed(player, adminMeta) {
     if (!global.CdsanClubEmail || !global.CdsanClubEmail.sendPlayerInscriptionPaymentConfirmed || !player) {
       return Promise.resolve();
     }
     const cb = player.chargeBreakdown || {};
     const total = cb.total != null ? cb.total : player.totalCharge;
+    const payCh = playerPaymentChannelLabel(player, adminMeta);
     return global.CdsanClubEmail.sendPlayerInscriptionPaymentConfirmed({
       email: player.email,
       guardianEmail: player.guardianEmail,
       dni: player.dni,
+      playerId: player.id,
       nombre: player.name || player.nombre,
       apellidos: player.surname || player.apellidos,
       season: player.inscriptionSeason || player.temporada,
+      inscriptionSeason: player.inscriptionSeason || player.temporada,
       category: player.category || player.categoria,
       totalEur: total,
-      paymentChannel: playerPaymentChannelLabel(player, adminMeta),
-      kitSummary: playerInscriptionKitSummary(player)
+      paymentChannel: payCh,
+      kitSummary: playerInscriptionKitSummary(player),
+      fields: playerInscriptionNotifyFields(player, { paid: true })
     }).catch(function (e) {
       console.warn('Correo confirmación pago inscripción jugador:', e);
     });
   }
 
-  /** Validación manual por administrador (transferencia, efectivo, etc.) */
-  async function markInscriptionPaidByAdmin(playerId, adminMeta) {
+  /** Activa jugador/a y socio-jugador vinculado (ficha + cuota pagadas a la vez). */
+  async function activatePlayerAndSocioByAdmin(playerId, adminMeta) {
     const players = readPlayers();
     const ix = players.findIndex((p) => p.id === playerId);
     if (ix < 0) throw new Error('Jugador no encontrado');
@@ -1023,11 +1187,17 @@
     if (adminMeta?.methodChoice) {
       method = methodMap[String(adminMeta.methodChoice)] || method;
     }
-    const saved = await finalizeInscription(players[ix], {
+    return finalizeInscription(players[ix], {
       paid: true,
       method: method,
-      validatedBy: adminMeta?.validatedBy || 'admin'
+      validatedBy: adminMeta?.validatedBy || 'admin',
+      validatedAt: adminMeta?.validatedAt
     });
+  }
+
+  /** Validación manual por administrador (transferencia, efectivo, etc.) */
+  async function markInscriptionPaidByAdmin(playerId, adminMeta) {
+    const saved = await activatePlayerAndSocioByAdmin(playerId, adminMeta);
     await notifyPlayerInscriptionPaymentConfirmed(saved, adminMeta);
     return saved;
   }
@@ -1111,18 +1281,11 @@
     return { ok: true, redirect: true };
   }
 
-  /** Tras vuelta OK de Redsys (cliente) — sincroniza local; la nube se activa en el webhook Redsys. */
+  /** Tras vuelta OK de Redsys: solo limpia el borrador local; el alta real la hace el webhook. */
   async function finalizeFromPendingOrder(orderId) {
-    const pending = loadPending();
-    if (!pending || !pending.registration) return false;
-    const payMethod = String(pending.payMethod || 'card').toLowerCase();
-    const method = payMethod === 'bizum' ? 'redsys_bizum' : 'redsys_card';
-    await finalizeInscription(pending.registration, {
-      paid: true,
-      method: method,
-      orderId: orderId,
-      validatedBy: 'redsys_auto'
-    });
+    try {
+      global.localStorage.removeItem(PENDING_KEY);
+    } catch (_) {}
     return true;
   }
 
@@ -1173,6 +1336,9 @@
   }
 
   global.PlayerInscription = {
+    playerInscriptionLinksSocio: playerInscriptionLinksSocio,
+    upsertMemberSocioJugador: upsertMemberSocioJugador,
+    persistMemberFirebase: persistMemberFirebase,
     normalizeDni: normalizeDni,
     findPlayerForSeason: findPlayerForSeason,
     findPaidPlayerForSeason: findPaidPlayerForSeason,
@@ -1193,6 +1359,13 @@
     submitKitCheckout: submitKitCheckout,
     finalizeFromPendingOrder: finalizeFromPendingOrder,
     markInscriptionPaidByAdmin: markInscriptionPaidByAdmin,
+    activatePlayerAndSocioByAdmin: activatePlayerAndSocioByAdmin,
+    isPlayerInscriptionPaid: isPlayerInscriptionPaid,
+    isPlayerInscriptionPaidRecord: function (p) {
+      return isPlayerInscriptionPaid(p, {});
+    },
+    findSocioJugadorMemberForPlayer: findSocioJugadorMemberForPlayer,
+    socioJugadorMemberMatchesPlayer: socioJugadorMemberMatchesPlayer,
     getDisplayStatus: getDisplayStatus,
     needsPaymentValidation: needsPaymentValidation,
     savePending: savePending,

@@ -547,6 +547,31 @@ function offlineInscriptionPaymentHintText(channel) {
   return 'Realiza el ingreso por transferencia bancaria a la cuenta del club. Un administrador validará tu inscripción al ver el pago.';
 }
 
+function normalizeNotifyFields(fields) {
+  if (!Array.isArray(fields)) return [];
+  return fields
+    .filter((f) => f && f.label)
+    .map((f) => ({
+      label: String(f.label).trim(),
+      value: f.value == null || f.value === '' ? '—' : String(f.value)
+    }));
+}
+
+function notifyFieldsHtmlRows(fields) {
+  return normalizeNotifyFields(fields)
+    .map(
+      (f) =>
+        `<tr><td style="padding:6px 12px 6px 0;color:#64748b;vertical-align:top;white-space:nowrap"><strong>${escapeHtml(f.label)}</strong></td><td style="padding:6px 0;color:#1e293b">${escapeHtml(f.value)}</td></tr>`
+    )
+    .join('');
+}
+
+function notifyFieldsTextLines(fields) {
+  return normalizeNotifyFields(fields)
+    .map((f) => `${f.label}: ${f.value}`)
+    .join('\n');
+}
+
 function buildPlayerInscriptionPendingContent(data) {
   const nombre = escapeHtml(memberDisplayName(data));
   const season = escapeHtml(String(data.season || data.inscriptionSeason || '').trim() || '—');
@@ -561,6 +586,16 @@ function buildPlayerInscriptionPendingContent(data) {
   const showBank =
     ch === 'transferencia' || ch === 'transfer' || ch === 'pending_transfer' || !ch || ch === 'transfer_manual';
   const payHint = offlineInscriptionPaymentHint(data.paymentChannel || data.paymentMethod);
+  const extraFields = normalizeNotifyFields(data.fields);
+  const hasExtraFields = extraFields.length > 0;
+  const summaryRows = hasExtraFields
+    ? notifyFieldsHtmlRows(extraFields)
+    : `<tr><td><strong>Temporada:</strong></td><td>${season}</td></tr>
+        <tr><td><strong>Categoría:</strong></td><td>${category}</td></tr>
+        <tr><td><strong>Importe:</strong></td><td>${total}</td></tr>
+        <tr><td><strong>Forma de pago:</strong></td><td>${payLabel}</td></tr>
+        <tr><td><strong>Estado:</strong></td><td>Pendiente de validación</td></tr>
+        ${kitSummary && kitSummary !== '—' ? `<tr><td style="vertical-align:top"><strong>Ropa (tallas):</strong></td><td>${kitSummary}</td></tr>` : ''}`;
 
   const subject = `Inscripción registrada — pendiente de pago — ${CLUB_NAME}`;
   const html = `
@@ -569,12 +604,9 @@ function buildPlayerInscriptionPendingContent(data) {
       <p>Hola, <strong>${nombre}</strong>:</p>
       <p>Tu inscripción como jugador/a en <strong>${CLUB_NAME}</strong> ha quedado registrada correctamente.</p>
       <table style="background:#f8fafc;border-radius:8px;padding:12px 16px;margin:16px 0;width:100%">
-        <tr><td><strong>Temporada:</strong></td><td>${season}</td></tr>
-        <tr><td><strong>Categoría:</strong></td><td>${category}</td></tr>
-        <tr><td><strong>Importe:</strong></td><td>${total}</td></tr>
-        <tr><td><strong>Forma de pago:</strong></td><td>${payLabel}</td></tr>
-        <tr><td><strong>Estado:</strong></td><td>Pendiente de validación</td></tr>
-        ${kitSummary && kitSummary !== '—' ? `<tr><td style="vertical-align:top"><strong>Ropa (tallas):</strong></td><td>${kitSummary}</td></tr>` : ''}
+        ${hasExtraFields ? `<tr><td colspan="2" style="padding:0 0 8px;font-weight:700;color:#1e3a8a">Datos de la inscripción</td></tr>` : ''}
+        ${summaryRows}
+        ${hasExtraFields ? `<tr><td><strong>Forma de pago:</strong></td><td>${payLabel}</td></tr><tr><td><strong>Estado:</strong></td><td>Pendiente de validación</td></tr>` : ''}
       </table>
       <p>${payHint}</p>
       <p>Tienes <strong>7 días</strong> para completar el pago. El club validará tu ficha al confirmar el ingreso.</p>
@@ -589,14 +621,16 @@ function buildPlayerInscriptionPendingContent(data) {
   const text =
     `Hola, ${memberDisplayName(data)}.\n\n` +
     `Tu inscripción en ${CLUB_NAME} ha quedado registrada.\n` +
-    `Temporada: ${data.season || data.inscriptionSeason || '—'}\n` +
-    `Categoría: ${data.category || data.categoria || '—'}\n` +
-    `Importe: ${formatEurAmount(data.totalEur)}\n` +
-    `Forma de pago: ${formatEventPaymentLabel(data.paymentChannel || data.paymentMethod)}\n` +
-    `Estado: pendiente de validación.\n` +
-    (data.kitSummary && String(data.kitSummary).trim() && String(data.kitSummary).trim() !== '—'
-      ? `Ropa (tallas): ${String(data.kitSummary).trim()}\n`
-      : '') +
+    (hasExtraFields
+      ? `${notifyFieldsTextLines(extraFields)}\nForma de pago: ${formatEventPaymentLabel(data.paymentChannel || data.paymentMethod)}\nEstado: pendiente de validación.\n`
+      : `Temporada: ${data.season || data.inscriptionSeason || '—'}\n` +
+        `Categoría: ${data.category || data.categoria || '—'}\n` +
+        `Importe: ${formatEurAmount(data.totalEur)}\n` +
+        `Forma de pago: ${formatEventPaymentLabel(data.paymentChannel || data.paymentMethod)}\n` +
+        `Estado: pendiente de validación.\n` +
+        (data.kitSummary && String(data.kitSummary).trim() && String(data.kitSummary).trim() !== '—'
+          ? `Ropa (tallas): ${String(data.kitSummary).trim()}\n`
+          : '')) +
     `\n${offlineInscriptionPaymentHintText(data.paymentChannel || data.paymentMethod)}\n` +
     `Tienes 7 días para completar el pago.\n` +
     (showBank ? `Cuenta del club: ${CLUB_BANK_ACCOUNT}\n` : '') +
@@ -626,13 +660,22 @@ async function sendPlayerInscriptionPendingEmail(data) {
 
 function buildPlayerInscriptionPaymentConfirmedContent(data) {
   const nombre = escapeHtml(memberDisplayName(data));
-  const season = escapeHtml(String(data.season || '').trim() || '—');
+  const season = escapeHtml(String(data.season || data.inscriptionSeason || '').trim() || '—');
   const category = escapeHtml(String(data.category || data.categoria || '—').trim());
   const total = escapeHtml(formatEurAmount(data.totalEur));
   const payLabel = escapeHtml(formatEventPaymentLabel(data.paymentChannel || data.paymentMethod));
   const kitSummary = escapeHtml(String(data.kitSummary || '').trim());
   const contact = escapeHtml(clubContactEmail());
   const siteUrl = String(process.env.SITE_URL || '').replace(/\/$/, '');
+  const extraFields = normalizeNotifyFields(data.fields);
+  const hasExtraFields = extraFields.length > 0;
+  const summaryRows = hasExtraFields
+    ? notifyFieldsHtmlRows(extraFields)
+    : `<tr><td><strong>Temporada:</strong></td><td>${season}</td></tr>
+        <tr><td><strong>Categoría:</strong></td><td>${category}</td></tr>
+        <tr><td><strong>Importe:</strong></td><td>${total}</td></tr>
+        <tr><td><strong>Pago:</strong></td><td>${payLabel} — correcto</td></tr>
+        ${kitSummary && kitSummary !== '—' ? `<tr><td style="vertical-align:top"><strong>Ropa (tallas):</strong></td><td>${kitSummary}</td></tr>` : ''}`;
 
   const subject = `Inscripción pagada — ${CLUB_NAME}`;
   const html = `
@@ -641,11 +684,9 @@ function buildPlayerInscriptionPaymentConfirmedContent(data) {
       <p>Hola, <strong>${nombre}</strong>:</p>
       <p>Hemos recibido el pago de tu inscripción como jugador/a en <strong>${CLUB_NAME}</strong>.</p>
       <table style="background:#ecfdf5;border-radius:8px;padding:12px 16px;margin:16px 0;width:100%">
-        <tr><td><strong>Temporada:</strong></td><td>${season}</td></tr>
-        <tr><td><strong>Categoría:</strong></td><td>${category}</td></tr>
-        <tr><td><strong>Importe:</strong></td><td>${total}</td></tr>
-        <tr><td><strong>Pago:</strong></td><td>${payLabel} — correcto</td></tr>
-        ${kitSummary && kitSummary !== '—' ? `<tr><td style="vertical-align:top"><strong>Ropa (tallas):</strong></td><td>${kitSummary}</td></tr>` : ''}
+        ${hasExtraFields ? `<tr><td colspan="2" style="padding:0 0 8px;font-weight:700;color:#059669">Datos de la inscripción</td></tr>` : ''}
+        ${summaryRows}
+        ${hasExtraFields ? `<tr><td><strong>Pago:</strong></td><td>${payLabel} — correcto</td></tr>` : ''}
       </table>
       <p>Tu ficha queda registrada con el pago confirmado.</p>
       ${siteUrl ? `<p><a href="${escapeHtml(siteUrl)}/inscripcion-jugador.html" style="font-weight:700;color:#1d4ed8;">Ver inscripción jugador/a</a></p>` : ''}
@@ -654,13 +695,15 @@ function buildPlayerInscriptionPaymentConfirmedContent(data) {
   const text =
     `Hola, ${memberDisplayName(data)}.\n\n` +
     `Tu inscripción en ${CLUB_NAME} está PAGADA y confirmada.\n` +
-    `Temporada: ${data.season || '—'}\n` +
-    `Categoría: ${data.category || data.categoria || '—'}\n` +
-    `Importe: ${formatEurAmount(data.totalEur)}\n` +
-    `Pago: ${formatEventPaymentLabel(data.paymentChannel || data.paymentMethod)} — correcto\n` +
-    (data.kitSummary && String(data.kitSummary).trim() && String(data.kitSummary).trim() !== '—'
-      ? `Ropa (tallas): ${String(data.kitSummary).trim()}\n`
-      : '') +
+    (hasExtraFields
+      ? `${notifyFieldsTextLines(extraFields)}\nPago: ${formatEventPaymentLabel(data.paymentChannel || data.paymentMethod)} — correcto\n`
+      : `Temporada: ${data.season || data.inscriptionSeason || '—'}\n` +
+        `Categoría: ${data.category || data.categoria || '—'}\n` +
+        `Importe: ${formatEurAmount(data.totalEur)}\n` +
+        `Pago: ${formatEventPaymentLabel(data.paymentChannel || data.paymentMethod)} — correcto\n` +
+        (data.kitSummary && String(data.kitSummary).trim() && String(data.kitSummary).trim() !== '—'
+          ? `Ropa (tallas): ${String(data.kitSummary).trim()}\n`
+          : '')) +
     `\nConsultas: ${clubContactEmail()}\n`;
   return { subject, html, text };
 }
@@ -764,6 +807,59 @@ async function sendPlayerPortalResetEmail(data) {
   }
 }
 
+function paymentTypeLabel(type) {
+  const map = {
+    membership_fee: 'cuota de socio/a',
+    player_inscription: 'inscripción de jugador/a',
+    player_kit: 'compra de equipación',
+    event_registration: 'inscripción al evento'
+  };
+  return map[String(type || '').trim()] || 'pago en la web del club';
+}
+
+function buildPaymentFailedContent(data) {
+  const concept = paymentTypeLabel(data.type);
+  const amount = Number(data.amountEur);
+  const amountTxt = Number.isFinite(amount) ? `${amount.toFixed(2)} €` : null;
+  const siteUrl = String(process.env.SITE_URL || '').replace(/\/$/, '');
+  const subject = `Pago no completado — ${CLUB_NAME}`;
+  const html = `
+    <div style="font-family:system-ui,sans-serif;max-width:560px;color:#1e293b;line-height:1.5">
+      <h2 style="color:#dc2626;margin:0 0 12px">Pago no completado</h2>
+      <p>Hola:</p>
+      <p>El banco <strong>no ha confirmado</strong> el pago de tu <strong>${escapeHtml(concept)}</strong>${amountTxt ? ` (${escapeHtml(amountTxt)})` : ''}.</p>
+      <p><strong>No se ha registrado ningún dato</strong> en el club por este intento. Puedes volver a la web e intentarlo de nuevo cuando quieras.</p>
+      ${siteUrl ? `<p><a href="${escapeHtml(siteUrl)}">Volver a la web del club</a></p>` : ''}
+      <p style="font-size:0.9rem;color:#64748b">Si crees que es un error o necesitas ayuda: <a href="mailto:${escapeHtml(clubContactEmail())}">${escapeHtml(clubContactEmail())}</a></p>
+    </div>`;
+  const text =
+    `Pago no completado — ${CLUB_NAME}\n\n` +
+    `El banco no ha confirmado el pago de tu ${concept}${amountTxt ? ' (' + amountTxt + ')' : ''}.\n\n` +
+    `No se ha registrado ningún dato en el club por este intento.\n\n` +
+    `Consultas: ${clubContactEmail()}\n`;
+  return { subject, html, text };
+}
+
+async function sendPaymentFailedEmail(data) {
+  const cfg = getEmailConfig();
+  if (!cfg.ok) return { sent: false, reason: cfg.error };
+  const email = String(data.email || data.customerEmail || '').trim().toLowerCase();
+  if (!email) return { sent: false, reason: 'email vacío' };
+  const content = buildPaymentFailedContent(data);
+  try {
+    const result = await sendDirectToMemberEmail({
+      memberEmail: email,
+      subject: content.subject,
+      html: content.html,
+      text: content.text,
+      replyTo: clubContactEmail()
+    });
+    return { sent: true, to: result.to, bcc: result.bcc };
+  } catch (err) {
+    return { sent: false, reason: err.message || String(err) };
+  }
+}
+
 module.exports = {
   sendMemberRegistrationEmail,
   sendMemberPaymentConfirmedEmail,
@@ -775,5 +871,6 @@ module.exports = {
   sendPlayerProfileUpdateConfirmedEmail,
   sendEventRegistrationPendingEmail,
   sendEventRegistrationConfirmedEmail,
-  sendTorneoPreinscripcionConfirmedEmail
+  sendTorneoPreinscripcionConfirmedEmail,
+  sendPaymentFailedEmail
 };

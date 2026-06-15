@@ -7,7 +7,8 @@ const {
   upsertCoachRecord,
   deleteCoachRecord,
   deleteMemberRecord,
-  deleteFriendRecord
+  deleteFriendRecord,
+  deletePlayerRecord
 } = require('./lib/firestore-admin');
 const { verifyAdminRequest } = require('./lib/admin-auth');
 const { corsHeaders, jsonResponse } = require('./lib/http-cors');
@@ -52,6 +53,16 @@ exports.handler = async (event) => {
       if (kind === 'friend') {
         await deleteFriendRecord(recordId);
         return jsonResponse(200, { ok: true, deleted: true, friendId: recordId }, origin);
+      }
+      if (kind === 'player') {
+        await deletePlayerRecord(recordId, {
+          email: body.email,
+          dni: body.dni,
+          name: body.name,
+          surname: body.surname,
+          season: body.season || body.inscriptionSeason
+        });
+        return jsonResponse(200, { ok: true, deleted: true, playerId: recordId }, origin);
       }
       return jsonResponse(400, { ok: false, error: 'delete no soportado para kind: ' + kind }, origin);
     }

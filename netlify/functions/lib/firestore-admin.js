@@ -121,6 +121,11 @@ function memberDocIsActive(data) {
 
 /** Comprueba que el aviso al club corresponde a un registro real reciente. */
 async function clubRecordExistsForNotify(opts) {
+  const playerId = String(opts.playerId || '').trim();
+  if (playerId) {
+    const snap = await playersRef().doc(playerId).get();
+    if (snap.exists) return true;
+  }
   const email = String(opts.email || opts.requesterEmail || '').trim().toLowerCase();
   const dni = normalizeDni(opts.dni);
   if (email) {
@@ -275,9 +280,13 @@ async function memberExistsForEmail(email, memberId) {
 }
 
 async function completeMembershipPayment(payment, redsysParams) {
-  const resolved = await resolveMemberDoc(payment);
+  let resolved = await resolveMemberDoc(payment);
+  if (!resolved && payment.registrationBundle && payment.registrationBundle.member) {
+    const saved = await upsertMemberRegistrationRecord(payment.registrationBundle.member);
+    resolved = { ref: membersRef().doc(saved.id), data: saved };
+  }
   if (!resolved) {
-    throw new Error('Socio no encontrado para activar el alta (memberId/email)');
+    throw new Error('Socio no encontrado para activar el alta (memberId/email/registrationBundle)');
   }
 
   const now = new Date().toISOString();
@@ -348,6 +357,28 @@ async function completeMembershipPayment(payment, redsysParams) {
     });
   } catch (mailErr) {
     console.warn('Email alta activa (pago):', mailErr.message || mailErr);
+  }
+}
+
+/** Aviso al usuario cuando la pasarela rechaza o cancela el pago (sin registrar datos). */
+async function sendPaymentFailedNotification(payment) {
+  if (!payment || payment.failedEmailSent) return { sent: false, reason: 'ya enviado' };
+  const orderId = payment.orderId || payment.id;
+  try {
+    const { sendPaymentFailedEmail } = require('./member-email');
+    const result = await sendPaymentFailedEmail({
+      email: payment.customerEmail,
+      customerEmail: payment.customerEmail,
+      type: payment.type,
+      amountEur: payment.amountEur
+    });
+    if (result.sent && orderId) {
+      await updatePayment(orderId, { failedEmailSent: true });
+    }
+    return result;
+  } catch (err) {
+    console.warn('Email pago KO:', err.message || err);
+    return { sent: false, reason: err.message || String(err) };
   }
 }
 
@@ -542,7 +573,12 @@ async function findPlayerDocByIdentity(player) {
 }
 
 function playerInscriptionLinksSocioFromReg(reg) {
-  return String(reg.registrationSource || '') === 'web_inscription';
+  if (!reg) return false;
+  if (String(reg.registrationSource || '') === 'web_inscription') return true;
+  if (reg.socioJugador || reg.isJugador) return true;
+  const season = String(reg.inscriptionSeason || reg.temporada || '').trim();
+  const hasName = !!String(reg.name || reg.nombre || '').trim();
+  return !!(season && hasName);
 }
 
 async function resolveMemberForPlayerInscription(reg) {
@@ -573,11 +609,13 @@ async function completePlayerInscription(payment) {
   const now = new Date().toISOString();
   const season = String(reg.inscriptionSeason || reg.temporada || '').trim();
   const dni = normalizeDni(reg.dni);
-  if (!dni) throw new Error('DNI ausente en inscripción');
+  const email = String(reg.email || payment.customerEmail || '').trim().toLowerCase();
+  if (!dni && !email) throw new Error('Identificador ausente (DNI o email) en inscripción');
 
   const patch = {
     ...reg,
-    dni,
+    dni: dni || '',
+    email: email || String(reg.email || '').trim().toLowerCase(),
     inscriptionSeason: season,
     temporada: season,
     inscriptionStatus: 'paid',
@@ -596,7 +634,7 @@ async function completePlayerInscription(payment) {
     socioJugador: playerInscriptionLinksSocioFromReg(reg)
   };
 
-  const existing = await findPlayerDocByDniSeason(dni, season);
+  const existing = await findPlayerDocByIdentity({ ...reg, dni, email, inscriptionSeason: season });
   let playerId;
   if (existing) {
     playerId = existing.data.id;
@@ -608,7 +646,8 @@ async function completePlayerInscription(payment) {
   }
 
   if (playerInscriptionLinksSocioFromReg(reg)) {
-    const resolved = await resolveMemberForPlayerInscription({ ...reg, linkedMemberId: reg.linkedMemberId });
+    const playerForMember = { ...patch, id: playerId, linkedMemberId: reg.linkedMemberId || null };
+    const existingMember = await findMemberDocForPlayerInscription(playerForMember);
     const cb = reg.chargeBreakdown || {};
     const cuotaSocio =
       Number(cb.socio) > 0
@@ -626,10 +665,10 @@ async function completePlayerInscription(payment) {
       name: reg.name || reg.nombre,
       apellidos: reg.surname || reg.apellidos,
       surname: reg.surname || reg.apellidos,
-      dni,
+      dni: dni || '',
       telefono: reg.phone || reg.telefono,
       phone: reg.phone || reg.telefono,
-      email: String(reg.email || payment.customerEmail || '').toLowerCase(),
+      email: email || String(reg.email || '').trim().toLowerCase(),
       domicilio: reg.domicilio || reg.address || '',
       localidad: reg.localidad || '',
       provincia: reg.provincia || 'Zamora',
@@ -638,14 +677,16 @@ async function completePlayerInscription(payment) {
       birthDate: reg.birthDate || reg.fechaNacimiento,
       fechaNacimiento: reg.birthDate || reg.fechaNacimiento,
       guardianName: reg.guardianName || '',
-      guardianDNI: reg.guardianDNI || '',
+      guardianDNI: normalizeDni(reg.guardianDNI || reg.guardianDni) || '',
       guardianPhone: reg.guardianPhone || '',
-      guardianEmail: reg.guardianEmail || '',
+      guardianEmail: String(reg.guardianEmail || '').trim().toLowerCase(),
       guardianAddress: reg.guardianAddress || '',
       pagado: true,
       paymentStatus: 'paid',
       status: 'active',
       estado: 'activo',
+      pendingReason: null,
+      fechaLimitePago: null,
       paymentOrderId: payment.orderId,
       paymentDate: now,
       inscriptionSeasonSocio: season,
@@ -661,20 +702,27 @@ async function completePlayerInscription(payment) {
       appScope: APP_SCOPE
     };
     if (cuotaSocio != null) memberPatch.cuota = cuotaSocio;
-    if (resolved) {
-      await resolved.ref.set(memberPatch, { merge: true });
+    let memberId;
+    if (existingMember) {
+      memberId = existingMember.data.id;
+      await existingMember.ref.set(memberPatch, { merge: true });
     } else {
       const ref = membersRef().doc();
+      memberId = ref.id;
       await ref.set(
         {
           ...memberPatch,
-          id: ref.id,
+          id: memberId,
           numeroSocio: 'SOC' + String(Date.now()).slice(-6),
           registrationDate: now
         },
         { merge: true }
       );
     }
+    await playersRef().doc(String(playerId)).set(
+      { linkedMemberId: memberId, updatedAt: now },
+      { merge: true }
+    );
   }
 
   try {
@@ -682,12 +730,17 @@ async function completePlayerInscription(payment) {
     const { buildPlayerInscriptionNotifyFields, formatKitSummary } = require('./player-inscription-notify-fields');
     const payCh = payment.payMethod === 'bizum' ? 'bizum' : 'tarjeta';
     const total = reg.chargeBreakdown && reg.chargeBreakdown.total != null ? reg.chargeBreakdown.total : reg.totalCharge;
+    const notifyFields = buildPlayerInscriptionNotifyFields(
+      { ...reg, id: playerId },
+      { orderId: payment.orderId, paid: true }
+    );
     await sendClubAdminNotification({
       kind: 'inscripcion_jugador_pagada',
       title: 'Inscripción jugador/a pagada (pasarela)',
       subject: `Inscripción pagada — ${payCh === 'bizum' ? 'Bizum' : 'Tarjeta'}`,
       paymentChannel: payCh,
       requesterEmail: reg.email || payment.customerEmail,
+      playerId,
       nombre: reg.name || reg.nombre,
       apellidos: reg.surname || reg.apellidos,
       dni: reg.dni,
@@ -699,19 +752,23 @@ async function completePlayerInscription(payment) {
       email: reg.email || payment.customerEmail,
       numeroSocio: reg.numeroSocio || reg.memberNumber,
       memberNumber: reg.numeroSocio || reg.memberNumber,
-      fields: buildPlayerInscriptionNotifyFields(reg, { orderId: payment.orderId })
+      fields: notifyFields
     });
     const { sendPlayerInscriptionPaymentConfirmedEmail } = require('./member-email');
     await sendPlayerInscriptionPaymentConfirmedEmail({
       email: reg.email || payment.customerEmail,
       guardianEmail: reg.guardianEmail,
+      dni: reg.dni,
+      playerId,
       nombre: reg.name || reg.nombre,
       apellidos: reg.surname || reg.apellidos,
       season,
+      inscriptionSeason: season,
       category: reg.category || reg.categoria,
       totalEur: total,
       paymentChannel: payCh,
-      kitSummary: formatKitSummary(reg)
+      kitSummary: formatKitSummary(reg),
+      fields: notifyFields
     });
   } catch (mailErr) {
     console.warn('Email club inscripción pagada:', mailErr.message || mailErr);
@@ -1363,6 +1420,55 @@ async function loginPlayerForProfileEdit(dni, password, season, name, surname) {
   };
 }
 
+async function changePlayerPortalPassword(opts) {
+  const o = opts && typeof opts === 'object' ? opts : {};
+  const currentPassword = String(o.currentPassword || '');
+  const newPassword = String(o.newPassword || '');
+  const playerId = String(o.playerId || '').trim();
+  if (newPassword.length < 6) return { ok: false, error: 'weak_password' };
+
+  let auth;
+  if (playerId) {
+    auth = await verifyPlayerPortalLoginById(playerId, currentPassword);
+  } else {
+    auth = await verifyPlayerPortalLogin(
+      o.dni,
+      currentPassword,
+      o.season,
+      o.name || o.nombre,
+      o.surname || o.apellidos
+    );
+  }
+  if (!auth.ok) return auth;
+
+  const id = String(auth.player.id);
+  const newHash = hashPortalPassword(newPassword);
+  await setPlayerPortalPasswordHash(id, newHash);
+
+  const snap = await playersRef().doc(id).get();
+  const playerData = snap.exists ? { id: snap.id, ...snap.data() } : auth.player;
+  const linkedId = playerData.linkedMemberId ? String(playerData.linkedMemberId).trim() : '';
+  if (linkedId && !linkedId.startsWith('MEMBER_')) {
+    await membersRef().doc(linkedId).set(
+      {
+        portalPasswordHash: newHash,
+        passwordHash: newHash,
+        updatedAt: new Date().toISOString()
+      },
+      { merge: true }
+    );
+  } else if (playerInscriptionLinksSocioFromReg(playerData)) {
+    await upsertMemberSocioJugadorFromPlayer(Object.assign({}, playerData, { portalPasswordHash: newHash }));
+  }
+
+  const playerSnap = await playersRef().doc(id).get();
+  if (!playerSnap.exists) return { ok: true };
+  return {
+    ok: true,
+    player: sanitizePlayerForPortalEdit({ id: playerSnap.id, ...playerSnap.data() })
+  };
+}
+
 async function updatePlayerProfileByPortal(opts) {
   const playerId = String(opts.playerId || '').trim();
   const password = String(opts.password || '');
@@ -1424,6 +1530,14 @@ async function updatePlayerProfileByPortal(opts) {
   return { ok: true, player: playerOut, diff: diff, member: savedMember, paid: paid };
 }
 
+function normalizePlayerCategoryId(cat) {
+  const c = String(cat || '').trim().toLowerCase();
+  if (c === 'prebenajmin' || c === 'prebenjamin') return 'prebenjamin';
+  if (c === 'juvenile' || c === 'juvenil') return 'juvenil';
+  if (c === 'aficionado' || c === 'senior') return 'senior';
+  return c;
+}
+
 function normalizePlayerRecordFields(raw) {
   const p = raw && typeof raw === 'object' ? { ...raw } : {};
   const name = String(p.name || p.nombre || '').trim();
@@ -1431,7 +1545,9 @@ function normalizePlayerRecordFields(raw) {
   const phone = String(p.phone || p.telefono || '').trim();
   const address = String(p.address || p.direccion || '').trim();
   const birthDate = String(p.birthDate || p.fechaNacimiento || '').trim();
-  const category = String(p.category || p.categoria || '').trim();
+  const category = normalizePlayerCategoryId(
+    p.category || p.categoria || p.playerCategory || p.categoriaJugador || ''
+  );
   const gDni = normalizeDni(p.guardianDNI || p.guardianDni);
   delete p.password;
   delete p.pass;
@@ -1452,6 +1568,8 @@ function normalizePlayerRecordFields(raw) {
     fechaNacimiento: birthDate,
     category,
     categoria: category,
+    playerCategory: String(p.playerCategory || p.categoriaJugador || category || '').trim() || category,
+    categoriaJugador: String(p.categoriaJugador || p.playerCategory || category || '').trim() || category,
     dni: normalizeDni(p.dni),
     email: String(p.email || '').trim().toLowerCase(),
     guardianDNI: gDni,
@@ -1469,11 +1587,31 @@ function resolveSocioCuotaFromPlayer(reg) {
   return Number.isFinite(total) && total > 0 ? total : null;
 }
 
+function isPlayerInscriptionPaid(player) {
+  if (!player) return false;
+  if (player.inscriptionPaid === true || player.pagado === true) return true;
+  if (String(player.paymentStatus || '').toLowerCase() === 'paid') return true;
+  if (String(player.inscriptionStatus || '').toLowerCase() === 'paid') return true;
+  const method = String(player.paymentMethod || '').toLowerCase();
+  if (method.indexOf('redsys') >= 0 && String(player.status || '').toLowerCase() === 'active') {
+    return true;
+  }
+  if (String(player.status || '').toLowerCase() === 'active' && player.validatedDate) {
+    const ins = String(player.inscriptionStatus || '').toLowerCase();
+    if (
+      ins !== 'pending_payment' &&
+      ins !== 'pending_transfer' &&
+      ins !== 'pending_cash' &&
+      ins !== 'pending_tpv'
+    ) {
+      return true;
+    }
+  }
+  return false;
+}
+
 function applyMemberPaymentStateFromPlayerRecord(member, player) {
-  const paid =
-    !!player.inscriptionPaid ||
-    String(player.paymentStatus || '').toLowerCase() === 'paid' ||
-    String(player.inscriptionStatus || '').toLowerCase() === 'paid';
+  const paid = isPlayerInscriptionPaid(player);
   const cuota = resolveSocioCuotaFromPlayer(player);
   if (cuota != null) member.cuota = cuota;
 
@@ -1483,9 +1621,14 @@ function applyMemberPaymentStateFromPlayerRecord(member, player) {
     member.status = 'active';
     member.estado = 'activo';
     member.pendingReason = null;
+    member.fechaLimitePago = null;
     member.validatedDate = player.validatedDate || new Date().toISOString();
     member.validatedBy = player.validatedBy || 'inscripcion_jugador';
     if (player.paymentOrderId) member.paymentOrderId = player.paymentOrderId;
+    if (!member.cuotaVigenteHasta) {
+      member.cuotaVigenteHasta = proximoCierreTemporadaIso();
+    }
+    member.inscriptionSeasonSocio = player.inscriptionSeason || player.temporada;
     return;
   }
 
@@ -1500,36 +1643,107 @@ function applyMemberPaymentStateFromPlayerRecord(member, player) {
   member.inscriptionSeasonSocio = player.inscriptionSeason || player.temporada;
 }
 
+function memberDocMatchesSocioJugadorPlayer(data, player) {
+  if (!data || !player) return false;
+  if (!(data.socioJugador || data.isJugador || data.playerId)) return false;
+
+  const playerId = String(player.id || '').trim();
+  if (playerId && data.playerId && String(data.playerId) === playerId) return true;
+
+  const linkedId = String(player.linkedMemberId || '').trim();
+  if (linkedId && String(data.id) === linkedId) return true;
+
+  const pn = normalizeNamePart(player.name || player.nombre);
+  const ps = normalizeNamePart(player.surname || player.apellidos);
+  const mn = normalizeNamePart(data.name || data.nombre);
+  const ms = normalizeNamePart(data.surname || data.apellidos);
+  if (!pn || !ps || mn !== pn || ms !== ps) return false;
+
+  const playerDni = normalizeDni(player.dni);
+  const memberDni = normalizeDni(data.dni);
+  if (playerDni && memberDni && playerDni !== memberDni) return false;
+
+  return true;
+}
+
+function memberDocMatchesAdultSocioReg(data, member) {
+  const mn = normalizeNamePart(data.name || data.nombre);
+  const ms = normalizeNamePart(data.surname || data.apellidos);
+  const pn = normalizeNamePart(member.name || member.nombre);
+  const ps = normalizeNamePart(member.surname || member.apellidos);
+  if (pn && ps && mn === pn && ms === ps) return true;
+  const dniA = normalizeDni(data.dni);
+  const dniB = normalizeDni(member.dni);
+  return !!(dniA && dniB && dniA === dniB);
+}
+
 async function findMemberDocForPlayerInscription(player) {
   const linkedId = player.linkedMemberId ? String(player.linkedMemberId).trim() : '';
   if (linkedId && !linkedId.startsWith('MEMBER_')) {
     const ref = membersRef().doc(linkedId);
     const snap = await ref.get();
-    if (snap.exists) return { ref, data: { id: snap.id, ...snap.data() } };
+    if (snap.exists) {
+      const data = { id: snap.id, ...snap.data() };
+      if (memberDocMatchesSocioJugadorPlayer(data, player)) {
+        return { ref, data };
+      }
+    }
   }
   const dni = normalizeDni(player.dni);
   if (dni) {
-    const q = await membersRef().where('dni', '==', dni).limit(1).get();
-    if (!q.empty) {
-      const doc = q.docs[0];
-      return { ref: doc.ref, data: { id: doc.id, ...doc.data() } };
+    const q = await membersRef().where('dni', '==', dni).limit(10).get();
+    for (const doc of q.docs) {
+      const data = { id: doc.id, ...doc.data() };
+      if (memberDocMatchesSocioJugadorPlayer(data, player)) {
+        return { ref: doc.ref, data };
+      }
     }
   }
   const playerId = player.id ? String(player.id).trim() : '';
   if (playerId && !playerId.startsWith('PLAYER_')) {
-    const q2 = await membersRef().where('playerId', '==', playerId).limit(1).get();
-    if (!q2.empty) {
-      const doc = q2.docs[0];
-      return { ref: doc.ref, data: { id: doc.id, ...doc.data() } };
+    const q2 = await membersRef().where('playerId', '==', playerId).limit(5).get();
+    for (const doc of q2.docs) {
+      const data = { id: doc.id, ...doc.data() };
+      if (memberDocMatchesSocioJugadorPlayer(data, player)) {
+        return { ref: doc.ref, data };
+      }
     }
   }
-  const email = String(player.email || '').trim().toLowerCase();
+  const email = String(player.email || player.guardianEmail || '').trim().toLowerCase();
   if (email) {
-    const q3 = await membersRef().where('email', '==', email).limit(5).get();
+    const q3 = await membersRef().where('email', '==', email).limit(15).get();
     for (const doc of q3.docs) {
-      const data = doc.data();
-      if (data.socioJugador || data.isJugador) {
-        return { ref: doc.ref, data: { id: doc.id, ...data } };
+      const data = { id: doc.id, ...doc.data() };
+      if (memberDocMatchesSocioJugadorPlayer(data, player)) {
+        return { ref: doc.ref, data };
+      }
+    }
+  }
+  return null;
+}
+
+async function findMemberDocForAdultSocioRegistration(member) {
+  const dni = normalizeDni(member.dni);
+  if (dni) {
+    const q = await membersRef().where('dni', '==', dni).limit(10).get();
+    for (const doc of q.docs) {
+      const data = { id: doc.id, ...doc.data() };
+      if (memberDocMatchesAdultSocioReg(data, member)) return { ref: doc.ref, data };
+    }
+  }
+  const email = String(member.email || '').trim().toLowerCase();
+  if (email) {
+    const q2 = await membersRef().where('email', '==', email).limit(15).get();
+    for (const doc of q2.docs) {
+      const data = { id: doc.id, ...doc.data() };
+      if (data.socioJugador && data.playerId && !memberDocMatchesAdultSocioReg(data, member)) {
+        continue;
+      }
+      if (memberDocMatchesAdultSocioReg(data, member)) {
+        return { ref: doc.ref, data };
+      }
+      if (!data.socioJugador && !data.playerId) {
+        return { ref: doc.ref, data };
       }
     }
   }
@@ -1556,7 +1770,7 @@ async function upsertMemberSocioJugadorFromPlayer(player) {
     dni: playerDni || '',
     telefono: player.phone || player.telefono || '',
     phone: player.phone || player.telefono || '',
-    email: String(player.email || '').trim().toLowerCase(),
+    email: String(player.email || player.guardianEmail || '').trim().toLowerCase(),
     domicilio: player.domicilio || player.address || '',
     localidad: player.localidad || '',
     provincia: player.provincia || 'Zamora',
@@ -1718,7 +1932,16 @@ async function upsertMemberRegistrationRecord(member) {
   const email = patch.email;
   if (!email) throw new Error('Email ausente en alta de socio');
 
-  const existing = await findMemberDocByIdentity(patch);
+  const adultModal =
+    String(patch.registrationSource || '') === 'web_modal_socio' ||
+    (!patch.socioJugador && !patch.isJugador && !patch.playerId);
+  if (adultModal) {
+    patch.socioJugador = false;
+    patch.isJugador = false;
+    patch.playerId = null;
+  }
+
+  const existing = await findMemberDocForAdultSocioRegistration(patch);
   let memberId;
   if (existing) {
     memberId = existing.data.id;
@@ -2048,6 +2271,65 @@ async function deleteMemberRecord(memberId, identity) {
   return { deleted: true, ids: [...deletedIds] };
 }
 
+async function deletePlayerRecord(playerId, identity) {
+  const deletedIds = new Set();
+  const id = String(playerId || '').trim();
+  const ident = identity && typeof identity === 'object' ? identity : {};
+
+  if (id && !id.startsWith('PLAYER_') && !id.startsWith('PENDING_')) {
+    const ref = playersRef().doc(id);
+    const snap = await ref.get();
+    if (snap.exists) {
+      await ref.delete();
+      deletedIds.add(id);
+      const data = snap.data() || {};
+      if (!ident.dni && data.dni) ident.dni = data.dni;
+      if (!ident.email && data.email) ident.email = data.email;
+      if (!ident.name && (data.name || data.nombre)) ident.name = data.name || data.nombre;
+      if (!ident.surname && (data.surname || data.apellidos)) ident.surname = data.surname || data.apellidos;
+      if (!ident.season && (data.inscriptionSeason || data.temporada)) {
+        ident.season = data.inscriptionSeason || data.temporada;
+      }
+    }
+  }
+
+  const name = String(ident.name || '').trim().toLowerCase();
+  const surname = String(ident.surname || '').trim().toLowerCase();
+  const season = String(ident.season || ident.inscriptionSeason || '').trim();
+  if (name && surname) {
+    const q = await playersRef().where('appScope', '==', APP_SCOPE).get();
+    for (const docSnap of q.docs) {
+      if (deletedIds.has(docSnap.id)) continue;
+      const d = docSnap.data() || {};
+      const pn = String(d.name || d.nombre || '').trim().toLowerCase();
+      const ps = String(d.surname || d.apellidos || '').trim().toLowerCase();
+      if (pn === name && ps === surname) {
+        const docSeason = String(d.inscriptionSeason || d.temporada || '').trim();
+        if (!season || !docSeason || docSeason === season) {
+          await docSnap.ref.delete();
+          deletedIds.add(docSnap.id);
+        }
+      }
+    }
+  }
+
+  const dni = normalizeDni(ident.dni);
+  if (dni) {
+    const q2 = await playersRef().where('dni', '==', dni).get();
+    for (const docSnap of q2.docs) {
+      if (!deletedIds.has(docSnap.id)) {
+        await docSnap.ref.delete();
+        deletedIds.add(docSnap.id);
+      }
+    }
+  }
+
+  if (deletedIds.size === 0) {
+    throw new Error('No se encontró el jugador en la nube (ID, nombre o DNI)');
+  }
+  return { deleted: true, ids: [...deletedIds] };
+}
+
 async function deleteFriendRecord(friendId) {
   const id = String(friendId || '').trim();
   if (!id) throw new Error('ID de amigo ausente');
@@ -2064,6 +2346,7 @@ module.exports = {
   completeEventPayment,
   completePlayerInscription,
   completePlayerKitPurchase,
+  sendPaymentFailedNotification,
   memberExistsForEmail,
   clubRecordExistsForNotify,
   applicationsRef,
@@ -2088,6 +2371,7 @@ module.exports = {
   sanitizePlayerForPortalEdit,
   computePlayerProfileDiff,
   loginPlayerForProfileEdit,
+  changePlayerPortalPassword,
   updatePlayerProfileByPortal,
   normalizePlayerRecordFields,
   upsertPlayerInscriptionRecord,
@@ -2109,5 +2393,6 @@ module.exports = {
   upsertCoachRecord,
   deleteCoachRecord,
   deleteMemberRecord,
-  deleteFriendRecord
+  deleteFriendRecord,
+  deletePlayerRecord
 };

@@ -132,6 +132,36 @@
         .insc-portal-pwd-block .muted { margin: 0 0 10px; font-size: 0.88rem; line-height: 1.45; }
         .field-hint-email-socio { font-size: 0.78rem; color: #64748b; margin: 6px 0 12px; line-height: 1.4; }
         .insc-portal-pwd-block input { margin-bottom: 0; }
+        .ins-pwd-wrap {
+            position: relative;
+            margin-bottom: 12px;
+        }
+        .insc-portal-pwd-block .grid2 .ins-pwd-wrap { margin-bottom: 0; }
+        .ins-pwd-wrap input {
+            width: 100%;
+            padding-right: 3.4rem;
+            margin-bottom: 0;
+        }
+        .ins-pwd-toggle {
+            position: absolute;
+            right: 6px;
+            top: 50%;
+            transform: translateY(-50%);
+            border: none;
+            background: transparent;
+            color: #1d4ed8;
+            font-size: 0.8rem;
+            font-weight: 700;
+            cursor: pointer;
+            padding: 6px 8px;
+            border-radius: 6px;
+            line-height: 1;
+        }
+        .ins-pwd-toggle:hover { background: #eff6ff; }
+        .ins-pwd-toggle:focus-visible {
+            outline: 2px solid #1d4ed8;
+            outline-offset: 2px;
+        }
         .ins-modal-head h2 { margin: 0; font-size: 1.1rem; color: var(--primary); }
         .ins-modal-close {
             border: none;
@@ -365,7 +395,12 @@
                         </div>
                         <div class="grid2">
                             <div><label for="insLookupSurname">Apellidos</label><input id="insLookupSurname"></div>
-                            <div><label for="insPortalPassword">Contraseña de acceso *</label><input type="password" id="insPortalPassword" autocomplete="current-password"></div>
+                            <div><label for="insPortalPassword">Contraseña de acceso *</label>
+                                <div class="ins-pwd-wrap">
+                                    <input type="password" id="insPortalPassword" autocomplete="current-password">
+                                    <button type="button" class="ins-pwd-toggle" data-target="insPortalPassword" aria-label="Mostrar contraseña" aria-pressed="false">Ver</button>
+                                </div>
+                            </div>
                         </div>
                         <p class="muted" style="font-size:0.88rem;margin:8px 0 12px;">
                             <a href="#" id="insPortalForgotLink" style="color:#1d4ed8;font-weight:600;">¿Olvidaste tu contraseña?</a> — escribe al club y te la restablecerán.
@@ -381,9 +416,15 @@
                             <label for="insPortalSetupEmail">Email del jugador/a *</label>
                             <input type="email" id="insPortalSetupEmail" autocomplete="email" style="margin-bottom:8px;">
                             <label for="insPortalSetupPwd">Nueva contraseña *</label>
-                            <input type="password" id="insPortalSetupPwd" autocomplete="new-password" style="margin-bottom:8px;">
+                            <div class="ins-pwd-wrap">
+                                <input type="password" id="insPortalSetupPwd" autocomplete="new-password">
+                                <button type="button" class="ins-pwd-toggle" data-target="insPortalSetupPwd" aria-label="Mostrar contraseña" aria-pressed="false">Ver</button>
+                            </div>
                             <label for="insPortalSetupPwd2">Repetir contraseña *</label>
-                            <input type="password" id="insPortalSetupPwd2" autocomplete="new-password" style="margin-bottom:8px;">
+                            <div class="ins-pwd-wrap">
+                                <input type="password" id="insPortalSetupPwd2" autocomplete="new-password">
+                                <button type="button" class="ins-pwd-toggle" data-target="insPortalSetupPwd2" aria-label="Mostrar contraseña" aria-pressed="false">Ver</button>
+                            </div>
                             <button type="button" class="btn btn-primary" id="insPortalSetupBtn" style="margin:0 0 8px;">Crear contraseña y continuar</button>
                             <p class="muted" style="font-size:0.88rem;margin:0;"><a href="#" id="insPortalBackLink2" style="color:#64748b;">Volver</a></p>
                         </div>
@@ -399,9 +440,15 @@
                         <div id="insPortalResetTokenBlock" style="display:none;">
                             <p class="muted" style="font-size:0.9rem;margin-bottom:10px;">Elige tu nueva contraseña de acceso a la ficha.</p>
                             <label for="insPortalResetTokenPwd">Nueva contraseña *</label>
-                            <input type="password" id="insPortalResetTokenPwd" autocomplete="new-password" style="margin-bottom:8px;">
+                            <div class="ins-pwd-wrap">
+                                <input type="password" id="insPortalResetTokenPwd" autocomplete="new-password">
+                                <button type="button" class="ins-pwd-toggle" data-target="insPortalResetTokenPwd" aria-label="Mostrar contraseña" aria-pressed="false">Ver</button>
+                            </div>
                             <label for="insPortalResetTokenPwd2">Repetir contraseña *</label>
-                            <input type="password" id="insPortalResetTokenPwd2" autocomplete="new-password" style="margin-bottom:8px;">
+                            <div class="ins-pwd-wrap">
+                                <input type="password" id="insPortalResetTokenPwd2" autocomplete="new-password">
+                                <button type="button" class="ins-pwd-toggle" data-target="insPortalResetTokenPwd2" aria-label="Mostrar contraseña" aria-pressed="false">Ver</button>
+                            </div>
                             <button type="button" class="btn btn-primary" id="insPortalResetTokenBtn" style="margin:0;">Guardar contraseña</button>
                         </div>
                     </div>
@@ -433,7 +480,7 @@
                         <div><label for="insDni">DNI <span class="muted" id="insDniHint">(obligatorio si eres mayor de edad)</span></label><input id="insDni"></div>
                         <div><label for="insEmail">Email *</label><input id="insEmail" type="email" required autocomplete="email"></div>
                     </div>
-                    <p id="insEmailSocioHint" class="field-hint-email-socio">El menor no puede compartir el mismo correo que su padre o tutor/a como socios.</p>
+                    <p id="insEmailSocioHint" class="field-hint-email-socio">Puedes usar el mismo correo del tutor/a como contacto del jugador/a. Cada hermano/a es una ficha distinta (nombre y apellidos). El tutor/a solo será socio si se registra en el modal de socios de la web.</p>
                     <div class="grid2">
                         <div><label for="insPhone">Teléfono *</label><input id="insPhone" type="tel" required></div>
                         <div><label for="insBirth">Fecha de nacimiento *</label><input id="insBirth" type="date" required></div>
@@ -452,11 +499,17 @@
                         <div class="grid2">
                             <div>
                                 <label for="insPortalPasswordNew" id="insPortalPasswordNewLabel">Contraseña *</label>
-                                <input type="password" id="insPortalPasswordNew" autocomplete="new-password" minlength="6">
+                                <div class="ins-pwd-wrap">
+                                    <input type="password" id="insPortalPasswordNew" autocomplete="new-password" minlength="6">
+                                    <button type="button" class="ins-pwd-toggle" data-target="insPortalPasswordNew" aria-label="Mostrar contraseña" aria-pressed="false">Ver</button>
+                                </div>
                             </div>
                             <div>
                                 <label for="insPortalPasswordNew2" id="insPortalPasswordNew2Label">Repetir contraseña *</label>
-                                <input type="password" id="insPortalPasswordNew2" autocomplete="new-password" minlength="6">
+                                <div class="ins-pwd-wrap">
+                                    <input type="password" id="insPortalPasswordNew2" autocomplete="new-password" minlength="6">
+                                    <button type="button" class="ins-pwd-toggle" data-target="insPortalPasswordNew2" aria-label="Mostrar contraseña" aria-pressed="false">Ver</button>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -567,6 +620,34 @@
                     <div id="payCardBlock"><button type="button" class="btn btn-card" id="btnPayCard">💳 Pagar con tarjeta</button></div>
                     <div id="payBizumBlock" hidden><button type="button" class="btn btn-bizum" id="btnPayBizum">📱 Pagar con Bizum</button></div>
                     <div id="payTransferBlock"><button type="button" class="btn btn-transfer" id="btnPayTransfer">🏦 Solicitar inscripción por transferencia, efectivo o TPV</button></div>
+                </section>
+
+                <section class="card insc-portal-pwd-block" id="insChangePortalPwdSection" style="display:none;">
+                    <h3>🔒 Cambiar contraseña de acceso a tu ficha</h3>
+                    <p class="muted">La misma que usas en «Buscar mi ficha». Mínimo 6 caracteres.</p>
+                    <label for="insChangePortalPwdCurrent">Contraseña actual *</label>
+                    <div class="ins-pwd-wrap">
+                        <input type="password" id="insChangePortalPwdCurrent" autocomplete="current-password">
+                        <button type="button" class="ins-pwd-toggle" data-target="insChangePortalPwdCurrent" aria-label="Mostrar contraseña" aria-pressed="false">Ver</button>
+                    </div>
+                    <div class="grid2">
+                        <div>
+                            <label for="insChangePortalPwdNew">Nueva contraseña *</label>
+                            <div class="ins-pwd-wrap">
+                                <input type="password" id="insChangePortalPwdNew" autocomplete="new-password" minlength="6">
+                                <button type="button" class="ins-pwd-toggle" data-target="insChangePortalPwdNew" aria-label="Mostrar contraseña" aria-pressed="false">Ver</button>
+                            </div>
+                        </div>
+                        <div>
+                            <label for="insChangePortalPwdNew2">Repetir nueva contraseña *</label>
+                            <div class="ins-pwd-wrap">
+                                <input type="password" id="insChangePortalPwdNew2" autocomplete="new-password" minlength="6">
+                                <button type="button" class="ins-pwd-toggle" data-target="insChangePortalPwdNew2" aria-label="Mostrar contraseña" aria-pressed="false">Ver</button>
+                            </div>
+                        </div>
+                    </div>
+                    <button type="button" class="btn btn-primary" id="insChangePortalPwdBtn" style="margin:8px 0 0;">Actualizar contraseña</button>
+                    <p id="insChangePortalPwdMsg" class="muted" style="margin:10px 0 0;"></p>
                 </section>
 
                 <section class="card" id="insSaveProfileSection" style="display:none;">

@@ -67,8 +67,8 @@
       }
       const em = String(data.email || '').trim().toLowerCase();
       const gEm = String(data.guardianEmail || '').trim().toLowerCase();
-      if (em && gEm && em === gEm) {
-        return 'El menor no puede usar el mismo correo que su padre o tutor/a. Indica un email distinto para el jugador/a.';
+      if (!em && !gEm) {
+        return 'Indica un email de contacto del jugador/a o del tutor/a.';
       }
     }
     if (!data.commitmentAccepted) {

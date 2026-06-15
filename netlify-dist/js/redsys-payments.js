@@ -134,6 +134,7 @@
       amountEur: amountEur,
       email: opts.email,
       memberId: opts.memberId,
+      registrationBundle: opts.registrationBundle || null,
       description: opts.description || 'Cuota socio CD Sanabria CF (' + amountEur + ' EUR)'
     });
   }

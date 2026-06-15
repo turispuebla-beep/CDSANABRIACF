@@ -47,6 +47,7 @@
     <script src="js/admin-torneo-preinscripciones.js"></script>
     <script src="js/admin-player-applications.js"></script>
     <script src="js/player-inscription.js"></script>
+    <script src="js/club-player-member-sync.js"></script>
     <script src="js/member-cloud-persist.js"></script>
     <script src="js/admin-cloud-persist.js"></script>
     <script src="js/club-player-export-config.js"></script>
@@ -573,6 +574,47 @@
             background: #e2e8f0;
             color: #334155;
         }
+        .admin-copy-dialog {
+            position: fixed;
+            inset: 0;
+            z-index: 10050;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            padding: 16px;
+            background: rgba(15, 23, 42, 0.55);
+        }
+        .admin-copy-dialog.is-open { display: flex; }
+        .admin-copy-dialog-card {
+            width: min(640px, 100%);
+            max-height: 90vh;
+            overflow: auto;
+            background: #fff;
+            border-radius: 12px;
+            padding: 18px;
+            box-shadow: 0 20px 50px rgba(0,0,0,0.25);
+        }
+        .admin-copy-dialog-card h3 { margin: 0 0 12px; font-size: 1.1rem; }
+        .admin-copy-dialog-text {
+            width: 100%;
+            min-height: 220px;
+            resize: vertical;
+            font-family: Consolas, 'Courier New', monospace;
+            font-size: 0.85rem;
+            line-height: 1.45;
+            padding: 10px;
+            border: 1px solid #cbd5e1;
+            border-radius: 8px;
+            box-sizing: border-box;
+            user-select: all;
+        }
+        .admin-copy-dialog-actions {
+            display: flex;
+            gap: 10px;
+            justify-content: flex-end;
+            margin-top: 12px;
+            flex-wrap: wrap;
+        }
     </style>
 </head>
 <body>
@@ -583,6 +625,17 @@
             <div class="admin-session-gate-actions">
                 <button type="button" class="admin-session-gate-primary" onclick="goToMainAdminLogin()">Iniciar sesión en la web principal</button>
                 <button type="button" class="admin-session-gate-secondary" onclick="closeAdminPanelWindow()">Cerrar panel</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="adminCopyableDialog" class="admin-copy-dialog" role="dialog" aria-modal="true" aria-labelledby="adminCopyableDialogTitle" onclick="if(event.target===this)closeAdminCopyableDialog()">
+        <div class="admin-copy-dialog-card">
+            <h3 id="adminCopyableDialogTitle">Mensaje</h3>
+            <textarea id="adminCopyableDialogText" class="admin-copy-dialog-text" readonly aria-label="Texto del mensaje"></textarea>
+            <div class="admin-copy-dialog-actions">
+                <button type="button" class="btn" onclick="adminCopyDialogToClipboard()">📋 Copiar texto</button>
+                <button type="button" class="btn btn-success" onclick="closeAdminCopyableDialog()">Cerrar</button>
             </div>
         </div>
     </div>
@@ -914,13 +967,13 @@
                             <h3>Filtrar por Categoría</h3>
                             <select id="categoryFilter" onchange="filterPlayersByCategory()" style="padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
                                 <option value="all">Todas las Categorías</option>
-                                <option value="prebenajmin">Prebenjamín (6-8 años)</option>
+                                <option value="prebenjamin">Prebenjamín (6-8 años)</option>
                                 <option value="benjamin">Benjamín (8-10 años)</option>
                                 <option value="alevin">Alevín (10-12 años)</option>
                                 <option value="infantil">Infantil (12-14 años)</option>
                                 <option value="cadete">Cadete (14-16 años)</option>
                                 <option value="juvenil">Juvenil (16-18 años)</option>
-                                <option value="aficionado">Aficionado (18+ años)</option>
+                                <option value="senior">Senior / Aficionado (18+ años)</option>
                             </select>
                         </div>
                         <div style="display:flex; gap:10px; flex-wrap:wrap;">
@@ -1130,7 +1183,7 @@
                                 <option value="infantil">Infantil</option>
                                 <option value="cadete">Cadete</option>
                                 <option value="juvenil">Juvenil</option>
-                                <option value="aficionado">Aficionado</option>
+                                <option value="senior">Senior / Aficionado</option>
                             </select>
                         </div>
                         <div>
@@ -1157,7 +1210,10 @@
 
                 <!-- Lista de jugadores -->
                 <div class="section">
-                    <h3>📋 Lista de Jugadores Registrados</h3>
+                    <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:12px;">
+                        <h3 style="margin:0;">📋 Lista de Jugadores Registrados</h3>
+                        <button type="button" class="btn btn-success" onclick="regularizeAdminPlayers()" title="Quita duplicados, sincroniza socios↔jugadores y crea registros faltantes">🔄 Regularizar fichas</button>
+                    </div>
                     <div id="playersListContainer">
                         <div id="playersList">
                             <!-- Los jugadores se cargarán aquí dinámicamente -->
@@ -2030,7 +2086,12 @@
                                 <option value="inactive">Inactivos</option>
                             </select>
                         </div>
-                        <button class="btn btn-success" onclick="showAddFriendForm()">➕ Registrar Nuevo Amigo</button>
+                        <div style="display:flex; flex-wrap:wrap; gap:8px; align-items:center;">
+                            <button class="btn btn-success" onclick="showAddFriendForm()">➕ Registrar Nuevo Amigo</button>
+                            <button type="button" class="btn" onclick="exportClubListFromTab('amigos','xlsx')" style="background:#10b981;color:white;">📊 Excel</button>
+                            <button type="button" class="btn" onclick="exportClubListFromTab('amigos','word')" style="background:#059669;color:white;">📄 Word</button>
+                            <button type="button" class="btn" onclick="exportClubListFromTab('amigos','pdf')" style="background:#475569;color:white;">🖨️ PDF</button>
+                        </div>
                     </div>
                     
                     <!-- Formulario para registrar amigo -->
@@ -2464,7 +2525,12 @@
                                 <option value="inactive">Inactivos</option>
                             </select>
                         </div>
-                        <button class="btn btn-success" onclick="showAddCoachForm()">➕ Registrar Nuevo Entrenador</button>
+                        <div style="display:flex; flex-wrap:wrap; gap:8px; align-items:center;">
+                            <button class="btn btn-success" onclick="showAddCoachForm()">➕ Registrar Nuevo Entrenador</button>
+                            <button type="button" class="btn" onclick="exportClubListFromTab('entrenadores','xlsx')" style="background:#f59e0b;color:white;">📊 Excel</button>
+                            <button type="button" class="btn" onclick="exportClubListFromTab('entrenadores','word')" style="background:#d97706;color:white;">📄 Word</button>
+                            <button type="button" class="btn" onclick="exportClubListFromTab('entrenadores','pdf')" style="background:#475569;color:white;">🖨️ PDF</button>
+                        </div>
                     </div>
                     
                     <!-- Formulario para registrar entrenador -->
@@ -2807,7 +2873,7 @@
                     <div style="background: #e3f2fd; padding: 20px; border-radius: 10px; margin-bottom: 30px;">
                         <h3>📋 Información de Exportación</h3>
                         <p style="margin: 10px 0; color: #1e3a8a;">
-                            💡 <strong>Formatos disponibles:</strong> Excel (.xlsx), Word (.doc) y PDF (imprimir / guardar como PDF).
+                            💡 <strong>Formatos disponibles:</strong> Excel (.xlsx) en tabla horizontal; Word (.doc) y PDF en ficha vertical con escudo del club.
                         </p>
                         <p style="margin: 10px 0; color: #1e3a8a;">
                             📁 Cada listado incluye los datos de contacto, estado y fechas registradas en el panel.
@@ -2831,7 +2897,7 @@
                                     <option value="infantil">Infantil</option>
                                     <option value="cadete">Cadete</option>
                                     <option value="juvenil">Juvenil</option>
-                                    <option value="aficionado">Aficionado</option>
+                                    <option value="senior">Senior / Aficionado</option>
                                 </select>
                             </div>
                             <div style="margin-bottom: 15px;">
@@ -3371,8 +3437,9 @@
                         </div>
                         <div style="display:flex; flex-wrap:wrap; gap:8px; align-items:center;">
                             <button class="btn btn-success" onclick="showAddMemberForm()">➕ Registrar Nuevo Socio</button>
-                            <button type="button" class="btn" onclick="exportClubList('socios','xlsx')" style="background:#2563eb;color:white;">📊 Excel</button>
-                            <button type="button" class="btn" onclick="exportClubList('socios','pdf')" style="background:#475569;color:white;">🖨️ PDF</button>
+                            <button type="button" class="btn" onclick="exportClubListFromTab('socios','xlsx')" style="background:#2563eb;color:white;">📊 Excel</button>
+                            <button type="button" class="btn" onclick="exportClubListFromTab('socios','word')" style="background:#1d4ed8;color:white;">📄 Word</button>
+                            <button type="button" class="btn" onclick="exportClubListFromTab('socios','pdf')" style="background:#475569;color:white;">🖨️ PDF</button>
                         </div>
                     </div>
                     
@@ -4357,6 +4424,52 @@
             }, 400);
         }
 
+        function showAdminCopyableDialog(title, text) {
+            const dlg = document.getElementById('adminCopyableDialog');
+            const titleEl = document.getElementById('adminCopyableDialogTitle');
+            const textEl = document.getElementById('adminCopyableDialogText');
+            if (!dlg || !textEl) {
+                alert(String(title || '') + '\n\n' + String(text || ''));
+                return;
+            }
+            if (titleEl) titleEl.textContent = title || 'Mensaje';
+            textEl.value = String(text || '');
+            dlg.classList.add('is-open');
+            try {
+                textEl.focus();
+                textEl.select();
+            } catch (_) {}
+        }
+
+        function closeAdminCopyableDialog() {
+            const dlg = document.getElementById('adminCopyableDialog');
+            if (dlg) dlg.classList.remove('is-open');
+        }
+
+        async function adminCopyDialogToClipboard() {
+            const textEl = document.getElementById('adminCopyableDialogText');
+            const text = textEl ? textEl.value : '';
+            try {
+                if (navigator.clipboard && navigator.clipboard.writeText) {
+                    await navigator.clipboard.writeText(text);
+                    alert('✅ Texto copiado al portapapeles.');
+                    return;
+                }
+            } catch (_) {}
+            try {
+                textEl.focus();
+                textEl.select();
+                document.execCommand('copy');
+                alert('✅ Texto copiado (selección manual).');
+            } catch (e) {
+                alert('Selecciona el texto con el ratón y pulsa Ctrl+C.');
+            }
+        }
+
+        window.showAdminCopyableDialog = showAdminCopyableDialog;
+        window.closeAdminCopyableDialog = closeAdminCopyableDialog;
+        window.adminCopyDialogToClipboard = adminCopyDialogToClipboard;
+
         async function verifyFirebaseAdminSession() {
             if (window.__CDSAN_FILE_PROTOCOL__ || location.protocol === 'file:') {
                 showAdminSessionGate('El panel de administración requiere la web publicada del club (HTTPS), no un archivo local.');
@@ -4946,9 +5059,15 @@
         }
 
         function normalizePlayerCategory(category) {
+            if (window.ClubPlayerMemberSync && window.ClubPlayerMemberSync.normalizeCategoryId) {
+                return window.ClubPlayerMemberSync.normalizeCategoryId(category);
+            }
             if (!category) return '';
-            if (category === 'prebenjamin') return 'prebenajmin';
-            return String(category).toLowerCase();
+            const c = String(category).toLowerCase();
+            if (c === 'prebenajmin' || c === 'prebenjamin') return 'prebenjamin';
+            if (c === 'aficionado' || c === 'senior') return 'senior';
+            if (c === 'juvenile' || c === 'juvenil') return 'juvenil';
+            return c;
         }
 
         function saveLastCategoryChange(change) {
@@ -5220,7 +5339,16 @@
         // Función para cargar lista de jugadores
         function loadPlayersList() {
             try {
-                const players = JSON.parse(localStorage.getItem('clubPlayers') || '[]');
+                let players = JSON.parse(localStorage.getItem('clubPlayers') || '[]');
+                if (window.ClubPlayerMemberSync && window.ClubPlayerMemberSync.dedupePlayers) {
+                    players = window.ClubPlayerMemberSync.dedupePlayers(players);
+                }
+                if (window.ClubPlayerMemberSync && window.ClubPlayerMemberSync.ensurePlayerCategoryFields) {
+                    players = players.map(function (p) {
+                        return window.ClubPlayerMemberSync.ensurePlayerCategoryFields(p);
+                    });
+                    localStorage.setItem('clubPlayers', JSON.stringify(players));
+                }
                 const playersList = document.getElementById('playersList');
                 
                 if (players.length === 0) {
@@ -5228,21 +5356,38 @@
                     return;
                 }
 
-                // Agrupar por categorías
-                const categories = {
-                    'prebenajmin': 'Prebenjamín (6-8 años)',
+                const categories = window.ClubPlayerMemberSync && window.ClubPlayerMemberSync.getAdminPlayerCategories
+                    ? window.ClubPlayerMemberSync.getAdminPlayerCategories()
+                    : {
+                    'prebenjamin': 'Prebenjamín (6-8 años)',
                     'benjamin': 'Benjamín (8-10 años)',
                     'alevin': 'Alevín (10-12 años)',
                     'infantil': 'Infantil (12-14 años)',
                     'cadete': 'Cadete (14-16 años)',
                     'juvenil': 'Juvenil (16-18 años)',
-                    'aficionado': 'Aficionado (18+ años)'
+                    'senior': 'Senior / Aficionado (18+ años)'
                 };
 
+                function playersInCategory(categoryKey) {
+                    return players.filter(function (player) {
+                        if (window.ClubPlayerMemberSync && window.ClubPlayerMemberSync.playerMatchesCategoryFilter) {
+                            return window.ClubPlayerMemberSync.playerMatchesCategoryFilter(player, categoryKey);
+                        }
+                        const cat = String(player.category || player.categoria || '').toLowerCase();
+                        if (categoryKey === 'senior') return cat === 'senior' || cat === 'aficionado';
+                        return cat === categoryKey;
+                    });
+                }
+
                 let html = '';
+                const renderedIds = new Set();
                 
                 Object.keys(categories).forEach(categoryKey => {
-                    const categoryPlayers = players.filter(player => player.category === categoryKey);
+                    const categoryPlayers = playersInCategory(categoryKey).filter(function (p) {
+                        if (renderedIds.has(p.id)) return false;
+                        renderedIds.add(p.id);
+                        return true;
+                    });
                     
                     if (categoryPlayers.length > 0) {
                         html += `
@@ -5317,6 +5462,28 @@
                     }
                 });
 
+                const uncategorized = players.filter(function (p) {
+                    if (renderedIds.has(p.id)) return false;
+                    if (window.ClubPlayerMemberSync && window.ClubPlayerMemberSync.resolvePlayerCategoryId) {
+                        return !window.ClubPlayerMemberSync.resolvePlayerCategoryId(p);
+                    }
+                    return !(p.category || p.categoria);
+                });
+                if (uncategorized.length > 0) {
+                    html += `
+                        <div class="category-section" data-category="_other" style="margin-bottom: 30px; background: white; border-radius: 10px; padding: 20px; border: 2px solid #f59e0b;">
+                            <h4 style="color: #b45309; margin-bottom: 15px;">⚠️ Sin categoría asignada
+                                <span style="background: #f59e0b; color: white; padding: 4px 8px; border-radius: 12px; font-size: 0.8rem; margin-left: 10px;">
+                                    ${uncategorized.length}
+                                </span>
+                            </h4>`;
+                    uncategorized.forEach(function (player) {
+                        renderedIds.add(player.id);
+                        html += `<div style="padding:10px;border-bottom:1px solid #eee;">${player.name} ${player.surname} — <button type="button" onclick="changePlayerCategoryManual('${player.id}')" style="padding:4px 8px;font-size:0.8rem;">🏷️ Asignar categoría</button></div>`;
+                    });
+                    html += `</div>`;
+                }
+
                 if (html === '') {
                     html = '<p style="text-align: center; color: #666; padding: 20px;">No hay jugadores en la categoría seleccionada.</p>';
                 }
@@ -5325,6 +5492,46 @@
                 console.log('👥 Lista de jugadores cargada:', players.length, 'jugadores');
             } catch (error) {
                 console.error('❌ Error cargando lista de jugadores:', error);
+            }
+        }
+
+        async function regularizeAdminPlayers() {
+            if (!window.ClubPlayerMemberSync) {
+                alert('❌ Módulo de sincronización no cargado.');
+                return;
+            }
+            if (!confirm('¿Regularizar fichas y socios?\n\n• Elimina duplicados e intentos abortados de pasarela (sin pago)\n• Crea socios faltantes desde jugadores (p. ej. menores sin socio)\n• Crea fichas jugador/a desde socios pendientes\n• Sincroniza con Firebase')) {
+                return;
+            }
+            try {
+                let membersResult = { created: 0, linked: 0 };
+                let playersResult = { removed: 0, created: 0, deduped: 0, total: 0 };
+                if (window.ClubPlayerMemberSync.regularizeMembersFromPlayers) {
+                    membersResult = await window.ClubPlayerMemberSync.regularizeMembersFromPlayers({ persist: true });
+                }
+                if (window.ClubPlayerMemberSync.regularizePlayersFromMembers) {
+                    playersResult = await window.ClubPlayerMemberSync.regularizePlayersFromMembers({ persist: true });
+                }
+                let catResult = { updated: 0 };
+                if (window.ClubPlayerMemberSync.regularizePlayerCategories) {
+                    catResult = await window.ClubPlayerMemberSync.regularizePlayerCategories({ persist: true });
+                }
+                loadPlayersList();
+                loadMembersList();
+                updateDashboardCounts();
+                alert(
+                    '✅ Regularización completada.\n\n' +
+                        'Socios creados desde jugadores: ' + (membersResult.created || 0) + '\n' +
+                        'Socios vinculados: ' + (membersResult.linked || 0) + '\n' +
+                        'Eliminados (intentos abortados): ' + (playersResult.removed || 0) + '\n' +
+                        'Fichas creadas desde socios: ' + (playersResult.created || 0) + '\n' +
+                        'Duplicados unificados: ' + (playersResult.deduped || 0) + '\n' +
+                        'Categorías normalizadas: ' + (catResult.updated || 0) + '\n' +
+                        'Total jugadores: ' + (playersResult.total || 0)
+                );
+            } catch (e) {
+                console.error(e);
+                alert('❌ Error al regularizar: ' + (e.message || e));
             }
         }
 
@@ -5499,29 +5706,42 @@
             }
         }
 
-        // Función para validar jugador (alta manual sin paso de pago web)
+        // Función para validar jugador (alta manual o validación administrativa con cuota+ficha)
         async function validatePlayer(playerId) {
-            if (confirm('¿Validar este jugador?\n\nEsto cambiará su estado a "Activo" (alta administrativa, sin cobro web).')) {
+            if (confirm('¿Validar este jugador/a?\n\nSe activará la ficha y, si la inscripción incluye cuota de socio/a, también quedará como socio/a ACTIVO (ficha + cuota pagadas a la vez).')) {
                 try {
-                    const players = JSON.parse(localStorage.getItem('clubPlayers') || '[]');
-                    const playerIndex = players.findIndex(p => p.id === playerId);
-                    
-                    if (playerIndex !== -1) {
-                        const currentAdmin = JSON.parse(localStorage.getItem('currentAdmin') || '{}');
+                    const currentAdmin = JSON.parse(localStorage.getItem('currentAdmin') || '{}');
+                    const adminName = currentAdmin.name || currentAdmin.email || 'Administrador';
+
+                    if (typeof window.PlayerInscription !== 'undefined' && window.PlayerInscription.activatePlayerAndSocioByAdmin) {
+                        await window.PlayerInscription.activatePlayerAndSocioByAdmin(playerId, {
+                            validatedBy: adminName
+                        });
+                    } else {
+                        const players = JSON.parse(localStorage.getItem('clubPlayers') || '[]');
+                        const playerIndex = players.findIndex(p => p.id === playerId);
+                        if (playerIndex === -1) {
+                            alert('❌ Jugador no encontrado');
+                            return;
+                        }
                         players[playerIndex].status = 'active';
                         players[playerIndex].estado = 'activo';
+                        players[playerIndex].inscriptionStatus = 'paid';
+                        players[playerIndex].paymentStatus = 'paid';
+                        players[playerIndex].inscriptionPaid = true;
                         players[playerIndex].validatedDate = new Date().toISOString();
-                        players[playerIndex].validatedBy = currentAdmin.name || currentAdmin.email || 'Administrador';
+                        players[playerIndex].validatedBy = adminName;
                         localStorage.setItem('clubPlayers', JSON.stringify(players));
                         await persistRecordToFirebase('clubPlayers', 'players', players[playerIndex]);
-                        
-                        loadPlayersList();
-                        alert('✅ Jugador validado correctamente');
-                        console.log('✅ Jugador validado:', players[playerIndex].name, players[playerIndex].surname);
                     }
+
+                    loadPlayersList();
+                    loadMembersList();
+                    updateDashboardCounts();
+                    alert('✅ Jugador/a validado/a. Si la inscripción incluía cuota de socio/a, comprueba que también figure como ACTIVO en Socios.');
                 } catch (error) {
                     console.error('❌ Error validando jugador:', error);
-                    alert('❌ Error al validar el jugador');
+                    alert('❌ Error al validar el jugador: ' + (error.message || error));
                 }
             }
         }
@@ -5541,17 +5761,23 @@
                 }
 
                 const player = players[playerIndex];
-                const categoryOptions = [
-                    { key: 'prebenajmin', label: 'Prebenjamín (6-8 años)' },
-                    { key: 'benjamin', label: 'Benjamín (8-10 años)' },
-                    { key: 'alevin', label: 'Alevín (10-12 años)' },
-                    { key: 'infantil', label: 'Infantil (12-14 años)' },
-                    { key: 'cadete', label: 'Cadete (14-16 años)' },
-                    { key: 'juvenil', label: 'Juvenil (16-18 años)' },
-                    { key: 'aficionado', label: 'Aficionado (18+ años)' }
-                ];
+                const categoryOptions = window.ClubPlayerMemberSync && window.ClubPlayerMemberSync.getCanonicalPlayerCategoryOptions
+                    ? window.ClubPlayerMemberSync.getCanonicalPlayerCategoryOptions().map(function (o) {
+                        return { key: o.id, label: o.label };
+                    })
+                    : [
+                    { id: 'prebenjamin', label: 'Prebenjamín (6-8 años)' },
+                    { id: 'benjamin', label: 'Benjamín (8-10 años)' },
+                    { id: 'alevin', label: 'Alevín (10-12 años)' },
+                    { id: 'infantil', label: 'Infantil (12-14 años)' },
+                    { id: 'cadete', label: 'Cadete (14-16 años)' },
+                    { id: 'juvenil', label: 'Juvenil (16-18 años)' },
+                    { id: 'senior', label: 'Senior / Aficionado (18+ años)' }
+                ].map(function (o) { return { key: o.id, label: o.label }; });
 
-                const currentCategory = normalizePlayerCategory(player.category);
+                const currentCategory = window.ClubPlayerMemberSync && window.ClubPlayerMemberSync.resolvePlayerCategoryId
+                    ? window.ClubPlayerMemberSync.resolvePlayerCategoryId(player)
+                    : normalizePlayerCategory(player.category);
                 const message = [
                     `Cambiar categoría de ${player.name} ${player.surname}:`,
                     '',
@@ -5580,10 +5806,28 @@
                     fromCategory: currentCategory,
                     toCategory: newCategory
                 });
-                player.category = newCategory;
-                player.lastModified = new Date().toISOString();
+                players[playerIndex].category = newCategory;
+                players[playerIndex].categoria = newCategory;
+                players[playerIndex].playerCategory = newCategory;
+                players[playerIndex].categoriaJugador = newCategory;
+                players[playerIndex].lastModified = new Date().toISOString();
+                if (window.ClubPlayerMemberSync && window.ClubPlayerMemberSync.ensurePlayerCategoryFields) {
+                    window.ClubPlayerMemberSync.ensurePlayerCategoryFields(players[playerIndex]);
+                }
+                const linkedId = players[playerIndex].linkedMemberId;
+                if (linkedId) {
+                    const members = JSON.parse(localStorage.getItem('clubMembers') || '[]');
+                    const mix = members.findIndex(function (m) { return String(m.id) === String(linkedId); });
+                    if (mix >= 0) {
+                        members[mix].playerCategory = newCategory;
+                        members[mix].categoriaJugador = newCategory;
+                        localStorage.setItem('clubMembers', JSON.stringify(members));
+                        localStorage.setItem('socios', JSON.stringify(members));
+                        await persistRecordToFirebase('clubMembers', 'members', members[mix]);
+                    }
+                }
                 localStorage.setItem('clubPlayers', JSON.stringify(players));
-                await persistRecordToFirebase('clubPlayers', 'players', player);
+                await persistRecordToFirebase('clubPlayers', 'players', players[playerIndex]);
 
                 loadPlayersList();
                 loadTeamsCards();
@@ -5596,29 +5840,111 @@
             }
         }
 
+        async function removePlayerFromCloudIfNeeded(playerId, identity) {
+            if (!playerId) return;
+            const id = String(playerId).trim();
+            const ident = identity && typeof identity === 'object' ? identity : {};
+            if (window.AdminClubCloudPersist && typeof window.AdminClubCloudPersist.deletePlayer === 'function') {
+                await window.AdminClubCloudPersist.deletePlayer(id, ident);
+                return;
+            }
+            if (!id || id.startsWith('PLAYER_') || id.startsWith('PENDING_')) {
+                throw new Error('ID de jugador no válido para borrar en la nube: ' + (id || '(vacío)'));
+            }
+            if (typeof window.deleteDocument !== 'function') {
+                throw new Error('La nube no está disponible: no se puede eliminar en el servidor');
+            }
+            await window.deleteDocument('players', id, 'admin');
+        }
+
         // Función para eliminar jugador
         async function deletePlayer(playerId) {
-            if (confirm('¿Estás seguro de que quieres eliminar este jugador?\n\n⚠️ Esta acción no se puede deshacer.')) {
-                try {
-                    const players = JSON.parse(localStorage.getItem('clubPlayers') || '[]');
-                    const playerToDelete = players.find(p => p.id === playerId);
-                    
-                    if (playerToDelete) {
-                        const updatedPlayers = players.filter(p => p.id !== playerId);
-                        localStorage.setItem('clubPlayers', JSON.stringify(updatedPlayers));
-                        await deleteRecordFromFirebase('players', playerId);
-                        await refreshLinkedMemberRoles(playerToDelete.dni, playerToDelete.name, playerToDelete.surname);
-                        
-                        loadPlayersList();
-                        loadMembersList();
-                        updateDashboardCounts();
-                        alert('✅ Jugador "' + playerToDelete.name + ' ' + playerToDelete.surname + '" eliminado correctamente');
-                        console.log('🗑️ Jugador eliminado:', playerToDelete.name, playerToDelete.surname);
-                    }
-                } catch (error) {
-                    console.error('❌ Error eliminando jugador:', error);
-                    alert('❌ Error al eliminar el jugador');
+            if (!confirm('¿Estás seguro de que quieres eliminar este jugador?\n\n⚠️ Esta acción no se puede deshacer.\n\nSe borrará también en la nube (Firebase). Si solo se quita en este dispositivo, volverá al refrescar.')) {
+                return;
+            }
+            try {
+                const players = JSON.parse(localStorage.getItem('clubPlayers') || '[]');
+                const playerToDelete = players.find(function (p) {
+                    return String(p.id) === String(playerId);
+                });
+
+                if (!playerToDelete) {
+                    showAdminCopyableDialog('Jugador no encontrado', '❌ Jugador/a no encontrado/a en la lista local.\nID buscado: ' + playerId);
+                    return;
                 }
+
+                const playerLabel = (playerToDelete.name || '') + ' ' + (playerToDelete.surname || '');
+                const playerIdentity = {
+                    email: playerToDelete.email,
+                    dni: playerToDelete.dni,
+                    name: playerToDelete.name || playerToDelete.nombre,
+                    surname: playerToDelete.surname || playerToDelete.apellidos,
+                    season: playerToDelete.inscriptionSeason || playerToDelete.temporada
+                };
+
+                try {
+                    await removePlayerFromCloudIfNeeded(playerId, playerIdentity);
+                } catch (syncErr) {
+                    console.error('❌ Error eliminando jugador en Firebase:', syncErr);
+                    showAdminCopyableDialog(
+                        'Error al eliminar jugador en la nube',
+                        '❌ No se pudo eliminar en el servidor (nube).\n\n' +
+                            'Jugador: ' + playerLabel.trim() + '\n' +
+                            'ID Firebase: ' + (playerId || '—') + '\n\n' +
+                            'La lista se sincroniza en tiempo real: si no se borra en la nube, volverá al refrescar.\n\n' +
+                            'Comprueba:\n' +
+                            '1. Sesión Admin en la web principal (Firebase Auth)\n' +
+                            '2. Deploy con funciones Netlify (npm run deploy:prod)\n' +
+                            '3. O bórralo manualmente en Firebase (ver abajo)\n\n' +
+                            'Firebase Console → Firestore → sanabria_players → buscar "' + playerLabel.trim() + '" → Eliminar documento\n' +
+                            'Proyecto: cdsanabriacf2026\n\n' +
+                            'Error técnico:\n' +
+                            (syncErr.message || String(syncErr))
+                    );
+                    return;
+                }
+
+                const updatedPlayers = players.filter(function (p) {
+                    return String(p.id) !== String(playerId);
+                });
+                if (typeof window.syncClubPlayersLocal === 'function') {
+                    window.syncClubPlayersLocal(updatedPlayers);
+                } else {
+                    const jp = JSON.stringify(updatedPlayers);
+                    localStorage.setItem('clubPlayers', jp);
+                    localStorage.setItem('players', jp);
+                    localStorage.setItem('jugadores', jp);
+                }
+
+                if (playerToDelete.linkedMemberId) {
+                    const members = JSON.parse(localStorage.getItem('clubMembers') || '[]');
+                    const mix = members.findIndex(function (m) {
+                        return String(m.id) === String(playerToDelete.linkedMemberId);
+                    });
+                    if (mix >= 0) {
+                        delete members[mix].playerId;
+                        if (typeof syncMembersLocalStorage === 'function') {
+                            syncMembersLocalStorage(members);
+                        } else {
+                            localStorage.setItem('clubMembers', JSON.stringify(members));
+                            localStorage.setItem('socios', JSON.stringify(members));
+                        }
+                    }
+                }
+
+                await refreshLinkedMemberRoles(playerToDelete.dni, playerToDelete.name, playerToDelete.surname);
+
+                loadPlayersList();
+                loadMembersList();
+                updateDashboardCounts();
+                showAdminCopyableDialog(
+                    'Jugador eliminado',
+                    '✅ Jugador "' + playerLabel.trim() + '" eliminado correctamente (también en el servidor).\n\nID: ' + playerId
+                );
+                console.log('🗑️ Jugador eliminado:', playerToDelete.name, playerToDelete.surname);
+            } catch (error) {
+                console.error('❌ Error eliminando jugador:', error);
+                showAdminCopyableDialog('Error al eliminar jugador', '❌ Error al eliminar el jugador.\n\n' + (error.message || String(error)));
             }
         }
 
@@ -7135,8 +7461,21 @@
             if (p.isEntrenadorMember || p.membershipKind === 'entrenador') return 'entrenador';
             const email = String(p.email || '').trim().toLowerCase();
             const dni = normalizeParticipantDni(p.dni);
+            const pName = `${String(p.nombre || p.name || '').trim()} ${String(p.apellidos || p.surname || '').trim()}`
+                .trim()
+                .toLowerCase();
             const members = JSON.parse(localStorage.getItem('clubMembers') || '[]');
-            if (email && members.some((m) => String(m.email || '').trim().toLowerCase() === email)) return 'socio';
+            const socioMatch = members.find(function (m) {
+                return membersShareIdentity(m, {
+                    email: email,
+                    dni: dni,
+                    name: p.nombre || p.name,
+                    surname: p.apellidos || p.surname,
+                    nombre: p.nombre || p.name,
+                    apellidos: p.apellidos || p.surname
+                });
+            });
+            if (socioMatch) return 'socio';
             if (dni && members.some((m) => normalizeParticipantDni(m.dni) === dni)) return 'socio';
             const amigos = JSON.parse(localStorage.getItem('clubFriends') || '[]');
             if (email && amigos.some((m) => String(m.email || '').trim().toLowerCase() === email)) return 'amigo';
@@ -7678,11 +8017,11 @@
             alert(`✅ Word: ${pack.filtered.length} inscritos (${pack.filterSummary})`);
         }
 
-        function exportEventParticipantsPdf(eventId) {
+        async function exportEventParticipantsPdf(eventId) {
             const pack = getEventParticipantsExportPack(eventId);
             if (!pack) return;
             const listTitle = `Inscritos — ${pack.title} (${pack.filterSummary})`;
-            exportDatasetToPdf(listTitle, pack.headers, pack.objectRows, `${pack.base}.pdf`);
+            await exportDatasetToPdf(listTitle, pack.headers, pack.objectRows, `${pack.base}.pdf`);
             addToExportHistory(`${pack.base}.pdf`);
             alert(`✅ PDF: ${pack.filtered.length} inscritos. Usa «Guardar como PDF» en el diálogo de impresión.`);
         }
@@ -11849,7 +12188,7 @@
             alert(`✅ ${result.message}`);
         }
 
-        function exportCompetitionCalendar(competitionId) {
+        async function exportCompetitionCalendar(competitionId) {
             const { competition } = getCompetitionById(competitionId);
             if (!competition) return alert('❌ Competición no encontrada');
             const matches = Array.isArray(competition.matches) ? competition.matches : [];
@@ -11943,7 +12282,7 @@
                 addToExportHistory(`${base}.doc`);
             }
             if (doPdf) {
-                exportDatasetToPdf(title, headers, rows, `${base}.pdf`);
+                await exportDatasetToPdf(title, headers, rows, `${base}.pdf`);
                 addToExportHistory(`${base}.pdf`);
             }
             alert(`✅ Calendario exportado (${filtered.length} partidos)`);
@@ -13253,11 +13592,36 @@
             await window.deleteDocument('members', id, 'admin');
         }
 
+        function memberFullNameKey(member) {
+            const m = normalizeClubMember(member);
+            return `${String(m.name || m.nombre || '').trim()} ${String(m.surname || m.apellidos || '').trim()}`
+                .trim()
+                .toLowerCase();
+        }
+
+        function membersShareIdentity(a, b) {
+            const ma = normalizeClubMember(a);
+            const mb = normalizeClubMember(b);
+            const dniA = String(ma.dni || '').trim().toLowerCase();
+            const dniB = String(mb.dni || '').trim().toLowerCase();
+            if (dniA && dniB && dniA === dniB) return true;
+            const emA = String(ma.email || '').trim().toLowerCase();
+            const emB = String(mb.email || '').trim().toLowerCase();
+            const nameA = memberFullNameKey(ma);
+            const nameB = memberFullNameKey(mb);
+            if (emA && emB && emA === emB && nameA && nameB && nameA === nameB) return true;
+            return false;
+        }
+
         function memberIdentityKey(member) {
             const m = normalizeClubMember(member);
             const dni = String(m.dni || '').trim().toLowerCase();
             const email = String(m.email || '').trim().toLowerCase();
+            const name = memberFullNameKey(m);
+            const playerId = String(m.playerId || '').trim();
             if (dni) return `dni:${dni}`;
+            if (playerId && (m.socioJugador || m.isJugador)) return `player:${playerId}`;
+            if (email && name) return `email:${email}|name:${name}`;
             if (email) return `email:${email}`;
             return '';
         }
@@ -14981,15 +15345,20 @@
                     return;
                 }
                 
-                // Verificar si el DNI o email ya existe en otro socio
-                const existingMember = members.find(m => 
-                    m.id !== memberId && 
-                    ((m.dni && m.dni.toLowerCase() === dni.toLowerCase()) || 
-                     (m.email && m.email.toLowerCase() === email.toLowerCase()))
-                );
-                
+                const existingMember = members.find(function (m) {
+                    if (m.id === memberId) return false;
+                    return membersShareIdentity(m, {
+                        dni: dni,
+                        email: email,
+                        name: name,
+                        surname: surname,
+                        nombre: name,
+                        apellidos: surname
+                    });
+                });
+
                 if (existingMember) {
-                    alert('❌ Ya existe otro socio con ese DNI o email');
+                    alert('❌ Ya existe otro socio con el mismo DNI o con ese email y los mismos nombre y apellidos.');
                     return;
                 }
                 
@@ -16135,6 +16504,7 @@
                     lastAccess: null,
                     accessCount: 0,
                     passwordHash: passwordHash,
+                    adminAccessKey: accessKey,
                     failedLoginAttempts: 0,
                     lockUntil: null,
                     permissions: permissions,
@@ -16438,6 +16808,7 @@
                     return;
                 }
                 coach.passwordHash = await hashCoachAccessKey(trimmed);
+                coach.adminAccessKey = trimmed;
                 if (coach.password) delete coach.password;
                 coach.keyUpdatedAt = new Date().toISOString();
                 coach.failedLoginAttempts = 0;
@@ -16469,6 +16840,7 @@
                 const coach = coaches[coachIndex];
                 if (!confirm(`¿Eliminar la clave de acceso de ${coach.name} ${coach.surname}?`)) return;
                 coach.passwordHash = null;
+                delete coach.adminAccessKey;
                 if (coach.password) delete coach.password;
                 coach.keyUpdatedAt = new Date().toISOString();
                 coach.failedLoginAttempts = 0;
@@ -17067,6 +17439,7 @@
                 'Cuota vigente hasta': formatExportDate(m.cuotaVigenteHasta),
                 'Fecha registro': formatExportDate(m.registrationDate || m.fechaRegistro),
                 'Es jugador/a': m.isJugador ? 'Sí' : '',
+                'Categoría juego': m.playerCategory || m.categoriaJugador || '',
                 'Es directiva': m.isDirectiva || m.isBoardMember ? 'Sí' : ''
             };
         }
@@ -17090,6 +17463,59 @@
             };
         }
 
+        function coachTeamExportLabel(team) {
+            const teamNames = {
+                prebenjamin: 'Prebenjamín',
+                prebenajmin: 'Prebenjamín',
+                benjamin: 'Benjamín',
+                alevin: 'Alevín',
+                infantil: 'Infantil',
+                cadete: 'Cadete',
+                juvenile: 'Juvenil',
+                juvenil: 'Juvenil',
+                aficionado: 'Aficionado',
+                senior: 'Senior / Aficionado'
+            };
+            const k = String(team || '').trim().toLowerCase();
+            return teamNames[k] || team || '';
+        }
+
+        function coachPermissionsExportLabel(c) {
+            const defaults =
+                typeof getDefaultCoachPermissions === 'function' ? getDefaultCoachPermissions() : {};
+            const perms = Object.assign({}, defaults, c.permissions || {});
+            const labels = [];
+            if (perms.lineups) labels.push('Convocatorias/alineaciones');
+            if (perms.training) labels.push('Entrenamientos de equipo');
+            if (perms.individual) labels.push('Entrenamientos individuales');
+            if (perms.export) labels.push('Exportaciones');
+            return labels.length ? labels.join(', ') : '—';
+        }
+
+        function coachAccessKeyExport(c) {
+            if (c.adminAccessKey && String(c.adminAccessKey).trim()) return String(c.adminAccessKey).trim();
+            if (c.password && String(c.password).trim()) return String(c.password).trim();
+            if (c.passwordHash) {
+                return 'Clave definida (no recuperable). Pulsa «Clave» en el panel y guárdala de nuevo para exportarla.';
+            }
+            return 'Sin clave';
+        }
+
+        function exportClubListFromTab(listType, format) {
+            const opts = {};
+            if (listType === 'socios') {
+                const el = document.getElementById('memberStatusFilter');
+                if (el) opts.status = el.value;
+            } else if (listType === 'amigos') {
+                const el = document.getElementById('friendStatusFilter');
+                if (el) opts.status = el.value;
+            } else if (listType === 'entrenadores') {
+                const el = document.getElementById('coachStatusFilter');
+                if (el) opts.status = el.value;
+            }
+            return exportClubList(listType, format, opts);
+        }
+
         function mapCoachExportRow(c) {
             return {
                 Nombre: c.name || c.nombre || '',
@@ -17097,10 +17523,21 @@
                 DNI: c.dni || '',
                 Email: c.email || '',
                 Teléfono: c.phone || c.telefono || '',
-                Equipo: c.team || c.equipo || '',
+                Equipo: coachTeamExportLabel(c.team || c.equipo),
                 Licencia: c.license || c.licencia || '',
-                Estado: memberStatusExportLabel(c.status),
-                'Último acceso': formatExportDate(c.lastAccess)
+                'Experiencia (años)': c.experience != null ? c.experience : '',
+                Estado: memberStatusExportLabel(c.status || c.estado),
+                'Clave de acceso': coachAccessKeyExport(c),
+                Permisos: coachPermissionsExportLabel(c),
+                'Intentos fallidos login': c.failedLoginAttempts != null ? c.failedLoginAttempts : 0,
+                'Bloqueado hasta': c.lockUntil ? formatExportDate(c.lockUntil) : '',
+                'Fecha registro': formatExportDate(c.registrationDate || c.fechaRegistro),
+                'Último acceso': formatExportDate(c.lastAccess),
+                'Total accesos': c.accessCount != null ? c.accessCount : '',
+                'Clave actualizada': formatExportDate(c.keyUpdatedAt),
+                'Notificaciones push': c.pushNotifications && c.pushNotifications.enabled !== false ? 'Sí' : 'No',
+                'Mensajes push enviados': c.pushNotifications && c.pushNotifications.sentCount != null ? c.pushNotifications.sentCount : 0,
+                'Fuente registro': c.registrationSource || ''
             };
         }
 
@@ -17127,7 +17564,13 @@
                 }
                 let items = JSON.parse(localStorage.getItem('clubPlayers') || '[]');
                 if (opts.category && opts.category !== 'all') {
-                    items = items.filter((p) => String(p.category || p.categoria || '') === opts.category);
+                    if (window.ClubPlayerMemberSync && window.ClubPlayerMemberSync.playerMatchesCategoryFilter) {
+                        items = items.filter(function (p) {
+                            return window.ClubPlayerMemberSync.playerMatchesCategoryFilter(p, opts.category);
+                        });
+                    } else {
+                        items = items.filter((p) => String(p.category || p.categoria || '') === opts.category);
+                    }
                 }
                 return items.map(mapPlayerExportRow);
             }
@@ -17139,7 +17582,13 @@
                 return items.map(mapSocioExportRow);
             }
             if (listType === 'amigos') {
-                return JSON.parse(localStorage.getItem('clubFriends') || '[]').map(mapAmigoExportRow);
+                let items = JSON.parse(localStorage.getItem('clubFriends') || '[]');
+                if (opts.status && opts.status !== 'all') {
+                    items = items.filter(function (a) {
+                        return memberMatchesExportStatusFilter(a, opts.status);
+                    });
+                }
+                return items.map(mapAmigoExportRow);
             }
             if (listType === 'entrenadores') {
                 let items = JSON.parse(localStorage.getItem('clubCoaches') || '[]');
@@ -17175,6 +17624,128 @@ th,td{border:1px solid #ccc;padding:5px 7px;text-align:left;white-space:nowrap;}
 <div class="wrap"><table><thead><tr>${head}</tr></thead><tbody>${body}</tbody></table></div></body></html>`;
         }
 
+        /** PDF A4 / Word: ficha vertical (campo debajo de campo). Excel sigue en tabla horizontal. */
+        async function resolveClubEscudoDataUri() {
+            try {
+                const raw = localStorage.getItem('clubLogo');
+                if (raw && raw !== 'null' && raw !== 'undefined') {
+                    const parsed = JSON.parse(raw);
+                    if (parsed && parsed.dataUrl && String(parsed.dataUrl).startsWith('data:')) {
+                        return String(parsed.dataUrl);
+                    }
+                    if (parsed && parsed.url && String(parsed.url).startsWith('data:')) {
+                        return String(parsed.url);
+                    }
+                }
+            } catch (_) {}
+            const candidates = [
+                'assets/escudo-cdsanabriacf.png',
+                'assets/escudo-192.png',
+                'assets/escudo-512.png',
+                'escudo-192.png'
+            ];
+            for (let i = 0; i < candidates.length; i++) {
+                try {
+                    const res = await fetch(candidates[i], { cache: 'force-cache' });
+                    if (!res.ok) continue;
+                    const blob = await res.blob();
+                    const dataUri = await new Promise(function (resolve, reject) {
+                        const fr = new FileReader();
+                        fr.onload = function () {
+                            resolve(fr.result);
+                        };
+                        fr.onerror = reject;
+                        fr.readAsDataURL(blob);
+                    });
+                    if (dataUri) return dataUri;
+                } catch (_) {}
+            }
+            return '';
+        }
+
+        function buildExportFichaVerticalHtml(title, headers, rows, escudoDataUri) {
+            const escudo = escudoDataUri ? String(escudoDataUri) : '';
+            const escudoTag = escudo
+                ? '<img src="' + escudo + '" alt="CD Sanabria CF" class="escudo-img">'
+                : '';
+            const metaLine =
+                'Generado: ' +
+                escapeHtmlExport(new Date().toLocaleString('es-ES')) +
+                ' · Registros: ' +
+                rows.length;
+            const fichas = rows
+                .map(function (row, index) {
+                    const nameParts = [row['Nombre'], row['Apellidos']].filter(function (v) {
+                        return v != null && String(v).trim() !== '';
+                    });
+                    const subtitle = nameParts.length
+                        ? nameParts.join(' ')
+                        : row['Nº socio'] || row['Nº amigo/a'] || 'Registro ' + (index + 1);
+                    const fieldRows = headers
+                        .map(function (h) {
+                            const raw = row[h];
+                            const display = raw == null || String(raw).trim() === '' ? '—' : String(raw);
+                            return (
+                                '<tr><th scope="row">' +
+                                escapeHtmlExport(h) +
+                                '</th><td>' +
+                                escapeHtmlExport(display) +
+                                '</td></tr>'
+                            );
+                        })
+                        .join('');
+                    return (
+                        '<section class="ficha">' +
+                        '<h2 class="ficha-title">' +
+                        escapeHtmlExport(subtitle) +
+                        '</h2>' +
+                        '<table class="ficha-table"><tbody>' +
+                        fieldRows +
+                        '</tbody></table></section>'
+                    );
+                })
+                .join('');
+            const wmBlock = escudo
+                ? '<div class="wm-escudo" aria-hidden="true">' + escudoTag + '</div>'
+                : '';
+            const headerBlock =
+                '<header class="header-brand">' +
+                (escudo ? '<div class="header-escudo">' + escudoTag + '</div>' : '') +
+                '<div class="header-text"><h1>' +
+                escapeHtmlExport(title) +
+                '</h1><p class="meta">' +
+                metaLine +
+                '</p></div></header>';
+            return (
+                '<!DOCTYPE html><html lang="es"><head><meta charset="utf-8"><title>' +
+                escapeHtmlExport(title) +
+                '</title><style>' +
+                '@page{size:A4 portrait;margin:12mm 14mm;}' +
+                'body{font-family:Arial,Helvetica,sans-serif;font-size:11pt;color:#1e293b;line-height:1.45;margin:0;padding:14mm 14mm 12mm;position:relative;}' +
+                '.wm-escudo{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);z-index:0;pointer-events:none;opacity:0.1;}' +
+                '.wm-escudo .escudo-img{width:240px;height:240px;object-fit:contain;}' +
+                '.doc-content{position:relative;z-index:1;}' +
+                '.header-brand{display:flex;align-items:center;gap:14px;margin:0 0 20px;padding-bottom:12px;border-bottom:2px solid #1e3a8a;}' +
+                '.header-escudo{flex-shrink:0;width:64px;height:64px;}' +
+                '.header-escudo .escudo-img{width:64px;height:64px;object-fit:contain;}' +
+                'h1{font-size:16pt;color:#1e3a8a;margin:0 0 4px;}' +
+                '.meta{font-size:9.5pt;color:#64748b;margin:0;}' +
+                '.ficha{margin:0 0 20px;padding:0 0 16px;border-bottom:2px solid #e2e8f0;page-break-inside:avoid;}' +
+                '.ficha:last-child{border-bottom:none;margin-bottom:0;}' +
+                '.ficha-title{font-size:13pt;color:#1e3a8a;margin:0 0 10px;font-weight:700;}' +
+                '.ficha-table{width:100%;border-collapse:collapse;table-layout:fixed;}' +
+                '.ficha-table th{text-align:left;vertical-align:top;width:36%;padding:7px 12px 7px 0;font-weight:600;color:#475569;border-bottom:1px solid #f1f5f9;}' +
+                '.ficha-table td{vertical-align:top;padding:7px 0;border-bottom:1px solid #f1f5f9;word-wrap:break-word;white-space:normal;overflow-wrap:anywhere;}' +
+                '@media print{.ficha{page-break-after:always;}.ficha:last-child{page-break-after:auto;}.wm-escudo{opacity:0.08;}}' +
+                '</style></head><body>' +
+                wmBlock +
+                '<div class="doc-content">' +
+                headerBlock +
+                fichas +
+                '</div></body></html>'
+            );
+        }
+
         async function exportDatasetToExcel(headers, rows, filename) {
             const ok = await ensureScriptLoaded(
                 'https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js',
@@ -17196,8 +17767,9 @@ th,td{border:1px solid #ccc;padding:5px 7px;text-align:left;white-space:nowrap;}
             return true;
         }
 
-        function exportDatasetToWord(title, headers, rows, filename) {
-            const html = buildExportTableHtml(title, headers, rows);
+        async function exportDatasetToWord(title, headers, rows, filename) {
+            const escudo = await resolveClubEscudoDataUri();
+            const html = buildExportFichaVerticalHtml(title, headers, rows, escudo);
             downloadBlobFile(
                 '\ufeff' + html,
                 filename.endsWith('.doc') ? filename : `${filename}.doc`,
@@ -17206,8 +17778,9 @@ th,td{border:1px solid #ccc;padding:5px 7px;text-align:left;white-space:nowrap;}
             return true;
         }
 
-        function exportDatasetToPdf(title, headers, rows, filename) {
-            const html = buildExportTableHtml(title, headers, rows);
+        async function exportDatasetToPdf(title, headers, rows, filename) {
+            const escudo = await resolveClubEscudoDataUri();
+            const html = buildExportFichaVerticalHtml(title, headers, rows, escudo);
             const w = window.open('', '_blank');
             if (!w) {
                 alert('Permite ventanas emergentes y usa Imprimir → Guardar como PDF.');
@@ -17243,11 +17816,19 @@ th,td{border:1px solid #ccc;padding:5px 7px;text-align:left;white-space:nowrap;}
                     if (!opts.payment) opts.payment = extra.payment;
                 }
                 if (listType === 'socios') {
-                    const stEl = document.getElementById('exportMemberStatus');
+                    const stEl =
+                        document.getElementById('exportMemberStatus') ||
+                        document.getElementById('memberStatusFilter');
+                    if (stEl && !opts.status) opts.status = stEl.value;
+                }
+                if (listType === 'amigos') {
+                    const stEl = document.getElementById('friendStatusFilter');
                     if (stEl && !opts.status) opts.status = stEl.value;
                 }
                 if (listType === 'entrenadores') {
-                    const stEl = document.getElementById('exportCoachStatus');
+                    const stEl =
+                        document.getElementById('exportCoachStatus') ||
+                        document.getElementById('coachStatusFilter');
                     if (stEl && !opts.status) opts.status = stEl.value;
                 }
 
@@ -17273,10 +17854,10 @@ th,td{border:1px solid #ccc;padding:5px 7px;text-align:left;white-space:nowrap;}
                         await exportDatasetToExcel(headers, rows, `${base}.xlsx`);
                         addToExportHistory(`${base}.xlsx`);
                     } else if (f === 'word' || f === 'doc') {
-                        exportDatasetToWord(meta.title, headers, rows, `${base}.doc`);
+                        await exportDatasetToWord(meta.title, headers, rows, `${base}.doc`);
                         addToExportHistory(`${base}.doc`);
                     } else if (f === 'pdf') {
-                        exportDatasetToPdf(meta.title, headers, rows, `${base}.pdf`);
+                        await exportDatasetToPdf(meta.title, headers, rows, `${base}.pdf`);
                         addToExportHistory(`${base}.pdf`);
                     } else if (f === 'csv') {
                         downloadCSV(convertToCSV(rows, headers), `${base}.csv`);
@@ -20859,7 +21440,54 @@ th,td{border:1px solid #ccc;padding:5px 7px;text-align:left;white-space:nowrap;}
             try {
                 console.table(results);
             } catch (_) {}
-            alert(resumen);
+            showAdminCopyableDialog('Reconciliación completada', resumen);
+        }
+
+        function readLocalModuleArray(localKey) {
+            const fallbackKeys = {
+                clubMembers: ['clubMembers', 'socios', 'members', 'allMembers'],
+                clubFriends: ['clubFriends', 'amigos', 'friends', 'allFriends'],
+                clubPlayers: ['clubPlayers', 'jugadores', 'players'],
+                clubCoaches: ['clubCoaches', 'entrenadores', 'coaches'],
+                clubBoard: ['clubBoard', 'directiva', 'board'],
+                clubTeams: ['clubTeams', 'equipos', 'teams'],
+                clubEvents: ['clubEvents', 'events', 'allEvents'],
+                encuentros: ['encuentros'],
+                clubCalendarEvents: ['clubCalendarEvents', 'calendarEvents'],
+                clubCompetitions: ['clubCompetitions', 'competitions'],
+                clubDocuments: ['clubDocuments', 'documents'],
+                clubPublicidad: ['clubPublicidad', 'publicidad', 'ads'],
+                pushMessages: ['pushMessages', 'notifications', 'clubNotifications']
+            };
+            const keys = fallbackKeys[localKey] || [localKey];
+            for (let i = 0; i < keys.length; i++) {
+                try {
+                    const list = JSON.parse(localStorage.getItem(keys[i]) || '[]');
+                    if (Array.isArray(list) && list.length > 0) return list;
+                } catch (_) {}
+            }
+            try {
+                const list = JSON.parse(localStorage.getItem(localKey) || '[]');
+                return Array.isArray(list) ? list : [];
+            } catch (_) {
+                return [];
+            }
+        }
+
+        function formatReconcileDetail(m, localCount, remoteCount, syncRes) {
+            if (localCount === remoteCount) {
+                return 'alineado (' + localCount + ' en local y nube)';
+            }
+            if (localCount > remoteCount) {
+                const synced = syncRes && syncRes.synced != null ? syncRes.synced : 0;
+                const failed = syncRes && syncRes.failed != null ? syncRes.failed : 0;
+                let detail = 'subidos a nube (' + synced + ' de ' + localCount + ')';
+                if (failed > 0) detail += ' · fallos: ' + failed;
+                if (syncRes && syncRes.error) detail += ' · ' + syncRes.error;
+                if (syncRes && syncRes.errors && syncRes.errors.length) detail += ' · ' + syncRes.errors[0];
+                return detail;
+            }
+            return 'descargados desde nube (' + remoteCount + ' · local tenía ' + localCount + ')';
         }
 
         async function reconciliarModulosConFirebase(options) {
@@ -20891,21 +21519,29 @@ th,td{border:1px solid #ccc;padding:5px 7px;text-align:left;white-space:nowrap;}
                 const results = [];
                 for (const m of modules) {
                     try {
-                        const local = JSON.parse(localStorage.getItem(m.localKey) || '[]');
-                        const localCount = Array.isArray(local) ? local.length : 0;
                         const remote = await window.getDocuments(m.collection);
                         const remoteCount = Array.isArray(remote) ? remote.length : 0;
+                        const local = readLocalModuleArray(m.localKey);
+                        const localCount = local.length;
+                        let syncRes = null;
 
-                        if (localCount !== remoteCount) {
-                            const syncRes = await window.syncLocalArrayKeyToFirebase(m.localKey);
-                            results.push({
-                                modulo: m.label,
-                                estado: '🔄',
-                                detalle: `reconciliado (${syncRes?.synced || 0} sincronizados)`
-                            });
-                        } else {
-                            results.push({ modulo: m.label, estado: '✅', detalle: 'alineado' });
+                        if (localCount > remoteCount) {
+                            syncRes = await window.syncLocalArrayKeyToFirebase(m.localKey);
+                        } else if (localCount < remoteCount && typeof window.syncClubMembersLocal === 'function' && m.localKey === 'clubMembers') {
+                            window.syncClubMembersLocal(remote);
+                        } else if (localCount < remoteCount && typeof window.syncClubPlayersLocal === 'function' && m.localKey === 'clubPlayers') {
+                            window.syncClubPlayersLocal(remote);
+                        } else if (localCount < remoteCount && typeof window.syncClubFriendsLocal === 'function' && m.localKey === 'clubFriends') {
+                            window.syncClubFriendsLocal(remote);
                         }
+
+                        const failed = syncRes && syncRes.failed ? syncRes.failed : 0;
+                        const hasError = !!(syncRes && (syncRes.error || failed > 0));
+                        results.push({
+                            modulo: m.label,
+                            estado: localCount === remoteCount ? '✅' : hasError ? '❌' : '🔄',
+                            detalle: formatReconcileDetail(m.label, localCount, remoteCount, syncRes)
+                        });
                     } catch (e) {
                         results.push({ modulo: m.label, estado: '❌', detalle: String(e?.message || e) });
                     }
@@ -20919,7 +21555,7 @@ th,td{border:1px solid #ccc;padding:5px 7px;text-align:left;white-space:nowrap;}
                 mostrarResumenReconciliacion(results);
             } catch (error) {
                 console.error('❌ Error en reconciliación de módulos:', error);
-                alert('❌ Error al reconciliar módulos con la nube.');
+                showAdminCopyableDialog('Error en reconciliación', '❌ Error al reconciliar módulos con la nube.\n\n' + (error.message || String(error)));
             }
         }
 

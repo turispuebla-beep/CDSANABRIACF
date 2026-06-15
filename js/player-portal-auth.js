@@ -300,6 +300,105 @@
     return data.player || null;
   }
 
+  async function changePasswordLocal(opts) {
+    const o = opts && typeof opts === 'object' ? opts : {};
+    let p = null;
+    if (o.playerId) {
+      p = readLocalPlayers().find(function (x) {
+        return String(x.id) === String(o.playerId);
+      });
+    } else {
+      p = findLocalPlayer(o.dni, o.name, o.surname, o.season);
+    }
+    if (!p) {
+      const err = new Error('not_found');
+      err.code = 'not_found';
+      throw err;
+    }
+    const hash = String(p.portalPasswordHash || '').trim();
+    if (!hash) {
+      const err = new Error('no_password');
+      err.code = 'no_password';
+      throw err;
+    }
+    if (!global.verifyClubAccessKey || !global.hashClubAccessKey) {
+      const err = new Error('verify_unavailable');
+      err.code = 'verify_unavailable';
+      throw err;
+    }
+    const ok = await global.verifyClubAccessKey(o.currentPassword || '', hash);
+    if (!ok) {
+      const err = new Error('bad_password');
+      err.code = 'bad_password';
+      throw err;
+    }
+    const newPwd = String(o.newPassword || '');
+    if (newPwd.length < 6) {
+      const err = new Error('weak_password');
+      err.code = 'weak_password';
+      throw err;
+    }
+    const newHash = await global.hashClubAccessKey(newPwd);
+    const updated = Object.assign({}, p, {
+      portalPasswordHash: newHash,
+      portalPasswordSetAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    });
+    try {
+      const players = readLocalPlayers();
+      const pix = players.findIndex(function (x) {
+        return String(x.id) === String(updated.id);
+      });
+      if (pix >= 0) players[pix] = updated;
+      else players.push(updated);
+      global.localStorage.setItem('clubPlayers', JSON.stringify(players));
+      if (updated.linkedMemberId) {
+        const members = JSON.parse(global.localStorage.getItem('clubMembers') || '[]');
+        const mix = members.findIndex(function (m) {
+          return String(m.id) === String(updated.linkedMemberId);
+        });
+        if (mix >= 0) {
+          members[mix].portalPasswordHash = newHash;
+          members[mix].passwordHash = newHash;
+          global.localStorage.setItem('clubMembers', JSON.stringify(members));
+          global.localStorage.setItem('socios', JSON.stringify(members));
+        }
+      }
+    } catch (_) {}
+    return sanitizePlayerForPortalEdit(updated);
+  }
+
+  async function changePassword(opts) {
+    const o = opts && typeof opts === 'object' ? opts : {};
+    try {
+      const data = await postJson({
+        action: 'change_password',
+        playerId: o.playerId || '',
+        dni: normalizeDni(o.dni),
+        name: o.name || '',
+        surname: o.surname || '',
+        season: o.season || '',
+        currentPassword: o.currentPassword || '',
+        newPassword: o.newPassword || ''
+      });
+      if (data.player) mergePlayerIntoLocalStorage(data.player);
+      return data.player || null;
+    } catch (e) {
+      if (
+        e.code === 'bad_password' ||
+        e.code === 'no_password' ||
+        e.code === 'weak_password' ||
+        e.code === 'not_found'
+      ) {
+        throw e;
+      }
+      if (!isServerUnavailableError(e)) throw e;
+      const player = await changePasswordLocal(o);
+      mergePlayerIntoLocalStorage(player);
+      return player;
+    }
+  }
+
   function getClubNotifyEmail() {
     if (global.ClubMailto && global.ClubMailto.getClubNotifyEmail) {
       return global.ClubMailto.getClubNotifyEmail();
@@ -370,6 +469,7 @@
     setupPassword: setupPassword,
     requestPasswordReset: requestPasswordReset,
     resetPasswordWithToken: resetPasswordWithToken,
+    changePassword: changePassword,
     openPasswordRecoveryMailto: openPasswordRecoveryMailto,
     mergePlayerIntoLocalStorage: mergePlayerIntoLocalStorage
   };

@@ -24,8 +24,18 @@
     cadete: 'Cadete',
     juvenile: 'Juvenil',
     juvenil: 'Juvenil',
-    aficionado: 'Aficionado'
+    senior: 'Senior / Aficionado',
+    aficionado: 'Senior / Aficionado'
   };
+
+  function categoryLabel(cat) {
+    const k = String(cat || '').toLowerCase();
+    if (global.ClubPlayerMemberSync && global.ClubPlayerMemberSync.normalizeCategoryId) {
+      const canon = global.ClubPlayerMemberSync.normalizeCategoryId(k);
+      return CATEGORY_LABELS[canon] || CATEGORY_LABELS[k] || cat || '';
+    }
+    return CATEGORY_LABELS[k] || cat || '';
+  }
 
   function formatExportDate(value) {
     if (!value) return '';
@@ -78,11 +88,6 @@
         value: consentYesNo(reg.categorySuperiorConsent, reg.categorySuperiorConsentAt)
       }
     ];
-  }
-
-  function categoryLabel(cat) {
-    const k = String(cat || '').toLowerCase();
-    return CATEGORY_LABELS[k] || cat || '';
   }
 
   function isMinorPlayer(p) {
@@ -169,6 +174,75 @@
       .join('\n');
   }
 
+  function composeGuardianAddressFromReg(reg) {
+    const r = reg || {};
+    if (r.guardianAddress) return r.guardianAddress;
+    if (global.PlayerInscription && global.PlayerInscription.composeAddress) {
+      return (
+        global.PlayerInscription.composeAddress({
+          domicilio: r.guardianDomicilio,
+          localidad: r.guardianLocalidad,
+          provincia: r.guardianProvincia
+        }) || '—'
+      );
+    }
+    return [r.guardianDomicilio, r.guardianLocalidad, r.guardianProvincia].filter(Boolean).join(', ') || '—';
+  }
+
+  /** Campos completos para correos de inscripción (club y jugador/a). */
+  function buildInscriptionNotifyFields(reg, opts) {
+    const extra = opts && typeof opts === 'object' ? opts : {};
+    const cb = (reg && reg.chargeBreakdown) || {};
+    const base = [
+      { label: 'ID ficha', value: reg.id || '—' },
+      { label: 'Nombre', value: reg.name || reg.nombre || '—' },
+      { label: 'Apellidos', value: reg.surname || reg.apellidos || '—' },
+      { label: 'DNI', value: reg.dni || '—' },
+      { label: 'Nº socio vinculado', value: reg.numeroSocio || reg.memberNumber || '—' },
+      { label: 'Temporada', value: reg.inscriptionSeason || reg.temporada || '—' },
+      { label: 'Categoría', value: reg.category || reg.categoria || '—' },
+      { label: 'Fecha nacimiento', value: reg.birthDate || reg.fechaNacimiento || '—' },
+      { label: 'Domicilio', value: reg.domicilio || reg.address || '—' },
+      { label: 'Localidad', value: reg.localidad || '—' },
+      { label: 'Provincia', value: reg.provincia || '—' },
+      { label: 'Teléfono', value: reg.phone || reg.telefono || '—' },
+      { label: 'Email', value: reg.email || '—' },
+      { label: 'Posición', value: reg.position || reg.posicion || '—' },
+      { label: 'Grupo sanguíneo', value: reg.bloodGroup || '—' },
+      { label: 'Lesiones', value: reg.injuries || '—' },
+      { label: 'Alergias / enfermedad', value: reg.allergyIllness || '—' },
+      { label: 'Observaciones', value: reg.observations || '—' },
+      {
+        label: 'Peso (kg)',
+        value: reg.weightKg != null && reg.weightKg !== '' ? reg.weightKg : '—'
+      },
+      {
+        label: 'Altura (cm)',
+        value: reg.heightCm != null && reg.heightCm !== '' ? reg.heightCm : '—'
+      },
+      { label: 'Cuota ficha (€)', value: cb.ficha != null ? cb.ficha : reg.fichaFee },
+      { label: 'Cuota socio (€)', value: cb.socio != null ? cb.socio : reg.socioFee },
+      { label: 'Total inscripción (€)', value: cb.total != null ? cb.total : reg.totalCharge }
+    ];
+    const kitFields = buildKitNotifyFields(reg);
+    const tutorIdx = base.length;
+    base.splice.apply(base, [tutorIdx, 0].concat(kitFields));
+    base.push(
+      { label: 'Tutor/a', value: reg.guardianName || '—' },
+      { label: 'DNI tutor/a', value: reg.guardianDNI || reg.guardianDni || '—' },
+      { label: 'Teléfono tutor/a', value: reg.guardianPhone || '—' },
+      { label: 'Email tutor/a', value: reg.guardianEmail || '—' },
+      { label: 'Domicilio tutor/a', value: composeGuardianAddressFromReg(reg) }
+    );
+    base.push.apply(base, buildConsentNotifyFields(reg));
+    if (extra.orderId) base.push({ label: 'Pedido pasarela', value: extra.orderId });
+    if (extra.paid) base.push({ label: 'Estado', value: 'Pagado / activo' });
+    if (extra.includeClubAccount) {
+      base.push({ label: 'Cuenta club', value: 'CAJA RURAL ES12 3085 0034 8222 5127 9226' });
+    }
+    return base;
+  }
+
   /** Campos para correo al club (resumen + una fila por prenda/talla). */
   function buildKitNotifyFields(playerOrReg) {
     const items = getKitItems(playerOrReg);
@@ -221,7 +295,10 @@
   /** Valores por id de campo (catálogo) */
   function buildFieldValues(p) {
     const cb = p.chargeBreakdown || {};
-    const cat = p.category || p.categoria || '';
+    const cat =
+      global.ClubPlayerMemberSync && global.ClubPlayerMemberSync.resolvePlayerCategoryId
+        ? global.ClubPlayerMemberSync.resolvePlayerCategoryId(p)
+        : p.category || p.categoria || '';
     return {
       nombre: p.name || p.nombre || '',
       apellidos: p.surname || p.apellidos || '',
@@ -309,10 +386,21 @@
   function filterPlayers(players, opts) {
     const o = opts || {};
     let items = Array.isArray(players) ? players.slice() : [];
-    if (o.category && o.category !== 'all') {
-      items = items.filter(function (p) {
-        return String(p.category || p.categoria || '') === o.category;
+    if (global.ClubPlayerMemberSync && global.ClubPlayerMemberSync.ensurePlayerCategoryFields) {
+      items = items.map(function (p) {
+        return global.ClubPlayerMemberSync.ensurePlayerCategoryFields(Object.assign({}, p));
       });
+    }
+    if (o.category && o.category !== 'all') {
+      if (global.ClubPlayerMemberSync && global.ClubPlayerMemberSync.playerMatchesCategoryFilter) {
+        items = items.filter(function (p) {
+          return global.ClubPlayerMemberSync.playerMatchesCategoryFilter(p, o.category);
+        });
+      } else {
+        items = items.filter(function (p) {
+          return String(p.category || p.categoria || '') === o.category;
+        });
+      }
     }
     if (o.season && o.season !== 'all') {
       items = items.filter(function (p) {
@@ -391,6 +479,7 @@
     formatKitSummary: formatKitSummary,
     formatKitDetailLines: formatKitDetailLines,
     buildKitNotifyFields: buildKitNotifyFields,
+    buildInscriptionNotifyFields: buildInscriptionNotifyFields,
     buildConsentNotifyFields: buildConsentNotifyFields,
     consentYesNo: consentYesNo,
     garmentLabel: garmentLabel

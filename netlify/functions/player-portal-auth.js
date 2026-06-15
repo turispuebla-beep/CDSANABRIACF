@@ -9,6 +9,7 @@ const {
   emailMatchesPlayer,
   createPlayerPortalResetToken,
   resetPlayerPortalPasswordWithToken,
+  changePlayerPortalPassword,
   normalizeDni
 } = require('./lib/firestore-admin');
 const { sendPlayerPortalResetEmail } = require('./lib/member-email');
@@ -163,6 +164,34 @@ exports.handler = async (event) => {
       if (!result.ok) {
         const status = result.error === 'expired' ? 410 : 400;
         return json(status, { ok: false, error: result.error }, origin);
+      }
+      return json(200, { ok: true, player: result.player || null }, origin);
+    }
+
+    if (action === 'change_password') {
+      const newPwdErr = validatePassword(body.newPassword);
+      if (newPwdErr) return json(400, { ok: false, error: 'weak_password', message: newPwdErr }, origin);
+      const curPwdErr = validatePassword(body.currentPassword);
+      if (curPwdErr) return json(400, { ok: false, error: 'weak_password', message: curPwdErr }, origin);
+      const result = await changePlayerPortalPassword({
+        playerId: body.playerId,
+        dni,
+        name: body.name || body.nombre,
+        surname: body.surname || body.apellidos,
+        season,
+        currentPassword: body.currentPassword,
+        newPassword: body.newPassword
+      });
+      if (!result.ok) {
+        const code =
+          result.error === 'bad_password'
+            ? 401
+            : result.error === 'no_password'
+              ? 403
+              : result.error === 'weak_password'
+                ? 400
+                : 404;
+        return json(code, { ok: false, error: result.error }, origin);
       }
       return json(200, { ok: true, player: result.player || null }, origin);
     }

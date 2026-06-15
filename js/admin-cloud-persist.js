@@ -158,6 +158,19 @@
     await postPayload({ kind: 'friend', action: 'delete', id: friendId });
   }
 
+  async function deletePlayer(playerId, identity) {
+    const payload = { kind: 'player', action: 'delete', id: playerId };
+    const ident = identity && typeof identity === 'object' ? identity : {};
+    if (ident.email) payload.email = String(ident.email).trim().toLowerCase();
+    if (ident.dni) payload.dni = ident.dni;
+    if (ident.name) payload.name = ident.name;
+    if (ident.surname) payload.surname = ident.surname;
+    if (ident.season || ident.inscriptionSeason) {
+      payload.season = ident.season || ident.inscriptionSeason;
+    }
+    await postPayload(payload);
+  }
+
   async function persist(kind, record) {
     if (kind === 'member') return persistMember(record);
     if (kind === 'friend') return persistFriend(record);
@@ -175,6 +188,7 @@
     deleteCoach: deleteCoach,
     deleteMember: deleteMember,
     deleteFriend: deleteFriend,
+    deletePlayer: deletePlayer,
     cloudRequired: cloudRequired
   };
 })(typeof window !== 'undefined' ? window : globalThis);

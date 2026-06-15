@@ -486,6 +486,10 @@ function mirrorLocalDelete(collectionName, docId) {
 }
 
 function stableDocIdFromItem(item, index = 0) {
+  const rawId = item?.id != null ? String(item.id).trim() : '';
+  if (rawId && !rawId.startsWith('MEMBER_') && !rawId.startsWith('PLAYER_') && !rawId.startsWith('PENDING_')) {
+    return rawId.replace(/[^\w.-]/g, '_').slice(0, 120);
+  }
   const candidate =
     item?.id ??
     item?.uid ??
@@ -588,37 +592,97 @@ function mirrorResolvedFirestoreListToLegacyKeys(resolvedCollection, documents) 
   }
 }
 
+function normalizeMemberForFirestoreSync(item) {
+  const m = item && typeof item === 'object' ? { ...item } : {};
+  const nombre = String(m.nombre || m.name || '').trim();
+  const apellidos = String(m.apellidos || m.surname || '').trim();
+  const email = String(m.email || '').trim().toLowerCase();
+  const dni = String(m.dni || '').trim();
+  const telefono = String(m.telefono || m.phone || '').trim();
+  return normalizeIdentityFields(DB_COLLECTIONS.MEMBERS, {
+    ...m,
+    nombre,
+    name: nombre,
+    apellidos,
+    surname: apellidos,
+    email,
+    dni,
+    telefono,
+    phone: telefono
+  });
+}
+
+function normalizeFriendForFirestoreSync(item) {
+  const f = item && typeof item === 'object' ? { ...item } : {};
+  const nombre = String(f.nombre || f.name || '').trim();
+  const apellidos = String(f.apellidos || f.surname || '').trim();
+  const email = String(f.email || '').trim().toLowerCase();
+  const dni = String(f.dni || '').trim();
+  const telefono = String(f.telefono || f.phone || '').trim();
+  return normalizeIdentityFields(DB_COLLECTIONS.FRIENDS, {
+    ...f,
+    nombre,
+    name: nombre,
+    apellidos,
+    surname: apellidos,
+    email,
+    dni,
+    telefono,
+    phone: telefono
+  });
+}
+
+function prepareItemForFirestoreSync(targetCollection, item, index) {
+  let row = item && typeof item === 'object' ? { ...item } : {};
+  if (targetCollection === DB_COLLECTIONS.MEMBERS) {
+    row = normalizeMemberForFirestoreSync(row);
+  } else if (targetCollection === DB_COLLECTIONS.FRIENDS) {
+    row = normalizeFriendForFirestoreSync(row);
+  }
+  const id = stableDocIdFromItem(row, index);
+  return { id, row };
+}
+
 async function syncLocalArrayKeyToFirebase(localKey) {
   try {
     const targetCollection = LOCAL_KEY_TO_COLLECTION[String(localKey || '').trim()];
-    if (!targetCollection) return { synced: 0, skipped: true };
+    if (!targetCollection) return { synced: 0, failed: 0, skipped: true };
     const list = readLocalCollection(localKey);
-    if (!Array.isArray(list)) return { synced: 0 };
+    if (!Array.isArray(list)) return { synced: 0, failed: 0 };
 
     if (db.isSimulation) {
-      return { synced: list.length, simulated: true };
+      return { synced: list.length, failed: 0, simulated: true };
     }
 
     let synced = 0;
+    let failed = 0;
+    const errors = [];
     for (let i = 0; i < list.length; i += 1) {
       const item = list[i];
       if (!item || typeof item !== 'object') continue;
-      const id = stableDocIdFromItem(item, i);
-      await setDoc(
-        doc(db, targetCollection, id),
-        withScopeForCollection(targetCollection, {
-          ...item,
-          id,
-          updatedAt: new Date().toISOString()
-        }),
-        { merge: true }
-      );
-      synced += 1;
+      const prepared = prepareItemForFirestoreSync(targetCollection, item, i);
+      try {
+        await setDoc(
+          doc(db, targetCollection, prepared.id),
+          withScopeForCollection(targetCollection, {
+            ...prepared.row,
+            id: prepared.id,
+            updatedAt: new Date().toISOString()
+          }),
+          { merge: true }
+        );
+        synced += 1;
+      } catch (itemErr) {
+        failed += 1;
+        if (errors.length < 3) {
+          errors.push(String(itemErr?.message || itemErr));
+        }
+      }
     }
-    return { synced };
+    return { synced, failed, errors };
   } catch (error) {
     console.error(`âŒ Error sincronizando clave local "${localKey}" con Firebase:`, error);
-    return { synced: 0, error: String(error?.message || error) };
+    return { synced: 0, failed: 0, error: String(error?.message || error) };
   }
 }
 

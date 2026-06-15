@@ -177,9 +177,18 @@ function buildExportAttachments(fields, data) {
     docRows +
     '</table></body></html>';
 
+  const jsonObj = {};
+  fields.forEach((f) => {
+    jsonObj[f.label] = f.value;
+  });
+  jsonObj['Forma de pago'] = formatPaymentLabel(data.paymentChannel || data.paymentMethod);
+  jsonObj['Fecha aviso'] = new Date().toLocaleString('es-ES');
+  const jsonContent = JSON.stringify(jsonObj, null, 2);
+
   return [
     { filename: base + '.csv', content: csv, type: 'text/csv; charset=utf-8' },
-    { filename: base + '.doc', content: docHtml, type: 'application/msword' }
+    { filename: base + '.doc', content: docHtml, type: 'application/msword' },
+    { filename: base + '.json', content: jsonContent, type: 'application/json; charset=utf-8' }
   ];
 }
 
@@ -210,7 +219,7 @@ function buildClubAdminContent(data) {
         ${rows}
       </table>
       ${requester ? `<p style="font-size:0.9rem">Correo del solicitante: <a href="mailto:${escapeHtml(requester)}">${escapeHtml(requester)}</a></p>` : ''}
-      <p style="font-size:0.85rem;color:#64748b;margin:12px 0 4px">📎 Adjuntos: <strong>Excel (.csv)</strong> y <strong>Word (.doc)</strong> con todos los datos.</p>
+      <p style="font-size:0.85rem;color:#64748b;margin:12px 0 4px">📎 Adjuntos: <strong>Excel (.csv)</strong>, <strong>Word (.doc)</strong> y <strong>JSON (.json)</strong> con todos los datos.</p>
       <p style="font-size:0.85rem;color:#64748b;margin:0 0 8px">Para PDF: imprime este correo o usa el panel admin → Socios / Amigos / Jugadores → PDF.</p>
       <p style="font-size:0.85rem;color:#94a3b8">Mensaje automático desde la web del club.</p>
     </div>`;
@@ -225,7 +234,7 @@ function buildClubAdminContent(data) {
     textLines.push(f.label + ': ' + f.value);
   });
   if (requester) textLines.push('', 'Correo solicitante: ' + requester);
-  textLines.push('', 'Adjuntos: Excel (.csv) y Word (.doc)', 'Fecha: ' + new Date().toLocaleString('es-ES'));
+  textLines.push('', 'Adjuntos: Excel (.csv), Word (.doc) y JSON (.json)', 'Fecha: ' + new Date().toLocaleString('es-ES'));
 
   return { subject, html, text: textLines.join('\n'), fields };
 }

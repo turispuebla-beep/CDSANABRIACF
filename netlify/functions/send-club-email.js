@@ -67,6 +67,7 @@ exports.handler = async (event) => {
         fields: body.fields,
         requesterEmail: email,
         email: body.email || email,
+        playerId: body.playerId,
         nombre: body.nombre || body.name,
         apellidos: body.apellidos || body.surname,
         dni: body.dni,
@@ -159,6 +160,8 @@ exports.handler = async (event) => {
       const result = await sendPlayerInscriptionPendingEmail({
         email,
         guardianEmail: body.guardianEmail,
+        dni: body.dni,
+        playerId: body.playerId,
         nombre: body.nombre || body.name,
         apellidos: body.apellidos || body.surname,
         season: body.season || body.inscriptionSeason,
@@ -168,7 +171,8 @@ exports.handler = async (event) => {
         totalEur: body.totalEur,
         paymentChannel: body.paymentChannel || body.paymentMethod,
         paymentMethod: body.paymentMethod || body.paymentChannel,
-        kitSummary: body.kitSummary
+        kitSummary: body.kitSummary,
+        fields: body.fields
       });
       return jsonResponse(
         200,
@@ -185,14 +189,19 @@ exports.handler = async (event) => {
       const result = await sendPlayerInscriptionPaymentConfirmedEmail({
         email,
         guardianEmail: body.guardianEmail,
+        dni: body.dni,
+        playerId: body.playerId,
         nombre: body.nombre || body.name,
         apellidos: body.apellidos || body.surname,
         season: body.season || body.inscriptionSeason,
+        inscriptionSeason: body.inscriptionSeason || body.season,
         category: body.category || body.categoria,
+        categoria: body.categoria || body.category,
         totalEur: body.totalEur,
         paymentChannel: body.paymentChannel || body.paymentMethod,
         paymentMethod: body.paymentMethod || body.paymentChannel,
-        kitSummary: body.kitSummary
+        kitSummary: body.kitSummary,
+        fields: body.fields
       });
       return jsonResponse(
         200,

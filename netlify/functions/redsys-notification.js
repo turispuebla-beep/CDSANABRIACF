@@ -12,7 +12,8 @@ const {
   completePayGoldPayment,
   completeEventPayment,
   completePlayerInscription,
-  completePlayerKitPurchase
+  completePlayerKitPurchase,
+  sendPaymentFailedNotification
 } = require('./lib/firestore-admin');
 
 function parseBody(event) {
@@ -77,6 +78,11 @@ exports.handler = async (event) => {
         redsysResponse: String(responseCode),
         redsysParams: params
       });
+      try {
+        await sendPaymentFailedNotification({ ...payment, orderId: order });
+      } catch (mailErr) {
+        console.warn('redsys-notification KO email:', mailErr.message || mailErr);
+      }
       return { statusCode: 200, body: 'OK' };
     }
 

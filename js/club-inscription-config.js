@@ -9,12 +9,12 @@
 
   /** Tabla pública inscripción — cuotas ficha + socio por categoría */
   const INSCRIPTION_CATEGORY_ROWS = [
-    { id: 'prebenjamin', label: 'P. BENJAMIN', years: '(2018/2019)', ficha: 65, socio: 10 },
-    { id: 'benjamin', label: 'BENJAMIN', years: '(2016/2017)', ficha: 65, socio: 10 },
-    { id: 'alevin', label: 'ALEVIN', years: '(2014/2015)', ficha: 65, socio: 10 },
-    { id: 'infantil', label: 'INFANTIL', years: '(2012/2013)', ficha: 65, socio: 10 },
-    { id: 'cadete', label: 'CADETE', years: '(2010/2011)', ficha: 65, socio: 10 },
-    { id: 'juvenil', label: 'JUVENIL', years: '(2007/2008/2009)', ficha: 175, socio: 25 },
+    { id: 'prebenjamin', label: 'P. BENJAMÍN', years: '(2019/2020)', ficha: 65, socio: 10 },
+    { id: 'benjamin', label: 'BENJAMÍN', years: '(2017/2018)', ficha: 65, socio: 10 },
+    { id: 'alevin', label: 'ALEVÍN', years: '(2015/2016)', ficha: 65, socio: 10 },
+    { id: 'infantil', label: 'INFANTIL', years: '(2013/2014)', ficha: 65, socio: 10 },
+    { id: 'cadete', label: 'CADETE', years: '(2011/2012)', ficha: 65, socio: 10 },
+    { id: 'juvenil', label: 'JUVENIL', years: '(2008/2009/2010)', ficha: 175, socio: 25 },
     { id: 'senior', label: 'SENIOR / AFICIONADO', years: '', ficha: 175, socio: 25 }
   ];
 

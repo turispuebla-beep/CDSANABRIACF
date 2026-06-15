@@ -28,14 +28,33 @@
         return [p.name || p.nombre, p.surname || p.apellidos].filter(Boolean).join(' ').trim();
     }
 
+    function personKey(record) {
+        return playerDisplayName(record).toLowerCase();
+    }
+
     function computeDynamicAdminNotifications() {
         const dismissed = readDismissed();
         const items = [];
+
+        const players = safeParse('clubPlayers', []);
+        const pendingIns = ['pending_payment', 'pending_transfer', 'pending_cash', 'pending_tpv'];
+        const pendingInscriptionNames = new Set();
+        players.forEach(function (p) {
+            if (!p) return;
+            const ins = String(p.inscriptionStatus || '').toLowerCase();
+            const needsAction = pendingIns.indexOf(ins) >= 0 || p.status === 'pending_validation';
+            if (!needsAction) return;
+            const name = personKey(p);
+            if (name) pendingInscriptionNames.add(name);
+        });
 
         const members = safeParse('clubMembers', []);
         members.filter(function (m) {
             return m && m.status === 'pending_validation';
         }).forEach(function (m) {
+            if ((m.socioJugador || m.isJugador) && pendingInscriptionNames.has(personKey(m))) {
+                return;
+            }
             const id = 'socio-' + (m.id || m.dni || m.email || Math.random());
             if (dismissed.has(id)) return;
             items.push({
@@ -66,8 +85,6 @@
             });
         });
 
-        const players = safeParse('clubPlayers', []);
-        const pendingIns = ['pending_payment', 'pending_transfer', 'pending_cash', 'pending_tpv'];
         players.forEach(function (p) {
             if (!p) return;
             const ins = String(p.inscriptionStatus || '').toLowerCase();

@@ -30,7 +30,7 @@
             } else {
                 title.textContent = 'Pago no completado';
                 title.className = 'ko';
-                msg.textContent = 'La operación fue cancelada o rechazada. Puedes intentarlo de nuevo desde la web.';
+                msg.textContent = 'La operación fue cancelada o rechazada. No se ha registrado ningún dato. Recibirás un correo de aviso y podrás intentarlo de nuevo desde la web.';
             }
 
             if (order && window.CdsanRedsys) {
@@ -46,7 +46,7 @@
                                 pendingKeys.forEach((k) => localStorage.removeItem(k));
                             } catch (_) {}
                         } else if (st.type === 'player_inscription') {
-                            msg.textContent = '✅ Pago confirmado. Tu inscripción pasa a PAGADA y ACTIVA. Si incluiste cuota de socio, se vinculará por DNI sin duplicar el alta.';
+                            msg.textContent = '✅ Pago confirmado. Tu inscripción quedará registrada y activa en unos segundos. Si incluiste cuota de socio, se vinculará por DNI sin duplicar el alta.';
                             if (window.PlayerInscription && window.PlayerInscription.finalizeFromPendingOrder) {
                                 try {
                                     await window.PlayerInscription.finalizeFromPendingOrder(order);

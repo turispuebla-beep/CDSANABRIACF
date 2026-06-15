@@ -66,7 +66,8 @@
       numeroSocio: opts.numeroSocio || opts.memberNumber,
       memberNumber: opts.memberNumber || opts.numeroSocio,
       numeroAmigo: opts.numeroAmigo || opts.friendNumber,
-      friendNumber: opts.friendNumber || opts.numeroAmigo
+      friendNumber: opts.friendNumber || opts.numeroAmigo,
+      playerId: opts.playerId
     });
   }
 
@@ -122,11 +123,11 @@
       totalEur: opts.totalEur,
       paymentChannel: opts.paymentChannel || opts.paymentMethod,
       paymentMethod: opts.paymentMethod || opts.paymentChannel,
+      fields: opts.fields,
+      playerId: opts.playerId,
       kitSummary: opts.kitSummary
     });
   }
-
-  /** Confirmación al jugador/a: inscripción pagada y validada. */
   function sendPlayerInscriptionPaymentConfirmed(opts) {
     return post({
       type: 'player_inscription_payment_confirmed',
@@ -134,6 +135,7 @@
       requesterEmail: opts.email,
       guardianEmail: opts.guardianEmail,
       dni: opts.dni,
+      playerId: opts.playerId,
       nombre: opts.nombre || opts.name,
       apellidos: opts.apellidos || opts.surname,
       season: opts.season || opts.inscriptionSeason,
@@ -143,7 +145,8 @@
       totalEur: opts.totalEur,
       paymentChannel: opts.paymentChannel || opts.paymentMethod,
       paymentMethod: opts.paymentMethod || opts.paymentChannel,
-      kitSummary: opts.kitSummary
+      kitSummary: opts.kitSummary,
+      fields: opts.fields
     });
   }
 

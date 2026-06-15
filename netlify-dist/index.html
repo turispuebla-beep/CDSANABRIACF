@@ -3257,8 +3257,10 @@
                     // Si hay datos en ambos, mantener el más reciente
                     console.log('📊 Datos en ambos almacenamientos, verificando consistencia...');
                     const sociosCombinados = [...sociosLocal, ...sociosFirebase];
-                    const sociosUnicos = sociosCombinados.filter((socio, index, self) => 
-                        index === self.findIndex(s => s.email === socio.email || s.dni === socio.dni)
+                    const sociosUnicos = sociosCombinados.filter((socio, index, self) =>
+                        index === self.findIndex(function (s) {
+                            return clubMembersSameIdentity(s, socio);
+                        })
                     );
                     localStorage.setItem('clubMembers', JSON.stringify(sociosUnicos));
                     console.log(`✅ Datos consolidados: ${sociosUnicos.length} socios únicos`);
@@ -10374,6 +10376,18 @@
         }
 
         // ===== FUNCIONES DE REGISTRO =====
+        function clubMembersSameIdentity(a, b) {
+            const dniA = String(a && a.dni || '').trim().toUpperCase().replace(/[^0-9A-Z]/g, '');
+            const dniB = String(b && b.dni || '').trim().toUpperCase().replace(/[^0-9A-Z]/g, '');
+            if (dniA && dniB && dniA === dniB) return true;
+            const emA = String(a && a.email || '').trim().toLowerCase();
+            const emB = String(b && b.email || '').trim().toLowerCase();
+            const nameA = [(a && (a.nombre || a.name) || ''), (a && (a.apellidos || a.surname) || '')].join(' ').trim().toLowerCase();
+            const nameB = [(b && (b.nombre || b.name) || ''), (b && (b.apellidos || b.surname) || '')].join(' ').trim().toLowerCase();
+            if (emA && emB && emA === emB && nameA && nameB && nameA === nameB) return true;
+            return false;
+        }
+
         async function registerSocio(event) {
             event.preventDefault();
             if (window.SiteUpdateMode && !SiteUpdateMode.guard()) return;
@@ -10402,7 +10416,10 @@
                 proteccionDatos: document.getElementById('socioProteccionDatos').checked,
                 notificaciones: document.getElementById('socioNotificaciones').checked,
                 consentimiento: document.getElementById('socioConsentimiento').checked,
-                registrationSource: 'web_modal_socio'
+                registrationSource: 'web_modal_socio',
+                socioJugador: false,
+                isJugador: false,
+                playerId: null
             };
 
             if (formData.password !== document.getElementById('socioPasswordConfirm').value) {
@@ -10424,8 +10441,22 @@
             formData.consentimientoIP = 'navegador-cliente';
 
             const sociosExistentes = JSON.parse(localStorage.getItem('clubMembers') || '[]');
-            if (sociosExistentes.some(s => s.email === formData.email)) {
-                alert('❌ Ya existe un socio registrado con este email');
+            const emReg = String(formData.email).trim().toLowerCase();
+            const dniReg = String(formData.dni || '').trim().toUpperCase().replace(/[^0-9A-Z]/g, '');
+            const nameReg = (formData.nombre + ' ' + formData.apellidos).trim().toLowerCase();
+            const duplicateSocio = sociosExistentes.some(function (s) {
+                if (String(s.email || '').trim().toLowerCase() !== emReg) return false;
+                const sName = [(s.nombre || s.name || ''), (s.apellidos || s.surname || '')].join(' ').trim().toLowerCase();
+                const sDni = String(s.dni || '').trim().toUpperCase().replace(/[^0-9A-Z]/g, '');
+                if ((s.socioJugador || s.isJugador) && s.playerId && sName !== nameReg) {
+                    return false;
+                }
+                if (sDni && dniReg && sDni === dniReg) return true;
+                if (sName && sName === nameReg) return true;
+                return false;
+            });
+            if (duplicateSocio) {
+                alert('❌ Ya existe un socio registrado con este email y los mismos datos (nombre o DNI).');
                 return;
             }
 
@@ -10461,6 +10492,44 @@
                     formData.passwordHash = await window.hashClubAccessKey(pwdRegistro);
                 }
                 delete formData.password;
+            }
+
+            const cuota = Number(formData.cuota) || 0;
+            const modoPago = window._socioRegistroModoPago === 'transfer' ? 'transfer' : 'card';
+            window._socioRegistroModoPago = null;
+
+            // Tarjeta/Bizum: no registrar ni enviar datos hasta que el banco confirme el pago (webhook Redsys).
+            if (modoPago === 'card' && cuota > 0) {
+                window._socioOfflinePaymentChannel = null;
+                if (window.firebaseAuth && !window.firebaseAuth.isSimulation) {
+                    try {
+                        const { signOut } = await import('https://www.gstatic.com/firebasejs/10.12.3/firebase-auth.js');
+                        await signOut(window.firebaseAuth);
+                    } catch (e) { console.warn('signOut tras registro socio:', e); }
+                }
+                if (!window.CdsanRedsys) {
+                    alert('❌ La pasarela de pago no está disponible. Recarga la página o contacta con cdsanabriafc@gmail.com.');
+                    return;
+                }
+                closeSociosModal();
+                try {
+                    await window.CdsanRedsys.payMembership({
+                        payMethod: 'card',
+                        amountEur: cuota,
+                        email: formData.email,
+                        memberId: null,
+                        registrationBundle: { member: formData },
+                        description: 'Cuota socio CD Sanabria CF — ' + (formData.numeroSocio || '')
+                    });
+                } catch (payErr) {
+                    console.warn('Pago cuota socio:', payErr);
+                    alert(
+                        '❌ No se pudo iniciar el pago con tarjeta.\n\n' +
+                            (payErr && payErr.message ? payErr.message + '\n\n' : '') +
+                            'Puedes intentarlo de nuevo o contactar con cdsanabriafc@gmail.com.'
+                    );
+                }
+                return;
             }
 
             let okFirebase = true;
@@ -10510,10 +10579,6 @@
             const mensajeNotificaciones = formData.notificaciones
                 ? '\n\n🔔 Notificaciones push activadas - Recibirás información del club'
                 : '\n\n📧 Recibirás información por email';
-
-            const cuota = Number(formData.cuota) || 0;
-            const modoPago = window._socioRegistroModoPago === 'transfer' ? 'transfer' : 'card';
-            window._socioRegistroModoPago = null;
             const syncedMember = JSON.parse(localStorage.getItem('clubMembers') || '[]')
                 .find((s) => String(s.email || '').toLowerCase() === String(formData.email || '').toLowerCase());
             const memberId = (syncedMember && syncedMember.id) || formData.id;
@@ -10560,17 +10625,6 @@
                         return;
                     }
                 }
-            }
-
-            if (modoPago === 'card' && cuota > 0) {
-                notifySocioRegisteredEmail(formData, memberId, 'card');
-                notifyClubSocioRegistration(formData, 'gateway_pending');
-                closeSociosModal();
-                alert(
-                    `✅ Registro guardado en la nube del club.\n\n📋 ${formatNumeroSocioDisplay(formData.numeroSocio)}\n💰 Cuota: ${cuota}€${perfilRegistroMsg}\n\nEn la siguiente pantalla paga con tarjeta. Si el pago es correcto, tu alta quedará activa al instante.${mensajeNotificaciones}`
-                );
-                window.location.href = 'pago-cuota-socio.html?email=' + encodeURIComponent(formData.email);
-                return;
             }
 
             const offlineCh = formData.offlinePaymentChannel || 'transferencia';

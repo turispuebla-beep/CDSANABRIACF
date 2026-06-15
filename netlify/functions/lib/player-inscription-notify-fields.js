@@ -92,6 +92,9 @@ function buildPlayerInscriptionNotifyFields(reg, opts) {
   const season = String(reg.inscriptionSeason || reg.temporada || '').trim();
   const fields = [
     { label: 'ID ficha', value: reg.id || '—' },
+    { label: 'Nombre', value: reg.name || reg.nombre || '—' },
+    { label: 'Apellidos', value: reg.surname || reg.apellidos || '—' },
+    { label: 'DNI', value: reg.dni || '—' },
     { label: 'Nº socio vinculado', value: reg.numeroSocio || reg.memberNumber || '—' },
     { label: 'Temporada', value: season || '—' },
     { label: 'Categoría', value: reg.category || reg.categoria || '—' },
@@ -99,6 +102,21 @@ function buildPlayerInscriptionNotifyFields(reg, opts) {
     { label: 'Domicilio', value: reg.domicilio || reg.address || reg.direccion || '—' },
     { label: 'Localidad', value: reg.localidad || '—' },
     { label: 'Provincia', value: reg.provincia || '—' },
+    { label: 'Teléfono', value: reg.phone || reg.telefono || '—' },
+    { label: 'Email', value: reg.email || '—' },
+    { label: 'Posición', value: reg.position || reg.posicion || '—' },
+    { label: 'Grupo sanguíneo', value: reg.bloodGroup || '—' },
+    { label: 'Lesiones', value: reg.injuries || '—' },
+    { label: 'Alergias / enfermedad', value: reg.allergyIllness || '—' },
+    { label: 'Observaciones', value: reg.observations || '—' },
+    {
+      label: 'Peso (kg)',
+      value: reg.weightKg != null && reg.weightKg !== '' ? reg.weightKg : '—'
+    },
+    {
+      label: 'Altura (cm)',
+      value: reg.heightCm != null && reg.heightCm !== '' ? reg.heightCm : '—'
+    },
     { label: 'Cuota ficha (€)', value: cb.ficha != null ? cb.ficha : reg.fichaFee != null ? reg.fichaFee : '—' },
     { label: 'Cuota socio (€)', value: cb.socio != null ? cb.socio : reg.socioFee != null ? reg.socioFee : '—' },
     { label: 'Total inscripción (€)', value: cb.total != null ? cb.total : reg.totalCharge != null ? reg.totalCharge : '—' },
@@ -111,6 +129,7 @@ function buildPlayerInscriptionNotifyFields(reg, opts) {
     ...buildConsentNotifyFields(reg)
   ];
   if (extra.orderId) fields.push({ label: 'Pedido pasarela', value: extra.orderId });
+  if (extra.paid) fields.push({ label: 'Estado', value: 'Pagado / activo' });
   if (extra.paymentNote) fields.push({ label: 'Nota pago', value: extra.paymentNote });
   if (extra.offlineChannel === 'transferencia' || extra.includeClubAccount) {
     fields.push({ label: 'Cuenta club', value: 'CAJA RURAL ES12 3085 0034 8222 5127 9226' });
