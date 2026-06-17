@@ -413,14 +413,31 @@
       idx = players.findIndex((p) => normalizeDni(p.dni) === dni);
     }
     if (idx < 0 && email && season) {
-      idx = players.findIndex(
-        (p) =>
-          String(p.email || '').trim().toLowerCase() === email &&
-          String(p.inscriptionSeason || p.temporada || '') === season
-      );
+      idx = players.findIndex((p) => {
+        if (String(p.email || '').trim().toLowerCase() !== email) return false;
+        if (String(p.inscriptionSeason || p.temporada || '') !== season) return false;
+        if (fullName) {
+          const pn = [p.name || p.nombre, p.surname || p.apellidos]
+            .filter(Boolean)
+            .join(' ')
+            .trim()
+            .toLowerCase();
+          return pn === fullName;
+        }
+        if (dni && normalizeDni(p.dni) === dni) return true;
+        return false;
+      });
     }
-    if (idx < 0 && email) {
-      idx = players.findIndex((p) => String(p.email || '').trim().toLowerCase() === email);
+    if (idx < 0 && email && fullName) {
+      idx = players.findIndex((p) => {
+        if (String(p.email || '').trim().toLowerCase() !== email) return false;
+        const pn = [p.name || p.nombre, p.surname || p.apellidos]
+          .filter(Boolean)
+          .join(' ')
+          .trim()
+          .toLowerCase();
+        return pn === fullName;
+      });
     }
     if (idx < 0 && fullName && season) {
       idx = players.findIndex(
@@ -859,6 +876,9 @@
         try {
           member.cuotaVigenteHasta = global.proximoCierreTemporada().toISOString();
         } catch (_) {}
+      }
+      if (global.ClubMemberNumbers && global.ClubMemberNumbers.assignNextRegularNumberIfNeeded) {
+        global.ClubMemberNumbers.assignNextRegularNumberIfNeeded(member, readMembers());
       }
       return;
     }

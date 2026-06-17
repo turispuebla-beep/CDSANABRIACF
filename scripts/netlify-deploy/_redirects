@@ -18,6 +18,8 @@
 /pago-cuota-socio.html    /pago-cuota-socio.html    200
 /inscripcion-jugador.html /inscripcion-jugador.html 200
 /inscripcion-jugador-demo.html /inscripcion-jugador-demo.html 200
+/torneo-equipo.html      /torneo-equipo.html      200
+/torneo-jugador.html     /torneo-jugador.html     200
 /sw.js                    /sw.js                    200
 /manifest.json            /manifest.json            200
 /js/*                     /js/:splat                200

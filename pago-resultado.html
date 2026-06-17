@@ -52,6 +52,10 @@
                                     await window.PlayerInscription.finalizeFromPendingOrder(order);
                                 } catch (_) {}
                             }
+                        } else if (st.type === 'torneo_team_inscription') {
+                            msg.textContent = '✅ Pago del torneo confirmado. La plantilla de tu equipo se enviará al club en unos segundos.';
+                            const back = document.querySelector('a[href="index.html"]');
+                            if (back) back.href = 'torneo-equipo.html';
                         } else {
                             msg.textContent += ' Estado confirmado: pagado.';
                         }

@@ -108,6 +108,33 @@ El código del panel reserva algunas acciones (gestión de otros admins, etc.) s
 
 ---
 
+## Organizador/a de competiciones (torneo Fútbol 7)
+
+Cuenta con acceso **solo a la pestaña Competiciones** del panel (`admin-panel.html`): campos múltiples, calendario paralelo, cuadros, actas y preinscripciones del torneo.
+
+| Campo | Valor |
+|-------|--------|
+| Colección | `sanabria_admins` |
+| **ID del documento** | UID de Firebase Authentication |
+
+```json
+{
+  "appScope": "cdsanabriacf",
+  "isAdmin": false,
+  "isSuperAdmin": false,
+  "role": "competition_organizer",
+  "email": "organizador@ejemplo.com",
+  "name": "Organizador Torneo F7"
+}
+```
+
+1. Crea el usuario en **Authentication** (email + contraseña).
+2. Crea el documento anterior con **ID = UID** del usuario.
+3. Entra en la web con **Acceso administrador** (mismo flujo que un admin).
+4. Despliega las **reglas de Firestore** actualizadas (`firestore.rules`) para permitir escritura en `sanabria_competitions` y lectura/edición de preinscripciones.
+
+---
+
 ## Comprobar que Firebase cargó
 
 En F12 → Consola debe aparecer:

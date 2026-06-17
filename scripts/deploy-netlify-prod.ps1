@@ -59,9 +59,10 @@ foreach ($f in $required) {
 Write-Host '[3/4] netlify deploy...' -ForegroundColor Cyan
 if ($Draft) {
     Write-Host '      Modo BORRADOR (no es producción)' -ForegroundColor Yellow
-    netlify deploy
+    netlify deploy --skip-functions-cache
 } else {
-    netlify deploy --prod
+    Write-Host '      Producción (--skip-functions-cache: sube todas las funciones)' -ForegroundColor DarkGray
+    netlify deploy --prod --skip-functions-cache
 }
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 

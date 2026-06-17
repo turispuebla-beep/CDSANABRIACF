@@ -152,6 +152,48 @@
     return false;
   }
 
+  function isTestOrDiagnosticRecord(rec) {
+    if (!rec || typeof rec !== 'object') return false;
+    if (rec.testRunId || rec.registrationSource === 'automated_test') return true;
+    const dni = normalizeDni(rec.dni);
+    if (dni === '88888888T' || dni === '88888888X') return true;
+    const name = normalizeFullName(rec.name || rec.nombre, rec.surname || rec.apellidos);
+    if (name === 'diag test') return true;
+    if (/^prueba\s/.test(name) && /(automatizado|jugador|socio|solicitud)/.test(name)) return true;
+    const email = normalizeEmail(rec.email);
+    if (email.endsWith('@example.invalid')) return true;
+    const phone = String(rec.phone || rec.telefono || '').replace(/\D/g, '');
+    if (phone === '600000001' && /(diag|test|prueba)/.test(name)) return true;
+    return false;
+  }
+
+  function purgeTestAndDiagnosticRecords(players, members) {
+    const removedPlayerIds = [];
+    const removedMemberIds = [];
+    const playerList = Array.isArray(players) ? players : [];
+    const memberList = Array.isArray(members) ? members : [];
+    const filteredPlayers = playerList.filter(function (p) {
+      if (isTestOrDiagnosticRecord(p)) {
+        if (p.id) removedPlayerIds.push(p.id);
+        return false;
+      }
+      return true;
+    });
+    const filteredMembers = memberList.filter(function (m) {
+      if (isTestOrDiagnosticRecord(m)) {
+        if (m.id) removedMemberIds.push(m.id);
+        return false;
+      }
+      return true;
+    });
+    return {
+      players: filteredPlayers,
+      members: filteredMembers,
+      removedPlayerIds: removedPlayerIds,
+      removedMemberIds: removedMemberIds
+    };
+  }
+
   function playerIdentityKeys(p) {
     const season = playerSeason(p);
     const keys = [];
@@ -159,10 +201,80 @@
     const email = normalizeEmail(p.email);
     const name = normalizeFullName(p.name || p.nombre, p.surname || p.apellidos);
     if (dni) keys.push('dni:' + dni + '|' + season);
-    if (email) keys.push('email:' + email + '|' + season);
     if (name) keys.push('name:' + name + '|' + season);
+    // Email solo con nombre (hermanos comparten correo del tutor)
+    if (email && name) keys.push('email:' + email + '|' + name + '|' + season);
     if (p.id) keys.push('id:' + p.id);
     return keys;
+  }
+
+  /** Identidad global (sin temporada): misma persona en 2025-2026 y 2026-2027. */
+  function globalPlayerIdentityKey(p) {
+    const dni = normalizeDni(p.dni);
+    if (dni) return 'dni:' + dni;
+    const name = normalizeFullName(p.name || p.nombre, p.surname || p.apellidos);
+    if (name) return 'name:' + name;
+    return 'id:' + String((p && p.id) || '');
+  }
+
+  function crossSeasonScore(p) {
+    let score = playerScore(p);
+    if (playerSeason(p) === currentSeason()) score += 100;
+    if (isPaidPlayer(p)) score += 50;
+    return score;
+  }
+
+  /** Corrige erratas conocidas en nombre/apellidos (p. ej. MONTEOR → MONTERO). */
+  function fixPlayerNameTypos(player) {
+    if (!player || typeof player !== 'object') return false;
+    let changed = false;
+    function fixText(value) {
+      if (!value || typeof value !== 'string') return value;
+      const fixed = value.replace(/\bMONTEOR\b/gi, 'MONTERO');
+      return fixed !== value ? fixed : value;
+    }
+    ['name', 'nombre', 'surname', 'apellidos'].forEach(function (key) {
+      if (!player[key]) return;
+      const fixed = fixText(String(player[key]));
+      if (fixed !== player[key]) {
+        player[key] = fixed;
+        changed = true;
+      }
+    });
+    return changed;
+  }
+
+  /**
+   * Si la misma persona tiene ficha en varias temporadas, conserva la mejor
+   * (temporada actual, pagada, más completa) y elimina el resto.
+   */
+  function removeCrossSeasonDuplicates(players) {
+    const list = Array.isArray(players) ? players.slice() : [];
+    if (list.length < 2) return { players: list, removedIds: [] };
+
+    const groups = new Map();
+    list.forEach(function (p) {
+      const key = globalPlayerIdentityKey(p);
+      if (!groups.has(key)) groups.set(key, []);
+      groups.get(key).push(p);
+    });
+
+    const kept = [];
+    const removedIds = [];
+    groups.forEach(function (group) {
+      if (group.length === 1) {
+        kept.push(group[0]);
+        return;
+      }
+      group.sort(function (a, b) {
+        return crossSeasonScore(b) - crossSeasonScore(a);
+      });
+      kept.push(group[0]);
+      for (let i = 1; i < group.length; i++) {
+        removedIds.push(group[i].id);
+      }
+    });
+    return { players: kept, removedIds: removedIds };
   }
 
   function playerScore(p) {
@@ -250,8 +362,13 @@
       players.find(function (p) {
         if (playerSeason(p) !== season) return false;
         if (dni && normalizeDni(p.dni) === dni) return true;
-        if (email && normalizeEmail(p.email) === email) return true;
         if (name && normalizeFullName(p.name || p.nombre, p.surname || p.apellidos) === name) return true;
+        if (email && normalizeEmail(p.email) === email) {
+          if (name) {
+            return normalizeFullName(p.name || p.nombre, p.surname || p.apellidos) === name;
+          }
+          return false;
+        }
         return false;
       }) || null
     );
@@ -566,6 +683,7 @@
 
     for (let i = 0; i < players.length; i++) {
       const player = players[i];
+      if (isTestOrDiagnosticRecord(player)) continue;
       if (playerSeason(player) !== season) continue;
       if (!playerShouldHaveSocioMember(player)) continue;
 
@@ -654,11 +772,18 @@
 
     players = dedupePlayers(players);
 
+    const crossSeason = removeCrossSeasonDuplicates(players);
+    players = crossSeason.players;
+    crossSeason.removedIds.forEach(function (id) {
+      if (id && removedIds.indexOf(id) < 0) removedIds.push(id);
+    });
+
     let created = 0;
     let linked = 0;
 
     members.forEach(function (member) {
       if (!memberIsSocioJugador(member)) return;
+      if (isTestOrDiagnosticRecord(member)) return;
       let player = findPlayerForMember(players, member, season);
       if (!player) {
         player = buildPlayerFromMember(member, season);
@@ -684,6 +809,14 @@
     });
 
     players = dedupePlayers(players);
+    players.forEach(function (p) {
+      fixPlayerNameTypos(p);
+    });
+    const crossFinal = removeCrossSeasonDuplicates(players);
+    players = crossFinal.players;
+    crossFinal.removedIds.forEach(function (id) {
+      if (id && removedIds.indexOf(id) < 0) removedIds.push(id);
+    });
     writePlayers(players);
     writeMembers(members);
 
@@ -798,8 +931,29 @@
     return { updated: updated, total: players.length };
   }
 
+  /** Añade fichas jugador/a desde socios socio-jugador que falten en la lista local. */
+  function fillMissingPlayersFromMembers(players, members, season) {
+    const list = Array.isArray(players) ? players.slice() : [];
+    const memberList = Array.isArray(members) ? members : [];
+    const seasonStr = String(season || currentSeason()).trim();
+    memberList.forEach(function (member) {
+      if (!memberIsSocioJugador(member)) return;
+      if (isTestOrDiagnosticRecord(member)) return;
+      const found = findPlayerForMember(list, member, seasonStr);
+      if (!found) {
+        list.push(buildPlayerFromMember(member, seasonStr));
+      }
+    });
+    return list;
+  }
+
   global.ClubPlayerMemberSync = {
     dedupePlayers: dedupePlayers,
+    globalPlayerIdentityKey: globalPlayerIdentityKey,
+    removeCrossSeasonDuplicates: removeCrossSeasonDuplicates,
+    fixPlayerNameTypos: fixPlayerNameTypos,
+    isTestOrDiagnosticRecord: isTestOrDiagnosticRecord,
+    purgeTestAndDiagnosticRecords: purgeTestAndDiagnosticRecords,
     isAbandonedInscriptionAttempt: isAbandonedInscriptionAttempt,
     regularizeMembersFromPlayers: regularizeMembersFromPlayers,
     regularizePlayersFromMembers: regularizePlayersFromMembers,
@@ -811,5 +965,7 @@
     ensurePlayerCategoryFields: ensurePlayerCategoryFields,
     playerMatchesCategoryFilter: playerMatchesCategoryFilter,
     regularizePlayerCategories: regularizePlayerCategories,
+    fillMissingPlayersFromMembers: fillMissingPlayersFromMembers,
+    buildPlayerFromMember: buildPlayerFromMember
   };
 })(typeof window !== 'undefined' ? window : globalThis);

@@ -34,6 +34,41 @@
     }
   }
 
+  function generateAccessCodeForRow(row) {
+    const year = new Date().getFullYear();
+    const suffix = String(row.id || row.localId || '')
+      .replace(/[^a-zA-Z0-9]/g, '')
+      .toUpperCase()
+      .slice(-4)
+      .padStart(4, '0');
+    return 'TP-' + year + '-' + suffix;
+  }
+
+  async function ensureAccessCodes(rows) {
+    if (!global.updateDocument) return rows;
+    const out = [];
+    for (let i = 0; i < rows.length; i++) {
+      const row = rows[i];
+      if (row.accessCode || !row.id) {
+        out.push(row);
+        continue;
+      }
+      const accessCode = generateAccessCodeForRow(row);
+      try {
+        await global.updateDocument('torneo_preinscripciones', row.id, {
+          accessCode: accessCode,
+          panelEnabled: row.panelEnabled !== false,
+          updatedAt: new Date().toISOString()
+        });
+        out.push(Object.assign({}, row, { accessCode: accessCode }));
+      } catch (e) {
+        console.warn('[AdminTorneoPreinscripciones] accessCode:', e);
+        out.push(row);
+      }
+    }
+    return out;
+  }
+
   function listTargets() {
     return [
       {
@@ -66,10 +101,12 @@
           '<thead><tr style="background:#eff6ff;text-align:left;">' +
           '<th style="padding:8px;border-bottom:1px solid #bfdbfe;">Fecha</th>' +
           '<th style="padding:8px;border-bottom:1px solid #bfdbfe;">Equipo</th>' +
+          '<th style="padding:8px;border-bottom:1px solid #bfdbfe;">Código</th>' +
           '<th style="padding:8px;border-bottom:1px solid #bfdbfe;">Categorías</th>' +
           '<th style="padding:8px;border-bottom:1px solid #bfdbfe;">Contacto</th>' +
           '<th style="padding:8px;border-bottom:1px solid #bfdbfe;">Tel.</th>' +
           '<th style="padding:8px;border-bottom:1px solid #bfdbfe;">Jug.</th>' +
+          '<th style="padding:8px;border-bottom:1px solid #bfdbfe;">Plantilla</th>' +
           '<th style="padding:8px;border-bottom:1px solid #bfdbfe;">Acciones</th>' +
           '</tr></thead><tbody>' +
           sorted
@@ -81,6 +118,7 @@
                   ? r.categories.join(', ')
                   : String(r.categories || '—');
               const linked = r.competitionTeamId ? ' · en competición' : '';
+              const accessCode = r.accessCode ? String(r.accessCode) : '';
               return (
                 '<tr style="border-bottom:1px solid #e2e8f0;">' +
                 '<td style="padding:8px;white-space:nowrap;">' +
@@ -92,6 +130,13 @@
                 escapeHtml(r.town || '') +
                 linked +
                 '</span></td>' +
+                '<td style="padding:8px;font-family:ui-monospace,monospace;font-size:0.82rem;">' +
+                (accessCode
+                  ? '<span title="Código responsable">' +
+                    escapeHtml(accessCode) +
+                    '</span>'
+                  : '<span style="color:#94a3b8;">—</span>') +
+                '</td>' +
                 '<td style="padding:8px;">' +
                 escapeHtml(cats) +
                 '</td>' +
@@ -107,6 +152,22 @@
                 '</td>' +
                 '<td style="padding:8px;">' +
                 escapeHtml(r.playerCount) +
+                '</td>' +
+                '<td style="padding:8px;font-size:0.82rem;">' +
+                escapeHtml(r.plantillaStatus || 'pendiente') +
+                (r.fichas && r.fichas.length
+                  ? '<br><span style="color:#64748b;">' +
+                    escapeHtml(
+                      String(
+                        r.fichas.filter(function (f) {
+                          return String(f.status || '') === 'enviada';
+                        }).length
+                      ) +
+                        '/' +
+                        String(r.playerCount || r.fichas.length)
+                    ) +
+                    ' fichas</span>'
+                  : '') +
                 '</td>' +
                 '<td style="padding:8px;white-space:nowrap;">' +
                 (r.competitionTeamId
@@ -269,7 +330,8 @@
         return;
       }
       const rows = await global.getDocuments('torneo_preinscripciones');
-      global.__torneoPreinscripcionesCache = Array.isArray(rows) ? rows : [];
+      const withCodes = await ensureAccessCodes(Array.isArray(rows) ? rows : []);
+      global.__torneoPreinscripcionesCache = withCodes;
       renderRows(global.__torneoPreinscripcionesCache);
     } catch (err) {
       console.warn('[AdminTorneoPreinscripciones]', err);

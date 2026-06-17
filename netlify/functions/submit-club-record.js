@@ -60,7 +60,9 @@ exports.handler = async (event) => {
           dni: body.dni,
           name: body.name,
           surname: body.surname,
-          season: body.season || body.inscriptionSeason
+          season: body.season || body.inscriptionSeason,
+          allowNotFound: body.allowNotFound === true,
+          purgeTestRecords: body.purgeTestRecords === true
         });
         return jsonResponse(200, { ok: true, deleted: true, playerId: recordId }, origin);
       }

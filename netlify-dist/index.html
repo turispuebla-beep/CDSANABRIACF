@@ -27,7 +27,9 @@
     <script src="js/site-update-mode.js"></script>
     <script src="js/player-application.js"></script>
     <script src="js/torneo-preinscripcion.js"></script>
+    <script src="js/torneo-responsable-access.js"></script>
     <script src="js/colaborador-solicitud.js"></script>
+    <script src="js/club-default-advertisers.js"></script>
     <script src="js/club-social-share.js"></script>
     <script src="js/club-email-notify.js"></script>
     <script src="js/payment-method-picker.js"></script>
@@ -1021,6 +1023,63 @@
             box-shadow: 0 6px 20px rgba(0,0,0,0.3);
         }
 
+        /* Zona publicidad + colaboradores (carrusel bajo el escudo) */
+        .feature-btn--sm {
+            font-size: 0.82rem;
+            padding: 6px 14px;
+            margin-top: 0;
+        }
+
+        .feature-actions--compact {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 8px;
+            margin-top: 14px;
+        }
+
+        .feature-btn--secondary {
+            background: #475569 !important;
+        }
+
+        .feature-btn--secondary:hover {
+            background: #334155 !important;
+        }
+
+        .ad-publicity-zone {
+            margin: 0 auto 32px;
+            max-width: 820px;
+            padding: 0 12px;
+            display: block;
+        }
+
+        .ad-publicity-zone-toolbar {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            margin-bottom: 12px;
+            min-height: 40px;
+            text-align: center;
+        }
+
+        .ad-colaborador-cta.ad-colaborador-cta--toolbar {
+            position: static;
+            top: auto;
+            right: auto;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            padding: 10px 20px;
+            border-radius: 999px;
+            font-size: 0.9rem;
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+        }
+
+        .team-info + .ad-publicity-zone {
+            margin-top: 4px;
+        }
+
         /* Estilos para el carrusel de publicidad */
         .team-info + .ad-carousel-empty {
             margin-top: -16px;
@@ -1028,10 +1087,9 @@
 
         .ad-carousel-empty {
             position: relative;
-            margin: 0 auto 40px;
+            margin: 0 auto;
             max-width: 100%;
             padding: 28px 24px;
-            padding-top: 48px;
             text-align: center;
             color: #64748b;
             background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
@@ -1114,13 +1172,29 @@
             font-weight: 700;
             color: #059669;
             white-space: nowrap;
-            font-size: 0.92rem;
+        }
+
+        .colab-service-row--no-price {
+            grid-template-columns: auto 1fr;
         }
 
         .colab-files-hint {
             font-size: 0.85rem;
             color: #64748b;
             margin: 4px 0 0;
+        }
+
+        .colab-social-fields {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+            margin-top: 4px;
+        }
+
+        @media (max-width: 560px) {
+            .colab-social-fields {
+                grid-template-columns: 1fr;
+            }
         }
 
         .colab-attach-notice {
@@ -1164,13 +1238,41 @@
 
         .proximo-evento-club {
             margin: 0 auto 22px;
-            max-width: 340px;
+            max-width: 560px;
             padding: 14px 12px 16px;
             text-align: center;
             background: linear-gradient(160deg, #ffffff 0%, #eff6ff 55%, #ecfdf5 100%);
             border-radius: 14px;
             border: 1px solid #bfdbfe;
             box-shadow: 0 6px 20px rgba(30, 58, 138, 0.1);
+        }
+
+        .proximo-evento-posters {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            align-items: flex-start;
+            gap: 16px;
+            margin: 0 auto;
+        }
+
+        .proximo-evento-col {
+            flex: 1 1 200px;
+            max-width: 240px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            text-align: center;
+        }
+
+        .proximo-evento-col--inscrip {
+            justify-content: center;
+            align-self: stretch;
+        }
+
+        .proximo-evento-col--inscrip .proximo-evento-poster-wrap {
+            margin-top: auto;
+            margin-bottom: auto;
         }
 
         .proximo-evento-kicker {
@@ -1183,15 +1285,16 @@
         }
 
         .proximo-evento-titulo {
-            margin: 0 0 10px;
+            margin: 0 0 8px;
             font-size: 1.05rem;
             color: #1e3a8a;
             line-height: 1.25;
         }
 
         .proximo-evento-poster-wrap {
-            margin: 0 auto 6px;
+            margin: 0;
             max-width: 200px;
+            flex: 1 1 160px;
             border-radius: 12px;
             overflow: hidden;
             box-shadow: 0 6px 18px rgba(0, 0, 0, 0.12);
@@ -1220,7 +1323,7 @@
         }
 
         .proximo-evento-zoom-hint {
-            margin: 0 0 10px;
+            margin: 0 0 8px;
             font-size: 0.7rem;
             color: #94a3b8;
         }
@@ -1295,6 +1398,126 @@
         .proximo-evento-cta:hover {
             transform: translateY(-2px);
             box-shadow: 0 8px 22px rgba(5, 150, 105, 0.45);
+        }
+
+        .proximo-evento-actions {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            margin-top: 4px;
+        }
+
+        .proximo-evento-cta--secondary {
+            background: linear-gradient(135deg, #1e3a8a 0%, #2563eb 100%);
+            box-shadow: 0 6px 18px rgba(37, 99, 235, 0.3);
+        }
+
+        .proximo-evento-cta--secondary:hover {
+            box-shadow: 0 8px 22px rgba(37, 99, 235, 0.42);
+        }
+
+        .tre-access-modal .modal-content {
+            max-width: 480px;
+        }
+
+        .tre-access-intro {
+            color: #64748b;
+            font-size: 0.92rem;
+            line-height: 1.5;
+            margin: 0 0 18px;
+        }
+
+        .tre-access-steps {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 18px;
+            flex-wrap: wrap;
+        }
+
+        .tre-access-step {
+            flex: 1;
+            min-width: 120px;
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            border-radius: 10px;
+            padding: 10px 12px;
+            font-size: 0.78rem;
+            color: #475569;
+            line-height: 1.35;
+        }
+
+        .tre-access-step strong {
+            display: block;
+            color: #1e3a8a;
+            font-size: 0.82rem;
+            margin-bottom: 4px;
+        }
+
+        .tre-access-form label {
+            display: block;
+            font-weight: 600;
+            font-size: 0.88rem;
+            color: #334155;
+            margin: 12px 0 6px;
+        }
+
+        .tre-access-form input {
+            width: 100%;
+            box-sizing: border-box;
+            padding: 12px;
+            border: 1px solid #cbd5e1;
+            border-radius: 10px;
+            font-size: 1rem;
+        }
+
+        .tre-access-form input:focus {
+            outline: 2px solid #93c5fd;
+            border-color: #60a5fa;
+        }
+
+        .tre-access-code-hint {
+            font-size: 0.8rem;
+            color: #64748b;
+            margin: 4px 0 0;
+        }
+
+        .tre-access-error {
+            background: #fef2f2;
+            border: 1px solid #fecaca;
+            color: #b91c1c;
+            padding: 12px 14px;
+            border-radius: 10px;
+            font-size: 0.9rem;
+            margin: 14px 0 0;
+            line-height: 1.45;
+        }
+
+        .tre-access-submit {
+            width: 100%;
+            margin-top: 18px;
+            padding: 12px 20px;
+            border: none;
+            border-radius: 999px;
+            font-weight: 800;
+            font-size: 0.95rem;
+            color: #fff;
+            cursor: pointer;
+            background: linear-gradient(135deg, #1e3a8a 0%, #2563eb 100%);
+            box-shadow: 0 6px 18px rgba(37, 99, 235, 0.35);
+        }
+
+        .tre-access-submit:disabled {
+            opacity: 0.65;
+            cursor: wait;
+        }
+
+        .tre-access-footer {
+            margin: 14px 0 0;
+            font-size: 0.82rem;
+            color: #64748b;
+            line-height: 1.45;
         }
 
         .proximo-evento-hint {
@@ -1388,9 +1611,17 @@
             .proximo-evento-titulo {
                 font-size: 0.98rem;
             }
-            .proximo-evento-poster-wrap {
-                max-width: 120px;
+            .proximo-evento-col {
+                max-width: 100%;
+                flex: 1 1 140px;
             }
+            .proximo-evento-poster-wrap {
+                max-width: 140px;
+            }
+        }
+
+        .ad-publicity-zone .ad-carousel {
+            margin: 0 auto;
         }
 
         .ad-carousel {
@@ -1640,6 +1871,21 @@
         }
 
         @media (max-width: 768px) {
+            .ad-publicity-zone {
+                margin-bottom: 24px;
+                padding: 0 10px;
+            }
+
+            .ad-publicity-zone-toolbar {
+                justify-content: center;
+                margin-bottom: 8px;
+            }
+
+            .ad-colaborador-cta.ad-colaborador-cta--toolbar {
+                width: auto;
+                max-width: 100%;
+            }
+
             .ad-carousel {
                 margin: 15px;
                 max-width: none;
@@ -2191,20 +2437,6 @@
             <span id="siteUpdateBannerText"></span>
         </div>
 
-        <!-- Carrusel de Publicidad -->
-        <div id="adCarousel" class="ad-carousel" style="display: none;">
-            <div class="carousel-container">
-                <div class="carousel-slides" id="carouselSlides">
-                    <!-- Los slides se cargarán dinámicamente -->
-                </div>
-                <button class="carousel-btn prev" onclick="changeSlide(-1)">❮</button>
-                <button class="carousel-btn next" onclick="changeSlide(1)">❯</button>
-                <div class="carousel-dots" id="carouselDots">
-                    <!-- Los puntos se generarán dinámicamente -->
-                </div>
-            </div>
-        </div>
-            
         <!-- Indicador del día actual -->
         <div class="current-day-banner" style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: white; padding: 12px; text-align: center; font-size: 0.9rem; border-radius: 10px; margin-bottom: 20px;">
                 <span id="currentDayDisplay">📅 Cargando fecha actual...</span>
@@ -2224,39 +2456,75 @@
             </div>
         </div>
 
-        <div id="adCarouselEmpty" class="ad-carousel-empty" style="display: none;" aria-live="polite">
-            <button type="button" class="ad-colaborador-cta" onclick="openColaboradorSolicitudModal()" aria-haspopup="dialog">
-                🤝 Colabora
-            </button>
-            <div class="ad-carousel-empty-icon" aria-hidden="true">📢</div>
-            <h3>No hay publicidad activa</h3>
-            <p>Añade publicidad y colaboradores</p>
-        </div>
+        <section id="adPublicityZone" class="ad-publicity-zone" aria-label="Publicidad y colaboradores">
+            <div class="ad-publicity-zone-toolbar">
+                <button type="button" class="ad-colaborador-cta ad-colaborador-cta--toolbar" onclick="openColaboradorSolicitudModal()" aria-haspopup="dialog">
+                    🤝 Colaboradores
+                </button>
+            </div>
+            <div id="adCarousel" class="ad-carousel" style="display: none;">
+                <div class="carousel-container">
+                    <div class="carousel-slides" id="carouselSlides">
+                        <!-- Los slides se cargarán dinámicamente -->
+                    </div>
+                    <button class="carousel-btn prev" onclick="changeSlide(-1)" aria-label="Anuncio anterior">❮</button>
+                    <button class="carousel-btn next" onclick="changeSlide(1)" aria-label="Siguiente anuncio">❯</button>
+                    <div class="carousel-dots" id="carouselDots"></div>
+                </div>
+            </div>
+            <div id="adCarouselEmpty" class="ad-carousel-empty" style="display: none;" aria-live="polite">
+                <div class="ad-carousel-empty-icon" aria-hidden="true">📢</div>
+                <h3>No hay publicidad activa</h3>
+                <p>Añade publicidad y colaboradores desde el panel o solicita colaboración con el botón de arriba.</p>
+            </div>
+        </section>
 
         <section id="proximoEventoClub" class="proximo-evento-club" aria-labelledby="proximoEventoTitulo">
             <p class="proximo-evento-kicker">Próximo evento del club</p>
-            <h2 id="proximoEventoTitulo" class="proximo-evento-titulo">Torneo Fútbol 7 — 2026</h2>
-            <button
-                type="button"
-                class="proximo-evento-poster-wrap"
-                onclick="abrirCartelProximoEvento()"
-                aria-label="Ampliar cartel del Torneo Fútbol 7 2026"
-            >
-                <img
-                    src="assets/torneo-futbol-7-2026.jpeg"
-                    alt=""
-                    class="proximo-evento-poster"
-                    width="480"
-                    height="680"
-                    loading="eager"
-                    aria-hidden="true"
-                >
-            </button>
-            <p class="proximo-evento-zoom-hint">Toca el cartel para verlo en grande</p>
-            <button type="button" class="proximo-evento-cta" onclick="openTorneoPreinscripcionModal()">
-                Inscríbete
-            </button>
-            <p class="proximo-evento-hint">Preinscripción abierta a todos. Más adelante pediremos los datos de los miembros del equipo.</p>
+            <div class="proximo-evento-posters">
+                <div class="proximo-evento-col proximo-evento-col--torneo">
+                    <h2 id="proximoEventoTitulo" class="proximo-evento-titulo">Torneo Fútbol 7 — 2026</h2>
+                    <button
+                        type="button"
+                        class="proximo-evento-poster-wrap"
+                        onclick="abrirCartelProximoEvento('assets/torneo-futbol-7-2026.jpeg')"
+                        aria-label="Ampliar cartel del Torneo Fútbol 7 2026"
+                    >
+                        <img
+                            src="assets/torneo-futbol-7-2026.jpeg"
+                            alt=""
+                            class="proximo-evento-poster"
+                            width="480"
+                            height="680"
+                            loading="eager"
+                            aria-hidden="true"
+                        >
+                    </button>
+                    <p class="proximo-evento-zoom-hint">Toca el cartel para verlo en grande</p>
+                    <div class="proximo-evento-actions">
+                        <button type="button" class="proximo-evento-cta" onclick="openTorneoPreinscripcionModal()">
+                            Inscríbete
+                        </button>
+                    </div>
+                    <p class="proximo-evento-hint">Preinscripción abierta a todos. Si ya tienes código de equipo, entra como responsable desde la tarjeta <strong>Competiciones</strong> más abajo.</p>
+                </div>
+                <div class="proximo-evento-col proximo-evento-col--inscrip">
+                    <button
+                        type="button"
+                        class="proximo-evento-poster-wrap"
+                        onclick="abrirCartelProximoEvento('assets/torneo-inscripciones-2026.jpg')"
+                        aria-label="Ampliar cartel"
+                    >
+                        <img
+                            src="assets/torneo-inscripciones-2026.jpg"
+                            alt=""
+                            class="proximo-evento-poster"
+                            loading="lazy"
+                            aria-hidden="true"
+                        >
+                    </button>
+                </div>
+            </div>
         </section>
 
         <div
@@ -2278,7 +2546,7 @@
                     id="proximoEventoLightboxImg"
                     class="proximo-evento-lightbox-img"
                     src="assets/torneo-futbol-7-2026.jpeg"
-                    alt="Cartel del Torneo Fútbol 7 2026 — CD Sanabria CF"
+                    alt=""
                 >
             </div>
         </div>
@@ -2316,16 +2584,19 @@
                 <button class="feature-btn" style="background: var(--primary-color); color: white; border: none; padding: 8px 16px; border-radius: 20px; margin-top: 15px; cursor: pointer;">Ver Eventos</button>
             </div>
 
-            <div class="feature-card" onclick="openFeature('competiciones')" style="cursor: pointer; position: relative;">
+            <div class="feature-card feature-card--competiciones" style="position: relative;">
                 <span id="badge-competiciones" class="feature-badge" style="display: none;"></span>
                 <div class="feature-icon">🏆</div>
                 <h3 class="feature-title">Competiciones</h3>
                 <p class="feature-description">
-                    Participamos en ligas, torneos y competiciones. 
+                    Participamos en ligas, torneos y competiciones.
                     Gestión de clasificaciones y resultados del club.
                 </p>
-                <button class="feature-btn" style="background: var(--primary-color); color: white; border: none; padding: 8px 16px; border-radius: 20px; margin-top: 15px; cursor: pointer;">Ver Competiciones</button>
-        </div>
+                <div class="feature-actions feature-actions--compact">
+                    <button type="button" class="feature-btn feature-btn--sm" style="background: var(--primary-color); color: white; border: none; border-radius: 20px; cursor: pointer;" onclick="openFeature('competiciones')">Ver Competiciones</button>
+                    <button type="button" class="feature-btn feature-btn--sm feature-btn--secondary" style="color: white; border: none; border-radius: 20px; cursor: pointer;" onclick="openTorneoResponsableAccessModal()">Soy responsable del equipo</button>
+                </div>
+            </div>
 
             <div class="feature-card" onclick="openFeature('multimedia')" style="cursor: pointer; position: relative;">
                 <div class="feature-icon">📸</div>
@@ -2586,6 +2857,36 @@
             </div>
         </div>
 
+        <!-- Acceso responsable de equipo — Torneo -->
+        <div id="torneoResponsableAccessModal" class="modal tre-access-modal" style="display: none;" role="dialog" aria-labelledby="treModalTitle" aria-modal="true">
+            <div class="modal-content">
+                <span class="close" onclick="closeTorneoResponsableAccessModal()" aria-label="Cerrar">&times;</span>
+                <h2 id="treModalTitle">👤 Soy responsable del equipo</h2>
+                <p class="tre-access-intro">
+                    Si ya preinscribiste tu equipo, entra con el <strong>código</strong> que recibiste por correo y el <strong>email de contacto</strong> de la preinscripción.
+                </p>
+                <div class="tre-access-steps" aria-hidden="true">
+                    <div class="tre-access-step"><strong>1</strong> Código del equipo</div>
+                    <div class="tre-access-step"><strong>2</strong> Tu email de contacto</div>
+                    <div class="tre-access-step"><strong>3</strong> Gestiona la plantilla</div>
+                </div>
+                <form id="treAccessForm" class="tre-access-form" onsubmit="submitTorneoResponsableAccess(event)">
+                    <label for="treAccessCode">Código de equipo</label>
+                    <input type="text" id="treAccessCode" name="treAccessCode" placeholder="TP-2026-A1B2" autocomplete="off" autocapitalize="characters" spellcheck="false" required>
+                    <p class="tre-access-code-hint">Formato: TP-2026-XXXX (lo encontrarás en el correo de confirmación).</p>
+
+                    <label for="treContactEmail">Email de contacto</label>
+                    <input type="email" id="treContactEmail" name="treContactEmail" placeholder="El mismo que usaste al inscribir el equipo" autocomplete="email" required>
+
+                    <div id="treAccessError" class="tre-access-error" hidden role="alert"></div>
+                    <button type="submit" class="tre-access-submit" id="treAccessSubmitBtn">Acceder a mi equipo</button>
+                </form>
+                <p class="tre-access-footer">
+                    ¿Aún no tienes equipo inscrito? Pulsa <strong>Inscríbete</strong> en la tarjeta del torneo. ¿Problemas? Escribe a <a href="mailto:cdsanabriafc@gmail.com">cdsanabriafc@gmail.com</a>.
+                </p>
+            </div>
+        </div>
+
         <!-- Solicitud colaborador / publicidad -->
         <div id="colaboradorSolicitudModal" class="modal" style="display: none;" role="dialog" aria-labelledby="colabModalTitle" aria-modal="true">
             <div class="modal-content" style="max-width: 560px; max-height: 92vh; overflow-y: auto;">
@@ -2608,8 +2909,22 @@
                     <label for="colabContactPhone">Teléfono *</label>
                     <input type="tel" id="colabContactPhone" name="colabContactPhone" required autocomplete="tel">
 
+                    <label for="colabWebsite">Página web (opcional)</label>
+                    <input type="text" id="colabWebsite" name="colabWebsite" placeholder="https://www.tu-empresa.es" autocomplete="url" inputmode="url">
+
+                    <div class="colab-social-fields">
+                        <div>
+                            <label for="colabFacebook">Facebook (opcional)</label>
+                            <input type="text" id="colabFacebook" name="colabFacebook" placeholder="https://www.facebook.com/tu-empresa" autocomplete="off" inputmode="url">
+                        </div>
+                        <div>
+                            <label for="colabInstagram">Instagram (opcional)</label>
+                            <input type="text" id="colabInstagram" name="colabInstagram" placeholder="https://www.instagram.com/tu-empresa" autocomplete="off" inputmode="url">
+                        </div>
+                    </div>
+                    <p class="colab-files-hint">Puedes indicar la página web, Facebook o Instagram del negocio.</p>
+
                     <span style="display:block;font-weight:600;color:#334155;margin-top:14px;">Servicios de publicidad *</span>
-                    <p style="font-size:0.85rem;color:#64748b;margin:4px 0 8px;">Renovación anual (precio orientativo del club):</p>
                     <div id="colabServicesBox" class="colab-services-box" role="group" aria-label="Servicios de publicidad"></div>
 
                     <label for="colabFiles">Archivos adjuntos (PDF o JPG, máx. 2, opcional)</label>
@@ -2625,7 +2940,7 @@
                 <span class="close" onclick="closeColaboradorSolicitudSuccessModal()" aria-label="Cerrar">&times;</span>
                 <h2 id="colabSuccessTitle">✅ Solicitud enviada</h2>
                 <p style="color:#334155;line-height:1.55;margin:0 0 16px;">
-                    Hemos enviado tus datos al club (<strong class="club-email-notify">cdsanabriafc@gmail.com</strong>). Si hace falta, el club te contactará por email o teléfono.
+                    Hemos enviado tus datos y archivos adjuntos al club (<strong class="club-email-notify">cdsanabriafc@gmail.com</strong>). Si hace falta, el club te contactará por email o teléfono.
                 </p>
                 <p id="colabSuccessMailtoHint" style="display:none;margin:0 0 12px;font-size:0.9rem;color:#64748b;">No se pudo avisar por correo automático. Usa el botón para abrir un mensaje al club.</p>
                 <a id="colabMailtoClubBtn" class="btn-primary" href="#" style="display:none;text-align:center;text-decoration:none;margin-bottom:10px;width:100%;box-sizing:border-box;">📧 Escribir al club</a>
@@ -4179,20 +4494,22 @@
                 }
 
                 const adminData = adminSnap.data() || {};
-                const isAdmin = adminData.isAdmin === true || adminData.isSuperAdmin === true || adminData.role === 'admin' || adminData.role === 'super_admin';
+                const isOrganizer = adminData.role === 'competition_organizer';
+                const isFullAdmin = adminData.isAdmin === true || adminData.isSuperAdmin === true || adminData.role === 'admin' || adminData.role === 'super_admin';
                 const validScope = adminData.appScope === 'cdsanabriacf';
 
-                if (!isAdmin || !validScope) {
+                if ((!isFullAdmin && !isOrganizer) || !validScope) {
                     await signOut(window.firebaseAuth);
-                    throw new Error('Sin permisos admin (isAdmin o appScope incorrecto)');
+                    throw new Error('Sin permisos admin u organizador (isAdmin, role o appScope incorrecto)');
                 }
 
                 const adminSession = {
                     id: uid,
-                    name: adminData.name || adminData.nombre || 'Administrador',
+                    name: adminData.name || adminData.nombre || (isOrganizer ? 'Organizador/a' : 'Administrador'),
                     email: (cred.user.email || email).toLowerCase(),
                     role: adminData.role || (adminData.isSuperAdmin ? 'super_admin' : 'admin'),
                     isSuperAdmin: adminData.isSuperAdmin === true,
+                    isAdmin: isFullAdmin,
                     teamId: adminData.teamId || 'CDSANABRIACF',
                     loginTime: new Date().toISOString()
                 };
@@ -4211,6 +4528,9 @@
                 if (window.SiteUpdateMode && window.SiteUpdateMode.refreshUi) {
                     window.SiteUpdateMode.refreshUi();
                 }
+                if (adminSession.role === 'competition_organizer') {
+                    alert('✅ Sesión de organizador/a de competiciones. Se abrirá solo la pestaña Competiciones.');
+                }
                 const opened =
                     window.AdminSession && window.AdminSession.openAdminPanelWindow
                         ? window.AdminSession.openAdminPanelWindow()
@@ -4224,6 +4544,13 @@
                 let hint = 'Verifica correo, contraseña y documento en Firestore → sanabria_admins (ID = UID). Ver docs/ACCESO-LOCAL-Y-ADMIN.md';
                 if (code === 'auth/invalid-credential' || code === 'auth/wrong-password' || code === 'auth/user-not-found') {
                     hint = 'Correo o contraseña incorrectos.';
+                } else if (code === 'auth/network-request-failed') {
+                    hint =
+                        'No hay conexión con Firebase (red bloqueada o web abierta sin HTTPS).\n\n' +
+                        '1. Abre la web publicada: https://www.cdsanabriacf.com (no abras index.html desde el Escritorio).\n' +
+                        '2. Comprueba internet y desactiva bloqueadores de anuncios / VPN.\n' +
+                        '3. Prueba otro navegador o ventana de incógnito.\n' +
+                        '4. Si sigue fallando: F12 → Red → intenta entrar y mira si falla identitytoolkit.googleapis.com';
                 } else if (error && error.message) {
                     hint = error.message;
                 }
@@ -4377,8 +4704,10 @@
             openAmigoRegistroModal();
         }
 
-        function abrirCartelProximoEvento() {
+        function abrirCartelProximoEvento(src) {
             const lb = document.getElementById('proximoEventoLightbox');
+            const img = document.getElementById('proximoEventoLightboxImg');
+            if (img && src) img.src = src;
             if (!lb) return;
             lb.classList.add('is-open');
             document.body.style.overflow = 'hidden';
@@ -4395,6 +4724,7 @@
             if (e.key !== 'Escape') return;
             const lb = document.getElementById('proximoEventoLightbox');
             if (lb && lb.classList.contains('is-open')) cerrarCartelProximoEvento();
+            if (typeof closeTorneoResponsableAccessModal === 'function') closeTorneoResponsableAccessModal();
         });
 
         function renderTorneoPreinscripcionCategories() {
@@ -4433,6 +4763,31 @@
         function closeTorneoPreinscripcionSuccessModal() {
             const m = document.getElementById('torneoPreinscripcionSuccessModal');
             if (m) m.style.display = 'none';
+        }
+
+        function openTorneoResponsableAccessModal(prefillCode) {
+            if (window.TorneoResponsableAccess && window.TorneoResponsableAccess.openAccessModal) {
+                window.TorneoResponsableAccess.openAccessModal(prefillCode || '');
+                return;
+            }
+            const m = document.getElementById('torneoResponsableAccessModal');
+            if (m) m.style.display = 'block';
+        }
+
+        function closeTorneoResponsableAccessModal() {
+            if (window.TorneoResponsableAccess && window.TorneoResponsableAccess.closeAccessModal) {
+                window.TorneoResponsableAccess.closeAccessModal();
+                return;
+            }
+            const m = document.getElementById('torneoResponsableAccessModal');
+            if (m) m.style.display = 'none';
+        }
+
+        function submitTorneoResponsableAccess(ev) {
+            if (window.TorneoResponsableAccess && window.TorneoResponsableAccess.submitAccessModal) {
+                return window.TorneoResponsableAccess.submitAccessModal(ev);
+            }
+            if (ev && ev.preventDefault) ev.preventDefault();
         }
 
         function openUneteClubFromTorneoPreinscripcion() {
@@ -4547,11 +4902,11 @@
             if (window.ClubContactDefaults && window.ClubContactDefaults.refreshClubEmailDisplays) {
                 window.ClubContactDefaults.refreshClubEmailDisplays();
             }
+            const form = document.getElementById('colaboradorSolicitudForm');
+            if (form) form.reset();
             if (window.ColaboradorSolicitud) {
                 window.ColaboradorSolicitud.renderServiceOptions(document.getElementById('colabServicesBox'));
             }
-            const form = document.getElementById('colaboradorSolicitudForm');
-            if (form) form.reset();
             const m = document.getElementById('colaboradorSolicitudModal');
             if (m) m.style.display = 'block';
         }
@@ -4574,8 +4929,13 @@
                 return;
             }
             const form = document.getElementById('colaboradorSolicitudForm');
+            const submitBtn = form && form.querySelector('button[type="submit"]');
             try {
-                const result = window.ColaboradorSolicitud.submitFromForm(form);
+                if (submitBtn) {
+                    submitBtn.disabled = true;
+                    submitBtn.textContent = 'Enviando…';
+                }
+                const result = await window.ColaboradorSolicitud.submitFromForm(form);
                 closeColaboradorSolicitudModal();
                 form.reset();
                 if (window.ColaboradorSolicitud.renderServiceOptions) {
@@ -4609,6 +4969,11 @@
                 document.getElementById('colaboradorSolicitudSuccessModal').style.display = 'block';
             } catch (e) {
                 alert('❌ ' + (e.message || e));
+            } finally {
+                if (submitBtn) {
+                    submitBtn.disabled = false;
+                    submitBtn.textContent = 'Enviar solicitud';
+                }
             }
         }
 
@@ -6597,19 +6962,33 @@
         
         // Cargar publicidad al iniciar la página
         document.addEventListener('DOMContentLoaded', function() {
+            setAdPublicityZoneVisible(true);
+            if (window.ClubDefaultAdvertisers && typeof window.ClubDefaultAdvertisers.ensureDefaultAdvertisers === 'function') {
+                window.ClubDefaultAdvertisers.ensureDefaultAdvertisers();
+            }
             loadPublicidadGallery();
+            loadCarouselAds();
         });
+
+        function setAdPublicityZoneVisible(show) {
+            const zone = document.getElementById('adPublicityZone');
+            if (zone) zone.style.display = show ? 'block' : 'none';
+        }
 
         function setPublicidadTopEmptyVisible(show) {
             const emptyEl = document.getElementById('adCarouselEmpty');
-            const sectionEl = document.getElementById('publicidadClubSection');
             const carouselEl = document.getElementById('adCarousel');
             if (emptyEl) emptyEl.style.display = show ? 'block' : 'none';
-            if (sectionEl) sectionEl.style.display = show ? 'none' : 'block';
             if (show && carouselEl) carouselEl.style.display = 'none';
+            setAdPublicityZoneVisible(true);
         }
 
-        // Cargar galería de publicidad
+        function setPublicidadClubSectionVisible(show) {
+            const sectionEl = document.getElementById('publicidadClubSection');
+            if (sectionEl) sectionEl.style.display = show ? 'block' : 'none';
+        }
+
+        // Cargar galería de publicidad (solo publicidad del club; colaboradores van en el carrusel superior)
         function loadPublicidadGallery() {
             try {
                 const publicidades = JSON.parse(localStorage.getItem('clubPublicidad') || '[]');
@@ -6629,11 +7008,22 @@
                 
                 if (activePublicidades.length === 0 && activeCollaboratorAds.length === 0) {
                     setPublicidadTopEmptyVisible(true);
+                    setPublicidadClubSectionVisible(false);
                     gallery.innerHTML = '';
                     return;
                 }
 
+                if (activePublicidades.length === 0) {
+                    setPublicidadClubSectionVisible(false);
+                    gallery.innerHTML = '';
+                    if (activeCollaboratorAds.length > 0) {
+                        setAdPublicityZoneVisible(true);
+                    }
+                    return;
+                }
+
                 setPublicidadTopEmptyVisible(false);
+                setPublicidadClubSectionVisible(true);
 
                 // Ordenar por prioridad y fecha de creación
                 activePublicidades.sort((a, b) => {
@@ -6684,43 +7074,8 @@
                     html += '</div>';
                 }
 
-                if (activeCollaboratorAds.length > 0) {
-                    const collaboratorCarousel = activeCollaboratorAds
-                        .filter(ad => ad.type === 'carrusel')
-                        .sort((a, b) => (a.position || 999) - (b.position || 999));
-                    const collaboratorStatic = activeCollaboratorAds
-                        .filter(ad => ad.type === 'estatico')
-                        .sort((a, b) => (a.position || 999) - (b.position || 999));
-                    const collaboratorBook = activeCollaboratorAds
-                        .filter(ad => ad.type === 'libro')
-                        .sort((a, b) => (a.position || 999) - (b.position || 999));
-                    if (collaboratorCarousel.length > 0) {
-                        html += '<div style="margin: 24px 0;"><h3 style="color: #1e3a8a; margin-bottom: 15px;">🤝 Colaboradores (Carrusel)</h3>';
-                        html += createCollaboratorCarouselHTML(collaboratorCarousel);
-                        html += '</div>';
-                    }
-                    if (collaboratorStatic.length > 0) {
-                        html += '<div style="margin: 24px 0;"><h3 style="color: #1e3a8a; margin-bottom: 15px;">📚 Colaboradores (Estático)</h3>';
-                        html += createCollaboratorStaticHTML(collaboratorStatic);
-                        html += '</div>';
-                    }
-                    if (collaboratorBook.length > 0) {
-                        html += '<div style="margin: 24px 0;"><h3 style="color: #1e3a8a; margin-bottom: 15px;">📖 Colaboradores (Libro)</h3>';
-                        html += createCollaboratorBookHTML(collaboratorBook);
-                        html += '</div>';
-                    }
-                }
-
                 gallery.innerHTML = html;
-                if (activeCollaboratorAds.some(ad => ad.type === 'libro')) {
-                    renderCollaboratorBookPage();
-                    updateCollaboratorBookAutoplayButton();
-                    if (collaboratorBookAutoplayEnabled) {
-                        startCollaboratorBookAutoplay();
-                    }
-                } else {
-                    stopCollaboratorBookAutoplay();
-                }
+                stopCollaboratorBookAutoplay();
 
                 // Inicializar carrusel si existe
                 if (carruselPublicidades.length > 0) {
@@ -6732,32 +7087,58 @@
                     pub.views = (pub.views || 0) + 1;
                 });
                 localStorage.setItem('clubPublicidad', JSON.stringify(publicidades));
-                if (activeCollaboratorAds.length > 0) {
-                    activeCollaboratorAds.forEach(ad => {
-                        ad.views = (ad.views || 0) + 1;
-                    });
-                    localStorage.setItem('clubAdvertisements', JSON.stringify(collaboratorAds));
-                }
 
-                console.log('📢 Galería de publicidad cargada:', activePublicidades.length, 'publicidades club y', activeCollaboratorAds.length, 'publicidades colaboradores activas');
+                console.log('📢 Galería de publicidad del club:', activePublicidades.length, 'activas');
             } catch (error) {
                 console.error('❌ Error cargando galería de publicidad:', error);
                 document.getElementById('publicidadGallery').innerHTML = '<p style="text-align: center; color: #dc2626;">Error al cargar la publicidad</p>';
             }
         }
 
-        function createCollaboratorMediaHTML(ad) {
+        function createCollaboratorMediaHTML(ad, options) {
+            const opts = options && typeof options === 'object' ? options : {};
+            const bindClick = opts.bindClick !== false;
             const src = ad.mediaData || ad.image || '';
+            const adId = escapeHtmlPublic(ad.id || '');
+            const website = String(ad.url || '').trim();
+            const hasWeb = !!website;
+            const mediaClick = bindClick
+                ? 'onclick="openCollaboratorAd(\'' + adId + '\')" role="button" tabindex="0" ' +
+                  'onkeydown="if(event.key===\'Enter\'||event.key===\' \'){event.preventDefault();openCollaboratorAd(\'' + adId + '\');}"'
+                : '';
+            const pointerStyle = hasWeb || bindClick ? 'cursor:pointer;' : '';
+
             if (ad.mediaKind === 'pdf' && src) {
+                const pdfName = escapeHtmlPublic(ad.mediaName || 'PDF del colaborador');
+                const safeSrc = escapeHtmlPublic(src);
+                if (hasWeb) {
+                    return `
+                        <div class="colab-media-link" ${mediaClick} title="Visitar web del colaborador" style="${pointerStyle}">
+                            <div style="padding: 14px; border: 1px solid #cbd5e1; border-radius: 10px; background: #f8fafc;">
+                                <div style="font-weight: 700; margin-bottom: 8px;">📄 ${pdfName}</div>
+                                <div style="font-size:0.9rem; color:#1d4ed8; font-weight:600;">🌐 Pulsa para abrir la página web</div>
+                                <a href="${safeSrc}" target="_blank" rel="noopener" style="display:inline-block;margin-top:8px;font-size:0.85rem;color:#64748b;" onclick="event.stopPropagation();">Ver PDF</a>
+                            </div>
+                        </div>
+                    `;
+                }
                 return `
-                    <div style="padding: 14px; border: 1px solid #cbd5e1; border-radius: 10px; background: #f8fafc;">
-                        <div style="font-weight: 700; margin-bottom: 8px;">📄 ${ad.mediaName || 'PDF del colaborador'}</div>
-                        <a href="${src}" target="_blank" rel="noopener" style="color:#1d4ed8; font-weight:600;">Abrir PDF</a>
+                    <div class="colab-media-link" ${mediaClick} style="${pointerStyle}">
+                        <div style="padding: 14px; border: 1px solid #cbd5e1; border-radius: 10px; background: #f8fafc;">
+                            <div style="font-weight: 700; margin-bottom: 8px;">📄 ${pdfName}</div>
+                            <a href="${safeSrc}" target="_blank" rel="noopener" style="color:#1d4ed8; font-weight:600;" onclick="event.stopPropagation();">Abrir PDF</a>
+                        </div>
                     </div>
                 `;
             }
             if (src) {
-                return `<img src="${src}" alt="${ad.title || 'Anuncio colaborador'}" style="max-width: 100%; max-height: 240px; border-radius: 10px; border: 1px solid #dee2e6;">`;
+                const safeSrc = escapeHtmlPublic(src);
+                const alt = escapeHtmlPublic(ad.title || 'Anuncio colaborador');
+                const img = `<img src="${safeSrc}" alt="${alt}" style="max-width: 100%; max-height: 240px; border-radius: 10px; border: 1px solid #dee2e6;${pointerStyle}">`;
+                if (bindClick || hasWeb) {
+                    return `<div class="colab-media-link" ${mediaClick} title="${hasWeb ? 'Visitar web del colaborador' : 'Abrir anuncio'}" style="${pointerStyle}display:inline-block;max-width:100%;">${img}</div>`;
+                }
+                return img;
             }
             return '<div style="padding: 12px; color:#64748b;">Sin archivo adjunto</div>';
         }
@@ -6766,8 +7147,8 @@
             let html = '<div class="publicidad-carrusel"><div class="carrusel-slides">';
             ads.forEach((ad) => {
                 html += `
-                    <div class="carrusel-slide" onclick="openCollaboratorAd('${ad.id}')">
-                        ${createCollaboratorMediaHTML(ad)}
+                    <div class="carrusel-slide" onclick="openCollaboratorAd('${ad.id}')" style="cursor:pointer;">
+                        ${createCollaboratorMediaHTML(ad, { bindClick: false })}
                         <div class="carrusel-content">
                             <h3>${ad.title || 'Colaborador'}</h3>
                             <p>${ad.company || ''}</p>
@@ -6941,11 +7322,12 @@
                 if (!ad) return;
                 ad.clicks = (ad.clicks || 0) + 1;
                 localStorage.setItem('clubAdvertisements', JSON.stringify(advertisements));
+                const website = String(ad.url || '').trim();
                 const mediaLink = ad.mediaData || ad.image || '';
-                if (ad.url) {
-                    window.open(ad.url, '_blank');
+                if (website) {
+                    window.open(website, '_blank', 'noopener,noreferrer');
                 } else if (mediaLink) {
-                    window.open(mediaLink, '_blank');
+                    window.open(mediaLink, '_blank', 'noopener,noreferrer');
                 }
             } catch (error) {
                 console.error('❌ Error abriendo anuncio de colaborador:', error);
@@ -6955,17 +7337,28 @@
         function createClubMediaHTML(pub) {
             const kind = (pub.mediaKind || '').toLowerCase();
             const src = pub.mediaData || pub.imagen || '';
+            const enlace = String(pub.enlace || '').trim();
             if (kind === 'pdf' && src) {
-                const name = pub.mediaName || pub.titulo || 'PDF';
+                const name = escapeHtmlPublic(pub.mediaName || pub.titulo || 'PDF');
+                const safeSrc = escapeHtmlPublic(src);
+                if (enlace) {
+                    return `
+                        <div style="padding: 14px; border-radius: 10px; border:1px solid #cbd5e1; background:#f8fafc; max-width:100%; max-height:240px; display:flex; flex-direction:column; justify-content:center; align-items:center;">
+                            <div style="font-weight:700; margin-bottom:8px; color:#1e3a8a;">📄 ${name}</div>
+                            <div style="font-size:0.9rem; color:#1d4ed8; font-weight:600; margin-bottom:8px;">🌐 Pulsa la tarjeta para abrir la web</div>
+                            <a href="${safeSrc}" target="_blank" rel="noopener" style="font-size:0.85rem;color:#64748b;" onclick="event.stopPropagation();">Ver PDF</a>
+                        </div>
+                    `;
+                }
                 return `
                     <div style="padding: 14px; border-radius: 10px; border:1px solid #cbd5e1; background:#f8fafc; max-width:100%; max-height:240px; display:flex; flex-direction:column; justify-content:center; align-items:center;">
                         <div style="font-weight:700; margin-bottom:8px; color:#1e3a8a;">📄 ${name}</div>
-                        <div style="font-size:0.9rem; color:#475569; margin-bottom:8px;">Pulsa para abrir el PDF en otra pestaña.</div>
+                        <div style="font-size:0.9rem; color:#475569; margin-bottom:8px;">Pulsa la tarjeta para abrir el PDF.</div>
                     </div>
                 `;
             }
             if (src) {
-                return `<img src="${src}" alt="${pub.titulo}" style="max-width:100%; max-height:240px; border-radius:10px; border:1px solid #dee2e6;">`;
+                return `<img src="${escapeHtmlPublic(src)}" alt="${escapeHtmlPublic(pub.titulo)}" style="max-width:100%; max-height:240px; border-radius:10px; border:1px solid #dee2e6;${enlace ? ' cursor:pointer;' : ''}">`;
             }
             return '';
         }
@@ -7082,7 +7475,7 @@
                         </div>
                         
                         ${(pub.imagen || pub.mediaData) ? `
-                            <div style="margin: 15px 0; text-align: center;">
+                            <div style="margin: 15px 0; text-align: center;${pub.enlace ? ' cursor:pointer;' : ''}"${pub.enlace ? ` onclick="clickPublicidad('${pub.id}', '${String(pub.enlace).replace(/'/g, "\\'")}')" title="Visitar web"` : ''}>
                                 ${createClubMediaHTML(pub)}
                             </div>
                         ` : ''}
@@ -8835,16 +9228,28 @@
                 );
                 
                 if (carouselAds.length === 0) {
-                    document.getElementById('adCarousel').style.display = 'none';
+                    const carouselEl = document.getElementById('adCarousel');
+                    if (carouselEl) carouselEl.style.display = 'none';
+                    setAdPublicityZoneVisible(true);
+                    const hasAny = advertisements.some(ad =>
+                        ad.status === 'active' &&
+                        (!ad.startDate || new Date(ad.startDate) <= new Date()) &&
+                        (!ad.endDate || new Date(ad.endDate) >= new Date())
+                    );
+                    if (!hasAny) {
+                        setPublicidadTopEmptyVisible(true);
+                    }
                     return;
                 }
                 
-                // Ordenar por posición
-                carouselAds.sort((a, b) => a.position - b.position);
+                carouselAds.sort((a, b) => (a.position || 999) - (b.position || 999));
                 carouselSlides = carouselAds;
                 
-                // Mostrar carrusel
-                document.getElementById('adCarousel').style.display = 'block';
+                const carouselEl = document.getElementById('adCarousel');
+                if (carouselEl) carouselEl.style.display = 'block';
+                setAdPublicityZoneVisible(true);
+                const emptyTop = document.getElementById('adCarouselEmpty');
+                if (emptyTop) emptyTop.style.display = 'none';
                 
                 // Generar slides
                 generateCarouselSlides();
@@ -8869,13 +9274,14 @@
             let dotsHTML = '';
             
             carouselSlides.forEach((ad, index) => {
-                // Generar slide
+                const imgSrc = ad.mediaData || ad.image || '';
+                const title = escapeHtmlPublic(ad.title || ad.company || 'Colaborador');
                 slidesHTML += `
-                    <div class="carousel-slide" onclick="handleAdClick('${ad.id}')">
-                        ${ad.image ? `<img src="${ad.image}" alt="${ad.title}">` : ''}
+                    <div class="carousel-slide" onclick="handleAdClick('${ad.id}')" style="cursor:pointer;" title="${ad.url ? 'Visitar web del colaborador' : title}">
+                        ${imgSrc ? `<img src="${imgSrc}" alt="${title}">` : ''}
                         <div class="carousel-slide-content">
-                            <div class="carousel-slide-title">${ad.title}</div>
-                            <div class="carousel-slide-company">${ad.company}</div>
+                            <div class="carousel-slide-title">${title}</div>
+                            <div class="carousel-slide-company">${escapeHtmlPublic(ad.company || '')}</div>
                         </div>
                     </div>
                 `;
@@ -8955,16 +9361,19 @@
             try {
                 const advertisements = JSON.parse(localStorage.getItem('clubAdvertisements') || '[]');
                 const ad = advertisements.find(a => a.id === adId);
-                
-                if (ad && ad.url) {
-                    // Incrementar contador de clicks
-                    ad.clicks = (ad.clicks || 0) + 1;
-                    localStorage.setItem('clubAdvertisements', JSON.stringify(advertisements));
-                    
-                    // Abrir enlace
-                    window.open(ad.url, '_blank');
-                    
-                    console.log('✅ Click en anuncio registrado:', ad.title);
+                if (!ad) return;
+
+                ad.clicks = (ad.clicks || 0) + 1;
+                localStorage.setItem('clubAdvertisements', JSON.stringify(advertisements));
+
+                const website = String(ad.url || '').trim();
+                const mediaLink = ad.mediaData || ad.image || '';
+                if (website) {
+                    window.open(website, '_blank', 'noopener,noreferrer');
+                    console.log('✅ Click en anuncio (web):', ad.title);
+                } else if (mediaLink) {
+                    window.open(mediaLink, '_blank', 'noopener,noreferrer');
+                    console.log('✅ Click en anuncio (imagen):', ad.title);
                 }
             } catch (error) {
                 console.error('❌ Error manejando click en anuncio:', error);
@@ -10653,9 +11062,9 @@
                 formData.estado = 'pendiente';
                 formData.status = 'pending_validation';
                 const list = JSON.parse(localStorage.getItem('clubMembers') || '[]');
-                const ix = list.findIndex(
-                    (s) => String(s.email || '').toLowerCase() === String(formData.email || '').toLowerCase()
-                );
+                const ix = list.findIndex(function (s) {
+                    return clubMembersSameIdentity(s, formData);
+                });
                 if (ix >= 0) {
                     Object.assign(list[ix], formData);
                     if (typeof window.syncClubMembersLocal === 'function') {

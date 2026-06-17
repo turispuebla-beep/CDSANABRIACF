@@ -3,20 +3,27 @@
  * Compatible con iOS, Android, HarmonyOS y notificaciones push
  */
 
-const CACHE_NAME = 'cdsanabriacf-v20260616-0016';
-const STATIC_CACHE = 'cdsanabriacf-v20260616-0016-static';
-const DYNAMIC_CACHE = 'cdsanabriacf-v20260616-0016-dynamic';
+const CACHE_NAME = 'cdsanabriacf-v20260617-1924';
+const STATIC_CACHE = 'cdsanabriacf-v20260617-1924-static';
+const DYNAMIC_CACHE = 'cdsanabriacf-v20260617-1924-dynamic';
 
 // Archivos críticos para cache (solo rutas que existen en el despliegue)
 const STATIC_ASSETS = [
   '/',
   '/index.html',
   '/admin-panel.html',
+  '/torneo-equipo.html',
+  '/torneo-jugador.html',
+  '/js/club-torneo-config.js',
+  '/js/torneo-equipo-manage-client.js',
+  '/js/torneo-jugador-ficha-ui.js',
   '/js/firebase-config.js',
   '/js/site-update-mode.js',
   '/js/admin-session.js',
   '/js/club-contact-defaults.js',
   '/js/torneo-preinscripcion.js',
+  '/js/torneo-responsable-access.js',
+  '/js/torneo-equipo-panel.js',
   '/js/player-application.js',
   '/js/protocol-guard.js',
   '/js/notification-system.js',

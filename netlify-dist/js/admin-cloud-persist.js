@@ -168,6 +168,8 @@
     if (ident.season || ident.inscriptionSeason) {
       payload.season = ident.season || ident.inscriptionSeason;
     }
+    if (ident.allowNotFound) payload.allowNotFound = true;
+    if (ident.purgeTestRecords) payload.purgeTestRecords = true;
     await postPayload(payload);
   }
 
@@ -177,6 +179,48 @@
     if (kind === 'player') return persistPlayer(record);
     if (kind === 'coach') return persistCoach(record);
     throw new Error('kind no soportado: ' + kind);
+  }
+
+  async function assignPendingMemberNumbers(opts) {
+    const headers = { 'Content-Type': 'application/json' };
+    if (global.CdsanAdminApiAuth && global.CdsanAdminApiAuth.getAdminAuthHeaders) {
+      Object.assign(headers, await global.CdsanAdminApiAuth.getAdminAuthHeaders());
+    }
+    const res = await fetch('/.netlify/functions/assign-member-numbers', {
+      method: 'POST',
+      headers: headers,
+      body: JSON.stringify({ dryRun: !!(opts && opts.dryRun) })
+    });
+    const json = await res.json().catch(function () {
+      return { ok: false };
+    });
+    if (!res.ok || !json.ok) {
+      const err = new Error(json.error || 'No se pudieron asignar números de socio');
+      err.code = 'assign_member_numbers_failed';
+      throw err;
+    }
+    return json;
+  }
+
+  async function repairPlayerInscriptions(orderIds) {
+    const headers = { 'Content-Type': 'application/json' };
+    if (global.CdsanAdminApiAuth && global.CdsanAdminApiAuth.getAdminAuthHeaders) {
+      Object.assign(headers, await global.CdsanAdminApiAuth.getAdminAuthHeaders());
+    }
+    const res = await fetch('/.netlify/functions/repair-player-inscriptions', {
+      method: 'POST',
+      headers: headers,
+      body: JSON.stringify({ orderIds: orderIds || [] })
+    });
+    const json = await res.json().catch(function () {
+      return { ok: false };
+    });
+    if (!res.ok || !json.ok) {
+      const err = new Error(json.error || 'No se pudieron reparar inscripciones');
+      err.code = 'repair_player_inscriptions_failed';
+      throw err;
+    }
+    return json;
   }
 
   global.AdminClubCloudPersist = {
@@ -189,6 +233,8 @@
     deleteMember: deleteMember,
     deleteFriend: deleteFriend,
     deletePlayer: deletePlayer,
+    assignPendingMemberNumbers: assignPendingMemberNumbers,
+    repairPlayerInscriptions: repairPlayerInscriptions,
     cloudRequired: cloudRequired
   };
 })(typeof window !== 'undefined' ? window : globalThis);

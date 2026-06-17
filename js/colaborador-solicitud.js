@@ -1,5 +1,5 @@
 /**
- * Solicitud de colaboradores / publicidad — formulario público (mailto al club).
+ * Solicitud de colaboradores / publicidad — envío al club por correo (Netlify).
  * Configurable desde admin → Publicidad → Formulario colaboradores.
  */
 (function (global) {
@@ -10,11 +10,21 @@
   const MAX_FILES = 2;
   const MAX_FILE_BYTES = 5 * 1024 * 1024;
 
+  const INTERES_COLABORADOR_SVC = {
+    id: 'interes_colaborador',
+    label: 'Estoy interesado en ser colaborador/anunciante',
+    defaultPrice: '',
+    noPrice: true
+  };
+
   const DEFAULT_CONFIG = {
     modalTitle: 'Solicitud de colaboración publicitaria',
     modalIntro:
-      'Completa el formulario para solicitar colaboración con el CD Sanabria CF. Al enviar, el club recibirá tus datos por correo.',
-    services: [{ id: 'renovacion', label: 'Renovación', defaultPrice: '50,00 €' }]
+      'Completa el formulario para solicitar colaboración con el CD Sanabria CF. Al enviar, el club recibirá tus datos y archivos adjuntos por correo.',
+    services: [
+      { id: 'renovacion', label: 'Renovación', defaultPrice: '50,00 €' },
+      INTERES_COLABORADOR_SVC
+    ]
   };
 
   const MASK_PUBLIC_SERVICE_PRICES = false;
@@ -22,6 +32,12 @@
   function publicDisplayPrice(price) {
     if (MASK_PUBLIC_SERVICE_PRICES) return '00,00 €';
     return price ? String(price) : '—';
+  }
+
+  function serviceShowsPrice(svc) {
+    if (!svc) return false;
+    if (svc.noPrice || String(svc.id || '') === 'interes_colaborador') return false;
+    return !!String(svc.defaultPrice || '').trim();
   }
 
   function normalizePublicServices(services) {
@@ -34,6 +50,12 @@
         id: 'renovacion',
         label: 'Renovación',
         defaultPrice: String((renov && renov.defaultPrice) || '50,00 €').trim() || '50,00 €'
+      },
+      {
+        id: INTERES_COLABORADOR_SVC.id,
+        label: INTERES_COLABORADOR_SVC.label,
+        defaultPrice: '',
+        noPrice: true
       }
     ];
   }
@@ -121,11 +143,26 @@
     return (bytes / (1024 * 1024)).toFixed(2) + ' MB';
   }
 
-  function validateFiles(fileList) {
+  function readFileAsBase64(file) {
+    return new Promise(function (resolve, reject) {
+      const reader = new FileReader();
+      reader.onload = function () {
+        const result = String(reader.result || '');
+        const ix = result.indexOf(',');
+        resolve(ix >= 0 ? result.slice(ix + 1) : result);
+      };
+      reader.onerror = function () {
+        reject(new Error('No se pudo leer el archivo «' + (file.name || 'adjunto') + '».'));
+      };
+      reader.readAsDataURL(file);
+    });
+  }
+
+  async function collectFilesFromInput(fileInput) {
     const files = [];
-    if (!fileList) return { ok: true, files: files };
-    for (let i = 0; i < fileList.length && files.length < MAX_FILES; i++) {
-      const f = fileList[i];
+    if (!fileInput || !fileInput.files) return files;
+    for (let i = 0; i < fileInput.files.length && files.length < MAX_FILES; i++) {
+      const f = fileInput.files[i];
       if (!f) continue;
       const name = String(f.name || '').toLowerCase();
       const okType =
@@ -135,14 +172,80 @@
         f.type === 'image/pjpeg' ||
         /\.(pdf|jpe?g)$/i.test(name);
       if (!okType) {
-        return { ok: false, error: 'Solo se permiten archivos PDF o JPG/JPEG: ' + (f.name || 'archivo') };
+        throw new Error('Solo se permiten archivos PDF o JPG/JPEG: ' + (f.name || 'archivo'));
       }
       if (f.size > MAX_FILE_BYTES) {
-        return { ok: false, error: 'El archivo «' + f.name + '» supera 5 MB.' };
+        throw new Error('El archivo «' + f.name + '» supera 5 MB.');
       }
-      files.push({ name: f.name, size: f.size, type: f.type });
+      const contentBase64 = await readFileAsBase64(f);
+      files.push({
+        name: f.name,
+        filename: f.name,
+        size: f.size,
+        type: f.type || (name.endsWith('.pdf') ? 'application/pdf' : 'image/jpeg'),
+        contentBase64: contentBase64
+      });
     }
-    return { ok: true, files: files };
+    return files;
+  }
+
+  function normalizeSocialUrl(raw, network) {
+    const s = String(raw || '').trim();
+    if (!s) return '';
+    if (/^https?:\/\//i.test(s)) return s;
+    const handle = s.replace(/^@/, '').replace(/^\//, '');
+    if (!handle) return '';
+    if (network === 'facebook') {
+      if (/facebook\.com|fb\.com/i.test(s)) return 'https://' + s.replace(/^\/\//, '');
+      return 'https://www.facebook.com/' + handle;
+    }
+    if (network === 'instagram') {
+      if (/instagram\.com/i.test(s)) return 'https://' + s.replace(/^\/\//, '');
+      return 'https://www.instagram.com/' + handle;
+    }
+    return s;
+  }
+
+  function normalizeWebsiteUrl(raw) {
+    const s = String(raw || '').trim();
+    if (!s) return '';
+    if (/^https?:\/\//i.test(s)) return s;
+    return 'https://' + s.replace(/^\/\//, '');
+  }
+
+  function validateWebsiteUrl(raw) {
+    const normalized = normalizeWebsiteUrl(raw);
+    if (!normalized) return { ok: true, value: '' };
+    try {
+      const u = new URL(normalized);
+      if (!/^https?:$/i.test(u.protocol)) {
+        return { ok: false, error: 'Indica una página web válida (http o https).' };
+      }
+      if (!u.hostname || !u.hostname.includes('.')) {
+        return { ok: false, error: 'Indica una página web válida.' };
+      }
+      return { ok: true, value: normalized };
+    } catch (_) {
+      return { ok: false, error: 'Indica una página web válida.' };
+    }
+  }
+
+  function validateSocialUrl(raw, network, label) {
+    const normalized = normalizeSocialUrl(raw, network);
+    if (!normalized) return { ok: true, value: '' };
+    try {
+      const u = new URL(normalized);
+      const host = u.hostname.toLowerCase();
+      if (network === 'facebook' && host.indexOf('facebook.com') < 0 && host.indexOf('fb.com') < 0) {
+        return { ok: false, error: 'Indica un enlace de Facebook válido.' };
+      }
+      if (network === 'instagram' && host.indexOf('instagram.com') < 0) {
+        return { ok: false, error: 'Indica un enlace de Instagram válido.' };
+      }
+      return { ok: true, value: normalized };
+    } catch (_) {
+      return { ok: false, error: 'Indica un enlace de ' + label + ' válido.' };
+    }
   }
 
   function validate(data) {
@@ -153,20 +256,31 @@
       return 'Indica un email de contacto válido.';
     }
     if (!data.contactPhone) return 'Indica un teléfono de contacto.';
+    if (data.socialError) return data.socialError;
     if (!data.selectedServices || !data.selectedServices.length) {
       return 'Marca al menos un servicio de publicidad que te interese.';
     }
     return null;
   }
 
+  function formatServiceLine(s) {
+    if (!s || !s.label) return '';
+    if (s.noPrice || !String(s.price || '').trim()) return '☑ ' + s.label;
+    return '☑ ' + s.label + ' — Precio ref.: ' + s.price;
+  }
+
+  function formatServiceNotifyValue(s) {
+    if (!s || !s.label) return '';
+    if (s.noPrice || !String(s.price || '').trim()) return s.label;
+    return s.label + ' — ' + s.price;
+  }
+
   function formatMailBody(data) {
-    const serviceLines = (data.selectedServices || []).map(function (s) {
-      return '☑ ' + s.label + ' — Precio ref.: ' + (s.price || '—');
-    });
+    const serviceLines = (data.selectedServices || []).map(formatServiceLine).filter(Boolean);
     const fileLines = [];
     if (data.files && data.files.length) {
       data.files.forEach(function (f) {
-        fileLines.push('• ' + f.name + ' (' + formatFileSize(f.size) + ')');
+        fileLines.push('• ' + f.name + ' (' + formatFileSize(f.size) + ') — adjunto en el correo al club');
       });
     }
 
@@ -186,15 +300,18 @@
             { label: 'Email', value: data.contactEmail },
             { label: 'Teléfono', value: data.contactPhone }
           ]
-        },
-        {
-          heading: 'SERVICIOS SOLICITADOS',
-          lines: serviceLines.length ? serviceLines : ['(Ninguno marcado)']
         }
       ];
+      if (data.website) sections[1].fields.push({ label: 'Página web', value: data.website });
+      if (data.facebook) sections[1].fields.push({ label: 'Facebook', value: data.facebook });
+      if (data.instagram) sections[1].fields.push({ label: 'Instagram', value: data.instagram });
+      sections.push({
+        heading: 'SERVICIOS SOLICITADOS',
+        lines: serviceLines.length ? serviceLines : ['(Ninguno marcado)']
+      });
       if (fileLines.length) {
         sections.push({
-          heading: 'ARCHIVOS INDICADOS',
+          heading: 'ARCHIVOS ADJUNTOS',
           lines: fileLines
         });
       }
@@ -219,22 +336,21 @@
       '── PERSONA DE CONTACTO ──',
       'Nombre:    ' + (data.contactName || ''),
       'Email:     ' + (data.contactEmail || ''),
-      'Teléfono:  ' + (data.contactPhone || ''),
-      '',
-      '── SERVICIOS SOLICITADOS ──'
+      'Teléfono:  ' + (data.contactPhone || '')
     ];
-
+    if (data.website) lines.push('Página web: ' + data.website);
+    if (data.facebook) lines.push('Facebook:  ' + data.facebook);
+    if (data.instagram) lines.push('Instagram: ' + data.instagram);
+    lines.push('', '── SERVICIOS SOLICITADOS ──');
     serviceLines.forEach(function (ln) {
       lines.push(ln);
     });
-
     if (fileLines.length) {
-      lines.push('', '── ARCHIVOS INDICADOS ──');
+      lines.push('', '── ARCHIVOS ADJUNTOS ──');
       fileLines.forEach(function (ln) {
         lines.push(ln);
       });
     }
-
     lines.push(
       '',
       '── NOTAS ──',
@@ -243,7 +359,6 @@
       '',
       '══════════════════════════════════════════'
     );
-
     return lines.join('\r\n');
   }
 
@@ -258,16 +373,22 @@
         contactName: data.contactName,
         contactEmail: data.contactEmail,
         contactPhone: data.contactPhone,
+        website: data.website || '',
+        facebook: data.facebook || '',
+        instagram: data.instagram || '',
         selectedServices: data.selectedServices || [],
         services: (data.selectedServices || []).map(function (s) {
           return s.label;
+        }),
+        fileNames: (data.files || []).map(function (f) {
+          return f.name;
         })
       });
       global.localStorage.setItem(SUBMISSIONS_KEY, JSON.stringify(list.slice(-100)));
     } catch (_) {}
   }
 
-  function collectFormData(formEl) {
+  async function collectFormData(formEl) {
     const cfg = readConfig();
     const selectedServices = [];
     cfg.services.forEach(function (svc) {
@@ -276,13 +397,35 @@
         selectedServices.push({
           id: svc.id,
           label: svc.label,
-          price: publicDisplayPrice(svc.defaultPrice)
+          price: serviceShowsPrice(svc) ? publicDisplayPrice(svc.defaultPrice) : '',
+          noPrice: !serviceShowsPrice(svc)
         });
       }
     });
+
+    const websiteCheck = validateWebsiteUrl((formEl.querySelector('#colabWebsite') || {}).value);
+    const facebookCheck = validateSocialUrl(
+      (formEl.querySelector('#colabFacebook') || {}).value,
+      'facebook',
+      'Facebook'
+    );
+    const instagramCheck = validateSocialUrl(
+      (formEl.querySelector('#colabInstagram') || {}).value,
+      'instagram',
+      'Instagram'
+    );
+    if (!websiteCheck.ok) {
+      return { socialError: websiteCheck.error, selectedServices: selectedServices, files: [] };
+    }
+    if (!facebookCheck.ok) {
+      return { socialError: facebookCheck.error, selectedServices: selectedServices, files: [] };
+    }
+    if (!instagramCheck.ok) {
+      return { socialError: instagramCheck.error, selectedServices: selectedServices, files: [] };
+    }
+
     const fileInput = formEl.querySelector('#colabFiles');
-    const fileCheck = validateFiles(fileInput && fileInput.files);
-    if (!fileCheck.ok) throw new Error(fileCheck.error);
+    const files = await collectFilesFromInput(fileInput);
 
     return {
       companyName: (formEl.querySelector('#colabCompanyName') || {}).value.trim(),
@@ -290,8 +433,11 @@
       contactName: (formEl.querySelector('#colabContactName') || {}).value.trim(),
       contactEmail: (formEl.querySelector('#colabContactEmail') || {}).value.trim(),
       contactPhone: (formEl.querySelector('#colabContactPhone') || {}).value.trim(),
+      website: websiteCheck.value,
+      facebook: facebookCheck.value,
+      instagram: instagramCheck.value,
       selectedServices: selectedServices,
-      files: fileCheck.files
+      files: files
     };
   }
 
@@ -304,20 +450,28 @@
     }
     container.innerHTML = cfg.services
       .map(function (svc) {
-        const price = escapeHtml(publicDisplayPrice(svc.defaultPrice));
+        const showPrice = serviceShowsPrice(svc);
+        const price = showPrice ? escapeHtml(publicDisplayPrice(svc.defaultPrice)) : '';
+        const defaultChecked = String(svc.id || '') === 'renovacion' ? ' checked' : '';
+        const rowClass =
+          'colab-service-row' + (showPrice ? '' : ' colab-service-row--no-price');
         return (
-          '<label class="colab-service-row">' +
+          '<label class="' +
+          rowClass +
+          '">' +
           '<input type="checkbox" id="colab_svc_' +
           escapeAttr(svc.id) +
           '" name="colabService" value="' +
           escapeAttr(svc.id) +
-          '" checked>' +
+          '"' +
+          defaultChecked +
+          '>' +
           '<span class="colab-service-label">' +
           escapeHtml(svc.label) +
           '</span>' +
-          '<span class="colab-service-price" aria-label="Precio de referencia">' +
-          price +
-          '</span>' +
+          (showPrice
+            ? '<span class="colab-service-price" aria-label="Precio de referencia">' + price + '</span>'
+            : '') +
           '</label>'
         );
       })
@@ -347,11 +501,14 @@
       { label: 'Email', value: data.contactEmail },
       { label: 'Teléfono', value: data.contactPhone }
     ];
+    if (data.website) fields.push({ label: 'Página web', value: data.website });
+    if (data.facebook) fields.push({ label: 'Facebook', value: data.facebook });
+    if (data.instagram) fields.push({ label: 'Instagram', value: data.instagram });
     (data.selectedServices || []).forEach(function (s) {
-      fields.push({ label: 'Servicio', value: s.label + ' — ' + (s.price || '—') });
+      fields.push({ label: 'Servicio', value: formatServiceNotifyValue(s) });
     });
     (data.files || []).forEach(function (f) {
-      fields.push({ label: 'Archivo', value: f.name + ' (' + formatFileSize(f.size) + ')' });
+      fields.push({ label: 'Archivo adjunto', value: f.name + ' (' + formatFileSize(f.size) + ')' });
     });
     try {
       const res = await global.CdsanClubEmail.sendClubAdminNotify({
@@ -360,7 +517,14 @@
         subject: 'Solicitud colaborador/publicidad — ' + (data.companyName || data.legalName || 'Empresa'),
         paymentChannel: 'consulta',
         requesterEmail: data.contactEmail,
-        fields: fields
+        fields: fields,
+        attachments: (data.files || []).map(function (f) {
+          return {
+            filename: f.filename || f.name,
+            type: f.type,
+            contentBase64: f.contentBase64
+          };
+        })
       });
       return { sent: !!(res && res.ok !== false && res.sent !== false) };
     } catch (e) {
@@ -369,9 +533,9 @@
     }
   }
 
-  function submitFromForm(formEl) {
+  async function submitFromForm(formEl) {
     if (!formEl) throw new Error('Formulario no encontrado.');
-    const data = collectFormData(formEl);
+    const data = await collectFormData(formEl);
     const err = validate(data);
     if (err) throw new Error(err);
 
@@ -403,11 +567,23 @@
 
   function buildPreviewSample() {
     const cfg = readConfig();
-    const services = (cfg.services || []).slice(0, 2).map(function (s) {
-      return { id: s.id, label: s.label, price: s.defaultPrice || '—' };
+    const services = (cfg.services || []).map(function (s) {
+      const showPrice = serviceShowsPrice(s);
+      return {
+        id: s.id,
+        label: s.label,
+        price: showPrice ? publicDisplayPrice(s.defaultPrice) : '',
+        noPrice: !showPrice
+      };
     });
     if (!services.length) {
-      services.push({ id: 'renovacion', label: 'Renovación', price: '50,00 €' });
+      services.push({ id: 'renovacion', label: 'Renovación', price: '50,00 €', noPrice: false });
+      services.push({
+        id: 'interes_colaborador',
+        label: INTERES_COLABORADOR_SVC.label,
+        price: '',
+        noPrice: true
+      });
     }
     return {
       companyName: 'Empresa Ejemplo S.L.',
@@ -415,6 +591,9 @@
       contactName: 'María García',
       contactEmail: 'contacto@empresa-ejemplo.es',
       contactPhone: '600 000 000',
+      website: 'https://www.empresa-ejemplo.es',
+      facebook: 'https://www.facebook.com/empresa-ejemplo',
+      instagram: 'https://www.instagram.com/empresa_ejemplo',
       selectedServices: services,
       files: [
         { name: 'catalogo-publicidad.pdf', size: 245760 },
@@ -436,6 +615,10 @@
     CONFIG_KEY: CONFIG_KEY,
     SUBMISSIONS_KEY: SUBMISSIONS_KEY,
     DEFAULT_CONFIG: DEFAULT_CONFIG,
+    normalizeSocialUrl: normalizeSocialUrl,
+    normalizeWebsiteUrl: normalizeWebsiteUrl,
+    validateWebsiteUrl: validateWebsiteUrl,
+    validateSocialUrl: validateSocialUrl,
     readConfig: readConfig,
     saveConfig: saveConfig,
     readSubmissions: readSubmissions,
@@ -443,6 +626,7 @@
     renderServiceOptions: renderServiceOptions,
     validate: validate,
     formatMailBody: formatMailBody,
+    formatServiceLine: formatServiceLine,
     notifyClubViaServer: notifyClubViaServer,
     submitFromForm: submitFromForm,
     openMailto: openMailto,

@@ -1,0 +1,320 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mi equipo — Torneo Fútbol 7 — CD Sanabria CF</title>
+    <style>
+        :root { --primary: #1e3a8a; --green: #059669; --bg: #f1f5f9; }
+        * { box-sizing: border-box; }
+        body {
+            font-family: system-ui, -apple-system, sans-serif;
+            margin: 0;
+            background: var(--bg);
+            color: #1e293b;
+            line-height: 1.5;
+        }
+        .wrap { max-width: 760px; margin: 0 auto; padding: 20px 16px 48px; }
+        .topbar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            margin-bottom: 16px;
+            flex-wrap: wrap;
+        }
+        .topbar a {
+            color: var(--primary);
+            text-decoration: none;
+            font-weight: 600;
+            font-size: 0.92rem;
+        }
+        .card {
+            background: #fff;
+            border-radius: 14px;
+            padding: 22px;
+            margin-bottom: 16px;
+            box-shadow: 0 4px 18px rgba(0,0,0,.06);
+        }
+        h1 { color: var(--primary); font-size: 1.45rem; margin: 0 0 6px; }
+        .sub { color: #64748b; font-size: 0.95rem; margin: 0 0 16px; }
+        h2 { font-size: 1.05rem; color: var(--primary); margin: 0 0 12px; }
+        label { display: block; font-weight: 600; font-size: 0.88rem; margin: 12px 0 6px; color: #334155; }
+        input[type="text"], input[type="email"] {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid #cbd5e1;
+            border-radius: 10px;
+            font-size: 1rem;
+        }
+        input:focus { outline: 2px solid #93c5fd; border-color: #60a5fa; }
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            padding: 12px 20px;
+            border-radius: 999px;
+            border: none;
+            font-weight: 700;
+            font-size: 0.95rem;
+            cursor: pointer;
+            text-decoration: none;
+        }
+        .btn-primary {
+            background: linear-gradient(135deg, #1e3a8a 0%, #2563eb 100%);
+            color: #fff;
+            width: 100%;
+            margin-top: 8px;
+        }
+        .btn-secondary {
+            background: #e2e8f0;
+            color: #334155;
+        }
+        .btn-outline {
+            background: #fff;
+            color: var(--primary);
+            border: 2px solid #93c5fd;
+        }
+        .error-box {
+            background: #fef2f2;
+            border: 1px solid #fecaca;
+            color: #b91c1c;
+            padding: 12px 14px;
+            border-radius: 10px;
+            font-size: 0.92rem;
+            margin: 12px 0 0;
+        }
+        .hero-badge {
+            display: inline-block;
+            background: #eff6ff;
+            color: #1d4ed8;
+            font-weight: 700;
+            font-size: 0.82rem;
+            padding: 4px 10px;
+            border-radius: 999px;
+            margin-bottom: 10px;
+        }
+        .meta-grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 10px;
+            margin: 16px 0;
+        }
+        @media (max-width: 520px) { .meta-grid { grid-template-columns: 1fr; } }
+        .meta-item {
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            border-radius: 10px;
+            padding: 12px;
+        }
+        .meta-item span { display: block; font-size: 0.78rem; color: #64748b; margin-bottom: 4px; }
+        .meta-item strong { font-size: 0.95rem; color: #0f172a; }
+        .progress-wrap {
+            background: #e2e8f0;
+            border-radius: 999px;
+            height: 10px;
+            overflow: hidden;
+            margin: 10px 0 6px;
+        }
+        .progress-bar {
+            height: 100%;
+            background: linear-gradient(90deg, #059669, #10b981);
+            border-radius: 999px;
+            transition: width 0.3s ease;
+        }
+        .progress-label { font-size: 0.88rem; color: #475569; }
+        .ficha-list { list-style: none; padding: 0; margin: 0; }
+        .ficha-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            padding: 12px 14px;
+            border: 1px solid #e2e8f0;
+            border-radius: 10px;
+            margin-bottom: 8px;
+            background: #fafafa;
+        }
+        .ficha-item strong { font-size: 0.92rem; }
+        .ficha-status {
+            font-size: 0.78rem;
+            font-weight: 700;
+            padding: 4px 10px;
+            border-radius: 999px;
+            white-space: nowrap;
+        }
+        .ficha-status--pendiente { background: #fef3c7; color: #92400e; }
+        .ficha-status--enviada { background: #d1fae5; color: #065f46; }
+        .info-box {
+            background: #eff6ff;
+            border: 1px solid #bfdbfe;
+            border-radius: 12px;
+            padding: 14px 16px;
+            font-size: 0.9rem;
+            color: #1e3a8a;
+            line-height: 1.5;
+        }
+        .code-pill {
+            font-family: ui-monospace, monospace;
+            background: #0f172a;
+            color: #f8fafc;
+            padding: 6px 12px;
+            border-radius: 8px;
+            font-size: 0.95rem;
+            letter-spacing: 0.04em;
+        }
+        .actions-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-top: 16px;
+        }
+        .coach-form label, .invite-form label {
+            display: block;
+            font-weight: 600;
+            font-size: 0.86rem;
+            margin: 10px 0 4px;
+            color: #334155;
+        }
+        .coach-form input, .coach-form select, .invite-form input {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #cbd5e1;
+            border-radius: 8px;
+            font-size: 1rem;
+            margin-bottom: 4px;
+        }
+        .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+        @media (max-width: 560px) { .grid2 { grid-template-columns: 1fr; } }
+        .btn-link-copy {
+            background: none;
+            border: none;
+            color: #2563eb;
+            font-size: 0.78rem;
+            cursor: pointer;
+            padding: 0;
+            text-decoration: underline;
+        }
+        .hint-ok { color: #059669; font-size: 0.88rem; margin: 8px 0 0; }
+        .fee-box {
+            background: #fefce8;
+            border: 1px solid #fde047;
+            border-radius: 10px;
+            padding: 12px 14px;
+            font-size: 0.9rem;
+            margin-top: 12px;
+        }
+        #loginView[hidden], #panelView[hidden] { display: none !important; }
+    </style>
+</head>
+<body>
+    <div class="wrap">
+        <div class="topbar">
+            <a href="index.html">← Volver a la web del club</a>
+            <button type="button" class="btn btn-secondary" id="btnLogout" style="display:none;">Cerrar sesión</button>
+        </div>
+
+        <div id="loginView" class="card">
+            <span class="hero-badge">Torneo Fútbol 7 — 2026</span>
+            <h1>Panel del responsable</h1>
+            <p class="sub">Introduce el código de equipo y el email con el que hiciste la preinscripción.</p>
+            <form id="loginForm">
+                <label for="loginAccessCode">Código de equipo</label>
+                <input type="text" id="loginAccessCode" placeholder="TP-2026-A1B2" autocomplete="off" autocapitalize="characters" spellcheck="false">
+
+                <label for="loginContactEmail">Email de contacto</label>
+                <input type="email" id="loginContactEmail" placeholder="el mismo de la preinscripción" autocomplete="email">
+
+                <div id="loginError" class="error-box" hidden></div>
+                <button type="submit" class="btn btn-primary" id="loginSubmitBtn">Acceder a mi equipo</button>
+            </form>
+            <p class="sub" style="margin-top:16px;margin-bottom:0;font-size:0.85rem;">
+                ¿Aún no tienes código? Preinscribe el equipo en la web. Recibirás el código por correo cuando el club confirme la plaza.
+            </p>
+        </div>
+
+        <div id="panelView" hidden>
+            <div class="card">
+                <span class="hero-badge" id="panelEventName">Torneo Fútbol 7 — 2026</span>
+                <h1 id="panelTeamName">Mi equipo</h1>
+                <p class="sub" id="panelSubtitle">Gestiona la plantilla de tu equipo para el torneo.</p>
+                <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:8px;">
+                    <span style="font-size:0.88rem;color:#64748b;">Código:</span>
+                    <span class="code-pill" id="panelAccessCode">—</span>
+                </div>
+                <div class="meta-grid">
+                    <div class="meta-item"><span>Categoría(s)</span><strong id="panelCategories">—</strong></div>
+                    <div class="meta-item"><span>Población</span><strong id="panelTown">—</strong></div>
+                    <div class="meta-item"><span>Jugadores (aprox.)</span><strong id="panelPlayerCount">—</strong></div>
+                    <div class="meta-item"><span>Estado plantilla</span><strong id="panelStatus">—</strong></div>
+                </div>
+                <div class="progress-wrap" aria-hidden="true"><div class="progress-bar" id="panelProgressBar" style="width:0%"></div></div>
+                <p class="progress-label" id="panelProgressLabel">0 de 0 fichas completadas</p>
+                <div class="fee-box">
+                    <strong>Cuota de inscripción del equipo:</strong> <span id="panelFeeLabel">—</span>
+                    <span style="display:block;font-size:0.82rem;color:#713f12;margin-top:4px;">Se paga con tarjeta al finalizar, cuando todas las fichas estén completas. El importe lo fija el club (variable TORNEO_INSCRIPTION_FEE_EUR en Netlify).</span>
+                </div>
+            </div>
+
+            <div class="card">
+                <h2>Entrenador/a del equipo</h2>
+                <p class="sub" style="margin-top:-6px;">Datos del entrenador/a o responsable técnico en el campo.</p>
+                <p id="teCoachStatus" class="hint-ok">Completa y guarda los datos del entrenador/a</p>
+                <form id="teCoachForm" class="coach-form">
+                    <div class="grid2">
+                        <div><label for="teCoachName">Nombre *</label><input type="text" id="teCoachName" required autocomplete="given-name"></div>
+                        <div><label for="teCoachSurname">Apellidos *</label><input type="text" id="teCoachSurname" required autocomplete="family-name"></div>
+                    </div>
+                    <label for="teCoachDniType">Tipo de documento *</label>
+                    <select id="teCoachDniType" required>
+                        <option value="espanol">DNI español</option>
+                        <option value="extranjero">Documento extranjero / NIE / pasaporte</option>
+                    </select>
+                    <label for="teCoachDni">Número de documento *</label>
+                    <input type="text" id="teCoachDni" required autocomplete="off">
+                    <label for="teCoachPhone">Teléfono *</label>
+                    <input type="tel" id="teCoachPhone" required autocomplete="tel">
+                    <div id="teCoachError" class="error-box" hidden></div>
+                    <button type="submit" class="btn btn-outline" id="teCoachSaveBtn" style="width:100%;margin-top:10px;">💾 Guardar entrenador/a</button>
+                </form>
+            </div>
+
+            <div class="card">
+                <h2>Plantilla del equipo</h2>
+                <p class="sub" style="margin-top:-6px;">Invita a cada jugador/a por email. Recibirán un enlace para completar su ficha (con tutor/a si es menor).</p>
+                <div id="teInviteBlock">
+                    <form id="teInviteForm" class="invite-form">
+                        <label for="teInviteEmail">Email del jugador/a *</label>
+                        <input type="email" id="teInviteEmail" required placeholder="jugador@ejemplo.com" autocomplete="email">
+                        <label for="teInviteLabel">Nombre en la lista (opcional)</label>
+                        <input type="text" id="teInviteLabel" placeholder="Ej: Juan Pérez">
+                        <div id="teInviteError" class="error-box" hidden></div>
+                        <p id="teInviteOk" class="hint-ok" hidden></p>
+                        <button type="submit" class="btn btn-primary" id="teInviteBtn" style="width:100%;margin-top:8px;">📧 Invitar jugador/a</button>
+                    </form>
+                </div>
+                <ul class="ficha-list" id="panelFichaList" style="margin-top:16px;"></ul>
+                <div id="teFinalizeError" class="error-box" hidden style="margin-top:12px;"></div>
+                <div class="actions-row">
+                    <button type="button" class="btn btn-outline" id="btnRefreshPanel">🔄 Actualizar</button>
+                    <button type="button" class="btn btn-primary" id="btnClosePlantilla" disabled>📤 Finalizar inscripción</button>
+                </div>
+            </div>
+
+            <div class="card">
+                <h2>Contacto del club</h2>
+                <p class="sub" style="margin:0;">Consultas: <a href="mailto:cdsanabriafc@gmail.com">cdsanabriafc@gmail.com</a></p>
+            </div>
+        </div>
+    </div>
+
+    <script src="js/cdsan-torneo-env.js"></script>
+    <script src="js/club-contact-defaults.js"></script>
+    <script src="js/club-torneo-config.js"></script>
+    <script src="js/redsys-payments.js"></script>
+    <script src="js/torneo-responsable-access.js"></script>
+    <script src="js/torneo-equipo-manage-client.js"></script>
+    <script src="js/torneo-equipo-panel.js"></script>
+</body>
+</html>

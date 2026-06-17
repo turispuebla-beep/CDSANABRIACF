@@ -54,9 +54,12 @@ exports.handler = async (event) => {
       if (!email || !email.includes('@')) {
         return jsonResponse(400, { ok: false, error: 'email del solicitante inválido' }, origin);
       }
-      const known = await clubRecordExistsForNotify(body);
-      if (!known) {
-        return jsonResponse(404, { ok: false, error: 'No hay registro del club para este aviso' }, origin);
+      const kind = String(body.kind || '').trim();
+      if (kind !== 'colaborador_publicidad') {
+        const known = await clubRecordExistsForNotify(body);
+        if (!known) {
+          return jsonResponse(404, { ok: false, error: 'No hay registro del club para este aviso' }, origin);
+        }
       }
       const result = await sendClubAdminNotification({
         kind: body.kind,
@@ -65,6 +68,7 @@ exports.handler = async (event) => {
         paymentChannel: body.paymentChannel || body.paymentMethod,
         paymentMethod: body.paymentMethod || body.paymentChannel,
         fields: body.fields,
+        userAttachments: body.attachments,
         requesterEmail: email,
         email: body.email || email,
         playerId: body.playerId,

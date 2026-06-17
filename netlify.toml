@@ -54,6 +54,12 @@
   [headers.values]
     Cache-Control = "public, max-age=31536000, immutable"
 
+# Incluir siempre lib/ en el paquete de cada función (membership-season.js, etc.)
+[functions]
+  included_files = ["netlify/functions/lib/**"]
+  node_bundler = "esbuild"
+  external_node_modules = ["firebase-admin"]
+
 # Renovación automática de socios activos tras el cierre de temporada (31/05)
 [functions."member-season-renewal"]
   schedule = "0 6 * * *"

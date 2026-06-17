@@ -404,6 +404,7 @@ function buildTorneoPreinscripcionConfirmedContent(data) {
         <tr><td><strong>Jugadores (aprox.):</strong></td><td>${players}</td></tr>
       </table>
       <p>Esta es una <strong>preinscripción</strong>. Más adelante el club solicitará los datos completos de los integrantes del equipo.</p>
+      ${data.accessCode ? `<p style="margin:16px 0;padding:12px 16px;background:#0f172a;color:#f8fafc;border-radius:8px;font-family:ui-monospace,monospace;">Tu código de responsable: <strong>${escapeHtml(data.accessCode)}</strong><br><span style="font-size:0.85rem;font-family:system-ui,sans-serif;color:#cbd5e1;">Guárdalo para gestionar la plantilla en la web (botón «Soy responsable del equipo»).</span></p>` : ''}
       ${siteUrl ? `<p><a href="${escapeHtml(siteUrl)}" style="font-weight:700;color:#1d4ed8;">Web del club</a></p>` : ''}
       <p style="font-size:0.9rem;color:#64748b">Consultas: <a href="mailto:${contact}">${contact}</a></p>
     </div>`;
@@ -414,6 +415,7 @@ function buildTorneoPreinscripcionConfirmedContent(data) {
     `Población: ${data.town || ''}\n` +
     `Categorías: ${formatTorneoCategoryList(data)}\n` +
     `Jugadores (aprox.): ${data.playerCount != null ? data.playerCount : '—'}\n\n` +
+    (data.accessCode ? `Código responsable: ${data.accessCode}\n(Gestiona la plantilla en la web del club → Soy responsable del equipo)\n\n` : '') +
     `Más adelante pediremos la ficha de cada jugador.\n` +
     `Consultas: ${clubContactEmail()}\n`;
   return { subject, html, text };
@@ -860,6 +862,117 @@ async function sendPaymentFailedEmail(data) {
   }
 }
 
+function buildTorneoPlayerInviteContent(data) {
+  const team = escapeHtml(String(data.teamName || 'Equipo').trim());
+  const eventName = escapeHtml(String(data.eventName || 'Torneo Fútbol 7 — 2026').trim());
+  const url = escapeHtml(String(data.inviteUrl || '').trim());
+  const subject = `Ficha jugador/a — ${data.teamName || 'Torneo'} — ${CLUB_NAME}`;
+  const html = `
+    <div style="font-family:system-ui,sans-serif;max-width:560px;color:#1e293b;line-height:1.5">
+      <h2 style="color:#1e3a8a;margin:0 0 12px">⚽ Completa tu ficha del torneo</h2>
+      <p>El responsable del equipo <strong>${team}</strong> te invita a rellenar tu ficha para <strong>${eventName}</strong> del <strong>${CLUB_NAME}</strong>.</p>
+      <p style="margin:20px 0"><a href="${url}" style="display:inline-block;background:#1e3a8a;color:#fff;padding:12px 20px;border-radius:8px;text-decoration:none;font-weight:700">Rellenar mi ficha</a></p>
+      <p style="font-size:0.88rem;color:#64748b">Si el botón no funciona, copia este enlace:<br><a href="${url}">${url}</a></p>
+    </div>`;
+  const text =
+    `Completa tu ficha del torneo para ${data.teamName || 'el equipo'}.\n\n` +
+    `${data.inviteUrl || ''}\n`;
+  return { subject, html, text };
+}
+
+async function sendTorneoPlayerInviteEmail(data) {
+  const cfg = getEmailConfig();
+  if (!cfg.ok) return { sent: false, reason: cfg.error };
+  const email = String(data.inviteEmail || '').trim().toLowerCase();
+  if (!email.includes('@')) return { sent: false, reason: 'email vacío' };
+  const content = buildTorneoPlayerInviteContent(data);
+  try {
+    const result = await sendDirectToMemberEmail({
+      memberEmail: email,
+      subject: content.subject,
+      html: content.html,
+      text: content.text,
+      replyTo: clubContactEmail()
+    });
+    return { sent: true, to: result.to, bcc: result.bcc };
+  } catch (err) {
+    return { sent: false, reason: err.message || String(err) };
+  }
+}
+
+async function sendTorneoFichaSubmittedEmails(data) {
+  const cfg = getEmailConfig();
+  if (!cfg.ok) return { sent: false };
+  const playerName = String(data.playerName || 'Jugador/a').trim();
+  try {
+    const { sendClubAdminNotification } = require('./club-admin-notify-email');
+    await sendClubAdminNotification({
+      kind: 'torneo_ficha_jugador',
+      title: 'Ficha torneo recibida',
+      subject: `Ficha torneo — ${playerName} — ${data.teamName || 'Equipo'}`,
+      nombre: playerName,
+      fields: [
+        { label: 'Equipo', value: data.teamName || '—' },
+        { label: 'Evento', value: data.eventName || '—' },
+        { label: 'Responsable', value: data.contactName || '—' },
+        { label: 'Email responsable', value: data.contactEmail || '—' }
+      ]
+    });
+  } catch (e) {
+    console.warn('sendTorneoFichaSubmittedEmails club:', e.message || e);
+  }
+  return { sent: true };
+}
+
+async function sendTorneoPlantillaCerradaEmails(data) {
+  const cfg = getEmailConfig();
+  const fichas = Array.isArray(data.fichas) ? data.fichas.filter((f) => f.data) : [];
+  const lines = fichas
+    .map(function (f, i) {
+      const n = [f.data.name, f.data.surname].filter(Boolean).join(' ');
+      return (i + 1) + '. ' + (n || f.label || '—');
+    })
+    .join('\n');
+  try {
+    const { sendClubAdminNotification } = require('./club-admin-notify-email');
+    await sendClubAdminNotification({
+      kind: 'torneo_plantilla_cerrada',
+      title: 'Plantilla torneo cerrada',
+      subject: `Plantilla cerrada — ${data.teamName || 'Equipo'} — ${data.eventName || 'Torneo'}`,
+      requesterEmail: data.contactEmail,
+      nombre: data.contactName,
+      telefono: data.contactPhone,
+      email: data.contactEmail,
+      fields: [
+        { label: 'Equipo', value: data.teamName },
+        { label: 'Evento', value: data.eventName },
+        { label: 'Código', value: data.accessCode },
+        { label: 'Jugadores', value: String(fichas.length) },
+        { label: 'Cuota pagada', value: data.inscriptionFeeEur != null ? data.inscriptionFeeEur + ' €' : '—' },
+        {
+          label: 'Entrenador/a',
+          value: data.coach ? [data.coach.name, data.coach.surname].filter(Boolean).join(' ') : '—'
+        }
+      ],
+      extraText: lines ? 'Plantilla:\n' + lines : ''
+    });
+  } catch (e) {
+    console.warn('sendTorneoPlantillaCerradaEmails club:', e.message || e);
+  }
+  if (cfg.ok && data.contactEmail) {
+    try {
+      await sendDirectToMemberEmail({
+        memberEmail: data.contactEmail,
+        subject: `Plantilla enviada — ${data.teamName || 'Torneo'} — ${CLUB_NAME}`,
+        html: `<p>Hola, <strong>${escapeHtml(data.contactName || '')}</strong>:</p><p>Hemos recibido la plantilla completa de <strong>${escapeHtml(data.teamName || '')}</strong> para el torneo. El club la revisará pronto.</p>`,
+        text: `Plantilla de ${data.teamName || 'equipo'} recibida por el club.\n`,
+        replyTo: clubContactEmail()
+      });
+    } catch (_) {}
+  }
+  return { sent: true };
+}
+
 module.exports = {
   sendMemberRegistrationEmail,
   sendMemberPaymentConfirmedEmail,
@@ -872,5 +985,8 @@ module.exports = {
   sendEventRegistrationPendingEmail,
   sendEventRegistrationConfirmedEmail,
   sendTorneoPreinscripcionConfirmedEmail,
+  sendTorneoPlayerInviteEmail,
+  sendTorneoFichaSubmittedEmails,
+  sendTorneoPlantillaCerradaEmails,
   sendPaymentFailedEmail
 };

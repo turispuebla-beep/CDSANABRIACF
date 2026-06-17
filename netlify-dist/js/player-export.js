@@ -428,15 +428,123 @@
     return items;
   }
 
-  function collectExportRows(opts) {
+  function comparePlayersByName(a, b) {
+    const na = normalizePlayerSortName(a);
+    const nb = normalizePlayerSortName(b);
+    return na.localeCompare(nb, 'es', { sensitivity: 'base' });
+  }
+
+  function normalizePlayerSortName(p) {
+    return (
+      String(p.surname || p.apellidos || '') +
+      ' ' +
+      String(p.name || p.nombre || '')
+    )
+      .trim()
+      .toLowerCase();
+  }
+
+  function categorySortIndex(catId) {
+    const order = ['prebenjamin', 'benjamin', 'alevin', 'infantil', 'cadete', 'juvenil', 'senior'];
+    const canon =
+      global.ClubPlayerMemberSync && global.ClubPlayerMemberSync.normalizeCategoryId
+        ? global.ClubPlayerMemberSync.normalizeCategoryId(catId)
+        : String(catId || '').toLowerCase();
+    const ix = order.indexOf(canon);
+    return ix >= 0 ? ix : 99;
+  }
+
+  function sortPlayersForExport(players) {
+    return (Array.isArray(players) ? players.slice() : []).sort(function (a, b) {
+      const catA =
+        global.ClubPlayerMemberSync && global.ClubPlayerMemberSync.resolvePlayerCategoryId
+          ? global.ClubPlayerMemberSync.resolvePlayerCategoryId(a)
+          : a.category || a.categoria || '';
+      const catB =
+        global.ClubPlayerMemberSync && global.ClubPlayerMemberSync.resolvePlayerCategoryId
+          ? global.ClubPlayerMemberSync.resolvePlayerCategoryId(b)
+          : b.category || b.categoria || '';
+      const diff = categorySortIndex(catA) - categorySortIndex(catB);
+      if (diff) return diff;
+      return comparePlayersByName(a, b);
+    });
+  }
+
+  function collectExportGroups(opts) {
     const exportSettings = global.ClubPlayerExportConfig ? global.ClubPlayerExportConfig.read() : null;
     let players = [];
     try {
       players = JSON.parse(global.localStorage.getItem('clubPlayers') || '[]');
     } catch (_) {}
-    return filterPlayers(players, opts).map(function (p) {
-      return mapPlayerExportRow(p, exportSettings);
+    let filtered = filterPlayers(players, opts);
+    if (global.ClubPlayerMemberSync && global.ClubPlayerMemberSync.removeCrossSeasonDuplicates) {
+      filtered = global.ClubPlayerMemberSync.removeCrossSeasonDuplicates(filtered).players;
+    }
+    filtered = sortPlayersForExport(filtered);
+
+    const groupByCategory = !opts || !opts.category || opts.category === 'all';
+    if (!groupByCategory) {
+      return [
+        {
+          label: null,
+          rows: filtered.map(function (p) {
+            return mapPlayerExportRow(p, exportSettings);
+          })
+        }
+      ];
+    }
+
+    if (!global.ClubPlayerMemberSync || !global.ClubPlayerMemberSync.groupPlayersByCategory) {
+      return [
+        {
+          label: null,
+          rows: filtered.map(function (p) {
+            return mapPlayerExportRow(p, exportSettings);
+          })
+        }
+      ];
+    }
+
+    const grouped = global.ClubPlayerMemberSync.groupPlayersByCategory(filtered);
+    const categories = grouped.categories;
+    const groups = [];
+    Object.keys(categories).forEach(function (catId) {
+      const catPlayers = grouped.grouped[catId] || [];
+      if (!catPlayers.length) return;
+      catPlayers.sort(comparePlayersByName);
+      groups.push({
+        label: categories[catId],
+        rows: catPlayers.map(function (p) {
+          return mapPlayerExportRow(p, exportSettings);
+        })
+      });
     });
+    if (grouped.grouped._other && grouped.grouped._other.length) {
+      grouped.grouped._other.sort(comparePlayersByName);
+      groups.push({
+        label: 'Otras categorías',
+        rows: grouped.grouped._other.map(function (p) {
+          return mapPlayerExportRow(p, exportSettings);
+        })
+      });
+    }
+    return groups.length
+      ? groups
+      : [
+          {
+            label: null,
+            rows: []
+          }
+        ];
+  }
+
+  function collectExportRows(opts) {
+    const groups = collectExportGroups(opts);
+    const rows = [];
+    groups.forEach(function (g) {
+      rows.push.apply(rows, g.rows);
+    });
+    return rows;
   }
 
   function refreshSeasonSelect(selectId) {
@@ -473,6 +581,8 @@
     buildFieldValues: buildFieldValues,
     filterPlayers: filterPlayers,
     collectExportRows: collectExportRows,
+    collectExportGroups: collectExportGroups,
+    sortPlayersForExport: sortPlayersForExport,
     refreshSeasonSelect: refreshSeasonSelect,
     isMinorPlayer: isMinorPlayer,
     getKitItems: getKitItems,

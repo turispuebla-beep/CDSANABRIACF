@@ -9,6 +9,17 @@ service cloud.firestore {
       return get(/databases/$(database)/documents/sanabria_admins/$(request.auth.uid));
     }
 
+    function isCompetitionOrganizer() {
+      return isSignedIn()
+        && exists(/databases/$(database)/documents/sanabria_admins/$(request.auth.uid))
+        && adminDoc().data.appScope == 'cdsanabriacf'
+        && adminDoc().data.role == 'competition_organizer';
+    }
+
+    function canManageCompetitions() {
+      return isAdmin() || isCompetitionOrganizer();
+    }
+
     function isAdmin() {
       return isSignedIn()
         && exists(/databases/$(database)/documents/sanabria_admins/$(request.auth.uid))
@@ -291,9 +302,9 @@ service cloud.firestore {
       allow read, write: if false;
     }
     match /sanabria_torneo_preinscripciones/{docId} {
-      allow read: if hasScope() && isAdmin();
+      allow read: if hasScope() && canManageCompetitions();
       allow create: if publicRegistrationsOpen() && torneoPreinscripcionValid();
-      allow update, delete: if hasScope() && isAdmin() && hasRequestedScope();
+      allow update, delete: if hasScope() && canManageCompetitions() && hasRequestedScope();
     }
     match /sanabria_coaches/{docId} {
       allow read: if hasScope();
@@ -305,14 +316,14 @@ service cloud.firestore {
     }
     match /sanabria_competitions/{docId} {
       allow read: if hasScope();
-      allow create: if isAdmin()
+      allow create: if canManageCompetitions()
         && hasRequestedScope()
         && competitionPayloadValid();
-      allow update: if isAdmin()
+      allow update: if canManageCompetitions()
         && hasScope()
         && hasRequestedScope()
         && competitionPayloadValid();
-      allow delete: if hasScope() && isAdmin();
+      allow delete: if hasScope() && canManageCompetitions();
     }
     match /sanabria_notifications/{docId} {
       allow read: if hasScope() && isSignedIn();

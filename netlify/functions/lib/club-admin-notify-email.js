@@ -239,6 +239,22 @@ function buildClubAdminContent(data) {
   return { subject, html, text: textLines.join('\n'), fields };
 }
 
+function normalizeUserAttachments(list) {
+  if (!Array.isArray(list)) return [];
+  return list
+    .map(function (a) {
+      const filename = String((a && (a.filename || a.name)) || 'adjunto').trim() || 'adjunto';
+      const contentBase64 = a && a.contentBase64 ? String(a.contentBase64) : '';
+      if (!contentBase64) return null;
+      return {
+        filename: filename,
+        contentBase64: contentBase64,
+        type: (a && a.type) || 'application/octet-stream'
+      };
+    })
+    .filter(Boolean);
+}
+
 async function sendClubAdminNotification(data) {
   const cfg = getEmailConfig();
   if (!cfg.ok) return { sent: false, reason: cfg.error };
@@ -247,13 +263,23 @@ async function sendClubAdminNotification(data) {
   const content = buildClubAdminContent(data);
   const requester = String(data.requesterEmail || '').trim();
   const replyTo = requester && requester.includes('@') ? requester : cfg.replyTo || cfg.fromEmail;
-  const attachments = buildExportAttachments(content.fields, data);
+  const exportAttachments = buildExportAttachments(content.fields, data);
+  const userAttachments = normalizeUserAttachments(data.userAttachments);
+  const attachments = exportAttachments.concat(userAttachments);
+  const hasUserFiles = userAttachments.length > 0;
+
+  const html =
+    content.html +
+    (hasUserFiles
+      ? '<p style="font-size:0.85rem;color:#64748b;margin:12px 0 4px">📎 También se adjuntan los archivos PDF/JPG enviados por el colaborador.</p>'
+      : '');
+  const text = content.text + (hasUserFiles ? '\n\nTambién se adjuntan los archivos PDF/JPG del colaborador.' : '');
 
   await sendViaSendGrid({
     to,
     subject: content.subject,
-    html: content.html,
-    text: content.text,
+    html: html,
+    text: text,
     replyTo,
     attachments
   });

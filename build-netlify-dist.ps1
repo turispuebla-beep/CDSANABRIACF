@@ -25,6 +25,8 @@ $copyItems = @(
     'pago-cuota-socio.html',
     'inscripcion-jugador.html',
     'inscripcion-jugador-demo.html',
+    'torneo-equipo.html',
+    'torneo-jugador.html',
     'sw.js',
     'manifest.json'
 )
@@ -70,6 +72,17 @@ $membershipEnvDist = Join-Path $jsDest 'cdsan-membership-env.js'
 Set-Content -Path $membershipEnvRoot -Value $membershipEnvJs -Encoding UTF8
 Set-Content -Path $membershipEnvDist -Value $membershipEnvJs -Encoding UTF8
 Write-Host '      + js/cdsan-membership-env.js (MEMBERSHIP_*)' -ForegroundColor Gray
+
+$torneoFee = Get-MembershipEnvVal 'TORNEO_INSCRIPTION_FEE_EUR' '0'
+$torneoEnvJs = @"
+/** Generado por build-netlify-dist.ps1 — cuota inscripción torneo (TORNEO_INSCRIPTION_FEE_EUR). */
+window.CDSAN_TORNEO = { inscriptionFeeEur: $torneoFee };
+"@
+$torneoEnvRoot = Join-Path $jsSrc 'cdsan-torneo-env.js'
+$torneoEnvDist = Join-Path $jsDest 'cdsan-torneo-env.js'
+Set-Content -Path $torneoEnvRoot -Value $torneoEnvJs -Encoding UTF8
+Set-Content -Path $torneoEnvDist -Value $torneoEnvJs -Encoding UTF8
+Write-Host '      + js/cdsan-torneo-env.js (TORNEO_INSCRIPTION_FEE_EUR)' -ForegroundColor Gray
 
 # Escudos e imágenes del club (carpeta assets/)
 $assetsSrc = Join-Path $root 'assets'
@@ -161,7 +174,7 @@ Write-Host "      Eliminados (aprox.): $removed archivos" -ForegroundColor Gray
 # Raíz de netlify-dist: solo lo publicable (evita basura de subidas anteriores)
 $keepRoot = @(
     'index.html', 'admin-panel.html', 'pago-resultado.html', 'pago-cuota-socio.html',
-    'inscripcion-jugador.html', 'inscripcion-jugador-demo.html',
+    'inscripcion-jugador.html', 'inscripcion-jugador-demo.html', 'torneo-equipo.html', 'torneo-jugador.html',
     'sw.js', 'manifest.json', 'favicon.ico',
     '_redirects', '.netlifyignore', '404.html', 'deploy-version.json'
 )
@@ -223,7 +236,7 @@ foreach ($name in @('escudo-192.png', 'escudo-512.png', 'escudo-cdsanabriacf.png
         $ok = $false
     }
 }
-foreach ($name in @('admin-session.js', 'club-contact-defaults.js', 'torneo-preinscripcion.js', 'admin-torneo-preinscripciones.js', 'player-application.js', 'protocol-guard.js', 'club-password-hash.js', 'colaborador-solicitud.js', 'site-update-mode.js')) {
+foreach ($name in @('admin-session.js', 'club-contact-defaults.js', 'torneo-preinscripcion.js', 'admin-torneo-preinscripciones.js', 'player-application.js', 'protocol-guard.js', 'club-password-hash.js', 'colaborador-solicitud.js', 'club-default-advertisers.js', 'site-update-mode.js')) {
     $p = Join-Path $dist "js\$name"
     if (-not (Test-Path $p)) {
         Write-Host "      FALTA: js/$name" -ForegroundColor Red

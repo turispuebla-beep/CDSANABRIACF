@@ -75,6 +75,7 @@ async function updatePayment(orderId, patch) {
 }
 
 const membershipSeason = require('./membership-season');
+const memberNumbers = require('./member-numbers');
 
 function proximoCierreTemporadaIso() {
   return membershipSeason.proximoCierreTemporadaIso();
@@ -294,6 +295,66 @@ async function memberExistsForEmail(email, memberId) {
   return !q.empty;
 }
 
+async function listAllMembersData() {
+  const snap = await membersRef().get();
+  return snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+}
+
+async function activationPatchWithMemberNumber(existingData, activationFields) {
+  const all = await listAllMembersData();
+  const merged = { ...(existingData || {}), ...(activationFields || {}) };
+  const numPatch = memberNumbers.memberNumberPatch(merged, all);
+  return {
+    patch: { ...(activationFields || {}), ...(numPatch || {}) },
+    merged: numPatch ? { ...merged, ...numPatch } : merged
+  };
+}
+
+/** Asigna n.º ≥ 51 a socios activos que solo tengan provisional SOC… (admin / recuperación). */
+async function assignPendingRegularMemberNumbers(opts = {}) {
+  const dryRun = opts.dryRun === true;
+  const all = await listAllMembersData();
+  const pending = all
+    .filter((m) => memberNumbers.needsRegularMemberNumber(m))
+    .sort((a, b) =>
+      String(a.registrationDate || a.fechaRegistro || a.validatedDate || '').localeCompare(
+        String(b.registrationDate || b.fechaRegistro || b.validatedDate || '')
+      )
+    );
+  const assigned = [];
+  let working = [...all];
+  const now = new Date().toISOString();
+  for (const m of pending) {
+    const merged = { ...m };
+    memberNumbers.assignNextRegularNumberIfNeeded(merged, working);
+    const num = memberNumbers.getRegularNumber(merged);
+    if (num == null) continue;
+    const row = {
+      id: m.id,
+      memberNumber: num,
+      numeroSocio: num,
+      numeroSocioRegular: num
+    };
+    if (!dryRun) {
+      await membersRef().doc(String(m.id)).set(
+        {
+          memberNumber: num,
+          numeroSocio: num,
+          numeroSocioRegular: num,
+          membershipTier: 'regular',
+          socioDeHonor: false,
+          lastModified: now,
+          updatedAt: now
+        },
+        { merge: true }
+      );
+      working = working.map((x) => (x.id === m.id ? { ...x, ...row } : x));
+    }
+    assigned.push(row);
+  }
+  return { ok: true, dryRun, assigned: assigned.length, members: assigned };
+}
+
 async function completeMembershipPayment(payment, redsysParams) {
   let resolved = await resolveMemberDoc(payment);
   if (!resolved && payment.registrationBundle && payment.registrationBundle.member) {
@@ -311,35 +372,33 @@ async function completeMembershipPayment(payment, redsysParams) {
     redsysParams.Ds_AuthorizationCode ||
     null;
 
-  await resolved.ref.set(
-    {
-      pagado: true,
-      paymentStatus: 'paid',
-      paymentOrderId: payment.orderId,
-      paymentDate: now,
-      paymentMethod: payment.payMethod === 'bizum' ? 'redsys_bizum' : 'redsys_caja_rural',
-      redsysAuthCode: authCode,
-      status: 'active',
-      estado: 'activo',
-      pendingReason: null,
-      fechaLimitePago: null,
-      fechaVencimiento: null,
-      validatedBy: 'redsys_auto',
-      validatedDate: now,
-      cuotaVigenteHasta: proximoCierreTemporadaIso(),
-      lastModified: now,
-      updatedAt: now,
-      activatedAt: now,
-      activationSource: 'redsys_membership_fee',
-      appScope: APP_SCOPE
-    },
-    { merge: true }
-  );
+  const { patch, merged } = await activationPatchWithMemberNumber(resolved.data, {
+    pagado: true,
+    paymentStatus: 'paid',
+    paymentOrderId: payment.orderId,
+    paymentDate: now,
+    paymentMethod: payment.payMethod === 'bizum' ? 'redsys_bizum' : 'redsys_caja_rural',
+    redsysAuthCode: authCode,
+    status: 'active',
+    estado: 'activo',
+    pendingReason: null,
+    fechaLimitePago: null,
+    fechaVencimiento: null,
+    validatedBy: 'redsys_auto',
+    validatedDate: now,
+    cuotaVigenteHasta: proximoCierreTemporadaIso(),
+    lastModified: now,
+    updatedAt: now,
+    activatedAt: now,
+    activationSource: 'redsys_membership_fee',
+    appScope: APP_SCOPE
+  });
+  await resolved.ref.set(patch, { merge: true });
 
   try {
     const { sendMemberPaymentConfirmedEmail } = require('./member-email');
     const { sendClubAdminNotification } = require('./club-admin-notify-email');
-    const d = resolved.data;
+    const d = merged;
     const payCh = payment.payMethod === 'bizum' ? 'bizum' : 'tarjeta';
     const nombre = [d.nombre || d.name, d.apellidos || d.surname].filter(Boolean).join(' ').trim();
     await sendMemberPaymentConfirmedEmail({
@@ -562,24 +621,37 @@ async function findPlayerDocByDniSeason(dni, season) {
       return { ref: doc.ref, data: { id: doc.id, ...data } };
     }
   }
-  return { ref: q.docs[0].ref, data: { id: q.docs[0].id, ...q.docs[0].data() } };
+  return null;
 }
 
-/** Localiza ficha por DNI+temporada o, en menores sin DNI, por email+temporada. */
+/** Localiza ficha por DNI+temporada; si no hay DNI, por nombre+apellidos+temporada; email solo con nombre. */
 async function findPlayerDocByIdentity(player) {
   const season = String(player.inscriptionSeason || player.temporada || '').trim();
   const dni = normalizeDni(player.dni);
   if (dni) {
     const byDni = await findPlayerDocByDniSeason(dni, season);
-    if (byDni) return byDni;
+    if (byDni && playerDocMatchesIdentity(byDni.data, player)) return byDni;
   }
-  const email = String(player.email || '').trim().toLowerCase();
-  if (email && season) {
+  const pn = normalizeNamePart(player.name || player.nombre);
+  const ps = normalizeNamePart(player.surname || player.apellidos);
+  if (pn && ps && season) {
+    const qName = await playersRef().where('inscriptionSeason', '==', season).limit(50).get();
+    for (const doc of qName.docs) {
+      const data = doc.data();
+      if (data.appScope && data.appScope !== APP_SCOPE) continue;
+      if (playerDocMatchesIdentity(data, player)) {
+        return { ref: doc.ref, data: { id: doc.id, ...data } };
+      }
+    }
+  }
+  const email = String(player.email || player.guardianEmail || '').trim().toLowerCase();
+  if (email && season && pn && ps) {
     const q = await playersRef().where('email', '==', email).limit(25).get();
     for (const doc of q.docs) {
       const data = doc.data();
       if (data.appScope && data.appScope !== APP_SCOPE) continue;
-      if (String(data.inscriptionSeason || data.temporada || '') === season) {
+      if (String(data.inscriptionSeason || data.temporada || '') !== season) continue;
+      if (playerDocMatchesIdentity(data, player)) {
         return { ref: doc.ref, data: { id: doc.id, ...data } };
       }
     }
@@ -615,7 +687,8 @@ async function resolveMemberForPlayerInscription(reg) {
  * Inscripción jugador/a (web): activa ficha en sanabria_players y socio-jugador si aplica.
  * Evita duplicar por DNI + temporada.
  */
-async function completePlayerInscription(payment) {
+async function completePlayerInscription(payment, opts) {
+  const skipNotify = !!(opts && opts.skipNotify);
   const reg = payment.playerRegistration;
   if (!reg || typeof reg !== 'object') {
     throw new Error('playerRegistration ausente');
@@ -651,6 +724,7 @@ async function completePlayerInscription(payment) {
 
   const existing = await findPlayerDocByIdentity({ ...reg, dni, email, inscriptionSeason: season });
   let playerId;
+  let memberId = null;
   if (existing) {
     playerId = existing.data.id;
     await existing.ref.set(patch, { merge: true });
@@ -717,22 +791,25 @@ async function completePlayerInscription(payment) {
       appScope: APP_SCOPE
     };
     if (cuotaSocio != null) memberPatch.cuota = cuotaSocio;
-    let memberId;
+    const allMembers = await listAllMembersData();
+    const memberBase = existingMember ? existingMember.data : {};
+    const numPatch = memberNumbers.memberNumberPatch({ ...memberBase, ...memberPatch }, allMembers);
+    if (numPatch) Object.assign(memberPatch, numPatch);
     if (existingMember) {
       memberId = existingMember.data.id;
       await existingMember.ref.set(memberPatch, { merge: true });
     } else {
       const ref = membersRef().doc();
       memberId = ref.id;
-      await ref.set(
-        {
-          ...memberPatch,
-          id: memberId,
-          numeroSocio: 'SOC' + String(Date.now()).slice(-6),
-          registrationDate: now
-        },
-        { merge: true }
-      );
+      const createPayload = {
+        ...memberPatch,
+        id: memberId,
+        registrationDate: now
+      };
+      if (!numPatch) {
+        createPayload.numeroSocio = 'SOC' + String(Date.now()).slice(-6);
+      }
+      await ref.set(createPayload, { merge: true });
     }
     await playersRef().doc(String(playerId)).set(
       { linkedMemberId: memberId, updatedAt: now },
@@ -740,15 +817,38 @@ async function completePlayerInscription(payment) {
     );
   }
 
+  let savedMemberData = null;
+  if (memberId) {
+    const memberSnap = await membersRef()
+      .doc(String(memberId))
+      .get()
+      .catch(() => null);
+    if (memberSnap && memberSnap.exists) {
+      savedMemberData = { id: memberSnap.id, ...memberSnap.data() };
+    }
+  }
+
+  const playerSnapNotify = await playersRef().doc(String(playerId)).get();
+  const savedPlayerNotify = playerSnapNotify.exists
+    ? { id: playerId, ...playerSnapNotify.data() }
+    : { ...reg, id: playerId };
+
   try {
+    if (skipNotify) return;
     const { sendClubAdminNotification } = require('./club-admin-notify-email');
     const { buildPlayerInscriptionNotifyFields, formatKitSummary } = require('./player-inscription-notify-fields');
     const payCh = payment.payMethod === 'bizum' ? 'bizum' : 'tarjeta';
     const total = reg.chargeBreakdown && reg.chargeBreakdown.total != null ? reg.chargeBreakdown.total : reg.totalCharge;
-    const notifyFields = buildPlayerInscriptionNotifyFields(
-      { ...reg, id: playerId },
-      { orderId: payment.orderId, paid: true }
-    );
+    const regForNotify = {
+      ...savedPlayerNotify,
+      numeroSocio: savedMemberData && (savedMemberData.numeroSocio || savedMemberData.memberNumber),
+      memberNumber: savedMemberData && (savedMemberData.memberNumber || savedMemberData.numeroSocio),
+      linkedMemberId: savedMemberData && savedMemberData.id
+    };
+    const notifyFields = buildPlayerInscriptionNotifyFields(regForNotify, {
+      orderId: payment.orderId,
+      paid: true
+    });
     await sendClubAdminNotification({
       kind: 'inscripcion_jugador_pagada',
       title: 'Inscripción jugador/a pagada (pasarela)',
@@ -765,8 +865,8 @@ async function completePlayerInscription(payment) {
       provincia: reg.provincia,
       telefono: reg.phone || reg.telefono,
       email: reg.email || payment.customerEmail,
-      numeroSocio: reg.numeroSocio || reg.memberNumber,
-      memberNumber: reg.numeroSocio || reg.memberNumber,
+      numeroSocio: regForNotify.numeroSocio || regForNotify.memberNumber,
+      memberNumber: regForNotify.memberNumber || regForNotify.numeroSocio,
       fields: notifyFields
     });
     const { sendPlayerInscriptionPaymentConfirmedEmail } = require('./member-email');
@@ -1116,6 +1216,20 @@ function emailMatchesPlayer(player, email) {
 
 function normalizeNamePart(v) {
   return String(v || '').trim().toLowerCase();
+}
+
+function playerDocMatchesIdentity(data, player) {
+  if (!data || !player) return false;
+  const playerDni = normalizeDni(player.dni);
+  const dataDni = normalizeDni(data.dni);
+  if (playerDni && dataDni && playerDni !== dataDni) return false;
+  const pn = normalizeNamePart(player.name || player.nombre);
+  const ps = normalizeNamePart(player.surname || player.apellidos);
+  const dn = normalizeNamePart(data.name || data.nombre);
+  const ds = normalizeNamePart(data.surname || data.apellidos);
+  if (pn && ps && dn && ds && (dn !== pn || ds !== ps)) return false;
+  if (playerDni && dataDni && playerDni === dataDni) return true;
+  return !!(pn && ps && dn === pn && ds === ps);
 }
 
 async function findPlayerForPortalLookup(dni, name, surname, season) {
@@ -1811,6 +1925,14 @@ async function upsertMemberSocioJugadorFromPlayer(player) {
     memberPatch.portalPasswordHash = player.portalPasswordHash;
   }
   applyMemberPaymentStateFromPlayerRecord(memberPatch, player);
+  if (memberNumbers.memberIsActive(memberPatch)) {
+    const allMembers = await listAllMembersData();
+    const numPatch = memberNumbers.memberNumberPatch(
+      { ...(existing ? existing.data : {}), ...memberPatch },
+      allMembers
+    );
+    if (numPatch) Object.assign(memberPatch, numPatch);
+  }
 
   let memberId;
   if (existing) {
@@ -1819,19 +1941,66 @@ async function upsertMemberSocioJugadorFromPlayer(player) {
   } else {
     const ref = membersRef().doc();
     memberId = ref.id;
-    await ref.set(
-      {
-        ...memberPatch,
-        id: memberId,
-        numeroSocio: 'SOC' + String(Date.now()).slice(-6),
-        memberNumber: null,
-        registrationDate: now
-      },
-      { merge: true }
-    );
+    const createPayload = {
+      ...memberPatch,
+      id: memberId,
+      registrationDate: now
+    };
+    if (!memberPatch.memberNumber && !memberNumbers.getRegularNumber(memberPatch)) {
+      createPayload.numeroSocio = 'SOC' + String(Date.now()).slice(-6);
+      createPayload.memberNumber = null;
+    }
+    await ref.set(createPayload, { merge: true });
   }
   const snap = await membersRef().doc(String(memberId)).get();
   return { id: memberId, ...(snap.exists ? snap.data() : memberPatch) };
+}
+
+/** Reaplica inscripción pagada desde el pedido Redsys (hermanos / fichas mezcladas). */
+async function repairPlayerInscriptionFromPaymentOrder(orderId) {
+  const oid = String(orderId || '').trim();
+  if (!oid) throw new Error('orderId requerido');
+  const payment = await getPayment(oid);
+  if (!payment) throw new Error('Pago no encontrado: ' + oid);
+  if (payment.type !== 'player_inscription') {
+    throw new Error('El pedido no es inscripción de jugador/a: ' + oid);
+  }
+  if (String(payment.status || '').toLowerCase() !== 'paid') {
+    throw new Error('El pedido no está pagado: ' + oid);
+  }
+  await completePlayerInscription(payment, { skipNotify: true });
+  const reg = payment.playerRegistration || {};
+  const dni = normalizeDni(reg.dni);
+  const season = String(reg.inscriptionSeason || reg.temporada || '').trim();
+  const playerDoc = dni && season ? await findPlayerDocByDniSeason(dni, season) : null;
+  let memberDoc = null;
+  if (playerDoc) {
+    memberDoc = await findMemberDocForPlayerInscription({
+      ...reg,
+      id: playerDoc.data.id,
+      dni,
+      inscriptionSeason: season
+    });
+  }
+  return {
+    ok: true,
+    orderId: oid,
+    playerId: playerDoc ? playerDoc.data.id : null,
+    memberId: memberDoc ? memberDoc.data.id : null,
+    numeroSocio: memberDoc ? memberDoc.data.numeroSocio || memberDoc.data.memberNumber : null,
+    nombre: reg.name || reg.nombre,
+    apellidos: reg.surname || reg.apellidos,
+    dni: reg.dni || ''
+  };
+}
+
+async function repairPlayerInscriptionsFromPaymentOrders(orderIds) {
+  const list = Array.isArray(orderIds) ? orderIds : [];
+  const results = [];
+  for (const oid of list) {
+    results.push(await repairPlayerInscriptionFromPaymentOrder(oid));
+  }
+  return { ok: true, repaired: results.length, results };
 }
 
 async function upsertPlayerInscriptionRecord(player) {
@@ -2091,6 +2260,22 @@ function torneoCategoryLabels(ids) {
     .filter(Boolean);
 }
 
+function normalizeTorneoAccessCode(raw) {
+  return String(raw || '')
+    .trim()
+    .toUpperCase()
+    .replace(/\s+/g, '');
+}
+
+function generateTorneoAccessCode(seed) {
+  const year = new Date().getFullYear();
+  const base = String(seed || '')
+    .replace(/[^a-zA-Z0-9]/g, '')
+    .toUpperCase();
+  const suffix = (base.slice(-4) || Math.random().toString(36).slice(2, 6)).toUpperCase().padStart(4, '0').slice(-4);
+  return `TP-${year}-${suffix}`;
+}
+
 function normalizeTorneoPreinscripcionFields(raw) {
   const d = raw && typeof raw === 'object' ? { ...raw } : {};
   const categories = Array.isArray(d.categories)
@@ -2111,10 +2296,101 @@ function normalizeTorneoPreinscripcionFields(raw) {
     status: String(d.status || 'preinscripcion_enviada').trim(),
     source: String(d.source || 'web').trim(),
     localId: d.localId ? String(d.localId) : null,
+    accessCode: d.accessCode ? normalizeTorneoAccessCode(d.accessCode) : '',
+    plantillaStatus: String(d.plantillaStatus || 'pendiente').trim(),
+    fichas: Array.isArray(d.fichas) ? d.fichas : [],
+    coach: d.coach && typeof d.coach === 'object' ? d.coach : null,
+    panelEnabled: d.panelEnabled !== false,
     appScope: APP_SCOPE,
     createdAt: d.createdAt || now,
     updatedAt: now
   };
+}
+
+function buildTorneoEquipoPanelPayload(record) {
+  const r = record && typeof record === 'object' ? record : {};
+  const fichas = Array.isArray(r.fichas) ? r.fichas : [];
+  const submitted = fichas.filter((f) => String(f.status || '') === 'enviada').length;
+  const playerCount = parseInt(r.playerCount, 10) || 0;
+  return {
+    id: r.id || '',
+    accessCode: r.accessCode || '',
+    eventName: r.eventName || 'Torneo Fútbol 7 — 2026',
+    teamName: r.teamName || '',
+    town: r.town || '',
+    categories: Array.isArray(r.categories) ? r.categories : [],
+    categoryLabels: Array.isArray(r.categoryLabels) ? r.categoryLabels : torneoCategoryLabels(r.categories),
+    playerCount,
+    contactName: r.contactName || '',
+    contactEmail: r.contactEmail || '',
+    plantillaStatus: r.plantillaStatus || 'pendiente',
+    fichasCount: fichas.length,
+    fichasSubmitted: submitted,
+    fichasPending: Math.max(0, playerCount - submitted),
+    fichas: fichas.map((f) => ({
+      id: f.id || '',
+      label: f.label || f.playerName || 'Jugador/a',
+      status: f.status || 'pendiente',
+      updatedAt: f.updatedAt || null
+    })),
+    competitionId: r.competitionId || null,
+    competitionTeamId: r.competitionTeamId || null
+  };
+}
+
+async function findTorneoPreinscripcionByAccessCode(accessCode) {
+  const code = normalizeTorneoAccessCode(accessCode);
+  if (!code) return null;
+  const snap = await torneoPreinscripcionesRef().where('accessCode', '==', code).limit(1).get();
+  if (!snap.empty) {
+    const doc = snap.docs[0];
+    return { id: doc.id, ...doc.data() };
+  }
+  return null;
+}
+
+async function ensureTorneoAccessCode(recordId) {
+  const ref = torneoPreinscripcionesRef().doc(String(recordId));
+  const snap = await ref.get();
+  if (!snap.exists) return null;
+  const data = snap.data() || {};
+  if (data.accessCode) return { id: snap.id, ...data };
+  const accessCode = generateTorneoAccessCode(snap.id);
+  const updatedAt = new Date().toISOString();
+  await ref.set({ accessCode, updatedAt }, { merge: true });
+  const next = await ref.get();
+  return { id: snap.id, ...(next.exists ? next.data() : { accessCode }) };
+}
+
+/** Verifica código + email del responsable y devuelve datos del panel. */
+async function verifyTorneoEquipoAccess(accessCode, contactEmail) {
+  const code = normalizeTorneoAccessCode(accessCode);
+  const email = String(contactEmail || '')
+    .trim()
+    .toLowerCase();
+  if (!code) throw new Error('Introduce el código de equipo.');
+  if (!email || !email.includes('@')) throw new Error('Introduce el email de contacto de la preinscripción.');
+
+  let record = await findTorneoPreinscripcionByAccessCode(code);
+  if (!record) throw new Error('Código no encontrado. Comprueba que lo has escrito bien o contacta con el club.');
+
+  if (!record.accessCode) {
+    record = await ensureTorneoAccessCode(record.id);
+  }
+  if (!record) throw new Error('No se pudo cargar el equipo.');
+
+  if (record.panelEnabled === false) {
+    throw new Error('El acceso al panel aún no está activo. El club lo habilitará tras revisar tu preinscripción.');
+  }
+
+  const recordEmail = String(record.contactEmail || '')
+    .trim()
+    .toLowerCase();
+  if (recordEmail !== email) {
+    throw new Error('El email no coincide con el de la preinscripción. Usa el mismo email que indicaste al inscribir el equipo.');
+  }
+
+  return buildTorneoEquipoPanelPayload({ ...record, accessCode: code });
 }
 
 /** Preinscripción torneo F7 desde la web pública. */
@@ -2132,9 +2408,10 @@ async function createTorneoPreinscripcionRecord(raw) {
 
   const ref = torneoPreinscripcionesRef().doc();
   const id = ref.id;
-  await ref.set({ ...patch, id }, { merge: true });
+  const accessCode = patch.accessCode ? normalizeTorneoAccessCode(patch.accessCode) : generateTorneoAccessCode(id);
+  await ref.set({ ...patch, id, accessCode, plantillaStatus: 'pendiente', fichas: [], panelEnabled: true }, { merge: true });
   const snap = await ref.get();
-  return { id, ...(snap.exists ? snap.data() : patch) };
+  return { id, ...(snap.exists ? snap.data() : { ...patch, accessCode }) };
 }
 
 function coachesRef() {
@@ -2290,6 +2567,20 @@ async function deletePlayerRecord(playerId, identity) {
   const deletedIds = new Set();
   const id = String(playerId || '').trim();
   const ident = identity && typeof identity === 'object' ? identity : {};
+  const allowNotFound = ident.allowNotFound === true;
+
+  function isTestPlayerData(d) {
+    const data = d || {};
+    const dni = normalizeDni(data.dni);
+    if (dni === '88888888T' || dni === '88888888X') return true;
+    if (data.testRunId || data.registrationSource === 'automated_test') return true;
+    const name = String(data.name || data.nombre || '').trim().toLowerCase();
+    const surname = String(data.surname || data.apellidos || '').trim().toLowerCase();
+    if (name === 'diag' && surname === 'test') return true;
+    const email = String(data.email || '').trim().toLowerCase();
+    if (email.endsWith('@example.invalid')) return true;
+    return false;
+  }
 
   if (id && !id.startsWith('PLAYER_') && !id.startsWith('PENDING_')) {
     const ref = playersRef().doc(id);
@@ -2311,6 +2602,10 @@ async function deletePlayerRecord(playerId, identity) {
   const name = String(ident.name || '').trim().toLowerCase();
   const surname = String(ident.surname || '').trim().toLowerCase();
   const season = String(ident.season || ident.inscriptionSeason || '').trim();
+  const isTestIdentity =
+    normalizeDni(ident.dni) === '88888888T' ||
+    normalizeDni(ident.dni) === '88888888X' ||
+    (name === 'diag' && surname === 'test');
   if (name && surname) {
     const q = await playersRef().where('appScope', '==', APP_SCOPE).get();
     for (const docSnap of q.docs) {
@@ -2320,10 +2615,21 @@ async function deletePlayerRecord(playerId, identity) {
       const ps = String(d.surname || d.apellidos || '').trim().toLowerCase();
       if (pn === name && ps === surname) {
         const docSeason = String(d.inscriptionSeason || d.temporada || '').trim();
-        if (!season || !docSeason || docSeason === season) {
+        if (isTestIdentity || isTestPlayerData(d) || !season || !docSeason || docSeason === season) {
           await docSnap.ref.delete();
           deletedIds.add(docSnap.id);
         }
+      }
+    }
+  }
+
+  if (isTestIdentity || ident.purgeTestRecords) {
+    const qTest = await playersRef().where('appScope', '==', APP_SCOPE).get();
+    for (const docSnap of qTest.docs) {
+      if (deletedIds.has(docSnap.id)) continue;
+      if (isTestPlayerData(docSnap.data() || {})) {
+        await docSnap.ref.delete();
+        deletedIds.add(docSnap.id);
       }
     }
   }
@@ -2340,6 +2646,7 @@ async function deletePlayerRecord(playerId, identity) {
   }
 
   if (deletedIds.size === 0) {
+    if (allowNotFound) return { deleted: false, ids: [] };
     throw new Error('No se encontró el jugador en la nube (ID, nombre o DNI)');
   }
   return { deleted: true, ids: [...deletedIds] };
@@ -2390,6 +2697,10 @@ module.exports = {
   updatePlayerProfileByPortal,
   normalizePlayerRecordFields,
   upsertPlayerInscriptionRecord,
+  assignPendingRegularMemberNumbers,
+  repairPlayerInscriptionFromPaymentOrder,
+  repairPlayerInscriptionsFromPaymentOrders,
+  listAllMembersData,
   upsertMemberSocioJugadorFromPlayer,
   findPlayerDocByIdentity,
   normalizeMemberRecordFields,
@@ -2401,6 +2712,12 @@ module.exports = {
   findFriendDocByIdentity,
   torneoPreinscripcionesRef,
   torneoCategoryLabels,
+  generateTorneoAccessCode,
+  normalizeTorneoAccessCode,
+  findTorneoPreinscripcionByAccessCode,
+  ensureTorneoAccessCode,
+  verifyTorneoEquipoAccess,
+  buildTorneoEquipoPanelPayload,
   createTorneoPreinscripcionRecord,
   coachesRef,
   normalizeCoachRecordFields,

@@ -32,6 +32,7 @@
     <script src="js/club-password-hash.js"></script>
     <script src="js/protocol-guard.js"></script>
     <script src="js/admin-session.js"></script>
+    <script src="js/admin-organizer-access.js"></script>
     <script src="js/club-member-numbers.js"></script>
     <script src="js/club-friend-numbers.js"></script>
     <script src="js/club-member-card.js"></script>
@@ -574,6 +575,46 @@
             background: #e2e8f0;
             color: #334155;
         }
+
+        body.admin-organizer-mode .navigation {
+            border-bottom-color: #93c5fd;
+        }
+
+        .organizer-f7-banner {
+            background: linear-gradient(135deg, #eff6ff 0%, #f0fdf4 100%);
+            border: 2px solid #93c5fd;
+            border-radius: 12px;
+            padding: 18px 20px;
+            margin-bottom: 20px;
+            color: #1e3a8a;
+        }
+
+        .organizer-f7-banner h3 {
+            margin: 0 0 8px;
+            font-size: 1.1rem;
+        }
+
+        .organizer-f7-banner p {
+            margin: 0 0 10px;
+            color: #334155;
+            line-height: 1.5;
+        }
+
+        .organizer-f7-banner ul {
+            margin: 0;
+            padding-left: 1.2rem;
+            color: #475569;
+            font-size: 0.92rem;
+            line-height: 1.55;
+        }
+
+        .organizer-f7-banner code {
+            background: #e2e8f0;
+            padding: 1px 6px;
+            border-radius: 4px;
+            font-size: 0.85em;
+        }
+
         .admin-copy-dialog {
             position: fixed;
             inset: 0;
@@ -1810,8 +1851,8 @@
                         <div style="display:flex; gap:8px; flex-wrap:wrap;">
                             <button class="btn btn-success" onclick="showAddCompetitionForm()">➕ Crear Nueva Competición</button>
                             <button class="btn" style="background:#2563eb; color:white;" onclick="showCompetitionSyncHealth()">🩺 Salud Sync</button>
-                            <button class="btn" style="background:#0f766e; color:white;" onclick="backupClubData()">💾 Backup Club</button>
-                            <button class="btn" style="background:#7c3aed; color:white;" onclick="restoreClubData()">♻️ Restaurar Backup</button>
+                            <button class="btn organizer-admin-only" data-admin-only="true" style="background:#0f766e; color:white;" onclick="backupClubData()">💾 Backup Club</button>
+                            <button class="btn organizer-admin-only" data-admin-only="true" style="background:#7c3aed; color:white;" onclick="restoreClubData()">♻️ Restaurar Backup</button>
                             <button class="btn" style="background:#1d4ed8; color:white;" onclick="triggerCompetitionImport()">📥 Importar Competiciones (CSV/Excel/Word)</button>
                             <button class="btn" style="background:#334155; color:white;" onclick="downloadCompetitionTemplateCSV()">📄 Plantilla CSV</button>
                             <button class="btn" style="background:#1e40af; color:white;" onclick="downloadCompetitionTemplateExcel()">📗 Plantilla Excel</button>
@@ -2465,6 +2506,7 @@
                         </div>
                     </div>
                     <h4 style="margin:16px 0 8px;">Opciones de publicidad (checkbox + precio)</h4>
+                    <p style="color:#64748b;font-size:0.88rem;margin:0 0 10px;">La opción «Renovación» es configurable. Siempre se muestra además «Estoy interesado en ser colaborador/anunciante» (sin precio).</p>
                     <div id="colabCfgServicesList" style="display:flex;flex-direction:column;gap:8px;margin-bottom:12px;"></div>
                     <button type="button" class="btn" onclick="addColaboradorFormConfigRow()" style="margin-right:8px;">➕ Añadir opción</button>
                     <button type="button" class="btn btn-success" onclick="saveColaboradorFormConfigAdmin()">💾 Guardar formulario colaboradores</button>
@@ -3249,8 +3291,9 @@
 
                         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px;">
                             <div>
-                                <label style="display: block; margin-bottom: 5px; font-weight: bold;">URL del Enlace</label>
-                                <input type="url" id="adUrl" placeholder="https://ejemplo.com" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
+                                <label style="display: block; margin-bottom: 5px; font-weight: bold;">Página web del colaborador</label>
+                                <input type="url" id="adUrl" placeholder="https://www.ejemplo.com" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
+                                <small style="color:#666;">Si la indicas, al pinchar la foto o el PDF en la web se abrirá esta página.</small>
                             </div>
                             <div>
                                 <label style="display: block; margin-bottom: 5px; font-weight: bold;">Categoría</label>
@@ -3437,6 +3480,8 @@
                         </div>
                         <div style="display:flex; flex-wrap:wrap; gap:8px; align-items:center;">
                             <button class="btn btn-success" onclick="showAddMemberForm()">➕ Registrar Nuevo Socio</button>
+                            <button type="button" class="btn" onclick="assignPendingMemberNumbersFromPanel()" style="background:#0f766e;color:white;" title="Socios activos sin N.º SOC. real (≥ 51)">🔢 Asignar números pendientes</button>
+                            <button type="button" class="btn" onclick="repairPlayerInscriptionsFromPanel()" style="background:#b45309;color:white;" title="Recrear jugador/a y socio desde pedido Redsys pagado">🔧 Reparar inscripción pasarela</button>
                             <button type="button" class="btn" onclick="exportClubListFromTab('socios','xlsx')" style="background:#2563eb;color:white;">📊 Excel</button>
                             <button type="button" class="btn" onclick="exportClubListFromTab('socios','word')" style="background:#1d4ed8;color:white;">📄 Word</button>
                             <button type="button" class="btn" onclick="exportClubListFromTab('socios','pdf')" style="background:#475569;color:white;">🖨️ PDF</button>
@@ -4086,6 +4131,7 @@
                         <div style="margin-bottom: 15px;">
                             <label style="display: block; margin-bottom: 5px; font-weight: bold;">Rol</label>
                             <select id="adminRole" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
+                                <option value="competition_organizer">Organizador/a de competiciones (solo pestaña Competiciones)</option>
                                 <option value="team_admin">Administrador de Equipo</option>
                                 <option value="assistant_admin">Administrador Asistente</option>
                             </select>
@@ -4526,12 +4572,26 @@
                     return false;
                 }
                 const d = snap.data() || {};
-                const ok =
-                    d.appScope === 'cdsanabriacf'
-                    && (d.isAdmin === true || d.isSuperAdmin === true || d.role === 'admin' || d.role === 'super_admin');
+                const isOrganizer = d.role === 'competition_organizer'
+                    || (window.AdminOrganizerAccess && window.AdminOrganizerAccess.isOrganizerFirestoreDoc(d));
+                const isFullAdmin =
+                    d.isAdmin === true
+                    || d.isSuperAdmin === true
+                    || d.role === 'admin'
+                    || d.role === 'super_admin';
+                const ok = d.appScope === 'cdsanabriacf' && (isFullAdmin || isOrganizer);
                 if (!ok) {
-                    showAdminSessionGate('Sin permisos de administrador en la nube del club.');
+                    showAdminSessionGate('Sin permisos de administrador u organizador en la nube del club.');
                     return false;
+                }
+                if (isOrganizer) {
+                    try {
+                        const cur = JSON.parse(localStorage.getItem('currentAdmin') || '{}');
+                        cur.role = 'competition_organizer';
+                        cur.isAdmin = false;
+                        localStorage.setItem('currentAdmin', JSON.stringify(cur));
+                        localStorage.setItem('adminUser', JSON.stringify(cur));
+                    } catch (_) {}
                 }
                 return true;
             } catch (e) {
@@ -4547,13 +4607,24 @@
             if (!firebaseOk) return;
             checkAdminSession();
             checkAdminPermissions();
+            if (window.AdminOrganizerAccess && window.AdminOrganizerAccess.isCompetitionOrganizer()) {
+                window.AdminOrganizerAccess.applyNavRestrictions();
+                window.AdminOrganizerAccess.applyCompetitionTabChrome();
+            }
             checkExpiredMembers(); // Verificar socios expirados al cargar
             checkAutomaticSeasonRenewal(); // Renovación automática tras 31/05 (Firebase)
             cargarConfiguracionTienda(); // Cargar configuración de tienda
             
             // Abrir pestaña si viene desde enlace de la web principal
             const savedTab = localStorage.getItem('adminActiveTab');
-            if (savedTab) {
+            const isOrganizer = window.AdminOrganizerAccess && window.AdminOrganizerAccess.isCompetitionOrganizer();
+            if (isOrganizer) {
+                localStorage.removeItem('adminActiveTab');
+                setTimeout(function () {
+                    showTab('competiciones');
+                    if (typeof loadCompetitionsList === 'function') loadCompetitionsList();
+                }, 300);
+            } else if (savedTab) {
                 console.log('📂 Abriendo pestaña desde enlace:', savedTab);
                 setTimeout(() => {
                     showTab(savedTab);
@@ -4563,7 +4634,7 @@
             
             // También verificar hash de la URL
             const hash = window.location.hash.replace('#', '');
-            if (hash && !savedTab) {
+            if (!isOrganizer && hash && !savedTab) {
                 console.log('📂 Abriendo pestaña desde hash URL:', hash);
                 setTimeout(() => {
                     showTab(hash);
@@ -4600,6 +4671,10 @@
                 // Actualizar información en pantalla con indicador de permisos (sin mostrar email)
                 const adminInfo = document.getElementById('currentAdminInfo');
                 if (adminInfo) {
+                    if (window.AdminOrganizerAccess && window.AdminOrganizerAccess.isCompetitionOrganizer(currentAdmin)) {
+                        adminInfo.textContent =
+                            '🏆 ' + (currentAdmin.name || 'Organizador/a') + ' · Solo competiciones (campeonatos F7)';
+                    } else {
                     const isPrincipal = currentAdmin.email === 'amco@gmx.es';
                     const isSecondAdmin = currentAdmin.email === 'cdsanabriafc@gmail.com';
                     
@@ -4610,6 +4685,7 @@
                         const roleText = isSecondAdmin ? '👨‍💼 SEGUNDO' : '👨‍💼 SECUNDARIO';
                         const permissionText = isSecondAdmin ? '(Permisos completos)' : '(Sin gestión de admins)';
                         adminInfo.textContent = `👤 ${currentAdmin.name || 'Administrador/a'} · ${roleText} · ${permissionText}`;
+                    }
                     }
                 }
                 
@@ -4747,7 +4823,7 @@
             document.getElementById('adminName').value = '';
             document.getElementById('adminEmail').value = '';
             document.getElementById('adminPassword').value = '';
-            document.getElementById('adminRole').value = 'team_admin';
+            document.getElementById('adminRole').value = 'competition_organizer';
         }
 
         function saveNewAdmin() {
@@ -4850,7 +4926,12 @@
                     html += '<div style="padding: 15px; text-align: center; color: #666;">No hay administradores adicionales registrados</div>';
                 } else {
                     admins.forEach(admin => {
-                        const roleText = admin.role === 'team_admin' ? 'Administrador de Equipo' : 'Administrador Asistente';
+                        const roleText =
+                            admin.role === 'competition_organizer'
+                                ? 'Organizador/a competiciones'
+                                : admin.role === 'team_admin'
+                                  ? 'Administrador de Equipo'
+                                  : 'Administrador Asistente';
                         html += `
                             <div style="display: flex; justify-content: space-between; align-items: center; padding: 15px; border-bottom: 1px solid #eee;">
                                 <div>
@@ -4916,21 +4997,72 @@
         }
 
         // === MÓDULO DE JUGADORES ===
+
+        let __adminEditingPlayerId = null;
+
+        function findPlayerIndexById(players, playerId) {
+            return (players || []).findIndex(function (p) {
+                return String(p.id) === String(playerId);
+            });
+        }
+
+        function findPlayerByIdLocal(playerId) {
+            let players = [];
+            try {
+                players = JSON.parse(localStorage.getItem('clubPlayers') || '[]');
+            } catch (_) {
+                players = [];
+            }
+            const ix = findPlayerIndexById(players, playerId);
+            if (ix >= 0) return players[ix];
+            if (window.ClubPlayerMemberSync && window.ClubPlayerMemberSync.globalPlayerIdentityKey) {
+                const targetKey = String(playerId || '').trim();
+                const byKey = players.find(function (p) {
+                    return window.ClubPlayerMemberSync.globalPlayerIdentityKey(p) === targetKey;
+                });
+                if (byKey) return byKey;
+            }
+            return null;
+        }
+
+        function jsPlayerIdArg(playerId) {
+            return JSON.stringify(String(playerId || ''));
+        }
+
+        function setPlayerFormMode(mode) {
+            const form = document.getElementById('addPlayerForm');
+            if (!form) return;
+            const title = form.querySelector('h4');
+            const saveBtn = form.querySelector('button.btn-success');
+            if (mode === 'edit') {
+                if (title) title.textContent = '✏️ Editar Jugador/a';
+                if (saveBtn) saveBtn.textContent = '💾 Guardar cambios';
+            } else {
+                if (title) title.textContent = '📝 Registrar Nuevo Jugador';
+                if (saveBtn) saveBtn.textContent = '💾 Guardar Jugador';
+            }
+        }
         
         // Función para mostrar formulario de añadir jugador
         function showAddPlayerForm() {
+            __adminEditingPlayerId = null;
+            setPlayerFormMode('add');
             document.getElementById('addPlayerForm').style.display = 'block';
             document.getElementById('addPlayerForm').scrollIntoView({ behavior: 'smooth' });
         }
 
         // Función para cancelar añadir jugador
         function cancelAddPlayer() {
+            __adminEditingPlayerId = null;
+            setPlayerFormMode('add');
             document.getElementById('addPlayerForm').style.display = 'none';
             clearPlayerForm();
         }
 
         // Función para limpiar formulario de jugador
         function clearPlayerForm() {
+            __adminEditingPlayerId = null;
+            setPlayerFormMode('add');
             const form = document.getElementById('addPlayerForm');
             const inputs = form.querySelectorAll('input, select');
             inputs.forEach(input => {
@@ -5225,13 +5357,14 @@
             }
         }
 
-        // Función para guardar jugador
+        // Función para guardar jugador (alta o edición)
         async function savePlayer() {
             try {
+                const editingId = __adminEditingPlayerId ? String(__adminEditingPlayerId) : '';
                 // Procesar foto del jugador
                 const photoFile = document.getElementById('playerPhoto').files[0];
                 let photoData = null;
-                const parsedAge = parseInt(document.getElementById('playerAge').value);
+                const parsedAge = parseInt(document.getElementById('playerAge').value, 10);
                 
                 if (photoFile) {
                     try {
@@ -5242,57 +5375,65 @@
                     }
                 }
 
+                const existingPlayers = JSON.parse(localStorage.getItem('clubPlayers') || '[]');
+                const editIx = editingId ? findPlayerIndexById(existingPlayers, editingId) : -1;
+                const prev = editIx >= 0 ? existingPlayers[editIx] : null;
+
                 const playerData = {
-                    id: 'PLAYER_' + Date.now(),
+                    id: prev ? prev.id : 'PLAYER_' + Date.now(),
                     name: document.getElementById('playerName').value.trim(),
+                    nombre: document.getElementById('playerName').value.trim(),
                     surname: document.getElementById('playerSurname').value.trim(),
+                    apellidos: document.getElementById('playerSurname').value.trim(),
                     dni: document.getElementById('playerDNI').value.trim(),
                     phone: document.getElementById('playerPhone').value.trim(),
+                    telefono: document.getElementById('playerPhone').value.trim(),
                     address: document.getElementById('playerAddress').value.trim(),
+                    domicilio: document.getElementById('playerAddress').value.trim(),
                     birthDate: document.getElementById('playerBirthDate').value,
+                    fechaNacimiento: document.getElementById('playerBirthDate').value,
                     age: Number.isNaN(parsedAge) ? null : parsedAge,
-                    category: document.getElementById('playerCategory').value,
+                    category: normalizePlayerCategory(document.getElementById('playerCategory').value),
+                    categoria: normalizePlayerCategory(document.getElementById('playerCategory').value),
                     number: document.getElementById('playerNumber').value,
                     position: document.getElementById('playerPosition').value,
                     license: document.getElementById('playerLicense').value.trim(),
                     appScope: 'cdsanabriacf',
-                    registrationSource: 'admin_panel',
-                    // Estadísticas deportivas
-                    matches: parseInt(document.getElementById('playerMatches').value) || 0,
-                    goals: parseInt(document.getElementById('playerGoals').value) || 0,
-                    assists: parseInt(document.getElementById('playerAssists').value) || 0,
-                    yellowCards: parseInt(document.getElementById('playerYellowCards').value) || 0,
-                    redCards: parseInt(document.getElementById('playerRedCards').value) || 0,
-                    // Datos del tutor
+                    registrationSource: prev ? (prev.registrationSource || 'admin_panel') : 'admin_panel',
+                    matches: parseInt(document.getElementById('playerMatches').value, 10) || 0,
+                    goals: parseInt(document.getElementById('playerGoals').value, 10) || 0,
+                    assists: parseInt(document.getElementById('playerAssists').value, 10) || 0,
+                    yellowCards: parseInt(document.getElementById('playerYellowCards').value, 10) || 0,
+                    redCards: parseInt(document.getElementById('playerRedCards').value, 10) || 0,
                     guardianName: document.getElementById('guardianName').value.trim(),
                     guardianDNI: document.getElementById('guardianDNI').value.trim(),
                     guardianPhone: document.getElementById('guardianPhone').value.trim(),
                     guardianEmail: document.getElementById('guardianEmail').value.trim(),
                     guardianAddress: document.getElementById('guardianAddress').value.trim(),
-                    // Consentimientos
                     playerConsent: document.getElementById('playerConsent').checked,
                     photoConsent: document.getElementById('photoConsent').checked,
-                    // Metadatos
-                    registrationDate: new Date().toISOString(),
-                    status: 'pending_validation',
+                    registrationDate: prev ? prev.registrationDate : new Date().toISOString(),
+                    status: prev ? prev.status : 'pending_validation',
+                    inscriptionSeason: prev ? (prev.inscriptionSeason || prev.temporada) : undefined,
+                    temporada: prev ? (prev.temporada || prev.inscriptionSeason) : undefined,
+                    linkedMemberId: prev ? prev.linkedMemberId : undefined,
+                    portalPasswordHash: prev ? prev.portalPasswordHash : undefined,
                     isMinor: !Number.isNaN(parsedAge) && parsedAge < 18,
-                    // Foto del jugador
-                    photo: photoData
+                    photo: photoData != null ? photoData : (prev ? prev.photo : null),
+                    updatedAt: new Date().toISOString(),
+                    lastModified: new Date().toISOString()
                 };
 
-                // Validar campos obligatorios
                 if (!playerData.name || !playerData.surname || !playerData.dni || !playerData.phone || !playerData.birthDate) {
                     alert('❌ Por favor, completa todos los campos obligatorios marcados con *');
                     return;
                 }
 
-                // Validar consentimientos
                 if (!playerData.playerConsent || !playerData.photoConsent) {
                     alert('❌ Los consentimientos son obligatorios para completar el registro');
                     return;
                 }
 
-                // Validar datos del tutor para menores
                 if (playerData.age < 18) {
                     if (!playerData.guardianName || !playerData.guardianDNI || !playerData.guardianPhone || !playerData.guardianEmail) {
                         alert('❌ Para menores de edad es obligatorio completar todos los datos del tutor');
@@ -5300,36 +5441,75 @@
                     }
                 }
 
-                // Validar DNI único
-                const existingPlayers = JSON.parse(localStorage.getItem('clubPlayers') || '[]');
-                if (existingPlayers.find(player => player.dni === playerData.dni)) {
-                    alert('❌ Ya existe un jugador registrado con este DNI');
+                const dniNorm = String(playerData.dni).trim().toUpperCase();
+                const dniDup = existingPlayers.find(function (p) {
+                    if (editingId && String(p.id) === editingId) return false;
+                    return String(p.dni || '').trim().toUpperCase() === dniNorm;
+                });
+                if (dniDup) {
+                    alert('❌ Ya existe otro jugador/a registrado/a con este DNI');
                     return;
                 }
 
-                // Validar dorsal único por categoría
                 if (playerData.number) {
-                    const sameCategory = existingPlayers.filter(player => player.category === playerData.category);
-                    if (sameCategory.find(player => player.number === playerData.number)) {
+                    const sameCategory = existingPlayers.filter(function (p) {
+                        if (editingId && String(p.id) === editingId) return false;
+                        return normalizePlayerCategory(p.category) === playerData.category;
+                    });
+                    if (sameCategory.find(function (p) { return String(p.number) === String(playerData.number); })) {
                         alert('❌ Ya existe un jugador con este dorsal en la categoría ' + playerData.category);
                         return;
                     }
                 }
 
-                // Guardar en localStorage
-                existingPlayers.push(playerData);
-                localStorage.setItem('clubPlayers', JSON.stringify(existingPlayers));
-                await persistRecordToFirebase('clubPlayers', 'players', playerData);
-                await refreshLinkedMemberRoles(playerData.dni, playerData.name, playerData.surname);
+                if (editIx >= 0) {
+                    existingPlayers[editIx] = Object.assign({}, prev, playerData);
+                } else {
+                    existingPlayers.push(playerData);
+                }
 
-                alert('✅ Jugador registrado exitosamente\n\n👤 ' + playerData.name + ' ' + playerData.surname + '\n📧 Categoría: ' + playerData.category + '\n🎯 Estado: Pendiente de validación\n\n💡 Si también es socio, se vinculará por DNI/nombre.');
-                
+                if (typeof window.syncClubPlayersLocal === 'function') {
+                    window.syncClubPlayersLocal(existingPlayers);
+                } else {
+                    localStorage.setItem('clubPlayers', JSON.stringify(existingPlayers));
+                }
+                await persistRecordToFirebase('clubPlayers', 'players', editIx >= 0 ? existingPlayers[editIx] : playerData);
+
+                if (playerData.linkedMemberId) {
+                    const members = JSON.parse(localStorage.getItem('clubMembers') || '[]');
+                    const mix = members.findIndex(function (m) { return String(m.id) === String(playerData.linkedMemberId); });
+                    if (mix >= 0) {
+                        members[mix].nombre = playerData.name;
+                        members[mix].name = playerData.name;
+                        members[mix].apellidos = playerData.surname;
+                        members[mix].surname = playerData.surname;
+                        members[mix].dni = playerData.dni;
+                        members[mix].telefono = playerData.phone;
+                        members[mix].phone = playerData.phone;
+                        members[mix].playerCategory = playerData.category;
+                        members[mix].categoriaJugador = playerData.category;
+                        if (typeof syncMembersLocalStorage === 'function') {
+                            syncMembersLocalStorage(members);
+                        } else {
+                            localStorage.setItem('clubMembers', JSON.stringify(members));
+                        }
+                        await persistRecordToFirebase('clubMembers', 'members', members[mix]);
+                    }
+                } else {
+                    await refreshLinkedMemberRoles(playerData.dni, playerData.name, playerData.surname);
+                }
+
+                alert(
+                    editingId
+                        ? '✅ Jugador/a actualizado/a correctamente.\n\n👤 ' + playerData.name + ' ' + playerData.surname
+                        : '✅ Jugador registrado exitosamente\n\n👤 ' + playerData.name + ' ' + playerData.surname + '\n📧 Categoría: ' + playerData.category + '\n🎯 Estado: Pendiente de validación\n\n💡 Si también es socio, se vinculará por DNI/nombre.'
+                );
+
+                __adminEditingPlayerId = null;
                 cancelAddPlayer();
                 loadPlayersList();
                 loadMembersList();
                 updateDashboardCounts();
-
-                console.log('👤 Nuevo jugador registrado:', playerData.name, playerData.surname);
             } catch (error) {
                 console.error('❌ Error guardando jugador:', error);
                 alert('❌ Error al guardar el jugador. Inténtalo de nuevo.');
@@ -5340,14 +5520,95 @@
         function loadPlayersList() {
             try {
                 let players = JSON.parse(localStorage.getItem('clubPlayers') || '[]');
+                let members = JSON.parse(localStorage.getItem('clubMembers') || '[]');
+                let testPurgeRemovedIds = [];
+                let testPurgeRemovedMemberIds = [];
+                if (window.ClubPlayerMemberSync && window.ClubPlayerMemberSync.purgeTestAndDiagnosticRecords) {
+                    const purged = window.ClubPlayerMemberSync.purgeTestAndDiagnosticRecords(players, members);
+                    testPurgeRemovedIds = purged.removedPlayerIds || [];
+                    testPurgeRemovedMemberIds = purged.removedMemberIds || [];
+                    players = purged.players;
+                    members = purged.members;
+                }
+                const beforeFill = players.length;
+                if (window.ClubPlayerMemberSync && window.ClubPlayerMemberSync.fillMissingPlayersFromMembers) {
+                    const knownIds = new Set(players.map(function (p) { return String(p.id); }));
+                    players = window.ClubPlayerMemberSync.fillMissingPlayersFromMembers(players, members);
+                    if (window.ClubPlayerMemberSync.purgeTestAndDiagnosticRecords) {
+                        const purgedAgain = window.ClubPlayerMemberSync.purgeTestAndDiagnosticRecords(players, members);
+                        purgedAgain.removedPlayerIds.forEach(function (id) {
+                            if (id && testPurgeRemovedIds.indexOf(id) < 0) testPurgeRemovedIds.push(id);
+                        });
+                        players = purgedAgain.players;
+                        members = purgedAgain.members;
+                    }
+                    players.forEach(function (p) {
+                        if (!knownIds.has(String(p.id)) && typeof persistRecordToFirebase === 'function') {
+                            persistRecordToFirebase('clubPlayers', 'players', p).catch(function (e) {
+                                console.warn('Persist jugador desde socio:', p.id, e);
+                            });
+                        }
+                    });
+                }
+                const beforeDedupe = players.length;
                 if (window.ClubPlayerMemberSync && window.ClubPlayerMemberSync.dedupePlayers) {
                     players = window.ClubPlayerMemberSync.dedupePlayers(players);
+                }
+                let nameFixes = 0;
+                if (window.ClubPlayerMemberSync && window.ClubPlayerMemberSync.fixPlayerNameTypos) {
+                    players.forEach(function (p) {
+                        if (window.ClubPlayerMemberSync.fixPlayerNameTypos(p)) nameFixes += 1;
+                    });
+                }
+                let crossRemovedIds = [];
+                if (window.ClubPlayerMemberSync && window.ClubPlayerMemberSync.removeCrossSeasonDuplicates) {
+                    const cross = window.ClubPlayerMemberSync.removeCrossSeasonDuplicates(players);
+                    crossRemovedIds = cross.removedIds || [];
+                    players = cross.players;
                 }
                 if (window.ClubPlayerMemberSync && window.ClubPlayerMemberSync.ensurePlayerCategoryFields) {
                     players = players.map(function (p) {
                         return window.ClubPlayerMemberSync.ensurePlayerCategoryFields(p);
                     });
-                    localStorage.setItem('clubPlayers', JSON.stringify(players));
+                }
+                if (players.length !== beforeFill || players.length !== beforeDedupe || nameFixes || crossRemovedIds.length || testPurgeRemovedIds.length || testPurgeRemovedMemberIds.length) {
+                    if (typeof window.syncClubPlayersLocal === 'function') {
+                        window.syncClubPlayersLocal(players);
+                    } else {
+                        localStorage.setItem('clubPlayers', JSON.stringify(players));
+                    }
+                    if (testPurgeRemovedMemberIds.length) {
+                        if (typeof syncMembersLocalStorage === 'function') {
+                            syncMembersLocalStorage(members);
+                        } else {
+                            localStorage.setItem('clubMembers', JSON.stringify(members));
+                            localStorage.setItem('socios', JSON.stringify(members));
+                        }
+                    }
+                    const cloudDeleteIds = testPurgeRemovedIds.concat(crossRemovedIds);
+                    cloudDeleteIds.forEach(function (playerId) {
+                        if (!playerId) return;
+                        removePlayerFromCloudIfNeeded(playerId, { purgeTestRecords: true, allowNotFound: true }).catch(function (e) {
+                            console.warn('Eliminar duplicado/prueba:', playerId, e);
+                        });
+                    });
+                    testPurgeRemovedMemberIds.forEach(function (memberId) {
+                        if (!memberId) return;
+                        if (window.AdminClubCloudPersist && typeof window.AdminClubCloudPersist.deleteMember === 'function') {
+                            window.AdminClubCloudPersist.deleteMember(memberId, { allowNotFound: true }).catch(function (e) {
+                                console.warn('Eliminar socio prueba:', memberId, e);
+                            });
+                        }
+                    });
+                    if (nameFixes) {
+                        players.forEach(function (p) {
+                            if (typeof persistRecordToFirebase === 'function') {
+                                persistRecordToFirebase('clubPlayers', 'players', p).catch(function (e) {
+                                    console.warn('Persist nombre corregido:', p.id, e);
+                                });
+                            }
+                        });
+                    }
                 }
                 const playersList = document.getElementById('playersList');
                 
@@ -5380,12 +5641,16 @@
                 }
 
                 let html = '';
-                const renderedIds = new Set();
+                const renderedIdentityKeys = new Set();
                 
                 Object.keys(categories).forEach(categoryKey => {
                     const categoryPlayers = playersInCategory(categoryKey).filter(function (p) {
-                        if (renderedIds.has(p.id)) return false;
-                        renderedIds.add(p.id);
+                        const identityKey =
+                            window.ClubPlayerMemberSync && window.ClubPlayerMemberSync.globalPlayerIdentityKey
+                                ? window.ClubPlayerMemberSync.globalPlayerIdentityKey(p)
+                                : String(p.id);
+                        if (renderedIdentityKeys.has(identityKey)) return false;
+                        renderedIdentityKeys.add(identityKey);
                         return true;
                     });
                     
@@ -5401,6 +5666,7 @@
                         `;
 
                         categoryPlayers.forEach(player => {
+                            const pid = jsPlayerIdArg(player.id);
                             const disp = (typeof window.PlayerInscription !== 'undefined' && window.PlayerInscription.getDisplayStatus)
                                 ? window.PlayerInscription.getDisplayStatus(player)
                                 : {
@@ -5445,14 +5711,14 @@
                                         ${selfUpdateAt ? `<div style="font-size: 0.8em; color: #7c3aed; margin-top: 4px; font-weight: 600;">📝 Ficha actualizada por el jugador el ${selfUpdateAt}</div>` : ''}
                                     </div>
                                     <div style="display: flex; gap: 5px;">
-                                        <button onclick="viewPlayerDetails('${player.id}')" style="padding: 5px 10px; font-size: 0.8rem; background: #6c757d; color: white; border: none; border-radius: 4px; cursor: pointer;">👁️ Ver</button>
-                                        <button onclick="updatePlayerStats('${player.id}')" style="padding: 5px 10px; font-size: 0.8rem; background: #f59e0b; color: white; border: none; border-radius: 4px; cursor: pointer;">📊 Stats</button>
-                                        <button onclick="editPlayer('${player.id}')" style="padding: 5px 10px; font-size: 0.8rem; background: #1e3a8a; color: white; border: none; border-radius: 4px; cursor: pointer;">✏️ Editar</button>
-                                        <button onclick="changePlayerCategoryManual('${player.id}')" style="padding: 5px 10px; font-size: 0.8rem; background: #2563eb; color: white; border: none; border-radius: 4px; cursor: pointer;">🏷️ Categoría</button>
-                                        <button onclick="setPlayerPortalPasswordAdmin('${player.id}')" style="padding: 5px 10px; font-size: 0.8rem; background: #7c3aed; color: white; border: none; border-radius: 4px; cursor: pointer;" title="Contraseña para Buscar mi ficha (inscripción web)">🔑 Contraseña ficha</button>
-                                        ${needsPay ? `<button onclick="validatePlayerPayment('${player.id}')" style="padding: 5px 10px; font-size: 0.8rem; background: #059669; color: white; border: none; border-radius: 4px; cursor: pointer;" title="Confirmar pago por transferencia o efectivo">✅ Validar pago</button>` : ''}
-                                        ${!needsPay && player.status === 'pending_validation' ? `<button onclick="validatePlayer('${player.id}')" style="padding: 5px 10px; font-size: 0.8rem; background: #059669; color: white; border: none; border-radius: 4px; cursor: pointer;">✅ Validar alta</button>` : ''}
-                                        <button onclick="deletePlayer('${player.id}')" style="padding: 5px 10px; font-size: 0.8rem; background: #dc2626; color: white; border: none; border-radius: 4px; cursor: pointer;">🗑️ Eliminar</button>
+                                        <button onclick="viewPlayerDetails(${pid})" style="padding: 5px 10px; font-size: 0.8rem; background: #6c757d; color: white; border: none; border-radius: 4px; cursor: pointer;">👁️ Ver</button>
+                                        <button onclick="updatePlayerStats(${pid})" style="padding: 5px 10px; font-size: 0.8rem; background: #f59e0b; color: white; border: none; border-radius: 4px; cursor: pointer;">📊 Stats</button>
+                                        <button onclick="editPlayer(${pid})" style="padding: 5px 10px; font-size: 0.8rem; background: #1e3a8a; color: white; border: none; border-radius: 4px; cursor: pointer;">✏️ Editar</button>
+                                        <button onclick="changePlayerCategoryManual(${pid})" style="padding: 5px 10px; font-size: 0.8rem; background: #2563eb; color: white; border: none; border-radius: 4px; cursor: pointer;">🏷️ Categoría</button>
+                                        <button onclick="setPlayerPortalPasswordAdmin(${pid})" style="padding: 5px 10px; font-size: 0.8rem; background: #7c3aed; color: white; border: none; border-radius: 4px; cursor: pointer;" title="Contraseña para Buscar mi ficha (inscripción web)">🔑 Contraseña ficha</button>
+                                        ${needsPay ? `<button onclick="validatePlayerPayment(${pid})" style="padding: 5px 10px; font-size: 0.8rem; background: #059669; color: white; border: none; border-radius: 4px; cursor: pointer;" title="Confirmar pago por transferencia o efectivo">✅ Validar pago</button>` : ''}
+                                        ${!needsPay && player.status === 'pending_validation' ? `<button onclick="validatePlayer(${pid})" style="padding: 5px 10px; font-size: 0.8rem; background: #059669; color: white; border: none; border-radius: 4px; cursor: pointer;">✅ Validar alta</button>` : ''}
+                                        <button onclick="deletePlayer(${pid})" style="padding: 5px 10px; font-size: 0.8rem; background: #dc2626; color: white; border: none; border-radius: 4px; cursor: pointer;">🗑️ Eliminar</button>
                                     </div>
                                 </div>
                             `;
@@ -5463,7 +5729,11 @@
                 });
 
                 const uncategorized = players.filter(function (p) {
-                    if (renderedIds.has(p.id)) return false;
+                    const identityKey =
+                        window.ClubPlayerMemberSync && window.ClubPlayerMemberSync.globalPlayerIdentityKey
+                            ? window.ClubPlayerMemberSync.globalPlayerIdentityKey(p)
+                            : String(p.id);
+                    if (renderedIdentityKeys.has(identityKey)) return false;
                     if (window.ClubPlayerMemberSync && window.ClubPlayerMemberSync.resolvePlayerCategoryId) {
                         return !window.ClubPlayerMemberSync.resolvePlayerCategoryId(p);
                     }
@@ -5478,8 +5748,13 @@
                                 </span>
                             </h4>`;
                     uncategorized.forEach(function (player) {
-                        renderedIds.add(player.id);
-                        html += `<div style="padding:10px;border-bottom:1px solid #eee;">${player.name} ${player.surname} — <button type="button" onclick="changePlayerCategoryManual('${player.id}')" style="padding:4px 8px;font-size:0.8rem;">🏷️ Asignar categoría</button></div>`;
+                        const identityKey =
+                            window.ClubPlayerMemberSync && window.ClubPlayerMemberSync.globalPlayerIdentityKey
+                                ? window.ClubPlayerMemberSync.globalPlayerIdentityKey(player)
+                                : String(player.id);
+                        renderedIdentityKeys.add(identityKey);
+                        const pid = jsPlayerIdArg(player.id);
+                        html += `<div style="padding:10px;border-bottom:1px solid #eee;">${player.name} ${player.surname} — <button type="button" onclick="changePlayerCategoryManual(${pid})" style="padding:4px 8px;font-size:0.8rem;">🏷️ Asignar categoría</button></div>`;
                     });
                     html += `</div>`;
                 }
@@ -5495,12 +5770,25 @@
             }
         }
 
+        window.viewPlayerDetails = viewPlayerDetails;
+        window.updatePlayerStats = updatePlayerStats;
+        window.savePlayerStats = savePlayerStats;
+        window.closeStatsModal = closeStatsModal;
+        window.editPlayer = editPlayer;
+        window.changePlayerCategoryManual = changePlayerCategoryManual;
+        window.setPlayerPortalPasswordAdmin = setPlayerPortalPasswordAdmin;
+        window.validatePlayerPayment = validatePlayerPayment;
+        window.validatePlayer = validatePlayer;
+        window.deletePlayer = deletePlayer;
+        window.filterPlayersByCategory = filterPlayersByCategory;
+        window.regularizeAdminPlayers = regularizeAdminPlayers;
+
         async function regularizeAdminPlayers() {
             if (!window.ClubPlayerMemberSync) {
                 alert('❌ Módulo de sincronización no cargado.');
                 return;
             }
-            if (!confirm('¿Regularizar fichas y socios?\n\n• Elimina duplicados e intentos abortados de pasarela (sin pago)\n• Crea socios faltantes desde jugadores (p. ej. menores sin socio)\n• Crea fichas jugador/a desde socios pendientes\n• Sincroniza con Firebase')) {
+            if (!confirm('¿Regularizar fichas y socios?\n\n• Elimina duplicados (misma persona en varias temporadas)\n• Quita intentos abortados de pasarela (sin pago)\n• Crea socios faltantes desde jugadores (p. ej. menores sin socio)\n• Crea fichas jugador/a desde socios pendientes\n• Sincroniza con Firebase')) {
                 return;
             }
             try {
@@ -5596,17 +5884,19 @@
 
         // Función para ver detalles del jugador
         function viewPlayerDetails(playerId) {
-            const players = JSON.parse(localStorage.getItem('clubPlayers') || '[]');
-            const player = players.find(p => p.id === playerId);
-            
-            if (player) {
-                const isMinor = player.age < 18;
-                let details = `👤 DETALLES DEL JUGADOR\n\n`;
-                details += `Nombre: ${player.name} ${player.surname}\n`;
-                details += `DNI: ${player.dni}\n`;
-                details += `Teléfono: ${player.phone}\n`;
-                details += `Edad: ${player.age} años\n`;
-                details += `Categoría: ${player.category}\n`;
+            const player = findPlayerByIdLocal(playerId);
+            if (!player) {
+                alert('❌ Jugador/a no encontrado/a. Pulsa «🔄 Regularizar fichas» o recarga la pestaña.');
+                return;
+            }
+            const age = player.age != null ? player.age : (player.birthDate ? getAgeAtDate(player.birthDate, new Date()) : '—');
+            const isMinor = Number(age) < 18;
+            let details = `👤 DETALLES DEL JUGADOR\n\n`;
+            details += `Nombre: ${player.name || player.nombre || ''} ${player.surname || player.apellidos || ''}\n`;
+            details += `DNI: ${player.dni || '—'}\n`;
+            details += `Teléfono: ${player.phone || player.telefono || '—'}\n`;
+            details += `Edad: ${age} años\n`;
+            details += `Categoría: ${player.category || player.categoria || '—'}\n`;
                 details += `Dorsal: ${player.number || 'Sin asignar'}\n`;
                 details += `Dirección: ${player.address || 'No especificada'}\n`;
                 const disp = (typeof window.PlayerInscription !== 'undefined' && window.PlayerInscription.getDisplayStatus)
@@ -5645,19 +5935,19 @@
                 details += consentLine('Consent. jugador/a CD Sanabria CF', !!player.playerConsent);
                 details += consentLine('Consent. fotos y vídeos del club', !!player.photoConsent);
                 details += consentLine('Autorización categoría superior', catSupOk);
-                details += `\nFecha de registro: ${new Date(player.registrationDate).toLocaleDateString()}`;
+                details += `\nFecha de registro: ${player.registrationDate ? new Date(player.registrationDate).toLocaleDateString() : '—'}`;
                 
                 alert(details);
-            }
         }
 
         // Validar pago de inscripción (transferencia, efectivo, etc.)
         async function validatePlayerPayment(playerId) {
             try {
                 const players = JSON.parse(localStorage.getItem('clubPlayers') || '[]');
-                const player = players.find((p) => p.id === playerId);
+                const ix = findPlayerIndexById(players, playerId);
+                const player = ix >= 0 ? players[ix] : null;
                 if (!player) {
-                    alert('❌ Jugador no encontrado');
+                    alert('❌ Jugador/a no encontrado/a');
                     return;
                 }
                 const total = player.chargeBreakdown && player.chargeBreakdown.total != null
@@ -5685,7 +5975,10 @@
                         validatedBy: adminName
                     });
                 } else {
-                    const ix = players.findIndex((p) => p.id === playerId);
+                    if (ix < 0) {
+                        alert('❌ Jugador/a no encontrado/a');
+                        return;
+                    }
                     players[ix].inscriptionStatus = 'paid';
                     players[ix].status = 'active';
                     players[ix].paymentStatus = 'paid';
@@ -5719,7 +6012,7 @@
                         });
                     } else {
                         const players = JSON.parse(localStorage.getItem('clubPlayers') || '[]');
-                        const playerIndex = players.findIndex(p => p.id === playerId);
+                        const playerIndex = findPlayerIndexById(players, playerId);
                         if (playerIndex === -1) {
                             alert('❌ Jugador no encontrado');
                             return;
@@ -5748,13 +6041,64 @@
 
         // Función para editar jugador
         function editPlayer(playerId) {
-            alert('🔧 Función de edición en desarrollo. ID: ' + playerId);
+            const player = findPlayerByIdLocal(playerId);
+            if (!player) {
+                alert('❌ Jugador/a no encontrado/a. Pulsa «🔄 Regularizar fichas» para recuperar fichas desde socios.');
+                return;
+            }
+            __adminEditingPlayerId = String(player.id);
+            setPlayerFormMode('edit');
+            document.getElementById('addPlayerForm').style.display = 'block';
+
+            document.getElementById('playerName').value = player.name || player.nombre || '';
+            document.getElementById('playerSurname').value = player.surname || player.apellidos || '';
+            document.getElementById('playerDNI').value = player.dni || '';
+            document.getElementById('playerPhone').value = player.phone || player.telefono || '';
+            document.getElementById('playerAddress').value = player.address || player.domicilio || player.direccion || '';
+            document.getElementById('playerBirthDate').value = (player.birthDate || player.fechaNacimiento || '').slice(0, 10);
+            document.getElementById('playerAge').value = player.age != null ? player.age : '';
+            const cat = normalizePlayerCategory(player.category || player.categoria || '');
+            document.getElementById('playerCategory').value = cat === 'senior' ? 'aficionado' : cat;
+            document.getElementById('playerNumber').value = player.number || '';
+            document.getElementById('playerPosition').value = player.position || '';
+            document.getElementById('playerLicense').value = player.license || '';
+            document.getElementById('playerMatches').value = player.matches || 0;
+            document.getElementById('playerGoals').value = player.goals || 0;
+            document.getElementById('playerAssists').value = player.assists || 0;
+            document.getElementById('playerYellowCards').value = player.yellowCards || 0;
+            document.getElementById('playerRedCards').value = player.redCards || 0;
+            document.getElementById('guardianName').value = player.guardianName || '';
+            document.getElementById('guardianDNI').value = player.guardianDNI || player.guardianDni || '';
+            document.getElementById('guardianPhone').value = player.guardianPhone || '';
+            document.getElementById('guardianEmail').value = player.guardianEmail || player.email || '';
+            document.getElementById('guardianAddress').value = player.guardianAddress || '';
+            document.getElementById('playerConsent').checked = !!player.playerConsent;
+            document.getElementById('photoConsent').checked = !!player.photoConsent;
+
+            const guardianSection = document.getElementById('guardianSection');
+            const ageNum = parseInt(document.getElementById('playerAge').value, 10);
+            if (!Number.isNaN(ageNum) && ageNum < 18) {
+                guardianSection.style.display = 'block';
+            } else if (player.birthDate || player.fechaNacimiento) {
+                calculateAge();
+            } else {
+                guardianSection.style.display = 'none';
+            }
+
+            if (player.photo) {
+                document.getElementById('playerPhotoPreview').src = player.photo;
+                document.getElementById('photoPreview').style.display = 'block';
+            } else {
+                document.getElementById('photoPreview').style.display = 'none';
+            }
+
+            document.getElementById('addPlayerForm').scrollIntoView({ behavior: 'smooth' });
         }
 
         async function changePlayerCategoryManual(playerId) {
             try {
                 const players = JSON.parse(localStorage.getItem('clubPlayers') || '[]');
-                const playerIndex = players.findIndex((p) => p.id === playerId);
+                const playerIndex = findPlayerIndexById(players, playerId);
                 if (playerIndex === -1) {
                     alert('❌ Jugador no encontrado.');
                     return;
@@ -5864,7 +6208,7 @@
             }
             try {
                 const players = JSON.parse(localStorage.getItem('clubPlayers') || '[]');
-                const playerToDelete = players.find(function (p) {
+                const playerToDelete = findPlayerByIdLocal(playerId) || players.find(function (p) {
                     return String(p.id) === String(playerId);
                 });
 
@@ -5874,38 +6218,51 @@
                 }
 
                 const playerLabel = (playerToDelete.name || '') + ' ' + (playerToDelete.surname || '');
+                const isTestRecord =
+                    window.ClubPlayerMemberSync &&
+                    window.ClubPlayerMemberSync.isTestOrDiagnosticRecord &&
+                    window.ClubPlayerMemberSync.isTestOrDiagnosticRecord(playerToDelete);
                 const playerIdentity = {
                     email: playerToDelete.email,
                     dni: playerToDelete.dni,
                     name: playerToDelete.name || playerToDelete.nombre,
                     surname: playerToDelete.surname || playerToDelete.apellidos,
-                    season: playerToDelete.inscriptionSeason || playerToDelete.temporada
+                    season: playerToDelete.inscriptionSeason || playerToDelete.temporada,
+                    purgeTestRecords: isTestRecord
                 };
 
+                let cloudDeleted = false;
                 try {
-                    await removePlayerFromCloudIfNeeded(playerId, playerIdentity);
+                    await removePlayerFromCloudIfNeeded(playerToDelete.id, playerIdentity);
+                    cloudDeleted = true;
                 } catch (syncErr) {
                     console.error('❌ Error eliminando jugador en Firebase:', syncErr);
-                    showAdminCopyableDialog(
-                        'Error al eliminar jugador en la nube',
-                        '❌ No se pudo eliminar en el servidor (nube).\n\n' +
-                            'Jugador: ' + playerLabel.trim() + '\n' +
-                            'ID Firebase: ' + (playerId || '—') + '\n\n' +
-                            'La lista se sincroniza en tiempo real: si no se borra en la nube, volverá al refrescar.\n\n' +
-                            'Comprueba:\n' +
-                            '1. Sesión Admin en la web principal (Firebase Auth)\n' +
-                            '2. Deploy con funciones Netlify (npm run deploy:prod)\n' +
-                            '3. O bórralo manualmente en Firebase (ver abajo)\n\n' +
-                            'Firebase Console → Firestore → sanabria_players → buscar "' + playerLabel.trim() + '" → Eliminar documento\n' +
-                            'Proyecto: cdsanabriacf2026\n\n' +
-                            'Error técnico:\n' +
-                            (syncErr.message || String(syncErr))
-                    );
-                    return;
+                    if (!isTestRecord) {
+                        showAdminCopyableDialog(
+                            'Error al eliminar jugador en la nube',
+                            '❌ No se pudo eliminar en el servidor (nube).\n\n' +
+                                'Jugador: ' + playerLabel.trim() + '\n' +
+                                'ID Firebase: ' + (playerToDelete.id || '—') + '\n\n' +
+                                'La lista se sincroniza en tiempo real: si no se borra en la nube, volverá al refrescar.\n\n' +
+                                'Comprueba:\n' +
+                                '1. Sesión Admin en la web principal (Firebase Auth)\n' +
+                                '2. Deploy con funciones Netlify (npm run deploy:prod)\n' +
+                                '3. O bórralo manualmente en Firebase (ver abajo)\n\n' +
+                                'Firebase Console → Firestore → sanabria_players → buscar "' + playerLabel.trim() + '" → Eliminar documento\n' +
+                                'Proyecto: cdsanabriacf2026\n\n' +
+                                'Error técnico:\n' +
+                                (syncErr.message || String(syncErr))
+                        );
+                        return;
+                    }
                 }
 
                 const updatedPlayers = players.filter(function (p) {
-                    return String(p.id) !== String(playerId);
+                    if (String(p.id) === String(playerToDelete.id)) return false;
+                    if (isTestRecord && window.ClubPlayerMemberSync && window.ClubPlayerMemberSync.isTestOrDiagnosticRecord(p)) {
+                        return false;
+                    }
+                    return true;
                 });
                 if (typeof window.syncClubPlayersLocal === 'function') {
                     window.syncClubPlayersLocal(updatedPlayers);
@@ -5939,7 +6296,9 @@
                 updateDashboardCounts();
                 showAdminCopyableDialog(
                     'Jugador eliminado',
-                    '✅ Jugador "' + playerLabel.trim() + '" eliminado correctamente (también en el servidor).\n\nID: ' + playerId
+                    '✅ Jugador "' + playerLabel.trim() + '" eliminado correctamente' +
+                        (cloudDeleted ? ' (también en el servidor).' : ' (solo en este navegador; sube el deploy y vuelve a abrir el panel).') +
+                        '\n\nID: ' + (playerToDelete.id || playerId)
                 );
                 console.log('🗑️ Jugador eliminado:', playerToDelete.name, playerToDelete.surname);
             } catch (error) {
@@ -6068,8 +6427,12 @@
         function updatePlayerStats(playerId) {
             try {
                 const players = JSON.parse(localStorage.getItem('clubPlayers') || '[]');
-                const playerIndex = players.findIndex(p => p.id === playerId);
+                const playerIndex = findPlayerIndexById(players, playerId);
                 
+                if (playerIndex === -1) {
+                    alert('❌ Jugador/a no encontrado/a');
+                    return;
+                }
                 if (playerIndex !== -1) {
                     const player = players[playerIndex];
                     
@@ -6133,8 +6496,12 @@
         async function savePlayerStats(playerId) {
             try {
                 const players = JSON.parse(localStorage.getItem('clubPlayers') || '[]');
-                const playerIndex = players.findIndex(p => p.id === playerId);
+                const playerIndex = findPlayerIndexById(players, playerId);
                 
+                if (playerIndex === -1) {
+                    alert('❌ Jugador/a no encontrado/a');
+                    return;
+                }
                 if (playerIndex !== -1) {
                     players[playerIndex].matches = parseInt(document.getElementById('updateMatches').value) || 0;
                     players[playerIndex].goals = parseInt(document.getElementById('updateGoals').value) || 0;
@@ -8174,12 +8541,16 @@
         // === MÓDULO DE COMPETICIONES ===
 
         function hasCompetitionAdminAccess() {
+            if (window.AdminOrganizerAccess && window.AdminOrganizerAccess.hasCompetitionManagementAccess()) {
+                return true;
+            }
             try {
                 const currentAdmin = JSON.parse(localStorage.getItem('currentAdmin') || '{}');
                 const hasSession = !!currentAdmin?.email;
                 const hasRoleFlag =
                     currentAdmin?.role === 'admin' ||
-                    currentAdmin?.role === 'super_admin';
+                    currentAdmin?.role === 'super_admin' ||
+                    currentAdmin?.role === 'competition_organizer';
                 return hasSession && hasRoleFlag;
             } catch (_) {
                 return false;
@@ -8188,7 +8559,7 @@
 
         function ensureCompetitionAdminAccess() {
             if (hasCompetitionAdminAccess()) return true;
-            alert('🔒 Solo administradores pueden gestionar competiciones.');
+            alert('🔒 Solo administradores u organizadores de competiciones pueden gestionar campeonatos.');
             return false;
         }
         
@@ -14942,6 +15313,115 @@
             }
         }
         
+        async function assignPendingMemberNumbersFromPanel() {
+            try {
+                if (!window.AdminClubCloudPersist || !window.AdminClubCloudPersist.assignPendingMemberNumbers) {
+                    alert('❌ Función no disponible. Despliega las funciones Netlify actualizadas.');
+                    return;
+                }
+                const CMN = window.ClubMemberNumbers;
+                const members = JSON.parse(localStorage.getItem('clubMembers') || '[]');
+                const localPending = members.filter(function (m) {
+                    if (String(m.status || '').toLowerCase() !== 'active' && m.estado !== 'activo') return false;
+                    if (CMN && CMN.isSocioDeHonor(m)) return false;
+                    if (CMN) return CMN.getRegularNumber(m) == null;
+                    const n = String(m.memberNumber || m.numeroSocio || '');
+                    return !n || n.startsWith('SOC');
+                }).length;
+                const msg =
+                    localPending > 0
+                        ? 'Hay ' +
+                          localPending +
+                          ' socio(s) activo(s) en este dispositivo sin número definitivo (≥ 51).\n\n¿Asignar números en Firebase y sincronizar?'
+                        : '¿Buscar en Firebase socios activos sin número definitivo y asignarles el siguiente disponible (≥ 51)?';
+                if (!confirm(msg)) return;
+                const result = await window.AdminClubCloudPersist.assignPendingMemberNumbers();
+                const rows = result.members || [];
+                if (rows.length) {
+                    const all = JSON.parse(localStorage.getItem('clubMembers') || '[]');
+                    rows.forEach(function (row) {
+                        const ix = all.findIndex(function (m) {
+                            return m.id === row.id;
+                        });
+                        if (ix >= 0) {
+                            all[ix].memberNumber = row.memberNumber;
+                            all[ix].numeroSocio = row.numeroSocio;
+                            all[ix].numeroSocioRegular = row.numeroSocioRegular;
+                            all[ix].membershipTier = 'regular';
+                        }
+                    });
+                    syncMembersLocalStorage(all);
+                }
+                loadMembersList();
+                updateMemberCounts();
+                alert(
+                    '✅ Números asignados: ' +
+                        (result.assigned || 0) +
+                        '.\n\nGuardado en Firebase (sanabria_members) y actualizado en este panel.'
+                );
+            } catch (e) {
+                console.error(e);
+                alert('❌ ' + (e.message || e));
+            }
+        }
+
+        async function repairPlayerInscriptionsFromPanel() {
+            try {
+                if (!window.AdminClubCloudPersist || !window.AdminClubCloudPersist.repairPlayerInscriptions) {
+                    alert('❌ Función no disponible. Despliega las funciones Netlify actualizadas.');
+                    return;
+                }
+                const raw = prompt(
+                    'Pedido(s) pasarela Redsys (números del correo «Pedido pasarela»), separados por coma:\n\nEjemplo: 173131153731,106631462066'
+                );
+                if (!raw || !String(raw).trim()) return;
+                const orderIds = String(raw)
+                    .split(/[,;\s]+/)
+                    .map(function (s) {
+                        return s.trim();
+                    })
+                    .filter(Boolean);
+                if (!orderIds.length) {
+                    alert('❌ Indica al menos un pedido.');
+                    return;
+                }
+                if (
+                    !confirm(
+                        'Se recrearán/actualizarán en Firebase las fichas de jugador/a y socio para ' +
+                            orderIds.length +
+                            ' pedido(s) pagado(s).\n\n¿Continuar?'
+                    )
+                ) {
+                    return;
+                }
+                const result = await window.AdminClubCloudPersist.repairPlayerInscriptions(orderIds);
+                const lines = (result.results || []).map(function (r) {
+                    return (
+                        (r.nombre || '') +
+                        ' ' +
+                        (r.apellidos || '') +
+                        ' (DNI ' +
+                        (r.dni || '—') +
+                        ')\n  Jugador: ' +
+                        (r.playerId || '—') +
+                        '\n  Socio: ' +
+                        (r.memberId || '—') +
+                        (r.numeroSocio ? ' · Nº ' + r.numeroSocio : '')
+                    );
+                });
+                alert(
+                    '✅ Reparación completada: ' +
+                        (result.repaired || 0) +
+                        ' pedido(s).\n\n' +
+                        (lines.length ? lines.join('\n\n') : '') +
+                        '\n\nRecarga listas (Jugadores / Socios) o sincroniza desde la nube.'
+                );
+            } catch (e) {
+                console.error(e);
+                alert('❌ ' + (e.message || e));
+            }
+        }
+
         async function validateMember(memberId) {
             try {
                 const members = JSON.parse(localStorage.getItem('clubMembers') || '[]');
@@ -14972,6 +15452,8 @@
                     if (!hadNum) {
                         members[memberIndex].memberNumber = nextNumber;
                         members[memberIndex].numeroSocio = nextNumber;
+                        members[memberIndex].numeroSocioRegular = nextNumber;
+                        members[memberIndex].membershipTier = 'regular';
                     }
                     members[memberIndex].pendingReason = null;
                     members[memberIndex].fechaLimitePago = null;
@@ -15419,6 +15901,7 @@
                     const next = CMN_edit ? CMN_edit.nextRegularMemberNumber(members) : (Math.max(...members.filter(m => m.status==='active').map(m=>parseInt(m.memberNumber)||0), 50) + 1);
                     member.memberNumber = next;
                     member.numeroSocio = next;
+                    member.numeroSocioRegular = next;
                     member.membershipTier = 'regular';
                     member.validatedBy = currentAdmin.name || currentAdmin.email || 'Administrador';
                     member.validatedDate = new Date().toISOString();
@@ -17663,18 +18146,9 @@ th,td{border:1px solid #ccc;padding:5px 7px;text-align:left;white-space:nowrap;}
             return '';
         }
 
-        function buildExportFichaVerticalHtml(title, headers, rows, escudoDataUri) {
-            const escudo = escudoDataUri ? String(escudoDataUri) : '';
-            const escudoTag = escudo
-                ? '<img src="' + escudo + '" alt="CD Sanabria CF" class="escudo-img">'
-                : '';
-            const metaLine =
-                'Generado: ' +
-                escapeHtmlExport(new Date().toLocaleString('es-ES')) +
-                ' · Registros: ' +
-                rows.length;
-            const fichas = rows
-                .map(function (row, index) {
+        function buildExportFichaVerticalHtml(title, headers, rows, escudoDataUri, groups) {
+            function buildFichasBlock(fichaRows) {
+                return (fichaRows || []).map(function (row, index) {
                     const nameParts = [row['Nombre'], row['Apellidos']].filter(function (v) {
                         return v != null && String(v).trim() !== '';
                     });
@@ -17703,6 +18177,37 @@ th,td{border:1px solid #ccc;padding:5px 7px;text-align:left;white-space:nowrap;}
                         fieldRows +
                         '</tbody></table></section>'
                     );
+                }).join('');
+            }
+
+            const exportGroups =
+                groups && groups.length > 1
+                    ? groups
+                    : [{ label: null, rows: rows || [] }];
+            const totalRows = exportGroups.reduce(function (sum, g) {
+                return sum + (g.rows ? g.rows.length : 0);
+            }, 0);
+            const escudo = escudoDataUri ? String(escudoDataUri) : '';
+            const escudoTag = escudo
+                ? '<img src="' + escudo + '" alt="CD Sanabria CF" class="escudo-img">'
+                : '';
+            const metaLine =
+                'Generado: ' +
+                escapeHtmlExport(new Date().toLocaleString('es-ES')) +
+                ' · Registros: ' +
+                totalRows;
+            const fichas = exportGroups
+                .map(function (group) {
+                    const block = buildFichasBlock(group.rows || []);
+                    if (!group.label) return block;
+                    return (
+                        '<section class="category-block">' +
+                        '<h2 class="category-heading">' +
+                        escapeHtmlExport(group.label) +
+                        '</h2>' +
+                        block +
+                        '</section>'
+                    );
                 })
                 .join('');
             const wmBlock = escudo
@@ -17730,13 +18235,16 @@ th,td{border:1px solid #ccc;padding:5px 7px;text-align:left;white-space:nowrap;}
                 '.header-escudo .escudo-img{width:64px;height:64px;object-fit:contain;}' +
                 'h1{font-size:16pt;color:#1e3a8a;margin:0 0 4px;}' +
                 '.meta{font-size:9.5pt;color:#64748b;margin:0;}' +
+                '.category-block{margin:0 0 28px;page-break-inside:avoid;}' +
+                '.category-heading{font-size:14pt;color:#1e3a8a;margin:24px 0 16px;padding:8px 0;border-bottom:3px solid #1e3a8a;}' +
+                '.category-block:first-of-type .category-heading{margin-top:0;}' +
                 '.ficha{margin:0 0 20px;padding:0 0 16px;border-bottom:2px solid #e2e8f0;page-break-inside:avoid;}' +
                 '.ficha:last-child{border-bottom:none;margin-bottom:0;}' +
                 '.ficha-title{font-size:13pt;color:#1e3a8a;margin:0 0 10px;font-weight:700;}' +
                 '.ficha-table{width:100%;border-collapse:collapse;table-layout:fixed;}' +
                 '.ficha-table th{text-align:left;vertical-align:top;width:36%;padding:7px 12px 7px 0;font-weight:600;color:#475569;border-bottom:1px solid #f1f5f9;}' +
                 '.ficha-table td{vertical-align:top;padding:7px 0;border-bottom:1px solid #f1f5f9;word-wrap:break-word;white-space:normal;overflow-wrap:anywhere;}' +
-                '@media print{.ficha{page-break-after:always;}.ficha:last-child{page-break-after:auto;}.wm-escudo{opacity:0.08;}}' +
+                '@media print{.category-block{page-break-before:auto;}.category-heading{page-break-after:avoid;}.ficha{page-break-after:always;}.ficha:last-child{page-break-after:auto;}.wm-escudo{opacity:0.08;}}' +
                 '</style></head><body>' +
                 wmBlock +
                 '<div class="doc-content">' +
@@ -17744,6 +18252,52 @@ th,td{border:1px solid #ccc;padding:5px 7px;text-align:left;white-space:nowrap;}
                 fichas +
                 '</div></body></html>'
             );
+        }
+
+        function excelSheetNameFromLabel(label, usedNames) {
+            const base = String(label || 'Listado')
+                .replace(/[\\/*?:\[\]]/g, ' ')
+                .trim()
+                .substring(0, 28) || 'Listado';
+            let name = base;
+            let n = 2;
+            while (usedNames.has(name)) {
+                const suffix = ' ' + n;
+                name = base.substring(0, Math.max(1, 31 - suffix.length)) + suffix;
+                n += 1;
+            }
+            usedNames.add(name);
+            return name;
+        }
+
+        async function exportDatasetToExcelGrouped(headers, groups, filename) {
+            const ok = await ensureScriptLoaded(
+                'https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js',
+                'XLSX'
+            );
+            if (!ok || !window.XLSX) {
+                alert('❌ No se pudo cargar Excel. Comprueba la conexión.');
+                return false;
+            }
+            const wb = window.XLSX.utils.book_new();
+            const usedNames = new Set();
+            (groups || []).forEach(function (group) {
+                if (!group.rows || !group.rows.length) return;
+                const ws = window.XLSX.utils.json_to_sheet(group.rows, { header: headers });
+                const sheetName = excelSheetNameFromLabel(group.label || 'Listado', usedNames);
+                window.XLSX.utils.book_append_sheet(wb, ws, sheetName);
+            });
+            if (!wb.SheetNames.length) {
+                const ws = window.XLSX.utils.json_to_sheet([], { header: headers });
+                window.XLSX.utils.book_append_sheet(wb, ws, 'Listado');
+            }
+            const buf = window.XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+            downloadBlobFile(
+                buf,
+                filename.endsWith('.xlsx') ? filename : `${filename}.xlsx`,
+                'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+            );
+            return true;
         }
 
         async function exportDatasetToExcel(headers, rows, filename) {
@@ -17767,9 +18321,9 @@ th,td{border:1px solid #ccc;padding:5px 7px;text-align:left;white-space:nowrap;}
             return true;
         }
 
-        async function exportDatasetToWord(title, headers, rows, filename) {
+        async function exportDatasetToWord(title, headers, rows, filename, groups) {
             const escudo = await resolveClubEscudoDataUri();
-            const html = buildExportFichaVerticalHtml(title, headers, rows, escudo);
+            const html = buildExportFichaVerticalHtml(title, headers, rows, escudo, groups);
             downloadBlobFile(
                 '\ufeff' + html,
                 filename.endsWith('.doc') ? filename : `${filename}.doc`,
@@ -17778,9 +18332,9 @@ th,td{border:1px solid #ccc;padding:5px 7px;text-align:left;white-space:nowrap;}
             return true;
         }
 
-        async function exportDatasetToPdf(title, headers, rows, filename) {
+        async function exportDatasetToPdf(title, headers, rows, filename, groups) {
             const escudo = await resolveClubEscudoDataUri();
-            const html = buildExportFichaVerticalHtml(title, headers, rows, escudo);
+            const html = buildExportFichaVerticalHtml(title, headers, rows, escudo, groups);
             const w = window.open('', '_blank');
             if (!w) {
                 alert('Permite ventanas emergentes y usa Imprimir → Guardar como PDF.');
@@ -17832,7 +18386,19 @@ th,td{border:1px solid #ccc;padding:5px 7px;text-align:left;white-space:nowrap;}
                     if (stEl && !opts.status) opts.status = stEl.value;
                 }
 
-                const rows = collectClubListExportRows(listType, opts);
+                let playerExportGroups = null;
+                let rows = collectClubListExportRows(listType, opts);
+                if (
+                    listType === 'jugadores' &&
+                    typeof window.PlayerExport !== 'undefined' &&
+                    window.PlayerExport.collectExportGroups
+                ) {
+                    playerExportGroups = window.PlayerExport.collectExportGroups(opts);
+                    rows = [];
+                    playerExportGroups.forEach(function (g) {
+                        rows.push.apply(rows, g.rows || []);
+                    });
+                }
                 if (!rows.length) {
                     alert('❌ No hay registros para exportar con los filtros seleccionados');
                     return false;
@@ -17848,16 +18414,36 @@ th,td{border:1px solid #ccc;padding:5px 7px;text-align:left;white-space:nowrap;}
                 const base = `${meta.filePrefix}_${date}`;
                 const fmt = String(format || 'xlsx').toLowerCase();
                 const formats = fmt === 'all' ? ['xlsx', 'word', 'pdf'] : [fmt];
+                const usePlayerCategoryGroups =
+                    listType === 'jugadores' &&
+                    playerExportGroups &&
+                    playerExportGroups.length > 1;
 
                 for (const f of formats) {
                     if (f === 'xlsx' || f === 'excel') {
-                        await exportDatasetToExcel(headers, rows, `${base}.xlsx`);
+                        if (usePlayerCategoryGroups) {
+                            await exportDatasetToExcelGrouped(headers, playerExportGroups, `${base}.xlsx`);
+                        } else {
+                            await exportDatasetToExcel(headers, rows, `${base}.xlsx`);
+                        }
                         addToExportHistory(`${base}.xlsx`);
                     } else if (f === 'word' || f === 'doc') {
-                        await exportDatasetToWord(meta.title, headers, rows, `${base}.doc`);
+                        await exportDatasetToWord(
+                            meta.title,
+                            headers,
+                            rows,
+                            `${base}.doc`,
+                            usePlayerCategoryGroups ? playerExportGroups : null
+                        );
                         addToExportHistory(`${base}.doc`);
                     } else if (f === 'pdf') {
-                        await exportDatasetToPdf(meta.title, headers, rows, `${base}.pdf`);
+                        await exportDatasetToPdf(
+                            meta.title,
+                            headers,
+                            rows,
+                            `${base}.pdf`,
+                            usePlayerCategoryGroups ? playerExportGroups : null
+                        );
                         addToExportHistory(`${base}.pdf`);
                     } else if (f === 'csv') {
                         downloadCSV(convertToCSV(rows, headers), `${base}.csv`);
@@ -18163,7 +18749,10 @@ th,td{border:1px solid #ccc;padding:5px 7px;text-align:left;white-space:nowrap;}
                 const title = document.getElementById('adTitle').value.trim();
                 const company = document.getElementById('adCompany').value.trim();
                 const description = document.getElementById('adDescription').value.trim();
-                const url = document.getElementById('adUrl').value.trim();
+                const urlRaw = document.getElementById('adUrl').value.trim();
+                const url = urlRaw && window.ColaboradorSolicitud && window.ColaboradorSolicitud.normalizeWebsiteUrl
+                    ? window.ColaboradorSolicitud.normalizeWebsiteUrl(urlRaw)
+                    : urlRaw;
                 const category = document.getElementById('adCategory').value;
                 const position = parseInt(document.getElementById('adPosition').value, 10);
                 const startDate = document.getElementById('adStartDate').value;
@@ -21707,6 +22296,9 @@ th,td{border:1px solid #ccc;padding:5px 7px;text-align:left;white-space:nowrap;}
         
         // Función para mostrar pestañas
         function showTab(tabName) {
+            if (window.AdminOrganizerAccess && !window.AdminOrganizerAccess.guardTabAccess(tabName)) {
+                tabName = 'competiciones';
+            }
             // Ocultar todas las pestañas
             const allTabs = document.querySelectorAll('.tab-content');
             allTabs.forEach(tab => tab.style.display = 'none');
@@ -21760,6 +22352,10 @@ th,td{border:1px solid #ccc;padding:5px 7px;text-align:left;white-space:nowrap;}
 
             if (tabName === 'eventos' || tabName === 'competiciones') {
                 if (typeof loadTorneoPreinscripcionesAdmin === 'function') loadTorneoPreinscripcionesAdmin();
+            }
+
+            if (tabName === 'competiciones') {
+                if (typeof loadCompetitionsList === 'function') loadCompetitionsList();
             }
 
             if (tabName === 'dashboard' && window.SiteUpdateMode && typeof window.SiteUpdateMode.refreshUi === 'function') {

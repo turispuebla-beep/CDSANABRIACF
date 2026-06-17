@@ -15,6 +15,7 @@ const {
   completePlayerKitPurchase,
   sendPaymentFailedNotification
 } = require('./lib/firestore-admin');
+const { completeTorneoTeamInscriptionPayment } = require('./lib/torneo-equipo');
 
 function parseBody(event) {
   const raw = event.body || '';
@@ -103,6 +104,8 @@ exports.handler = async (event) => {
       await completePlayerKitPurchase(payment);
     } else if (payment.type === 'paygold_custom') {
       await completePayGoldPayment(payment, params);
+    } else if (payment.type === 'torneo_team_inscription') {
+      await completeTorneoTeamInscriptionPayment(payment);
     }
 
     return { statusCode: 200, body: 'OK' };

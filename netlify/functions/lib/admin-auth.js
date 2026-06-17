@@ -27,6 +27,14 @@ function isClubAdminDoc(data) {
   );
 }
 
+function isCompetitionOrganizerDoc(data) {
+  return data && data.appScope === 'cdsanabriacf' && data.role === 'competition_organizer';
+}
+
+function isClubAdminOrOrganizerDoc(data) {
+  return isClubAdminDoc(data) || isCompetitionOrganizerDoc(data);
+}
+
 /**
  * Verifica Firebase ID token y documento sanabria_admins/{uid}.
  */
@@ -89,5 +97,7 @@ module.exports = {
   verifyAdminRequest,
   verifySeasonRenewalRequest,
   isNetlifyScheduledInvocation,
-  isClubAdminDoc
+  isClubAdminDoc,
+  isCompetitionOrganizerDoc,
+  isClubAdminOrOrganizerDoc
 };

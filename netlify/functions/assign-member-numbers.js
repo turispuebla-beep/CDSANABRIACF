@@ -1,0 +1,31 @@
+'use strict';
+
+const { assignPendingRegularMemberNumbers } = require('./lib/firestore-admin');
+const { verifyAdminRequest } = require('./lib/admin-auth');
+const { corsHeaders, jsonResponse } = require('./lib/http-cors');
+
+exports.handler = async (event) => {
+  const origin = (event.headers && (event.headers.origin || event.headers.Origin)) || '';
+
+  if (event.httpMethod === 'OPTIONS') {
+    return { statusCode: 204, headers: corsHeaders(origin), body: '' };
+  }
+  if (event.httpMethod !== 'POST') {
+    return jsonResponse(405, { ok: false, error: 'Method not allowed' }, origin);
+  }
+
+  const auth = await verifyAdminRequest(event);
+  if (!auth.ok) {
+    return jsonResponse(auth.statusCode || 401, { ok: false, error: auth.error }, origin);
+  }
+
+  try {
+    const body = JSON.parse(event.body || '{}');
+    const dryRun = body.dryRun === true;
+    const result = await assignPendingRegularMemberNumbers({ dryRun });
+    return jsonResponse(200, result, origin);
+  } catch (err) {
+    console.error('assign-member-numbers:', err);
+    return jsonResponse(500, { ok: false, error: err.message || 'Error interno' }, origin);
+  }
+};

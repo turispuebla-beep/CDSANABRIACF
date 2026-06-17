@@ -136,7 +136,9 @@ async function sendViaSmtp(cfg, { to, subject, html, text, bcc, replyTo, attachm
     Array.isArray(attachments) && attachments.length
       ? attachments.map((a) => ({
           filename: a.filename,
-          content: a.content,
+          content: a.contentBase64
+            ? Buffer.from(String(a.contentBase64), 'base64')
+            : Buffer.from(String(a.content || ''), 'utf8'),
           contentType: a.type || 'application/octet-stream'
         }))
       : undefined;
@@ -175,7 +177,9 @@ async function sendViaSendGridApi(cfg, { to, subject, html, text, bcc, replyTo, 
 
   if (Array.isArray(attachments) && attachments.length) {
     body.attachments = attachments.map((a) => ({
-      content: Buffer.from(String(a.content || ''), 'utf8').toString('base64'),
+      content: a.contentBase64
+        ? String(a.contentBase64)
+        : Buffer.from(String(a.content || ''), 'utf8').toString('base64'),
       filename: a.filename,
       type: a.type || 'application/octet-stream',
       disposition: 'attachment'

@@ -115,6 +115,10 @@ MEMBERSHIP_PAYMENT_DEADLINE_DAYS=7
 
 MEMBERSHIP_SEASON_FIRST_CLOSE_YEAR=2027
 
+# Cuota inscripción equipo torneo (€) — pago tarjeta al finalizar plantilla. 0 = sin cobro online.
+
+TORNEO_INSCRIPTION_FEE_EUR=0
+
 # Secreto opcional para invocar cron/manual member-season-renewal (Bearer). El cron de Netlify usa cabecera interna.
 
 NETLIFY_CRON_SECRET=
