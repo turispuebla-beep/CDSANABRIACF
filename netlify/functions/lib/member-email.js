@@ -41,17 +41,17 @@ function buildRegistrationContent(data) {
   let pasosText;
   if (nextStep === 'card') {
     pasosHtml = `
-      <p>Para activar tu alta, completa el pago de la cuota con tarjeta en la pasarela segura del banco.</p>
-      ${siteUrl ? `<p><a href="${escapeHtml(siteUrl)}/pago-cuota-socio.html">Pagar cuota con tarjeta</a></p>` : ''}
-      <p>Cuando el pago sea correcto, tu alta quedará <strong>activa al instante</strong>.</p>`;
+      <p>Has elegido pagar con <strong>tarjeta</strong>. Completa el pago en la pasarela segura del banco.</p>
+      <p>Cuando el pago sea correcto, tu alta quedará <strong>activa al instante</strong> con tu número de socio y acceso al carnet.</p>`;
     pasosText =
-      'Completa el pago con tarjeta en la web del club. Cuando el pago sea correcto, tu alta quedará activa al instante.';
+      'Has elegido tarjeta. Al confirmar el pago en el banco, tu alta quedará activa al instante con número de socio y carnet.';
   } else {
     pasosHtml = `
-      <p>Si vas a pagar por <strong>transferencia o efectivo</strong>, tienes <strong>7 días</strong> para ingresar la cuota.
-      Un administrador validará tu alta al ver el pago en la cuenta del club.</p>`;
+      <p>Has elegido pagar por <strong>transferencia, efectivo o TPV en el club</strong>. Tienes <strong>7 días</strong> para abonar la cuota.
+      Serás socio/a de pleno derecho cuando un administrador del club compruebe el pago.</p>
+      <p>Cuenta del club: <strong>CAJA RURAL ES12 3085 0034 8222 5127 9226</strong></p>`;
     pasosText =
-      'Si pagas por transferencia o efectivo: tienes 7 días para ingresar la cuota; el club validará tu alta al ver el pago.';
+      'Has elegido transferencia, efectivo o TPV. Tienes 7 días para abonar la cuota; el club te dará de alta al comprobar el pago.';
   }
 
   const subject = `Registro recibido — ${CLUB_NAME}`;
@@ -102,6 +102,114 @@ function buildPaymentConfirmedContent(data) {
     `Consultas: ${clubContactEmail()}\n`;
 
   return { subject, html, text };
+}
+
+function formatAmigNum(raw) {
+  if (!raw) return '—';
+  const s = String(raw).trim();
+  if (/^AMIG/i.test(s)) return s;
+  const n = parseInt(s, 10);
+  if (Number.isFinite(n)) return 'N.º AMIG. ' + String(n).padStart(6, '0');
+  return s;
+}
+
+function buildFriendRegistrationContent(data) {
+  const nombre = escapeHtml(memberDisplayName(data));
+  const numeroAmigo = escapeHtml(formatAmigNum(data.numeroAmigo || data.friendNumber));
+  const siteUrl = String(process.env.SITE_URL || '').replace(/\/$/, '');
+  const subject = `Registro amigo/a confirmado — ${CLUB_NAME}`;
+  const html = `
+    <div style="font-family:system-ui,sans-serif;max-width:560px;color:#1e293b;line-height:1.5">
+      <h2 style="color:#1e3a8a;margin:0 0 12px">¡Hola, ${nombre}!</h2>
+      <p>Tu registro como <strong>amigo/a del club</strong> en <strong>${CLUB_NAME}</strong> se ha guardado correctamente.</p>
+      <table style="background:#f8fafc;border-radius:8px;padding:12px 16px;margin:16px 0;width:100%">
+        <tr><td><strong>Nº amigo/a:</strong></td><td>${numeroAmigo}</td></tr>
+        <tr><td><strong>Estado:</strong></td><td>Activo/a (gratuito)</td></tr>
+      </table>
+      <p>Ya puedes iniciar sesión en la web del club con tu correo y contraseña para acceder a competiciones y encuentros.</p>
+      ${siteUrl ? `<p><a href="${escapeHtml(siteUrl)}/">Entrar en la web del club</a></p>` : ''}
+      <p style="font-size:0.9rem;color:#64748b">Consultas: <a href="mailto:${escapeHtml(clubContactEmail())}">${escapeHtml(clubContactEmail())}</a></p>
+      <p style="font-size:0.85rem;color:#94a3b8">Este mensaje se envía automáticamente. No respondas a este correo si no es necesario.</p>
+    </div>`;
+  const text =
+    `Hola, ${memberDisplayName(data)}.\n\n` +
+    `Tu registro como amigo/a del club en ${CLUB_NAME} se ha guardado correctamente.\n` +
+    `${formatAmigNum(data.numeroAmigo || data.friendNumber)}\n` +
+    `Estado: Activo/a (gratuito)\n\n` +
+    `Puedes iniciar sesión en la web del club con tu correo y contraseña.\n` +
+    (siteUrl ? `${siteUrl}/\n\n` : '') +
+    `Consultas: ${clubContactEmail()}\n`;
+  return { subject, html, text };
+}
+
+async function sendFriendRegistrationEmail(data) {
+  const cfg = getEmailConfig();
+  if (!cfg.ok) return { sent: false, reason: cfg.error };
+  const email = String(data.email || '').trim().toLowerCase();
+  if (!email) return { sent: false, reason: 'email vacío' };
+  const content = buildFriendRegistrationContent(data);
+  try {
+    const result = await sendDirectToMemberEmail({
+      memberEmail: email,
+      subject: content.subject,
+      html: content.html,
+      text: content.text,
+      replyTo: clubContactEmail()
+    });
+    return { sent: true, to: result.to, bcc: result.bcc };
+  } catch (err) {
+    return { sent: false, reason: err.message || String(err) };
+  }
+}
+
+function buildFriendClubNotifyFields(saved) {
+  return [
+    { label: 'Notificaciones push', value: saved.notificaciones ? 'Sí' : 'No' },
+    { label: 'Estado', value: 'Activo (gratuito)' },
+    { label: 'Origen registro', value: saved.registrationSource || 'web' },
+    { label: 'ID registro', value: saved.id || '—' }
+  ];
+}
+
+/** Correo al amigo/a y aviso al club tras alta en Firebase. */
+async function notifyFriendRegistrationEmails(saved) {
+  const row = saved && typeof saved === 'object' ? saved : {};
+  const nombre = row.nombre || row.name || '';
+  const apellidos = row.apellidos || row.surname || '';
+  const email = String(row.email || '').trim().toLowerCase();
+  if (!email) return { friend: { sent: false }, club: { sent: false } };
+
+  const friendResult = await sendFriendRegistrationEmail({
+    email,
+    nombre,
+    apellidos,
+    numeroAmigo: row.numeroAmigo || row.friendNumber,
+    friendNumber: row.friendNumber || row.numeroAmigo
+  });
+
+  let clubResult = { sent: false };
+  try {
+    const { sendClubAdminNotification } = require('./club-admin-notify-email');
+    clubResult = await sendClubAdminNotification({
+      kind: 'registro_amigo',
+      title: 'Nuevo registro de amigo/a',
+      subject: 'Registro amigo/a — ' + nombre + ' ' + apellidos,
+      paymentChannel: 'gratuito',
+      requesterEmail: email,
+      email,
+      nombre,
+      apellidos,
+      dni: row.dni,
+      telefono: row.telefono || row.phone,
+      numeroAmigo: row.numeroAmigo || row.friendNumber,
+      friendNumber: row.friendNumber || row.numeroAmigo,
+      fields: buildFriendClubNotifyFields(row)
+    });
+  } catch (err) {
+    clubResult = { sent: false, reason: err.message || String(err) };
+  }
+
+  return { friend: friendResult, club: clubResult };
 }
 
 async function sendMemberRegistrationEmail(data) {
@@ -903,36 +1011,157 @@ async function sendTorneoPlayerInviteEmail(data) {
 async function sendTorneoFichaSubmittedEmails(data) {
   const cfg = getEmailConfig();
   if (!cfg.ok) return { sent: false };
+  const {
+    fichaDataToFields,
+    documentsHtmlPreview,
+    collectFichaAttachments,
+    DOC_LEGAL_TEXT
+  } = require('./torneo-email-docs');
+
+  const fichaData = data.fichaData && typeof data.fichaData === 'object' ? data.fichaData : {};
   const playerName = String(data.playerName || 'Jugador/a').trim();
+  const fields = fichaDataToFields(fichaData);
+  const docHtml = documentsHtmlPreview(fichaData.documents);
+  const userAttachments = collectFichaAttachments(fichaData);
+  const extraHtml =
+    '<h3 style="color:#1e3a8a;margin:20px 0 8px">Documentación acreditativa</h3>' +
+    '<p style="font-size:0.85rem;color:#64748b;line-height:1.45;margin:0 0 12px">' +
+    escapeHtml(DOC_LEGAL_TEXT) +
+    '</p>' +
+    docHtml;
+
   try {
     const { sendClubAdminNotification } = require('./club-admin-notify-email');
     await sendClubAdminNotification({
       kind: 'torneo_ficha_jugador',
       title: 'Ficha torneo recibida',
       subject: `Ficha torneo — ${playerName} — ${data.teamName || 'Equipo'}`,
+      requesterEmail: fichaData.email || data.contactEmail,
       nombre: playerName,
       fields: [
         { label: 'Equipo', value: data.teamName || '—' },
         { label: 'Evento', value: data.eventName || '—' },
         { label: 'Responsable', value: data.contactName || '—' },
         { label: 'Email responsable', value: data.contactEmail || '—' }
-      ]
+      ].concat(fields),
+      extraHtml,
+      userAttachments
     });
   } catch (e) {
     console.warn('sendTorneoFichaSubmittedEmails club:', e.message || e);
   }
+
+  if (data.contactEmail) {
+    try {
+      const rows = fields
+        .map(function (f) {
+          return '<tr><td style="padding:4px 8px 4px 0;color:#64748b"><strong>' + escapeHtml(f.label) + '</strong></td><td style="padding:4px 0">' + escapeHtml(f.value) + '</td></tr>';
+        })
+        .join('');
+      await sendDirectToMemberEmail({
+        memberEmail: data.contactEmail,
+        subject: `Ficha recibida — ${playerName} — ${data.teamName || 'Torneo'} — ${CLUB_NAME}`,
+        html:
+          '<div style="font-family:system-ui,sans-serif;max-width:640px;line-height:1.5;color:#1e293b">' +
+          '<p>Hola, <strong>' +
+          escapeHtml(data.contactName || '') +
+          '</strong>:</p>' +
+          '<p>Se ha recibido la ficha de <strong>' +
+          escapeHtml(playerName) +
+          '</strong> para el equipo <strong>' +
+          escapeHtml(data.teamName || '') +
+          '</strong>.</p>' +
+          '<table style="width:100%;border-collapse:collapse;margin:12px 0">' +
+          rows +
+          '</table>' +
+          extraHtml +
+          '<p style="font-size:0.85rem;color:#64748b">Los documentos PDF/imagen van adjuntos a este correo.</p></div>',
+        text:
+          'Ficha recibida de ' +
+          playerName +
+          ' para ' +
+          (data.teamName || 'equipo') +
+          '.\n\n' +
+          fields.map(function (f) {
+            return f.label + ': ' + f.value;
+          }).join('\n'),
+        attachments: userAttachments,
+        replyTo: clubContactEmail()
+      });
+    } catch (e) {
+      console.warn('sendTorneoFichaSubmittedEmails responsable:', e.message || e);
+    }
+  }
+
   return { sent: true };
 }
 
 async function sendTorneoPlantillaCerradaEmails(data) {
   const cfg = getEmailConfig();
+  const {
+    fichaDataToFields,
+    coachToFields,
+    documentsHtmlPreview,
+    collectRecordAttachments,
+    DOC_LEGAL_TEXT
+  } = require('./torneo-email-docs');
+
   const fichas = Array.isArray(data.fichas) ? data.fichas.filter((f) => f.data) : [];
-  const lines = fichas
+  const coachFields = coachToFields(data.coach);
+  let extraHtml =
+    '<p style="font-size:0.85rem;color:#64748b;line-height:1.45;margin:0 0 16px">' +
+    escapeHtml(DOC_LEGAL_TEXT) +
+    '</p>';
+  extraHtml +=
+    '<h3 style="color:#1e3a8a;margin:16px 0 8px">Responsable técnico (torneo)</h3>' +
+    '<table style="width:100%;border-collapse:collapse;margin:0 0 12px">' +
+    coachFields
+      .map(function (f) {
+        return (
+          '<tr><td style="padding:4px 8px 4px 0;color:#64748b;white-space:nowrap"><strong>' +
+          escapeHtml(f.label) +
+          '</strong></td><td style="padding:4px 0">' +
+          escapeHtml(f.value) +
+          '</td></tr>'
+        );
+      })
+      .join('') +
+    '</table>' +
+    documentsHtmlPreview(data.coach && data.coach.documents);
+
+  fichas.forEach(function (f, i) {
+    const name = [f.data.name, f.data.surname].filter(Boolean).join(' ') || f.label || 'Jugador/a ' + (i + 1);
+    const fields = fichaDataToFields(f.data);
+    extraHtml +=
+      '<h3 style="color:#1e3a8a;margin:20px 0 8px">Jugador/a ' +
+      (i + 1) +
+      ': ' +
+      escapeHtml(name) +
+      '</h3>' +
+      '<table style="width:100%;border-collapse:collapse;margin:0 0 12px">' +
+      fields
+        .map(function (fd) {
+          return (
+            '<tr><td style="padding:4px 8px 4px 0;color:#64748b;white-space:nowrap"><strong>' +
+            escapeHtml(fd.label) +
+            '</strong></td><td style="padding:4px 0">' +
+            escapeHtml(fd.value) +
+            '</td></tr>'
+          );
+        })
+        .join('') +
+      '</table>' +
+      documentsHtmlPreview(f.data.documents);
+  });
+
+  const userAttachments = collectRecordAttachments(data);
+  const extraText = fichas
     .map(function (f, i) {
       const n = [f.data.name, f.data.surname].filter(Boolean).join(' ');
       return (i + 1) + '. ' + (n || f.label || '—');
     })
     .join('\n');
+
   try {
     const { sendClubAdminNotification } = require('./club-admin-notify-email');
     await sendClubAdminNotification({
@@ -948,13 +1177,11 @@ async function sendTorneoPlantillaCerradaEmails(data) {
         { label: 'Evento', value: data.eventName },
         { label: 'Código', value: data.accessCode },
         { label: 'Jugadores', value: String(fichas.length) },
-        { label: 'Cuota pagada', value: data.inscriptionFeeEur != null ? data.inscriptionFeeEur + ' €' : '—' },
-        {
-          label: 'Entrenador/a',
-          value: data.coach ? [data.coach.name, data.coach.surname].filter(Boolean).join(' ') : '—'
-        }
-      ],
-      extraText: lines ? 'Plantilla:\n' + lines : ''
+        { label: 'Cuota pagada', value: data.inscriptionFeeEur != null ? data.inscriptionFeeEur + ' €' : '—' }
+      ].concat(coachFields),
+      extraHtml,
+      extraText: extraText ? 'Plantilla:\n' + extraText : '',
+      userAttachments
     });
   } catch (e) {
     console.warn('sendTorneoPlantillaCerradaEmails club:', e.message || e);
@@ -964,8 +1191,18 @@ async function sendTorneoPlantillaCerradaEmails(data) {
       await sendDirectToMemberEmail({
         memberEmail: data.contactEmail,
         subject: `Plantilla enviada — ${data.teamName || 'Torneo'} — ${CLUB_NAME}`,
-        html: `<p>Hola, <strong>${escapeHtml(data.contactName || '')}</strong>:</p><p>Hemos recibido la plantilla completa de <strong>${escapeHtml(data.teamName || '')}</strong> para el torneo. El club la revisará pronto.</p>`,
-        text: `Plantilla de ${data.teamName || 'equipo'} recibida por el club.\n`,
+        html:
+          '<div style="font-family:system-ui,sans-serif;max-width:640px;line-height:1.5;color:#1e293b">' +
+          '<p>Hola, <strong>' +
+          escapeHtml(data.contactName || '') +
+          '</strong>:</p>' +
+          '<p>Hemos recibido la plantilla completa de <strong>' +
+          escapeHtml(data.teamName || '') +
+          '</strong> para el torneo. El club la revisará pronto.</p>' +
+          extraHtml +
+          '<p style="font-size:0.85rem;color:#64748b;margin-top:16px">Todos los datos y documentos PDF/imagen van adjuntos a este correo.</p></div>',
+        text: `Plantilla de ${data.teamName || 'equipo'} recibida por el club.\n\n${extraText}`,
+        attachments: userAttachments,
         replyTo: clubContactEmail()
       });
     } catch (_) {}
@@ -975,6 +1212,8 @@ async function sendTorneoPlantillaCerradaEmails(data) {
 
 module.exports = {
   sendMemberRegistrationEmail,
+  sendFriendRegistrationEmail,
+  notifyFriendRegistrationEmails,
   sendMemberPaymentConfirmedEmail,
   sendPlayerInscriptionPendingEmail,
   sendPlayerInscriptionPaymentConfirmedEmail,

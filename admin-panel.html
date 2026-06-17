@@ -1634,21 +1634,6 @@
                         <!-- Los eventos se cargarán aquí dinámicamente -->
                     </div>
                 </div>
-
-                <!-- Preinscripciones torneo (Firestore) -->
-                <div class="section" style="background:#eff6ff;padding:20px;border-radius:12px;border:2px solid #93c5fd;margin-top:24px;">
-                    <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;margin-bottom:12px;">
-                        <div>
-                            <h3 style="margin:0;">🏆 Preinscripciones torneo</h3>
-                            <p style="color:#64748b;font-size:0.92rem;margin:6px 0 0;">Solicitudes del formulario público (Torneo Fútbol 7). Correo automático al club y al contacto; datos en Firestore. También en pestaña Competiciones.</p>
-                        </div>
-                        <button type="button" class="btn btn-success" onclick="loadTorneoPreinscripcionesAdmin()">🔄 Actualizar listado</button>
-                    </div>
-                    <p style="margin:0 0 12px;font-size:0.9rem;"><strong>Total:</strong> <span id="torneoPreinscripcionesAdminCount">0</span></p>
-                    <div id="torneoPreinscripcionesAdminList">
-                        <p style="color:#64748b;margin:0;">Pulsa «Actualizar listado» para cargar desde Firestore.</p>
-                    </div>
-                </div>
             </div>
 
             <!-- Encuentros Tab -->
@@ -2094,7 +2079,7 @@
                     <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;margin-bottom:12px;">
                         <div>
                             <h3 style="margin:0;">🏆 Preinscripciones torneo Fútbol 7</h3>
-                            <p style="color:#64748b;font-size:0.92rem;margin:6px 0 0;">Equipos preinscritos desde la web. Puedes añadirlos al cuadro de una competición con «Añadir a competición».</p>
+                            <p style="color:#64748b;font-size:0.92rem;margin:6px 0 0;">Datos del torneo Fútbol 7, <strong>separados</strong> de jugadores, entrenadores y equipos del club. Mismo nombre + email = un responsable; cada categoría tiene su código.</p>
                         </div>
                         <button type="button" class="btn btn-success" onclick="loadTorneoPreinscripcionesAdmin()">🔄 Actualizar listado</button>
                     </div>
@@ -16475,6 +16460,7 @@
                                     <p style="margin: 2px 0; color: #666;"><strong>Registro:</strong> ${new Date(fr.registrationDate).toLocaleDateString('es-ES')}</p>
                                     <p style="margin: 2px 0; color: #666;"><strong>Último acceso:</strong> ${lastAccessText}</p>
                                     <p style="margin: 2px 0; color: #666;"><strong>Accesos:</strong> ${friend.accessCount != null ? friend.accessCount : 0}</p>
+                                    ${friend.torneoResponsableEnabled || friend.canTorneoResponsable ? '<p style="margin: 2px 0; color: #7c3aed; font-weight:600;">⚽ Responsable de equipo habilitado</p>' : ''}
                                 </div>
                                 <div style="display: flex; flex-direction: column; gap: 5px;">
                                     <span style="background: ${statusColor}; color: white; padding: 2px 8px; border-radius: 12px; font-size: 0.8rem;">${statusText}</span>
@@ -16662,6 +16648,12 @@
                                     <option value="inactive" ${fr.status === 'inactive' ? 'selected' : ''}>Inactivo</option>
                                 </select>
                             </div>
+                            <div style="margin-bottom: 15px; padding: 12px; background: #f0f9ff; border-radius: 8px; border: 1px solid #bfdbfe;">
+                                <label style="display:flex; align-items:flex-start; gap:8px; cursor:pointer; font-weight: normal;">
+                                    <input type="checkbox" id="editFriendTorneoResponsable" ${raw.torneoResponsableEnabled || raw.canTorneoResponsable ? 'checked' : ''} style="margin-top:4px;">
+                                    <span><strong>Responsable de equipo (torneo)</strong><br><small style="color:#666;">Permite ver el botón «Soy responsable del equipo» en la web. Sin marcar, solo calendario y competiciones.</small></span>
+                                </label>
+                            </div>
                             <div style="margin-bottom: 15px;">
                                 <label style="display:block; margin-bottom:5px; font-weight:bold;">Nueva contraseña de acceso web</label>
                                 <input type="password" id="editFriendPassword" placeholder="Dejar vacío para no cambiar — no se muestra la anterior" autocomplete="new-password" style="width:100%; padding:8px; border:1px solid #ddd; border-radius:4px;">
@@ -16699,6 +16691,7 @@
                 const email = document.getElementById('editFriendEmail').value.trim();
                 const status = document.getElementById('editFriendStatus').value;
                 const newPwd = document.getElementById('editFriendPassword').value.trim();
+                const torneoResponsableEnabled = !!document.getElementById('editFriendTorneoResponsable')?.checked;
 
                 if (!name || !surname || !dni || !phone || !email) {
                     alert('❌ Completa los campos obligatorios');
@@ -16725,7 +16718,9 @@
                     phone,
                     telefono: phone,
                     email,
-                    status
+                    status,
+                    torneoResponsableEnabled,
+                    canTorneoResponsable: torneoResponsableEnabled
                 };
                 if (newPwd) {
                     if (window.firebaseAuth && !window.firebaseAuth.isSimulation && cur.authUid) {

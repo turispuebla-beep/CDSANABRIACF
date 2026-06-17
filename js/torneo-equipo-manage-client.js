@@ -16,6 +16,7 @@
         Object.assign({}, payload || {}, {
           action: action,
           accessCode: session.accessCode,
+          activeAccessCode: session.activeAccessCode || session.accessCode,
           contactEmail: session.contactEmail
         })
       )

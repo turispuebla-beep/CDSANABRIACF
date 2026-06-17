@@ -32,8 +32,10 @@
   }
 
   function writeSession(accessCode, contactEmail, panel) {
+    const activeAccessCode = panel && panel.activeAccessCode ? normalizeCode(panel.activeAccessCode) : normalizeCode(accessCode);
     const payload = {
       accessCode: normalizeCode(accessCode),
+      activeAccessCode: activeAccessCode,
       contactEmail: String(contactEmail || '')
         .trim()
         .toLowerCase(),
@@ -43,6 +45,29 @@
     };
     global.sessionStorage.setItem(SESSION_KEY, JSON.stringify(payload));
     return payload;
+  }
+
+  function setActiveCategory(accessCode) {
+    const session = readSession();
+    if (!session || !session.panel) return null;
+    const code = normalizeCode(accessCode);
+    const entry = (session.panel.teamEntries || []).find(function (e) {
+      return normalizeCode(e.accessCode) === code;
+    });
+    if (!entry) return session.panel;
+    const merged = Object.assign({}, session.panel, entry, {
+      activeAccessCode: entry.accessCode,
+      teamEntries: session.panel.teamEntries,
+      entryCount: session.panel.entryCount,
+      teamName: session.panel.teamName,
+      responsibleEmail: session.panel.responsibleEmail,
+      contactEmail: session.panel.contactEmail,
+      contactName: session.panel.contactName,
+      eventName: session.panel.eventName,
+      coach: session.panel.coach
+    });
+    writeSession(session.accessCode, session.contactEmail, merged);
+    return merged;
   }
 
   function clearSession() {
@@ -194,6 +219,7 @@
     openAccessModal: openAccessModal,
     closeAccessModal: closeAccessModal,
     submitAccessModal: submitAccessModal,
+    setActiveCategory: setActiveCategory,
     initFromUrl: initFromUrl,
     plantillaStatusLabel: plantillaStatusLabel
   };

@@ -4,6 +4,7 @@ const { getEmailConfig } = require('./lib/club-email');
 const {
   sendMemberRegistrationEmail,
   sendMemberPaymentConfirmedEmail,
+  sendFriendRegistrationEmail,
   sendPlayerApplicationApprovedEmail,
   sendPlayerProfileUpdateConfirmedEmail,
   sendPlayerInscriptionPendingEmail,
@@ -12,9 +13,15 @@ const {
   sendEventRegistrationConfirmedEmail
 } = require('./lib/member-email');
 const { sendClubAdminNotification } = require('./lib/club-admin-notify-email');
-const { memberExistsForEmail, clubRecordExistsForNotify } = require('./lib/firestore-admin');
+const { memberExistsForEmail, friendExistsForEmail, clubRecordExistsForNotify } = require('./lib/firestore-admin');
 const { verifyAdminRequest } = require('./lib/admin-auth');
 const { corsHeaders, jsonResponse } = require('./lib/http-cors');
+
+const NOTIFY_KINDS_SKIP_RECORD_CHECK = new Set([
+  'colaborador_publicidad',
+  'registro_socio',
+  'registro_amigo'
+]);
 
 const ADMIN_ONLY_TYPES = new Set([
   'member_validated_manual',
@@ -55,7 +62,7 @@ exports.handler = async (event) => {
         return jsonResponse(400, { ok: false, error: 'email del solicitante inválido' }, origin);
       }
       const kind = String(body.kind || '').trim();
-      if (kind !== 'colaborador_publicidad') {
+      if (!NOTIFY_KINDS_SKIP_RECORD_CHECK.has(kind)) {
         const known = await clubRecordExistsForNotify(body);
         if (!known) {
           return jsonResponse(404, { ok: false, error: 'No hay registro del club para este aviso' }, origin);
@@ -108,6 +115,21 @@ exports.handler = async (event) => {
         numeroSocio: body.numeroSocio || body.memberNumber,
         cuota: body.cuota,
         nextStep
+      });
+      return jsonResponse(200, { ok: true, sent: result.sent }, origin);
+    }
+
+    if (type === 'friend_registered') {
+      const exists = await friendExistsForEmail(email, body.friendId);
+      if (!exists) {
+        return jsonResponse(404, { ok: false, error: 'Amigo/a no encontrado/a' }, origin);
+      }
+      const result = await sendFriendRegistrationEmail({
+        email,
+        nombre: body.nombre || body.name,
+        apellidos: body.apellidos || body.surname,
+        numeroAmigo: body.numeroAmigo || body.friendNumber,
+        friendNumber: body.friendNumber || body.numeroAmigo
       });
       return jsonResponse(200, { ok: true, sent: result.sent }, origin);
     }

@@ -295,6 +295,17 @@ async function memberExistsForEmail(email, memberId) {
   return !q.empty;
 }
 
+async function friendExistsForEmail(email, friendId) {
+  const norm = String(email || '').trim().toLowerCase();
+  if (!norm) return false;
+  if (friendId) {
+    const snap = await friendsRef().doc(String(friendId)).get();
+    if (snap.exists && String(snap.data().email || '').toLowerCase() === norm) return true;
+  }
+  const q = await friendsRef().where('email', '==', norm).limit(1).get();
+  return !q.empty;
+}
+
 async function listAllMembersData() {
   const snap = await membersRef().get();
   return snap.docs.map((d) => ({ id: d.id, ...d.data() }));
@@ -2332,9 +2343,7 @@ function buildTorneoEquipoPanelPayload(record) {
       label: f.label || f.playerName || 'Jugador/a',
       status: f.status || 'pendiente',
       updatedAt: f.updatedAt || null
-    })),
-    competitionId: r.competitionId || null,
-    competitionTeamId: r.competitionTeamId || null
+    }))
   };
 }
 
@@ -2393,6 +2402,45 @@ async function verifyTorneoEquipoAccess(accessCode, contactEmail) {
   return buildTorneoEquipoPanelPayload({ ...record, accessCode: code });
 }
 
+function normalizeTorneoTeamName(name) {
+  return String(name || '')
+    .trim()
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/\s+/g, ' ');
+}
+
+function isActiveTorneoPreinscripcion(record) {
+  const st = String((record && record.status) || 'preinscripcion_enviada')
+    .trim()
+    .toLowerCase();
+  return st !== 'descartada' && st !== 'eliminada' && st !== 'cancelada';
+}
+
+async function findDuplicateTorneoPreinscripcion(patch) {
+  const teamKey = normalizeTorneoTeamName(patch.teamName);
+  const email = String(patch.contactEmail || '')
+    .trim()
+    .toLowerCase();
+  const newCats = new Set(
+    (Array.isArray(patch.categories) ? patch.categories : []).map((c) => String(c || '').trim().toLowerCase())
+  );
+  if (!teamKey || !email || !newCats.size) return null;
+
+  const snap = await torneoPreinscripcionesRef().get();
+  for (const doc of snap.docs) {
+    const d = doc.data() || {};
+    if (!isActiveTorneoPreinscripcion(d)) continue;
+    if (normalizeTorneoTeamName(d.teamName) !== teamKey) continue;
+    if (String(d.contactEmail || '').trim().toLowerCase() !== email) continue;
+    const existing = Array.isArray(d.categories) ? d.categories : [];
+    const overlap = existing.some((c) => newCats.has(String(c || '').trim().toLowerCase()));
+    if (overlap) return { id: doc.id, ...d };
+  }
+  return null;
+}
+
 /** Preinscripción torneo F7 desde la web pública. */
 async function createTorneoPreinscripcionRecord(raw) {
   const patch = normalizeTorneoPreinscripcionFields(raw);
@@ -2405,6 +2453,16 @@ async function createTorneoPreinscripcionRecord(raw) {
     throw new Error('Email de contacto no válido');
   }
   if (!patch.contactPhone) throw new Error('Teléfono de contacto obligatorio');
+
+  const duplicate = await findDuplicateTorneoPreinscripcion(patch);
+  if (duplicate) {
+    const dupCode = duplicate.accessCode ? ' Código existente: ' + duplicate.accessCode + '.' : '';
+    throw new Error(
+      'Ya hay una preinscripción para este equipo (mismo nombre), responsable (email) y categoría.' + dupCode
+    );
+  }
+
+  patch.teamKey = normalizeTorneoTeamName(patch.teamName);
 
   const ref = torneoPreinscripcionesRef().doc();
   const id = ref.id;
@@ -2670,6 +2728,7 @@ module.exports = {
   completePlayerKitPurchase,
   sendPaymentFailedNotification,
   memberExistsForEmail,
+  friendExistsForEmail,
   clubRecordExistsForNotify,
   applicationsRef,
   normalizeDni,
@@ -2714,6 +2773,8 @@ module.exports = {
   torneoCategoryLabels,
   generateTorneoAccessCode,
   normalizeTorneoAccessCode,
+  normalizeTorneoTeamName,
+  isActiveTorneoPreinscripcion,
   findTorneoPreinscripcionByAccessCode,
   ensureTorneoAccessCode,
   verifyTorneoEquipoAccess,

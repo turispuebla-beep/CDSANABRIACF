@@ -151,8 +151,22 @@
     });
   }
 
+  /** Correo al amigo/a tras registro guardado en Firebase. */
+  function sendFriendRegistered(opts) {
+    return post({
+      type: 'friend_registered',
+      email: opts.email,
+      friendId: opts.friendId,
+      nombre: opts.nombre,
+      apellidos: opts.apellidos,
+      numeroAmigo: opts.numeroAmigo || opts.friendNumber,
+      friendNumber: opts.friendNumber || opts.numeroAmigo
+    });
+  }
+
   global.CdsanClubEmail = {
     sendMemberRegistered: sendMemberRegistered,
+    sendFriendRegistered: sendFriendRegistered,
     sendClubAdminNotify: sendClubAdminNotify,
     sendEventRegistrationPending: sendEventRegistrationPending,
     sendEventRegistrationConfirmed: sendEventRegistrationConfirmed,

@@ -113,7 +113,10 @@
       throw err;
     }
     const remote = json.friend || { id: json.friendId, ...friend };
-    return mergeFriendIntoLocal(remote);
+    return {
+      friend: mergeFriendIntoLocal(remote),
+      emailsSent: !!json.emailsSent
+    };
   }
 
   global.ClubMemberCloudPersist = {

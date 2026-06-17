@@ -219,6 +219,8 @@ function buildClubAdminContent(data) {
         ${rows}
       </table>
       ${requester ? `<p style="font-size:0.9rem">Correo del solicitante: <a href="mailto:${escapeHtml(requester)}">${escapeHtml(requester)}</a></p>` : ''}
+      ${data.extraHtml ? `<div style="margin:16px 0">${data.extraHtml}</div>` : ''}
+      ${data.extraText ? `<pre style="white-space:pre-wrap;font-size:0.85rem;background:#f8fafc;padding:12px;border-radius:8px;border:1px solid #e2e8f0">${escapeHtml(data.extraText)}</pre>` : ''}
       <p style="font-size:0.85rem;color:#64748b;margin:12px 0 4px">📎 Adjuntos: <strong>Excel (.csv)</strong>, <strong>Word (.doc)</strong> y <strong>JSON (.json)</strong> con todos los datos.</p>
       <p style="font-size:0.85rem;color:#64748b;margin:0 0 8px">Para PDF: imprime este correo o usa el panel admin → Socios / Amigos / Jugadores → PDF.</p>
       <p style="font-size:0.85rem;color:#94a3b8">Mensaje automático desde la web del club.</p>
@@ -234,6 +236,7 @@ function buildClubAdminContent(data) {
     textLines.push(f.label + ': ' + f.value);
   });
   if (requester) textLines.push('', 'Correo solicitante: ' + requester);
+  if (data.extraText) textLines.push('', String(data.extraText));
   textLines.push('', 'Adjuntos: Excel (.csv), Word (.doc) y JSON (.json)', 'Fecha: ' + new Date().toLocaleString('es-ES'));
 
   return { subject, html, text: textLines.join('\n'), fields };

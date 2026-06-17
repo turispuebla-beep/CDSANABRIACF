@@ -24,6 +24,9 @@
         .error { background: #fef2f2; border: 1px solid #fecaca; color: #b91c1c; padding: 12px; border-radius: 10px; font-size: 0.9rem; }
         .ok { background: #ecfdf5; border: 1px solid #86efac; color: #065f46; padding: 16px; border-radius: 10px; }
         .guardian { background: #fffbeb; border: 1px solid #fde68a; border-radius: 10px; padding: 14px; margin-top: 8px; }
+        .doc-legal { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px; padding: 12px 14px; font-size: 0.85rem; color: #475569; line-height: 1.45; margin: 12px 0; }
+        .doc-upload input[type="file"] { font-size: 0.88rem; padding: 8px 0; }
+        .age-hint { font-size: 0.88rem; color: #1e40af; margin: -2px 0 8px; font-weight: 600; }
         a { color: var(--primary); }
         [hidden] { display: none !important; }
     </style>
@@ -53,6 +56,7 @@
                 <input type="text" id="tjDni" required autocomplete="off">
                 <label for="tjBirth">Fecha de nacimiento *</label>
                 <input type="date" id="tjBirth" required>
+                <p id="tjAgeHint" class="age-hint" hidden></p>
                 <div class="grid2">
                     <div><label for="tjEmail">Email</label><input type="email" id="tjEmail" autocomplete="email"></div>
                     <div><label for="tjPhone">Teléfono</label><input type="tel" id="tjPhone" autocomplete="tel"></div>
@@ -77,6 +81,17 @@
                     </div>
                 </div>
 
+                <h2>Documentación acreditativa *</h2>
+                <p class="doc-legal" id="tjDocLegal"></p>
+                <div class="doc-upload">
+                    <label for="tjDocAnverso">DNI — anverso (o documento válido) *</label>
+                    <input type="file" id="tjDocAnverso" accept="image/jpeg,image/png,image/webp,application/pdf" required>
+                    <label for="tjDocReverso">DNI — reverso (recomendado)</label>
+                    <input type="file" id="tjDocReverso" accept="image/jpeg,image/png,image/webp,application/pdf">
+                    <label for="tjDocOtro">Otro documento acreditativo (opcional)</label>
+                    <input type="file" id="tjDocOtro" accept="image/jpeg,image/png,image/webp,application/pdf">
+                </div>
+
                 <h2>Consentimientos</h2>
                 <label class="check"><input type="checkbox" id="tjClubRules" required> Acepto las normas del torneo y del club, y el tratamiento de mis datos para la organización del evento. *</label>
                 <label class="check"><input type="checkbox" id="tjPhotoConsent" required> Autorizo (o el tutor/a autoriza) el uso de imagen del jugador/a en fotos y vídeos del torneo y actividades del club. *</label>
@@ -91,6 +106,7 @@
             <p id="tjDoneText" style="margin:0;"></p>
         </div>
     </div>
+    <script src="js/torneo-document-upload.js"></script>
     <script src="js/torneo-jugador-ficha-ui.js"></script>
 </body>
 </html>

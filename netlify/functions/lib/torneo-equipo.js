@@ -5,6 +5,8 @@ const {
   torneoPreinscripcionesRef,
   torneoCategoryLabels,
   normalizeTorneoAccessCode,
+  normalizeTorneoTeamName,
+  isActiveTorneoPreinscripcion,
   findTorneoPreinscripcionByAccessCode,
   ensureTorneoAccessCode
 } = require('./firestore-admin');
@@ -31,6 +33,8 @@ function normalizeDniType(raw) {
   return v === 'extranjero' || v === 'foreign' || v === 'nie' || v === 'pasaporte' ? 'extranjero' : 'espanol';
 }
 
+const { normalizeStoredDocuments } = require('./torneo-email-docs');
+
 function normalizeCoach(raw) {
   const c = raw && typeof raw === 'object' ? raw : {};
   return {
@@ -38,13 +42,14 @@ function normalizeCoach(raw) {
     surname: String(c.surname || c.apellidos || '').trim(),
     phone: String(c.phone || c.telefono || '').trim(),
     dni: String(c.dni || '').trim().toUpperCase(),
-    dniType: normalizeDniType(c.dniType || c.tipoDocumento)
+    dniType: normalizeDniType(c.dniType || c.tipoDocumento),
+    documents: normalizeStoredDocuments(c.documents)
   };
 }
 
 function coachIsComplete(coach) {
   const c = normalizeCoach(coach);
-  return !!(c.name && c.surname && c.phone && c.dni);
+  return !!(c.name && c.surname && c.phone && c.dni && c.documents.length >= 1);
 }
 
 function ageFromBirthDate(birthDate) {
@@ -81,7 +86,9 @@ function normalizeFichaSubmit(raw) {
     guardianEmail: String(guardian.email || d.guardianEmail || '').trim().toLowerCase(),
     photoConsent: !!d.photoConsent,
     clubRulesAccepted: !!d.clubRulesAccepted,
-    playerConsent: d.playerConsent !== false
+    playerConsent: d.playerConsent !== false,
+    age: age != null ? age : null,
+    documents: normalizeStoredDocuments(d.documents)
   };
 }
 
@@ -90,6 +97,9 @@ function validateFichaSubmit(data) {
   if (!data.surname) throw new Error('Apellidos obligatorios');
   if (!data.dni) throw new Error('Documento de identidad obligatorio');
   if (!data.birthDate) throw new Error('Fecha de nacimiento obligatoria');
+  if (!Array.isArray(data.documents) || !data.documents.length) {
+    throw new Error('Sube al menos un documento acreditativo de edad (DNI anverso u otro válido).');
+  }
   if (!data.clubRulesAccepted) throw new Error('Debes aceptar las normas del torneo y del club');
   if (!data.photoConsent) throw new Error('Debes indicar el consentimiento de imagen');
   if (data.isMinor) {
@@ -117,6 +127,89 @@ async function loadRecordByAccess(accessCode, contactEmail) {
     throw new Error('El email no coincide con el de la preinscripción.');
   }
   return { ...record, accessCode: code };
+}
+
+async function findTeamEntriesForRecord(record) {
+  const teamKey = normalizeTorneoTeamName(record.teamName);
+  const email = String(record.contactEmail || '')
+    .trim()
+    .toLowerCase();
+  if (!teamKey || !email) return [record];
+
+  const snap = await torneoPreinscripcionesRef().get();
+  const entries = [];
+  snap.docs.forEach(function (doc) {
+    const data = { id: doc.id, ...(doc.data() || {}) };
+    if (!isActiveTorneoPreinscripcion(data)) return;
+    if (normalizeTorneoTeamName(data.teamName) !== teamKey) return;
+    if (String(data.contactEmail || '').trim().toLowerCase() !== email) return;
+    entries.push(data);
+  });
+
+  entries.sort(function (a, b) {
+    return new Date(a.createdAt || 0).getTime() - new Date(b.createdAt || 0).getTime();
+  });
+
+  return entries.length ? entries : [record];
+}
+
+function pickCanonicalTeamName(records) {
+  if (!records.length) return '';
+  const sorted = records.slice().sort(function (a, b) {
+    return new Date(a.createdAt || 0).getTime() - new Date(b.createdAt || 0).getTime();
+  });
+  return sorted[0].teamName || '';
+}
+
+async function buildGroupedPanel(accessCode, contactEmail, activeAccessCodeOptional) {
+  const record = await loadRecordByAccess(accessCode, contactEmail);
+  const allRecords = await findTeamEntriesForRecord(record);
+  const entries = allRecords.map(function (r) {
+    return buildPanelPayload(r);
+  });
+  const activeCode = normalizeTorneoAccessCode(activeAccessCodeOptional || accessCode);
+  let active =
+    entries.find(function (e) {
+      return normalizeTorneoAccessCode(e.accessCode) === activeCode;
+    }) ||
+    entries.find(function (e) {
+      return e.id === record.id;
+    }) ||
+    entries[0];
+
+  const coachEntry =
+    entries.find(function (e) {
+      return e.coach && e.coach.complete;
+    }) || active;
+
+  return {
+    ...active,
+    activeAccessCode: active.accessCode,
+    teamName: pickCanonicalTeamName(allRecords) || active.teamName,
+    responsibleEmail: String(record.contactEmail || '')
+      .trim()
+      .toLowerCase(),
+    contactEmail: record.contactEmail,
+    contactName: record.contactName,
+    coach: coachEntry.coach,
+    teamEntries: entries.map(function (e) {
+      return {
+        recordId: e.id,
+        accessCode: e.accessCode,
+        categoryLabels: e.categoryLabels,
+        categories: e.categories,
+        town: e.town,
+        playerCount: e.playerCount,
+        plantillaStatus: e.plantillaStatus,
+        fichasSubmitted: e.fichasSubmitted,
+        fichasPending: e.fichasPending,
+        canFinalize: e.canFinalize,
+        fichas: e.fichas,
+        inscriptionFeeEur: e.inscriptionFeeEur
+      };
+    }),
+    entryCount: entries.length
+  };
 }
 
 function maskDni(dni) {
@@ -165,7 +258,8 @@ function buildPanelPayload(record) {
       phone: coach.phone,
       dni: coach.dni || '',
       dniType: coach.dniType,
-      complete: coachIsComplete(coach)
+      documentCount: coach.documents.length,
+      complete: coachIsComplete(record.coach || {})
     },
     fichas: fichas.map((f) => ({
       id: f.id || '',
@@ -180,40 +274,55 @@ function buildPanelPayload(record) {
       submitted >= playerCount &&
       playerCount > 0 &&
       !['enviada_club', 'pagada', 'pendiente_pago'].includes(String(record.plantillaStatus || '')),
-    competitionId: record.competitionId || null,
-    competitionTeamId: record.competitionTeamId || null,
     paymentOrderId: record.paymentOrderId || null
   };
 }
 
-async function verifyTorneoEquipoAccess(accessCode, contactEmail) {
-  const record = await loadRecordByAccess(accessCode, contactEmail);
-  return buildPanelPayload(record);
+async function verifyTorneoEquipoAccess(accessCode, contactEmail, activeAccessCodeOptional) {
+  return buildGroupedPanel(accessCode, contactEmail, activeAccessCodeOptional);
 }
 
-async function saveTorneoCoach(accessCode, contactEmail, coachRaw) {
+async function saveTorneoCoach(accessCode, contactEmail, coachRaw, activeAccessCodeOptional) {
   const record = await loadRecordByAccess(accessCode, contactEmail);
   const coach = normalizeCoach(coachRaw);
-  if (!coach.name || !coach.surname) throw new Error('Nombre y apellidos del entrenador/a obligatorios');
-  if (!coach.phone) throw new Error('Teléfono del entrenador/a obligatorio');
-  if (!coach.dni) throw new Error('DNI o documento del entrenador/a obligatorio');
+  if (!coach.name || !coach.surname) throw new Error('Nombre y apellidos del responsable técnico obligatorios');
+  if (!coach.phone) throw new Error('Teléfono del responsable técnico obligatorio');
+  if (!coach.dni) throw new Error('DNI o documento del responsable técnico obligatorio');
 
-  const ref = torneoPreinscripcionesRef().doc(record.id);
+  let documentRefs = [];
+  if (coachRaw.keepDocuments && record.coach && Array.isArray(record.coach.documents) && record.coach.documents.length) {
+    documentRefs = record.coach.documents.filter(function (d) {
+      return d && d.id;
+    });
+  } else {
+    if (!coach.documents.length) {
+      throw new Error('Sube al menos un documento acreditativo (DNI anverso u otro válido).');
+    }
+    const { saveTorneoDocumentRefs } = require('./torneo-document-store');
+    documentRefs = await saveTorneoDocumentRefs(record.id, 'coach', coach.documents);
+  }
+  if (!documentRefs.length) {
+    throw new Error('Sube al menos un documento acreditativo (DNI anverso u otro válido).');
+  }
+  coach.documents = documentRefs;
+
+  const siblings = await findTeamEntriesForRecord(record);
   const now = new Date().toISOString();
-  await ref.set(
-    {
-      coach,
-      plantillaStatus: record.plantillaStatus === 'pendiente' ? 'en_curso' : record.plantillaStatus,
-      updatedAt: now
-    },
-    { merge: true }
-  );
-  const snap = await ref.get();
-  return buildPanelPayload({ id: record.id, ...(snap.exists ? snap.data() : {}) });
+  for (let i = 0; i < siblings.length; i++) {
+    const s = siblings[i];
+    const ref = torneoPreinscripcionesRef().doc(s.id);
+    const plantillaStatus =
+      String(s.plantillaStatus || 'pendiente') === 'pendiente' ? 'en_curso' : s.plantillaStatus;
+    await ref.set({ coach, plantillaStatus, updatedAt: now }, { merge: true });
+  }
+
+  const activeCode = activeAccessCodeOptional || accessCode;
+  return buildGroupedPanel(accessCode, contactEmail, activeCode);
 }
 
-async function createTorneoFichaInvite(accessCode, contactEmail, inviteRaw) {
-  const record = await loadRecordByAccess(accessCode, contactEmail);
+async function createTorneoFichaInvite(accessCode, contactEmail, inviteRaw, activeAccessCodeOptional) {
+  const activeCode = activeAccessCodeOptional || accessCode;
+  const record = await loadRecordByAccess(activeCode, contactEmail);
   const fichas = Array.isArray(record.fichas) ? [...record.fichas] : [];
   const playerCount = parseInt(record.playerCount, 10) || 0;
   if (playerCount < 1) throw new Error('Número de jugadores no definido en la preinscripción.');
@@ -266,7 +375,7 @@ async function createTorneoFichaInvite(accessCode, contactEmail, inviteRaw) {
 
   const snap = await ref.get();
   return {
-    panel: buildPanelPayload({ id: record.id, ...(snap.exists ? snap.data() : {}) }),
+    panel: await buildGroupedPanel(accessCode, contactEmail, activeCode),
     inviteUrl,
     emailSent,
     fichaId: ficha.id
@@ -326,19 +435,24 @@ async function submitTorneoFichaByInvite(token, rawFicha) {
 
   const data = normalizeFichaSubmit(rawFicha);
   validateFichaSubmit(data);
+  const fullDocuments = data.documents.slice();
 
   const fichas = Array.isArray(found.record.fichas) ? found.record.fichas.map((f) => ({ ...f })) : [];
   const ix = fichas.findIndex((f) => String(f.id) === String(found.ficha.id));
   if (ix < 0) throw new Error('Ficha no encontrada.');
 
   const now = new Date().toISOString();
+  const { saveTorneoDocumentRefs } = require('./torneo-document-store');
+  const documentRefs = await saveTorneoDocumentRefs(found.recordId, found.ficha.id, fullDocuments);
+  const storedData = { ...data, documents: documentRefs };
+
   fichas[ix] = {
     ...fichas[ix],
     status: 'enviada',
     submittedAt: now,
     updatedAt: now,
     label: [data.name, data.surname].filter(Boolean).join(' ').trim() || fichas[ix].label,
-    data
+    data: storedData
   };
 
   const ref = torneoPreinscripcionesRef().doc(found.recordId);
@@ -351,7 +465,8 @@ async function submitTorneoFichaByInvite(token, rawFicha) {
       eventName: found.record.eventName,
       playerName: [data.name, data.surname].filter(Boolean).join(' '),
       contactEmail: found.record.contactEmail,
-      contactName: found.record.contactName
+      contactName: found.record.contactName,
+      fichaData: { ...data, documents: fullDocuments }
     });
   } catch (e) {
     console.warn('submitTorneoFicha email:', e.message || e);
@@ -362,29 +477,6 @@ async function submitTorneoFichaByInvite(token, rawFicha) {
     record: { ...found.record, fichas },
     ficha: fichas[ix]
   });
-}
-
-function rosterFromFichas(fichas, coach) {
-  return (Array.isArray(fichas) ? fichas : [])
-    .filter((f) => String(f.status || '') === 'enviada' && f.data)
-    .map((f, idx) => ({
-      source: 'torneo_invite',
-      id: f.id,
-      name: [f.data.name, f.data.surname].filter(Boolean).join(' ').trim(),
-      number: String(idx + 1),
-      dni: f.data.dni,
-      dniType: f.data.dniType,
-      birthDate: f.data.birthDate,
-      email: f.data.email,
-      phone: f.data.phone,
-      isMinor: f.data.isMinor,
-      guardianName: [f.data.guardianName, f.data.guardianSurname].filter(Boolean).join(' '),
-      guardianDni: f.data.guardianDni,
-      guardianPhone: f.data.guardianPhone,
-      guardianEmail: f.data.guardianEmail,
-      photoConsent: f.data.photoConsent,
-      clubRulesAccepted: f.data.clubRulesAccepted
-    }));
 }
 
 async function completeTorneoPlantilla(recordId, paymentMeta) {
@@ -407,7 +499,9 @@ async function completeTorneoPlantilla(recordId, paymentMeta) {
 
   try {
     const { sendTorneoPlantillaCerradaEmails } = require('./member-email');
-    await sendTorneoPlantillaCerradaEmails(merged);
+    const { hydrateRecordForEmail } = require('./torneo-document-store');
+    const hydrated = await hydrateRecordForEmail(merged);
+    await sendTorneoPlantillaCerradaEmails(hydrated);
   } catch (e) {
     console.warn('completeTorneoPlantilla email:', e.message || e);
   }
@@ -420,7 +514,7 @@ async function prepareTorneoFinalize(accessCode, contactEmail) {
   const panel = buildPanelPayload(record);
   if (!panel.canFinalize) {
     throw new Error(
-      'Completa los datos del entrenador/a y todas las fichas de jugadores antes de finalizar la inscripción.'
+      'Completa los datos del responsable técnico y todas las fichas de participantes antes de finalizar la inscripción.'
     );
   }
   const fee = getTorneoInscriptionFeeEur();

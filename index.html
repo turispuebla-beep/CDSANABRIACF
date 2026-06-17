@@ -130,12 +130,21 @@
         #quienesSomosModal .quienes-somos-body {
             color: #334155;
             font-size: 1rem;
-            line-height: 1.65;
-            text-align: left;
+            line-height: 1.75;
+            text-align: justify;
+            hyphens: auto;
+            -webkit-hyphens: auto;
+            padding: 0 6px;
         }
 
         #quienesSomosModal .quienes-somos-body p {
-            margin: 0 0 14px;
+            margin: 0 0 1em;
+            text-align: justify;
+            text-indent: 2em;
+        }
+
+        #quienesSomosModal .quienes-somos-body > p:first-child {
+            text-indent: 0;
         }
 
         #quienesSomosModal .quienes-somos-cta {
@@ -144,6 +153,7 @@
             color: #059669;
             text-align: center;
             margin: 18px 0;
+            text-indent: 0;
         }
 
         #quienesSomosModal .quienes-somos-contact {
@@ -1667,21 +1677,23 @@
             bottom: 0;
             left: 0;
             right: 0;
-            background: rgba(0,0,0,0.7);
+            background: rgba(0, 0, 0, 0.42);
             color: white;
-            padding: 15px;
+            padding: 5px 10px 7px;
             text-align: center;
         }
 
         .carousel-slide-title {
             font-size: 1.2rem;
             font-weight: bold;
-            margin-bottom: 5px;
+            margin-bottom: 2px;
+            line-height: 1.15;
         }
 
         .carousel-slide-company {
             font-size: 0.9rem;
             opacity: 0.9;
+            line-height: 1.15;
         }
 
         /* Estilos para el carrusel de publicidad del club */
@@ -2342,6 +2354,55 @@
             color: #047857;
             flex-wrap: wrap;
         }
+
+        .socio-registro-intro {
+            color: #475569;
+            font-size: 0.9rem;
+            line-height: 1.55;
+            margin: 0 0 16px;
+        }
+
+        .socio-pay-actions {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            margin-top: 18px;
+        }
+
+        .socio-pay-btn {
+            width: 100%;
+            margin: 0;
+            padding: 12px 16px;
+            font-size: 0.95rem;
+            font-weight: 700;
+            border-radius: 10px;
+            border: none;
+            cursor: pointer;
+        }
+
+        .socio-pay-btn--card {
+            background: linear-gradient(180deg, #10b981, #059669);
+            color: #fff;
+        }
+
+        .socio-pay-btn--offline {
+            background: linear-gradient(180deg, #3b82f6, #2563eb);
+            color: #fff;
+        }
+
+        .socio-pay-btn:disabled {
+            opacity: 0.55;
+            cursor: not-allowed;
+        }
+
+        .socio-bank-iban--compact {
+            margin: 4px 0 0;
+            font-size: 0.82rem;
+            color: #64748b;
+            text-align: center;
+            line-height: 1.45;
+        }
+
         #loginModal .modal-content {
             max-width: 400px;
         }
@@ -2552,7 +2613,7 @@
         </div>
             
         <div class="features">
-            <div class="feature-card" onclick="openFeature('equipos')" style="cursor: pointer; position: relative;">
+            <div class="feature-card" data-feature="equipos" onclick="openFeature('equipos')" style="cursor: pointer; position: relative;">
                 <span id="badge-equipos" class="feature-badge" style="display: none;"></span>
                 <div class="feature-icon">⚽</div>
                 <h3 class="feature-title">Nuestro Equipo</h3>
@@ -2563,7 +2624,7 @@
                 <button class="feature-btn" style="background: var(--primary-color); color: white; border: none; padding: 8px 16px; border-radius: 20px; margin-top: 15px; cursor: pointer;">Ver Equipos</button>
             </div>
             
-            <div class="feature-card" onclick="openFeature('calendario')" style="cursor: pointer; position: relative;">
+            <div class="feature-card" data-feature="calendario" onclick="openFeature('calendario')" style="cursor: pointer; position: relative;">
                 <span id="badge-calendario" class="feature-badge" style="display: none;"></span>
                 <div class="feature-icon">📅</div>
                 <h3 class="feature-title">Calendario</h3>
@@ -2573,7 +2634,7 @@
                 <button class="feature-btn" style="background: var(--primary-color); color: white; border: none; padding: 8px 16px; border-radius: 20px; margin-top: 15px; cursor: pointer;">Ver Calendario</button>
             </div>
             
-            <div class="feature-card" onclick="openFeature('eventos')" style="cursor: pointer; position: relative;">
+            <div class="feature-card" data-feature="eventos" onclick="openFeature('eventos')" style="cursor: pointer; position: relative;">
                 <span id="badge-eventos" class="feature-badge" style="display: none;"></span>
                 <div class="feature-icon">🎉</div>
                 <h3 class="feature-title">Eventos del Club</h3>
@@ -2584,7 +2645,7 @@
                 <button class="feature-btn" style="background: var(--primary-color); color: white; border: none; padding: 8px 16px; border-radius: 20px; margin-top: 15px; cursor: pointer;">Ver Eventos</button>
             </div>
 
-            <div class="feature-card feature-card--competiciones" style="position: relative;">
+            <div class="feature-card feature-card--competiciones" data-feature="competiciones" style="position: relative;">
                 <span id="badge-competiciones" class="feature-badge" style="display: none;"></span>
                 <div class="feature-icon">🏆</div>
                 <h3 class="feature-title">Competiciones</h3>
@@ -2594,20 +2655,20 @@
                 </p>
                 <div class="feature-actions feature-actions--compact">
                     <button type="button" class="feature-btn feature-btn--sm" style="background: var(--primary-color); color: white; border: none; border-radius: 20px; cursor: pointer;" onclick="openFeature('competiciones')">Ver Competiciones</button>
-                    <button type="button" class="feature-btn feature-btn--sm feature-btn--secondary" style="color: white; border: none; border-radius: 20px; cursor: pointer;" onclick="openTorneoResponsableAccessModal()">Soy responsable del equipo</button>
+                    <button type="button" id="treResponsableEntryBtn" class="feature-btn feature-btn--sm feature-btn--secondary" style="color: white; border: none; border-radius: 20px; cursor: pointer;" onclick="openTorneoResponsableAccessModal()">Soy responsable del equipo</button>
                 </div>
             </div>
 
-            <div class="feature-card" onclick="openFeature('multimedia')" style="cursor: pointer; position: relative;">
+            <div class="feature-card" data-feature="multimedia" onclick="openFeature('multimedia')" style="cursor: pointer; position: relative;">
                 <div class="feature-icon">📸</div>
                 <h3 class="feature-title">Galería Multimedia</h3>
                 <p class="feature-description">
-                    Fotos y vídeos del CD Sanabria CF en las redes sociales. Abierto para todos.
+                    Fotos y vídeos del CD Sanabria CF en las redes sociales.
                 </p>
                 <button class="feature-btn" style="background: var(--primary-color); color: white; border: none; padding: 8px 16px; border-radius: 20px; margin-top: 15px; cursor: pointer;">Ver Galería</button>
-    </div>
+            </div>
     
-            <div class="feature-card" onclick="openFeature('encuentros')" style="cursor: pointer; position: relative;">
+            <div class="feature-card" data-feature="encuentros" onclick="openFeature('encuentros')" style="cursor: pointer; position: relative;">
                 <span id="badge-encuentros" class="feature-badge" style="display: none;"></span>
                 <div class="feature-icon">⚽</div>
                 <h3 class="feature-title">Encuentros</h3>
@@ -2618,7 +2679,7 @@
                 <button class="feature-btn" style="background: var(--primary-color); color: white; border: none; padding: 8px 16px; border-radius: 20px; margin-top: 15px; cursor: pointer;">Ver Encuentros</button>
             </div>
 
-            <div class="feature-card" onclick="openFeature('documentos')" style="cursor: pointer; grid-column: 1 / -1; max-width: 400px; margin: 0 auto; position: relative;">
+            <div class="feature-card" data-feature="documentos" onclick="openFeature('documentos')" style="cursor: pointer; grid-column: 1 / -1; max-width: 400px; margin: 0 auto; position: relative;">
                 <span id="badge-documentos" class="feature-badge" style="display: none;"></span>
                 <div class="feature-icon">📄</div>
                 <h3 class="feature-title">Documentos del Club</h3>
@@ -2656,7 +2717,7 @@
             </div>
         </div>
 
-        <!-- Galería Multimedia (abierta para todos) -->
+        <!-- Galería Multimedia (contenido solo con sesión de socio/a o entrenador/a) -->
         <div id="galeriaMultimedia" class="galeria-multimedia-section">
             <h2>📸 Galería Multimedia</h2>
             <p style="color:#64748b;margin-bottom:16px;">Fotos y vídeos del CD Sanabria CF en las redes sociales</p>
@@ -2700,7 +2761,7 @@
                     <p>El CD Sanabria CF tiene más de medio siglo de historia.</p>
                     <p>Desde hace más de 50 años, nuestro club ha sido un referente del fútbol en la comarca: un lugar donde el deporte va de la mano del compañerismo, el respeto y el orgullo de pertenecer a esta gran familia.</p>
                     <p>Gracias al esfuerzo constante de jugadores, técnicos, directiva y familias, generación tras generación de niñas y niños han encontrado aquí su primer balón, sus primeros amigos y sus primeras ilusiones. Todos han podido disfrutar del fútbol en nuestro seno y han compartido la misma experiencia: formar parte de un gran equipo que representa a Sanabria con pasión y compromiso.</p>
-                    <p>Hoy miramos al futuro con la misma convicción: seguir representando a nuestra tierra, acoger a quien quiera jugar y transmitir lo que este club ha sido siempre — fútbol, comunidad y orgullo comarcal.</p>
+                    <p>Hoy miramos al futuro con la misma convicción: seguir representando a nuestra tierra, acoger a quien quiera jugar y transmitir lo que este club ha sido siempre — fútbol, comunidad y orgullo <strong>COMARCAL</strong>.</p>
                     <p class="quienes-somos-cta">¡¡¡Únete!!!</p>
                     <div class="quienes-somos-contact">
                         <p><strong>Contacto</strong></p>
@@ -2805,6 +2866,9 @@
                 <h2 id="tpModalTitle">⚽ Preinscripción — Torneo Fútbol 7</h2>
                 <p style="color:#64748b;font-size:0.9rem;line-height:1.45;margin:0 0 16px;">
                     Reserva plaza para tu equipo. No hace falta estar registrado en la web. Después recogeremos los datos completos de todos los integrantes.
+                </p>
+                <p style="color:#475569;font-size:0.85rem;line-height:1.45;margin:0 0 16px;padding:10px 12px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;">
+                    El club puede solicitar documentación acreditativa de edad (DNI por ambas caras u otro documento válido) y su presentación física en cualquier momento, aunque ya se hubiera enviado por la web.
                 </p>
                 <p id="tpUpdateModeNotice" class="tp-update-mode-notice" hidden>
                     La preinscripción está temporalmente desactivada mientras actualizamos la web. Puedes revisar el formulario, pero no se puede enviar hasta que el club reactive los registros.
@@ -3021,24 +3085,14 @@
             <div class="modal-content">
                 <span class="close" onclick="closeSociosModal()">&times;</span>
                 <h2>👨‍👩‍👧‍👦 Registro de Socio/a</h2>
-                <div class="socio-pago-card socio-pago-card--card" id="socioCardPayInfo">
-                    <span class="socio-pago-badge">Recomendado</span>
-                    <h3 class="socio-pago-title">💳 Pagar con tarjeta (TPV Caja Rural)</h3>
-                    <p class="socio-pago-text">Completa el formulario y pulsa <strong>«Registrarse y pagar con tarjeta»</strong>. Serás redirigido al TPV seguro de Redsys. Tu alta queda <strong>activa al instante</strong> cuando el banco confirme el pago.</p>
-                    <p id="socioCardPayWarn" class="socio-pago-text" style="display:none;color:#b45309;margin-top:8px;font-weight:600;"></p>
-                </div>
-                <div class="socio-pago-card socio-pago-card--transfer">
-                    <h3 class="socio-pago-title socio-pago-title--warn">🏦 Transferencia o efectivo</h3>
-                    <p class="socio-pago-text socio-pago-text--warn" style="font-weight: 600; margin-bottom: 4px;">Si prefieres no pagar con tarjeta en la web:</p>
-                    <ul class="socio-pago-list">
-                        <li><strong>7 días</strong> para ingresar la cuota</li>
-                        <li>Validación manual cuando el club vea el pago en cuenta</li>
-                        <li>Sin ingreso en plazo, el alta caduca</li>
-                        <li>Dudas: <strong class="club-email-public">cdsanabriafc@gmail.com</strong></li>
-                    </ul>
-                </div>
+                <p id="socioRegistroIntro" class="socio-registro-intro">
+                    Completa tus datos y elige cómo pagar la cuota al final.
+                    Con <strong>tarjeta</strong>, tu alta queda activa al confirmar el banco (número de socio y carnet).
+                    Con <strong>transferencia, efectivo o TPV</strong>, quedas registrado/a y el club te dará de alta cuando compruebe el pago.
+                </p>
+                <p id="socioCardPayWarn" class="socio-pago-text" style="display:none;color:#b45309;margin:0 0 12px;font-weight:600;"></p>
                 
-                <form id="sociosForm" onsubmit="registerSocio(event)">
+                <form id="sociosForm" onsubmit="event.preventDefault();">
                     <div class="form-group">
                         <label for="socioNombre">Nombre *</label>
                         <input type="text" id="socioNombre" required>
@@ -3141,21 +3195,12 @@
                         </label>
                     </div>
                     
-                    <div class="form-buttons">
-                        <button type="submit" class="btn-primary" id="socioSubmitCardBtn">Registrarse y pagar con tarjeta</button>
+                    <div class="socio-pay-actions">
+                        <button type="button" class="btn-primary socio-pay-btn socio-pay-btn--card" id="socioSubmitCardBtn" onclick="registrarSocioConTarjeta()">💳 Pagar con tarjeta</button>
+                        <button type="button" class="btn-primary socio-pay-btn socio-pay-btn--offline" id="socioSubmitOfflineBtn" onclick="solicitarRegistroSocioTransferencia()">🏦 Transferencia, efectivo o TPV</button>
                         <button type="button" class="btn-secondary" onclick="closeSociosModal()">Cancelar</button>
-                    </div>
-                    <div class="socio-pago-cta">
-                        <p class="socio-pago-btn-hint" style="margin-top:0;">¿Ya completaste el registro y solo falta pagar?</p>
-                        <button type="button" class="socio-pago-btn" onclick="abrirPaginaPagoCuotaDesdeRegistro()">
-                            <span aria-hidden="true">💳</span> Ir a pagar la cuota (tarjeta)
-                        </button>
-                        <button type="button" class="socio-pago-btn socio-pago-btn--transfer" onclick="solicitarRegistroSocioTransferencia()">
-                            <span aria-hidden="true">🏦</span> Solicitar registro por transferencia, efectivo o TPV
-                        </button>
-                        <p class="socio-bank-iban">
-                            <strong>CAJA RURAL</strong>
-                            ES12 3085 0034 8222 5127 9226
+                        <p class="socio-bank-iban socio-bank-iban--compact">
+                            <strong>CAJA RURAL</strong> ES12 3085 0034 8222 5127 9226
                         </p>
                     </div>
                 </form>
@@ -4660,6 +4705,7 @@
 
         function refreshSocioCardPayUi() {
             const submitBtn = document.getElementById('socioSubmitCardBtn');
+            const offlineBtn = document.getElementById('socioSubmitOfflineBtn');
             const warnEl = document.getElementById('socioCardPayWarn');
             const cuotaInput = document.getElementById('socioCuota');
             const cuota = cuotaInput ? Number(cuotaInput.value) || 0 : 0;
@@ -4667,25 +4713,36 @@
             if (submitBtn) {
                 if (cuota <= 0) {
                     submitBtn.disabled = false;
-                    submitBtn.textContent = 'Registrarse como Socio/a';
+                    submitBtn.textContent = '💳 Registrarse como socio/a';
                 } else if (enabled) {
                     submitBtn.disabled = false;
-                    submitBtn.textContent = 'Registrarse y pagar con tarjeta';
+                    submitBtn.textContent = '💳 Pagar con tarjeta';
                 } else {
                     submitBtn.disabled = true;
-                    submitBtn.textContent = 'Pago con tarjeta no disponible';
+                    submitBtn.textContent = '💳 Pago con tarjeta no disponible';
                 }
+            }
+            if (offlineBtn) {
+                offlineBtn.disabled = false;
+                offlineBtn.textContent = '🏦 Transferencia, efectivo o TPV';
             }
             if (warnEl) {
                 if (cuota > 0 && !enabled) {
                     warnEl.style.display = 'block';
                     warnEl.textContent =
-                        'El TPV con tarjeta no está disponible ahora. Usa la opción de transferencia, efectivo o TPV más abajo, o inténtalo más tarde.';
+                        'El TPV con tarjeta no está disponible ahora. Usa transferencia, efectivo o TPV, o inténtalo más tarde.';
                 } else {
                     warnEl.style.display = 'none';
                     warnEl.textContent = '';
                 }
             }
+        }
+
+        function registrarSocioConTarjeta() {
+            if (window.SiteUpdateMode && !SiteUpdateMode.guard()) return;
+            window._socioRegistroModoPago = 'card';
+            window._socioOfflinePaymentChannel = null;
+            registerSocio({ preventDefault: function () {} });
         }
 
         function openAmigoRegistroModal() {
@@ -4766,6 +4823,10 @@
         }
 
         function openTorneoResponsableAccessModal(prefillCode) {
+            if (!canAccessTorneoResponsableContent()) {
+                showRestrictedAccessModal('torneo_responsable');
+                return;
+            }
             if (window.TorneoResponsableAccess && window.TorneoResponsableAccess.openAccessModal) {
                 window.TorneoResponsableAccess.openAccessModal(prefillCode || '');
                 return;
@@ -5085,13 +5146,18 @@
             return true;
         }
 
-        function buildSocioClubNotifyFields(formData) {
+        function buildSocioClubNotifyFields(formData, paymentChannel) {
+            let estado = 'Pendiente validación de pago (alta manual)';
+            const ch = String(paymentChannel || '').toLowerCase();
+            if (ch === 'tarjeta' || ch === 'card' || ch === 'pasarela') {
+                estado = 'Pago con tarjeta iniciado (pendiente confirmación banco)';
+            }
             return [
                 { label: 'Sexo', value: formData.sexo },
                 { label: 'Fecha nacimiento', value: formData.fechaNacimiento },
                 { label: 'Cuota (€)', value: formData.cuota },
                 { label: 'Notificaciones push', value: formData.notificaciones ? 'Sí' : 'No' },
-                { label: 'Estado', value: 'Pendiente validación de pago' },
+                { label: 'Estado', value: estado },
                 { label: 'ID registro', value: formData.id || '—' },
                 { label: 'Cuenta club', value: 'CAJA RURAL ES12 3085 0034 8222 5127 9226' }
             ];
@@ -5100,15 +5166,24 @@
         function buildAmigoClubNotifyFields(formData) {
             return [
                 { label: 'Notificaciones push', value: formData.notificaciones ? 'Sí' : 'No' },
-                { label: 'Estado', value: 'Activo' },
+                { label: 'Estado', value: 'Activo (gratuito)' },
+                { label: 'Origen registro', value: formData.registrationSource || 'web_modal_amigo' },
                 { label: 'ID registro', value: formData.id || '—' }
             ];
         }
 
-        function formatNumeroAmigoDisplay(numRaw) {
-            if (!numRaw) return '—';
-            if (window.ClubFriendNumbers) return window.ClubFriendNumbers.formatFriendLabel({ numeroAmigo: numRaw });
-            return String(numRaw);
+        function notifyAmigoRegisteredEmail(formData, friendId) {
+            if (!window.CdsanClubEmail || !formData || !formData.email) return;
+            window.CdsanClubEmail.sendFriendRegistered({
+                email: formData.email,
+                friendId: friendId || formData.id,
+                nombre: formData.nombre,
+                apellidos: formData.apellidos,
+                numeroAmigo: formData.numeroAmigo,
+                friendNumber: formData.numeroAmigo
+            }).catch(function (e) {
+                console.warn('Correo registro amigo:', e);
+            });
         }
 
         function notifyClubAmigoRegistration(formData) {
@@ -5132,6 +5207,18 @@
             });
         }
 
+        function notifyAmigoRegistrationEmails(formData, friendId, emailsAlreadySent) {
+            if (emailsAlreadySent) return;
+            notifyAmigoRegisteredEmail(formData, friendId);
+            notifyClubAmigoRegistration(formData);
+        }
+
+        function formatNumeroAmigoDisplay(numRaw) {
+            if (!numRaw) return '—';
+            if (window.ClubFriendNumbers) return window.ClubFriendNumbers.formatFriendLabel({ numeroAmigo: numRaw });
+            return String(numRaw);
+        }
+
         function offlineSocioPaymentLabel(ch) {
             if (ch === 'efectivo') return 'efectivo';
             if (ch === 'tpv') return 'TPV';
@@ -5148,11 +5235,21 @@
         function notifyClubSocioRegistration(formData, paymentChannel) {
             if (!window.CdsanClubEmail || !formData || !formData.email) return;
             const ch =
-                paymentChannel === 'efectivo' ? 'efectivo' : paymentChannel === 'tpv' ? 'tpv' : 'transferencia';
+                paymentChannel === 'efectivo'
+                    ? 'efectivo'
+                    : paymentChannel === 'tpv'
+                      ? 'tpv'
+                      : paymentChannel === 'tarjeta' || paymentChannel === 'pasarela' || paymentChannel === 'card'
+                        ? 'tarjeta'
+                        : 'transferencia';
+            const subjectLabel =
+                ch === 'tarjeta'
+                    ? 'Registro socio — pago con tarjeta'
+                    : 'Registro socio — ' + offlineSocioPaymentLabel(ch);
             window.CdsanClubEmail.sendClubAdminNotify({
                 kind: 'registro_socio',
                 title: 'Nuevo registro de socio/a',
-                subject: 'Registro socio — ' + offlineSocioPaymentLabel(ch),
+                subject: subjectLabel,
                 paymentChannel: ch,
                 requesterEmail: formData.email,
                 nombre: formData.nombre,
@@ -5165,7 +5262,7 @@
                 email: formData.email,
                 numeroSocio: formData.numeroSocio,
                 memberNumber: formData.numeroSocio,
-                fields: buildSocioClubNotifyFields(formData)
+                fields: buildSocioClubNotifyFields(formData, ch)
             }).catch(function (e) {
                 console.warn('Correo aviso club socio:', e);
             });
@@ -5177,7 +5274,7 @@
             let choice = 'transferencia';
             if (window.PaymentMethodPicker && window.PaymentMethodPicker.showPaymentOfflinePicker) {
                 const picked = await window.PaymentMethodPicker.showPaymentOfflinePicker({
-                    title: 'Forma de pago de la cuota'
+                    title: 'Transferencia, efectivo o TPV'
                 });
                 if (!picked) return;
                 choice = picked;
@@ -5269,7 +5366,7 @@
                     ctaSection.style.display = 'block';
                     ctaSection.innerHTML = `
                         <h2>¡Bienvenido/a, ${currentAmigo.nombre}!</h2>
-                        <p>🤝 Amigo del club - Acceso a competiciones y encuentros</p>
+                        <p>🤝 Amigo del club — Acceso a calendario y competiciones</p>
                         
                         <div class="download-section">
                             <button class="cta-button" onclick="logoutAmigo()" style="background: #dc2626;">
@@ -5294,6 +5391,37 @@
                     ctaSection.style.display = 'none';
                     ctaSection.innerHTML = '';
                 }
+            }
+
+            ensureProtectedContentHidden();
+        }
+
+        function canAccessTorneoResponsableContent() {
+            const userStatus = getUserStatus();
+            if (userStatus === 'visitante') return false;
+            if (userStatus === 'amigo') {
+                const currentAmigo = JSON.parse(localStorage.getItem('currentAmigo') || '{}');
+                return !!(
+                    currentAmigo.torneoResponsableEnabled ||
+                    currentAmigo.canTorneoResponsable
+                );
+            }
+            return userStatus === 'socio' || userStatus === 'entrenador';
+        }
+
+        function ensureProtectedContentHidden() {
+            if (!checkAccess('multimedia')) {
+                const galeriaSection = document.getElementById('galeriaMultimedia');
+                if (galeriaSection && galeriaSection.style.display !== 'none') {
+                    if (typeof cerrarGaleriaMultimedia === 'function') {
+                        cerrarGaleriaMultimedia();
+                    } else {
+                        galeriaSection.style.display = 'none';
+                    }
+                }
+            }
+            if (!canAccessTorneoResponsableContent()) {
+                closeTorneoResponsableAccessModal();
             }
         }
 
@@ -5736,20 +5864,21 @@
         function checkAccess(feature) {
             const userStatus = getUserStatus();
             
-            // Definir permisos por característica
             const permissions = {
-                'equipos': ['socio', 'entrenador'],           // Solo socios y entrenadores
-                'calendario': ['socio', 'entrenador'],        // Solo socios y entrenadores
-                'eventos': ['socio', 'entrenador'],           // Solo socios y entrenadores
-                'competiciones': ['socio', 'amigo'], // Solo socios y amigos
-                'encuentros': ['socio', 'amigo', 'entrenador'], // Socios, amigos y entrenadores
-                'documentos': ['socio', 'entrenador']         // Solo socios y entrenadores
+                'equipos': ['socio', 'entrenador'],
+                'calendario': ['socio', 'entrenador', 'amigo'],
+                'eventos': ['socio', 'entrenador'],
+                'competiciones': ['socio', 'amigo'],
+                'encuentros': ['socio', 'entrenador'],
+                'documentos': ['socio', 'entrenador']
             };
+
+            if (feature === 'multimedia') {
+                return userStatus === 'socio' || userStatus === 'entrenador';
+            }
             
-            // Si la característica no está en permisos, es accesible para todos
             if (!permissions[feature]) return true;
             
-            // Verificar si el usuario tiene permisos
             return permissions[feature].includes(userStatus);
         }
 
@@ -5763,41 +5892,100 @@
                 'competiciones': 'Competiciones',
                 'multimedia': 'Galería Multimedia',
                 'encuentros': 'Encuentros',
-                'documentos': 'Documentos del Club'
+                'documentos': 'Documentos del Club',
+                'torneo_responsable': 'Soy responsable del equipo'
             };
             
             const featureName = featureNames[feature] || feature;
             
             let modalContent = '';
-            
-            if (userStatus === 'amigo') {
-                // Modal específico para amigos del club
+
+            if (feature === 'torneo_responsable' && userStatus === 'visitante') {
+                modalContent = `
+                    <div style="text-align: center; padding: 20px;">
+                        <div style="font-size: 4rem; margin-bottom: 20px;">🔒</div>
+                        <h3 style="color: #dc2626; margin-bottom: 15px;">Inicia sesión</h3>
+                        <p style="color: #666; margin-bottom: 20px; line-height: 1.6;">
+                            Para acceder a <strong>${featureName}</strong> debes iniciar sesión en el club
+                            (socio/a, entrenador/a o amigo/a habilitado/a como responsable).
+                        </p>
+                        <div style="display: flex; gap: 10px; justify-content: center; flex-wrap: wrap;">
+                            <button onclick="showLoginModal(createSocioLoginForm()); this.closest('.modal').remove();" style="background: #dc2626; color: white; border: none; padding: 12px 24px; border-radius: 25px; cursor: pointer; font-weight: bold;">
+                                🔑 Iniciar sesión
+                            </button>
+                            <button onclick="openSocioRegistroModal(); this.closest('.modal').remove();" style="background: #1e3a8a; color: white; border: none; padding: 12px 24px; border-radius: 25px; cursor: pointer;">
+                                👨‍👩‍👧‍👦 Hacerse Socio/a
+                            </button>
+                            <button onclick="this.closest('.modal').remove()" style="background: #6b7280; color: white; border: none; padding: 12px 24px; border-radius: 25px; cursor: pointer;">
+                                ❌ Cancelar
+                            </button>
+                        </div>
+                    </div>
+                `;
+            } else if (feature === 'torneo_responsable' && userStatus === 'amigo') {
+                modalContent = `
+                    <div style="text-align: center; padding: 20px;">
+                        <div style="font-size: 4rem; margin-bottom: 20px;">⚽</div>
+                        <h3 style="color: #3b82f6; margin-bottom: 15px;">Acceso no habilitado</h3>
+                        <p style="color: #666; margin-bottom: 20px; line-height: 1.6;">
+                            Puedes ver la opción <strong>${featureName}</strong>, pero el club debe habilitarte como responsable de equipo
+                            para acceder al panel. Contacta con la administración si necesitas este acceso.
+                        </p>
+                        <div style="display: flex; gap: 10px; justify-content: center; flex-wrap: wrap;">
+                            <button onclick="this.closest('.modal').remove()" style="background: #6b7280; color: white; border: none; padding: 12px 24px; border-radius: 25px; cursor: pointer;">
+                                ❌ Cerrar
+                            </button>
+                        </div>
+                    </div>
+                `;
+            } else if (feature === 'multimedia' && userStatus === 'visitante') {
+                modalContent = `
+                    <div style="text-align: center; padding: 20px;">
+                        <div style="font-size: 4rem; margin-bottom: 20px;">📸</div>
+                        <h3 style="color: #dc2626; margin-bottom: 15px;">Inicia sesión</h3>
+                        <p style="color: #666; margin-bottom: 20px; line-height: 1.6;">
+                            Puedes ver la tarjeta de <strong>${featureName}</strong>, pero el contenido solo está disponible
+                            para socios/as y entrenadores/as con sesión iniciada.
+                        </p>
+                        <div style="display: flex; gap: 10px; justify-content: center; flex-wrap: wrap;">
+                            <button onclick="showLoginModal(createSocioLoginForm()); this.closest('.modal').remove();" style="background: #dc2626; color: white; border: none; padding: 12px 24px; border-radius: 25px; cursor: pointer; font-weight: bold;">
+                                🔑 Iniciar sesión
+                            </button>
+                            <button onclick="openSocioRegistroModal(); this.closest('.modal').remove();" style="background: #1e3a8a; color: white; border: none; padding: 12px 24px; border-radius: 25px; cursor: pointer;">
+                                👨‍👩‍👧‍👦 Hacerse Socio/a
+                            </button>
+                            <button onclick="this.closest('.modal').remove()" style="background: #6b7280; color: white; border: none; padding: 12px 24px; border-radius: 25px; cursor: pointer;">
+                                ❌ Cancelar
+                            </button>
+                        </div>
+                    </div>
+                `;
+            } else if (userStatus === 'amigo') {
                 modalContent = `
                     <div style="text-align: center; padding: 20px;">
                         <div style="font-size: 4rem; margin-bottom: 20px;">🤝</div>
-                        <h3 style="color: #3b82f6; margin-bottom: 15px;">Contenido Exclusivo para Socios</h3>
+                        <h3 style="color: #3b82f6; margin-bottom: 15px;">Contenido no disponible para amigos/as</h3>
                         <p style="color: #666; margin-bottom: 20px; line-height: 1.6;">
-                            Como <strong>amigo del club</strong>, puedes acceder a <strong>Competiciones</strong> y <strong>Encuentros</strong>.
+                            Como <strong>amigo/a del club</strong>, tu acceso incluye <strong>Calendario</strong> y <strong>Competiciones</strong>
+                            (clasificaciones, estadísticas, próximos partidos y resultados).
                         </p>
                         <p style="color: #666; margin-bottom: 20px; line-height: 1.6;">
-                            Para acceder a <strong>${featureName}</strong>, necesitas ser <strong>socio del club</strong>.
+                            <strong>${featureName}</strong> está reservado para socios/as y entrenadores/as del club.
                         </p>
                         <div style="background: #f0f9ff; padding: 15px; border-radius: 10px; margin-bottom: 20px; border-left: 4px solid #3b82f6;">
-                            <h4 style="color: #1e40af; margin-bottom: 10px;">🤝 Como Amigo del Club puedes:</h4>
+                            <h4 style="color: #1e40af; margin-bottom: 10px;">🤝 Como amigo/a del club puedes:</h4>
                             <ul style="text-align: left; color: #666; line-height: 1.8;">
-                                <li>✅ Ver competiciones y resultados</li>
-                                <li>✅ Consultar encuentros y partidos</li>
+                                <li>✅ Ver el calendario (partidos, competiciones, eventos y actividades)</li>
+                                <li>✅ Consultar competiciones, clasificaciones y resultados</li>
                                 <li>✅ Recibir notificaciones del club</li>
-                                <li>✅ Participar en eventos abiertos</li>
                             </ul>
                         </div>
                         <div style="background: #fef2f2; padding: 15px; border-radius: 10px; margin-bottom: 20px; border-left: 4px solid #dc2626;">
-                            <h4 style="color: #dc2626; margin-bottom: 10px;">👨‍👩‍👧‍👦 Como Socio tendrías acceso a:</h4>
+                            <h4 style="color: #dc2626; margin-bottom: 10px;">👨‍👩‍👧‍👦 Como socio/a tendrías acceso a:</h4>
                             <ul style="text-align: left; color: #666; line-height: 1.8;">
                                 <li>✅ Información detallada de equipos y jugadores/as</li>
-                                <li>✅ Calendario completo de eventos y partidos</li>
-                                <li>✅ Documentos oficiales del club</li>
-                                <li>✅ Participación en eventos especiales</li>
+                                <li>✅ Eventos del club, encuentros y documentos oficiales</li>
+                                <li>✅ Galería multimedia y contenido exclusivo</li>
                             </ul>
                         </div>
                         <div style="display: flex; gap: 10px; justify-content: center; flex-wrap: wrap;">
@@ -8369,6 +8557,9 @@
                 dni: amigo.dni || '',
                 estado: amigo.estado || amigo.status || 'activo',
                 status: amigo.status || 'active',
+                torneoResponsableEnabled: !!(
+                    amigo.torneoResponsableEnabled || amigo.canTorneoResponsable
+                ),
                 authUid: result.uid || null,
                 loginTime: new Date().toISOString(),
                 rememberSession
@@ -9279,10 +9470,6 @@
                 slidesHTML += `
                     <div class="carousel-slide" onclick="handleAdClick('${ad.id}')" style="cursor:pointer;" title="${ad.url ? 'Visitar web del colaborador' : title}">
                         ${imgSrc ? `<img src="${imgSrc}" alt="${title}">` : ''}
-                        <div class="carousel-slide-content">
-                            <div class="carousel-slide-title">${title}</div>
-                            <div class="carousel-slide-company">${escapeHtmlPublic(ad.company || '')}</div>
-                        </div>
                     </div>
                 `;
                 
@@ -9488,6 +9675,10 @@
         }
 
         function mostrarGaleriaMultimedia() {
+            if (!checkAccess('multimedia')) {
+                showRestrictedAccessModal('multimedia');
+                return;
+            }
             const features = document.querySelector('.features');
             const memberWelcome = document.getElementById('memberWelcomeSection');
             const publicidadSection = document.querySelector('.multimedia-section');
@@ -10931,7 +11122,7 @@
                 if (!window.CdsanRedsys.isEnabled()) {
                     alert(
                         '❌ El pago con tarjeta no está disponible en este momento.\n\n' +
-                            'Usa «Solicitar registro por transferencia, efectivo o TPV» o inténtalo más tarde.\n\n' +
+                            'Usa «Transferencia, efectivo o TPV» o inténtalo más tarde.\n\n' +
                             'Consultas: cdsanabriafc@gmail.com'
                     );
                     return;
@@ -10968,6 +11159,8 @@
             // Tarjeta/Bizum: no registrar ni enviar datos hasta que el banco confirme el pago (webhook Redsys).
             if (modoPago === 'card' && cuota > 0) {
                 window._socioOfflinePaymentChannel = null;
+                notifySocioRegisteredEmail(formData, null, 'card');
+                notifyClubSocioRegistration(formData, 'tarjeta');
                 if (window.firebaseAuth && !window.firebaseAuth.isSimulation) {
                     try {
                         const { signOut } = await import('https://www.gstatic.com/firebasejs/10.12.3/firebase-auth.js');
@@ -11100,7 +11293,7 @@
             const pagoHumano = offlineSocioPaymentHint(offlineCh);
 
             alert(
-                `✅ ¡Registro de socio completado!\n\nTu alta figura ya en el sistema del club (pendiente de validación del pago si aplica).\n\n📋 ${formatNumeroSocioDisplay(formData.numeroSocio)}\n💰 Cuota: ${cuota}€${perfilRegistroMsg}\n\n🏦 Ingresa la cuota en 7 días por ${pagoHumano}.\nEl club validará tu alta al ver el pago.\n• Dudas: ${getClubPublicEmail()}\n\n📧 Hemos enviado un aviso al club con tus datos.${mensajeNotificaciones}`
+                `✅ ¡Registro de socio completado!\n\n📋 ${formatNumeroSocioDisplay(formData.numeroSocio)} (provisional hasta validar pago)\n💰 Cuota: ${cuota}€${perfilRegistroMsg}\n\n🏦 Abona la cuota en 7 días por ${pagoHumano}.\nSerás socio/a de pleno derecho cuando el club compruebe el pago.\n• Dudas: ${getClubPublicEmail()}\n\n📧 Hemos enviado un aviso al club y a tu correo.${mensajeNotificaciones}`
             );
 
             closeSociosModal();
@@ -11212,8 +11405,11 @@
             }
 
             let okFirebase = true;
+            let emailsSent = false;
             try {
-                okFirebase = await enviarAmigoABaseDatos(formData);
+                const saveResult = await enviarAmigoABaseDatos(formData);
+                okFirebase = !!(saveResult && saveResult.ok !== false);
+                emailsSent = !!(saveResult && saveResult.emailsSent);
             } catch (e) {
                 console.warn('enviarAmigoABaseDatos:', e);
                 alert(
@@ -11255,16 +11451,14 @@
                 activarNotificacionesPush('amigo', formData.email, formData.nombre);
             }
 
-            notifyClubAmigoRegistration(formData);
+            notifyAmigoRegistrationEmails(formData, formData.id, emailsSent);
 
             const mensajeNotificaciones = formData.notificaciones
                 ? '\n\n🔔 Notificaciones push activadas - Recibirás información del club'
                 : '\n\n📧 Recibirás información por email';
 
-            const avisoFirebase = '';
-
             alert(
-                `✅ ¡Registro de amigo/a completado!\n\nTu alta figura ya en el sistema del club.\n\n📋 ${formatNumeroAmigoDisplay(formData.numeroAmigo)}\n\n🤝 ¡Bienvenido/a al club!\n\nAhora puedes acceder a competiciones y encuentros.\n\n📧 Hemos enviado un aviso al club con tus datos.${mensajeNotificaciones}`
+                `✅ ¡Registro de amigo/a completado!\n\nTu alta figura ya en el sistema del club (Firebase y panel de administración).\n\n📋 ${formatNumeroAmigoDisplay(formData.numeroAmigo)}\n\n🤝 ¡Bienvenido/a al club!\n\nAhora puedes acceder a competiciones y encuentros.\n\n📧 Hemos enviado un aviso al club y a tu correo con los datos del registro.${mensajeNotificaciones}`
             );
 
             closeAmigosModal();
@@ -11436,9 +11630,9 @@
 
             if (window.ClubFriendCloudPersist && typeof window.ClubFriendCloudPersist.persistFriendViaNetlify === 'function') {
                 try {
-                    await window.ClubFriendCloudPersist.persistFriendViaNetlify(amigoSafe);
+                    const result = await window.ClubFriendCloudPersist.persistFriendViaNetlify(amigoSafe);
                     console.log('✅ Amigo guardado en Firebase (Netlify):', amigoSafe.nombre);
-                    return true;
+                    return { ok: true, emailsSent: !!(result && result.emailsSent) };
                 } catch (netlifyErr) {
                     console.warn('⚠️ Netlify amigo:', netlifyErr);
                     if (typeof window.clubCloudPersistIsRequired === 'function' && window.clubCloudPersistIsRequired()) {
@@ -11447,7 +11641,7 @@
                 }
             }
 
-            if (!window.createDocument) return false;
+            if (!window.createDocument) return { ok: false, emailsSent: false };
             try {
                 const docId = await window.createDocument('friends', amigoSafe);
                 if (docId) amigoSafe.id = String(docId);
@@ -11463,10 +11657,10 @@
                 }
                 try { window.dispatchEvent(new CustomEvent('friendsUpdated', { detail: list })); } catch (_) {}
                 console.log('✅ Amigo guardado en Firebase:', amigoSafe.nombre);
-                return true;
+                return { ok: true, emailsSent: false };
             } catch (error) {
                 console.warn('⚠️ Error guardando amigo en Firebase:', error);
-                return false;
+                return { ok: false, emailsSent: false };
             }
         }
 
@@ -12936,6 +13130,7 @@
             registrarServiceWorker();
             mostrarBannerInstalacion();
             refrescarDatosAlAbrir('domcontentloaded');
+            if (typeof ensureProtectedContentHidden === 'function') ensureProtectedContentHidden();
             setTimeout(mostrarBannerCookies, 1500);
             if (window.clubNotificationSystem && typeof window.clubNotificationSystem.loadNotificationsForUser === 'function') {
                 window.clubNotificationSystem.loadNotificationsForUser();

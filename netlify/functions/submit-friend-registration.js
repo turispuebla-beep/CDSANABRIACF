@@ -1,6 +1,7 @@
 'use strict';
 
 const { upsertFriendRegistrationRecord } = require('./lib/firestore-admin');
+const { notifyFriendRegistrationEmails } = require('./lib/member-email');
 const { assertPublicActionsAllowed, isSiteUpdateModeError } = require('./lib/site-public-mode');
 
 const CORS_BASE = {
@@ -48,7 +49,16 @@ exports.handler = async (event) => {
       return json(400, { ok: false, error: 'Datos de amigo/a ausentes' }, origin);
     }
     const saved = await upsertFriendRegistrationRecord(friend);
-    return json(200, { ok: true, friendId: saved.id, friend: saved }, origin);
+
+    let emailsSent = false;
+    try {
+      const mail = await notifyFriendRegistrationEmails(saved);
+      emailsSent = !!(mail.friend && mail.friend.sent) || !!(mail.club && mail.club.sent);
+    } catch (mailErr) {
+      console.warn('submit-friend-registration emails:', mailErr.message || mailErr);
+    }
+
+    return json(200, { ok: true, friendId: saved.id, friend: saved, emailsSent }, origin);
   } catch (err) {
     if (isSiteUpdateModeError(err)) {
       return json(503, { ok: false, error: err.message, code: 'site_update_mode' }, origin);

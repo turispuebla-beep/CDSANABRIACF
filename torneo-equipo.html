@@ -185,6 +185,8 @@
             font-size: 1rem;
             margin-bottom: 4px;
         }
+        .coach-form input[type="file"] { font-size: 0.88rem; padding: 8px 0; border: none; }
+        .doc-legal { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px; padding: 12px 14px; font-size: 0.85rem; color: #475569; line-height: 1.45; margin: 10px 0; }
         .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
         @media (max-width: 560px) { .grid2 { grid-template-columns: 1fr; } }
         .btn-link-copy {
@@ -206,6 +208,33 @@
             margin-top: 12px;
         }
         #loginView[hidden], #panelView[hidden] { display: none !important; }
+        .category-tabs {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin: 0 0 14px;
+        }
+        .category-tab {
+            border: 2px solid #93c5fd;
+            background: #fff;
+            color: #1e40af;
+            border-radius: 999px;
+            padding: 8px 14px;
+            font-size: 0.82rem;
+            font-weight: 700;
+            cursor: pointer;
+        }
+        .category-tab.is-active {
+            background: #1e3a8a;
+            border-color: #1e3a8a;
+            color: #fff;
+        }
+        .category-tab small {
+            display: block;
+            font-weight: 600;
+            opacity: 0.85;
+            font-size: 0.72rem;
+        }
     </style>
 </head>
 <body>
@@ -218,7 +247,7 @@
         <div id="loginView" class="card">
             <span class="hero-badge">Torneo Fútbol 7 — 2026</span>
             <h1>Panel del responsable</h1>
-            <p class="sub">Introduce el código de equipo y el email con el que hiciste la preinscripción.</p>
+            <p class="sub">Introduce un código de equipo y el <strong>email del responsable</strong>. Si el mismo equipo está en varias categorías, verás cada una en el panel.</p>
             <form id="loginForm">
                 <label for="loginAccessCode">Código de equipo</label>
                 <input type="text" id="loginAccessCode" placeholder="TP-2026-A1B2" autocomplete="off" autocapitalize="characters" spellcheck="false">
@@ -239,6 +268,7 @@
                 <span class="hero-badge" id="panelEventName">Torneo Fútbol 7 — 2026</span>
                 <h1 id="panelTeamName">Mi equipo</h1>
                 <p class="sub" id="panelSubtitle">Gestiona la plantilla de tu equipo para el torneo.</p>
+                <div id="panelCategoryTabs" class="category-tabs" hidden></div>
                 <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:8px;">
                     <span style="font-size:0.88rem;color:#64748b;">Código:</span>
                     <span class="code-pill" id="panelAccessCode">—</span>
@@ -258,9 +288,9 @@
             </div>
 
             <div class="card">
-                <h2>Entrenador/a del equipo</h2>
-                <p class="sub" style="margin-top:-6px;">Datos del entrenador/a o responsable técnico en el campo.</p>
-                <p id="teCoachStatus" class="hint-ok">Completa y guarda los datos del entrenador/a</p>
+                <h2>Responsable técnico en el campo</h2>
+                <p class="sub" style="margin-top:-6px;">Persona que dirige al equipo en el torneo. Datos <strong>solo para este evento</strong>; no se guardan en jugadores ni entrenadores del CD Sanabria CF.</p>
+                <p id="teCoachStatus" class="hint-ok">Completa y guarda los datos del responsable técnico</p>
                 <form id="teCoachForm" class="coach-form">
                     <div class="grid2">
                         <div><label for="teCoachName">Nombre *</label><input type="text" id="teCoachName" required autocomplete="given-name"></div>
@@ -275,8 +305,16 @@
                     <input type="text" id="teCoachDni" required autocomplete="off">
                     <label for="teCoachPhone">Teléfono *</label>
                     <input type="tel" id="teCoachPhone" required autocomplete="tel">
+                    <h3 style="font-size:0.95rem;color:#1e3a8a;margin:16px 0 8px;border-bottom:1px solid #e2e8f0;padding-bottom:6px;">Documentación acreditativa *</h3>
+                    <p class="doc-legal" id="teCoachDocLegal"></p>
+                    <label for="teCoachDocAnverso">DNI — anverso (o documento válido) *</label>
+                    <input type="file" id="teCoachDocAnverso" accept="image/jpeg,image/png,image/webp,application/pdf">
+                    <label for="teCoachDocReverso">DNI — reverso (recomendado)</label>
+                    <input type="file" id="teCoachDocReverso" accept="image/jpeg,image/png,image/webp,application/pdf">
+                    <label for="teCoachDocOtro">Otro documento (opcional)</label>
+                    <input type="file" id="teCoachDocOtro" accept="image/jpeg,image/png,image/webp,application/pdf">
                     <div id="teCoachError" class="error-box" hidden></div>
-                    <button type="submit" class="btn btn-outline" id="teCoachSaveBtn" style="width:100%;margin-top:10px;">💾 Guardar entrenador/a</button>
+                    <button type="submit" class="btn btn-outline" id="teCoachSaveBtn" style="width:100%;margin-top:10px;">💾 Guardar responsable técnico</button>
                 </form>
             </div>
 
@@ -309,6 +347,7 @@
         </div>
     </div>
 
+    <script src="js/torneo-document-upload.js"></script>
     <script src="js/cdsan-torneo-env.js"></script>
     <script src="js/club-contact-defaults.js"></script>
     <script src="js/club-torneo-config.js"></script>

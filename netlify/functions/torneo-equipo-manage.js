@@ -58,20 +58,22 @@ exports.handler = async (event) => {
   try {
     const body = JSON.parse(event.body || '{}');
     const action = String(body.action || 'panel').trim().toLowerCase();
-    const { accessCode, contactEmail } = authFields(body);
+    const login = authFields(body);
+    const accessCode = body.activeAccessCode || body.code || login.accessCode;
+    const contactEmail = login.contactEmail;
 
     if (action === 'panel' || action === 'refresh') {
-      const panel = await verifyTorneoEquipoAccess(accessCode, contactEmail);
+      const panel = await verifyTorneoEquipoAccess(login.accessCode, contactEmail, accessCode);
       return json(200, { ok: true, panel }, origin);
     }
 
     if (action === 'save_coach') {
-      const panel = await saveTorneoCoach(accessCode, contactEmail, body.coach || body);
+      const panel = await saveTorneoCoach(login.accessCode, contactEmail, body.coach || body, accessCode);
       return json(200, { ok: true, panel }, origin);
     }
 
     if (action === 'invite_player') {
-      const result = await createTorneoFichaInvite(accessCode, contactEmail, body.invite || body);
+      const result = await createTorneoFichaInvite(login.accessCode, contactEmail, body.invite || body, accessCode);
       return json(200, { ok: true, ...result }, origin);
     }
 
@@ -80,7 +82,7 @@ exports.handler = async (event) => {
 
       if (fee <= 0) {
         await finalizeTorneoPlantillaFree(accessCode, contactEmail);
-        const updated = await verifyTorneoEquipoAccess(accessCode, contactEmail);
+        const updated = await verifyTorneoEquipoAccess(login.accessCode, contactEmail, accessCode);
         return json(200, { ok: true, panel: updated, paymentRequired: false }, origin);
       }
 

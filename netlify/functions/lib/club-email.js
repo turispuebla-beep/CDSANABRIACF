@@ -214,7 +214,7 @@ async function sendViaSendGrid(payload) {
  * Envío directo al socio/jugador (solicitud aceptada, restablecer contraseña).
  * Siempre llega al email del destinatario; copia oculta al buzón del club.
  */
-async function sendDirectToMemberEmail({ memberEmail, subject, html, text, replyTo }) {
+async function sendDirectToMemberEmail({ memberEmail, subject, html, text, replyTo, attachments }) {
   const cfg = getEmailConfig();
   if (!cfg.ok) throw new Error(cfg.error);
   const to = String(memberEmail || '').trim().toLowerCase();
@@ -227,6 +227,7 @@ async function sendDirectToMemberEmail({ memberEmail, subject, html, text, reply
     subject,
     html,
     text,
+    attachments,
     replyTo: String(replyTo || cfg.replyTo || cfg.fromEmail || CLUB_EMAIL_DEFAULT).trim()
   });
   return { sent: true, to, bcc };

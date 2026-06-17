@@ -111,6 +111,7 @@ const DB_COLLECTIONS = {
   PLAYERS: 'sanabria_players',        // Jugadores
   PLAYER_APPLICATIONS: 'sanabria_player_applications', // Solicitudes nuevo jugador
   TORNEO_PREINSCRIPTIONS: 'sanabria_torneo_preinscripciones', // Preinscripciones torneo F7
+  TORNEO_DOCUMENTS: 'sanabria_torneo_documents', // Documentos torneo (DNI, etc.)
   COACHES: 'sanabria_coaches',        // Entrenadores
   BOARD: 'sanabria_board',            // Directiva
   TEAMS: 'sanabria_teams',            // Equipos
@@ -150,6 +151,7 @@ function normalizeCollectionName(rawName) {
     player_applications: DB_COLLECTIONS.PLAYER_APPLICATIONS,
     clubPlayerApplications: DB_COLLECTIONS.PLAYER_APPLICATIONS,
     torneo_preinscripciones: DB_COLLECTIONS.TORNEO_PREINSCRIPTIONS,
+    torneo_documents: DB_COLLECTIONS.TORNEO_DOCUMENTS,
     clubTorneoPreinscripciones: DB_COLLECTIONS.TORNEO_PREINSCRIPTIONS,
     coaches: DB_COLLECTIONS.COACHES,
     board: DB_COLLECTIONS.BOARD,

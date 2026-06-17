@@ -25,9 +25,24 @@
     return a;
   }
 
+  function updateAgeHint() {
+    const birth = $('tjBirth') && $('tjBirth').value;
+    const age = ageFromBirth(birth);
+    const hint = $('tjAgeHint');
+    if (!hint) return;
+    if (age == null) {
+      hint.hidden = true;
+      hint.textContent = '';
+      return;
+    }
+    hint.hidden = false;
+    hint.textContent = 'Edad: ' + age + ' años' + (age < 18 ? ' (menor — datos de tutor/a obligatorios)' : '');
+  }
+
   function toggleGuardian() {
     const birth = $('tjBirth') && $('tjBirth').value;
     const age = ageFromBirth(birth);
+    updateAgeHint();
     const block = $('tjGuardianBlock');
     if (!block) return;
     const minor = age != null && age < 18;
@@ -78,7 +93,7 @@
       : 'Tu ficha ha quedado registrada. El responsable del equipo y el club la recibirán.';
   }
 
-  function readForm() {
+  function readFormBase() {
     return {
       name: ($('tjName') && $('tjName').value.trim()) || '',
       surname: ($('tjSurname') && $('tjSurname').value.trim()) || '',
@@ -101,6 +116,21 @@
     };
   }
 
+  async function readFormWithDocuments() {
+    const base = readFormBase();
+    const U = global.TorneoDocumentUpload;
+    if (!U) throw new Error('Subida de documentos no disponible.');
+    const documents = await U.readLabeledInputs([
+      { el: $('tjDocAnverso'), id: 'dni_anverso', label: 'DNI anverso' },
+      { el: $('tjDocReverso'), id: 'dni_reverso', label: 'DNI reverso' },
+      { el: $('tjDocOtro'), id: 'otro_doc', label: 'Otro documento' }
+    ]);
+    if (!documents.length) {
+      throw new Error('Sube al menos el DNI por el anverso u otro documento válido.');
+    }
+    return Object.assign({}, base, { documents: documents });
+  }
+
   async function handleSubmit(ev) {
     ev.preventDefault();
     const errEl = $('tjError');
@@ -114,7 +144,8 @@
       btn.textContent = 'Enviando…';
     }
     try {
-      const data = await api('submit', { ficha: readForm() });
+      const ficha = await readFormWithDocuments();
+      const data = await api('submit', { ficha: ficha });
       showDone(data.ficha || {});
     } catch (err) {
       if (errEl) {
@@ -131,6 +162,9 @@
 
   async function init() {
     const token = getInviteToken();
+    if ($('tjDocLegal') && global.TorneoDocumentUpload) {
+      $('tjDocLegal').textContent = global.TorneoDocumentUpload.TORNEO_DOC_LEGAL_TEXT;
+    }
     if (!token) {
       $('tjLoading').hidden = true;
       $('tjErrorMain').hidden = false;

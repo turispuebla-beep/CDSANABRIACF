@@ -44,6 +44,65 @@
     };
   }
 
+  async function readCoachFormWithDocuments(existingDocCount) {
+    const base = readCoachForm();
+    const U = global.TorneoDocumentUpload;
+    if (!U) throw new Error('Subida de documentos no disponible.');
+    const documents = await U.readLabeledInputs([
+      { el: $('teCoachDocAnverso'), id: 'dni_anverso', label: 'DNI anverso' },
+      { el: $('teCoachDocReverso'), id: 'dni_reverso', label: 'DNI reverso' },
+      { el: $('teCoachDocOtro'), id: 'otro_doc', label: 'Otro documento' }
+    ]);
+    if (!documents.length && (existingDocCount || 0) > 0) {
+      return Object.assign({}, base, { keepDocuments: true });
+    }
+    if (!documents.length) {
+      throw new Error('Sube al menos el DNI por el anverso u otro documento válido.');
+    }
+    return Object.assign({}, base, { documents: documents });
+  }
+
+  function renderCategoryTabs(panel) {
+    const wrap = $('panelCategoryTabs');
+    if (!wrap) return;
+    const entries = Array.isArray(panel.teamEntries) ? panel.teamEntries : [];
+    if (entries.length < 2) {
+      wrap.hidden = true;
+      wrap.innerHTML = '';
+      return;
+    }
+    wrap.hidden = false;
+    const active = panel.activeAccessCode || panel.accessCode || '';
+    wrap.innerHTML = entries
+      .map(function (e) {
+        const labels =
+          Array.isArray(e.categoryLabels) && e.categoryLabels.length
+            ? e.categoryLabels.join(', ')
+            : 'Categoría';
+        const isActive = String(e.accessCode || '') === String(active);
+        return (
+          '<button type="button" class="category-tab' +
+          (isActive ? ' is-active' : '') +
+          '" data-access-code="' +
+          escapeHtml(e.accessCode || '') +
+          '">' +
+          escapeHtml(labels) +
+          '<small>' +
+          escapeHtml(e.accessCode || '') +
+          '</small></button>'
+        );
+      })
+      .join('');
+    wrap.querySelectorAll('.category-tab').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        const code = btn.getAttribute('data-access-code') || '';
+        if (!code || !global.TorneoResponsableAccess) return;
+        const next = global.TorneoResponsableAccess.setActiveCategory(code);
+        if (next) renderPanel(next);
+      });
+    });
+  }
+
   function renderPanel(panel) {
     const cats =
       Array.isArray(panel.categoryLabels) && panel.categoryLabels.length
@@ -56,7 +115,12 @@
     $('panelEventName').textContent = panel.eventName || 'Torneo Fútbol 7 — 2026';
     $('panelTeamName').textContent = panel.teamName || 'Mi equipo';
     $('panelSubtitle').textContent =
-      'Responsable: ' + (panel.contactName || '—') + ' · ' + (panel.contactEmail || '');
+      'Responsable: ' +
+      (panel.contactName || '—') +
+      ' · ' +
+      (panel.responsibleEmail || panel.contactEmail || '') +
+      (panel.entryCount > 1 ? ' · ' + panel.entryCount + ' categorías' : '');
+    renderCategoryTabs(panel);
     $('panelAccessCode').textContent = panel.accessCode || '—';
     $('panelCategories').textContent = cats;
     $('panelTown').textContent = panel.town || '—';
@@ -70,9 +134,10 @@
 
     fillCoachForm(panel.coach);
     if ($('teCoachStatus')) {
+      const docCount = panel.coach && panel.coach.documentCount ? panel.coach.documentCount : 0;
       $('teCoachStatus').textContent = panel.coach && panel.coach.complete
-        ? '✅ Datos del entrenador/a guardados'
-        : 'Completa y guarda los datos del entrenador/a';
+        ? '✅ Datos del responsable técnico guardados' + (docCount ? ' (' + docCount + ' documento(s))' : '')
+        : 'Completa y guarda los datos del responsable técnico (incluye documentación)';
     }
 
     const list = $('panelFichaList');
@@ -130,7 +195,7 @@
           : '📤 Finalizar y enviar al club';
       closeBtn.title = panel.canFinalize
         ? 'Enviar plantilla completa al club'
-        : 'Completa entrenador/a y todas las fichas';
+        : 'Completa responsable técnico y todas las fichas';
     }
 
     if ($('teInviteBlock')) {
@@ -208,9 +273,16 @@
     }
     if (btn) btn.disabled = true;
     try {
-      const panel = await global.TorneoEquipoManage.saveCoach(readCoachForm());
+      const session = global.TorneoResponsableAccess && global.TorneoResponsableAccess.readSession();
+      const docCount =
+        session && session.panel && session.panel.coach ? session.panel.coach.documentCount || 0 : 0;
+      const coach = await readCoachFormWithDocuments(docCount);
+      const panel = await global.TorneoEquipoManage.saveCoach(coach);
       renderPanel(panel);
-      if ($('teCoachStatus')) $('teCoachStatus').textContent = '✅ Datos del entrenador/a guardados';
+      if ($('teCoachDocAnverso')) $('teCoachDocAnverso').value = '';
+      if ($('teCoachDocReverso')) $('teCoachDocReverso').value = '';
+      if ($('teCoachDocOtro')) $('teCoachDocOtro').value = '';
+      if ($('teCoachStatus')) $('teCoachStatus').textContent = '✅ Datos del responsable técnico guardados';
     } catch (err) {
       if (errEl) {
         errEl.hidden = false;
@@ -290,6 +362,9 @@
   }
 
   function init() {
+    if ($('teCoachDocLegal') && global.TorneoDocumentUpload) {
+      $('teCoachDocLegal').textContent = global.TorneoDocumentUpload.TORNEO_DOC_LEGAL_TEXT;
+    }
     const params = new URLSearchParams(global.location.search || '');
     const prefill = params.get('equipo') || params.get('code');
     if (prefill && $('loginAccessCode')) {
