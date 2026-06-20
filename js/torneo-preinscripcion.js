@@ -9,17 +9,26 @@
   const EVENT_NAME = 'Torneo Fútbol 7 — 2026';
   const API = '/.netlify/functions/submit-torneo-preinscripcion';
 
-  const TORNEO_CATEGORIES = [
-    { id: 'benjamin', label: 'Benjamín' },
-    { id: 'alevin', label: 'Alevín' },
-    { id: 'infantil', label: 'Infantil' },
-    { id: 'cadete', label: 'Cadete' },
-    { id: 'juvenil', label: 'Juvenil' },
-    { id: 'senior', label: 'Senior' }
-  ];
-
   function getCategories() {
-    return TORNEO_CATEGORIES.slice();
+    if (global.ClubTorneoPricing && global.ClubTorneoPricing.getCategories) {
+      return global.ClubTorneoPricing.getCategories();
+    }
+    return [
+      { id: 'prebenjamin', label: 'Prebenjamín (Chupetines)', feeEur: 60 },
+      { id: 'benjamin', label: 'Benjamín', feeEur: 60 },
+      { id: 'alevin', label: 'Alevín', feeEur: 60 },
+      { id: 'infantil', label: 'Infantil', feeEur: 60 },
+      { id: 'cadete', label: 'Cadete', feeEur: 60 },
+      { id: 'juvenil', label: 'Juvenil', feeEur: 100 },
+      { id: 'senior', label: 'Senior', feeEur: 100 }
+    ];
+  }
+
+  function estimateFeeEur(categoryIds) {
+    if (global.ClubTorneoPricing && global.ClubTorneoPricing.sumFeesForCategoryIds) {
+      return global.ClubTorneoPricing.sumFeesForCategoryIds(categoryIds);
+    }
+    return 0;
   }
 
   function readAll() {
@@ -64,6 +73,14 @@
     return 'mailto:' + encodeURIComponent(addr) + (q.length ? '?' + q.join('&') : '');
   }
 
+  function formatFeeForMail(categoryIds) {
+    const fee = estimateFeeEur(categoryIds);
+    if (global.ClubTorneoPricing && global.ClubTorneoPricing.formatEur) {
+      return fee > 0 ? global.ClubTorneoPricing.formatEur(fee) + ' (informativo)' : '—';
+    }
+    return fee > 0 ? fee + ' € (informativo)' : '—';
+  }
+
   function categoryLabels(ids) {
     const map = {};
     getCategories().forEach(function (c) {
@@ -87,6 +104,7 @@
       return 'Indica un email de contacto válido.';
     }
     if (!data.contactPhone) return 'Indica un teléfono de contacto.';
+    if (!data.premiosAceptados) return 'Debes leer y aceptar los términos sobre premios.';
     return null;
   }
 
@@ -103,7 +121,8 @@
               { label: 'Nombre equipo', value: data.teamName },
               { label: 'Nº jugadores', value: data.playerCount },
               { label: 'Población', value: data.town },
-              { label: 'Categorías', value: cats }
+              { label: 'Categorías', value: cats },
+              { label: 'Cuota estimada', value: formatFeeForMail(data.categories) }
             ]
           },
           {
@@ -130,6 +149,7 @@
       'Número de jugadores: ' + (data.playerCount || ''),
       'Población: ' + (data.town || ''),
       'Categorías: ' + cats,
+      'Cuota estimada: ' + formatFeeForMail(data.categories),
       '',
       'Persona de contacto: ' + (data.contactName || ''),
       'Email: ' + (data.contactEmail || ''),
@@ -149,6 +169,7 @@
       playerCount: data.playerCount,
       town: data.town,
       categories: data.categories.slice(),
+      estimatedFeeEur: estimateFeeEur(data.categories),
       contactName: data.contactName,
       contactEmail: data.contactEmail,
       contactPhone: data.contactPhone,
@@ -201,7 +222,9 @@
       body: JSON.stringify({
         preinscripcion: Object.assign({}, formData, {
           eventName: EVENT_NAME,
-          localId: localEntry.id
+          localId: localEntry.id,
+          premiosAceptados: !!formData.premiosAceptados,
+          premiosAceptadosAt: formData.premiosAceptados ? new Date().toISOString() : null
         })
       })
     });
@@ -306,6 +329,7 @@
     STORAGE_KEY: STORAGE_KEY,
     EVENT_NAME: EVENT_NAME,
     getCategories: getCategories,
+    estimateFeeEur: estimateFeeEur,
     readAll: readAll,
     validate: validate,
     submitPreinscripcion: submitPreinscripcion,

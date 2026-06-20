@@ -10,6 +10,8 @@ netlify_env
 # Artefactos locales
 node_modules/
 *.log
+deploy-log.txt
+*-netlify-dist.zip
 .DS_Store
 Thumbs.db
 

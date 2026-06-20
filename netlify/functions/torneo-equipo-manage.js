@@ -4,8 +4,11 @@ const {
   verifyTorneoEquipoAccess,
   saveTorneoCoach,
   createTorneoFichaInvite,
+  saveTorneoPlantillaBatch,
+  uploadTorneoFichaDocuments,
   prepareTorneoFinalize,
   finalizeTorneoPlantillaFree,
+  finalizeTorneoPlantillaOffline,
   getTorneoInscriptionFeeEur
 } = require('./lib/torneo-equipo');
 const { savePendingPayment } = require('./lib/firestore-admin');
@@ -77,32 +80,131 @@ exports.handler = async (event) => {
       return json(200, { ok: true, ...result }, origin);
     }
 
+    if (action === 'save_roster_batch') {
+      const panel = await saveTorneoPlantillaBatch(
+        login.accessCode,
+        contactEmail,
+        body.players || body.roster,
+        accessCode
+      );
+      return json(200, { ok: true, panel }, origin);
+    }
+
+    if (action === 'upload_ficha_documents') {
+      const panel = await uploadTorneoFichaDocuments(
+        login.accessCode,
+        contactEmail,
+        body.fichaId || body.playerId,
+        body.documents,
+        accessCode
+      );
+      return json(200, { ok: true, panel }, origin);
+    }
+
     if (action === 'finalize') {
-      const { record, panel, fee } = await prepareTorneoFinalize(accessCode, contactEmail);
+      if (!body.inscripcionPremiosAceptados) {
+        return json(
+          400,
+          { ok: false, error: 'Debes leer y aceptar los términos sobre premios.' },
+          origin
+        );
+      }
+      const payMethod = String(body.payMethod || 'card')
+        .trim()
+        .toLowerCase();
+      const offlineMethods = ['transferencia', 'efectivo'];
+      const nowIso = new Date().toISOString();
+
+      if (payMethod === 'gratis') {
+        return json(
+          400,
+          { ok: false, error: 'Debes elegir una forma de pago para finalizar la inscripción.' },
+          origin
+        );
+      }
+      if (payMethod === 'tpv') {
+        return json(
+          400,
+          {
+            ok: false,
+            error: 'Para el torneo solo está disponible tarjeta, transferencia o efectivo.'
+          },
+          origin
+        );
+      }
+
+      const { record, panel, fee, unpaidRecords, unpaidPanels } = await prepareTorneoFinalize(
+        accessCode,
+        contactEmail
+      );
 
       if (fee <= 0) {
-        await finalizeTorneoPlantillaFree(accessCode, contactEmail);
-        const updated = await verifyTorneoEquipoAccess(login.accessCode, contactEmail, accessCode);
-        return json(200, { ok: true, panel: updated, paymentRequired: false }, origin);
+        return json(
+          400,
+          { ok: false, error: 'Cuota de inscripción no configurada. Contacta con el club.' },
+          origin
+        );
       }
+
+      const activeCode = body.activeAccessCode || accessCode;
+
+      if (offlineMethods.includes(payMethod)) {
+        const updatedPanel = await finalizeTorneoPlantillaOffline(
+          accessCode,
+          contactEmail,
+          {
+            payMethod: payMethod,
+            inscripcionPremiosAceptados: true,
+            inscripcionPremiosAceptadosAt: nowIso
+          },
+          activeCode
+        );
+        return json(
+          200,
+          { ok: true, panel: updatedPanel, offlinePayment: payMethod },
+          origin
+        );
+      }
+
+      const unpaidIds = unpaidRecords.map(function (r) {
+        return r.id;
+      });
+      const { recordInscripcionPremiosAcceptance } = require('./lib/torneo-equipo');
+      await recordInscripcionPremiosAcceptance(unpaidIds);
 
       const cfg = getRedsysConfig();
       if (!cfg.ok) {
         return json(503, { ok: false, error: 'Pago con tarjeta no disponible. Contacta con el club.' }, origin);
       }
 
+      const onlineMethod = payMethod === 'bizum' ? 'bizum' : 'card';
+      if (onlineMethod !== 'card') {
+        return json(
+          400,
+          { ok: false, error: 'Por ahora solo está disponible el pago con tarjeta online.' },
+          origin
+        );
+      }
+      const publicCfg = getRedsysPublicConfig();
+
       const orderId = generateRedsysOrderId();
-      const description = `Inscripción torneo — ${record.teamName || 'Equipo'}`.slice(0, 125);
+      const teamLabels = unpaidPanels
+        .map(function (p) {
+          return p.teamName || 'Equipo';
+        })
+        .join(' + ');
+      const description = `Inscripción torneo — ${teamLabels}`.slice(0, 125);
       const paymentDoc = {
         type: 'torneo_team_inscription',
-        payMethod: 'card',
+        payMethod: onlineMethod,
         amountEur: fee,
         amountCents: amountToCents(fee),
         customerEmail: String(record.contactEmail || contactEmail).trim().toLowerCase(),
         description,
         torneoPreinscripcionId: record.id,
+        torneoPreinscripcionIds: unpaidIds,
         preinscripcionId: record.id,
-        teamName: record.teamName,
+        teamName: teamLabels,
         eventName: record.eventName,
         accessCode: record.accessCode
       };
@@ -124,20 +226,24 @@ exports.handler = async (event) => {
         DS_MERCHANT_MERCHANTNAME: 'CD Sanabria CF'
       };
 
-      const form = buildRedirectForm(cfg, merchantParams);
-      const publicCfg = getRedsysPublicConfig();
+      if (onlineMethod === 'bizum') {
+        merchantParams.DS_MERCHANT_PAYMETHODS = 'z';
+      }
 
-      await require('./lib/firestore-admin')
-        .torneoPreinscripcionesRef()
-        .doc(record.id)
-        .set(
+      const form = buildRedirectForm(cfg, merchantParams);
+
+      const preRef = require('./lib/firestore-admin').torneoPreinscripcionesRef();
+      const now = new Date().toISOString();
+      for (let i = 0; i < unpaidIds.length; i++) {
+        await preRef.doc(unpaidIds[i]).set(
           {
             plantillaStatus: 'pendiente_pago',
             pendingPaymentOrderId: orderId,
-            updatedAt: new Date().toISOString()
+            updatedAt: now
           },
           { merge: true }
         );
+      }
 
       return json(
         200,
@@ -147,7 +253,8 @@ exports.handler = async (event) => {
           amountEur: fee,
           orderId,
           redirect: form,
-          cardEnabled: publicCfg.cardEnabled
+          cardEnabled: publicCfg.cardEnabled,
+          teamCount: unpaidIds.length
         },
         origin
       );

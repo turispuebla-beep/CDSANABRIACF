@@ -80,7 +80,12 @@ exports.handler = async (event) => {
             { label: 'Población', value: saved.town },
             { label: 'Categorías', value: cats.join(', ') },
             { label: 'Nº jugadores (aprox.)', value: saved.playerCount },
+            { label: 'Cuota estimada', value: saved.estimatedFeeEur != null ? saved.estimatedFeeEur + ' €' : '—' },
+            { label: 'Cód. responsable', value: saved.responsibleCode || '—' },
+            { label: 'Cód. equipo', value: saved.accessCode || '—' },
             { label: 'Contacto', value: saved.contactName },
+            { label: 'Email contacto', value: saved.contactEmail },
+            { label: 'Teléfono', value: saved.contactPhone },
             { label: 'ID preinscripción', value: saved.id }
           ]
         });

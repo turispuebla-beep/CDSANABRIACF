@@ -17,12 +17,69 @@
   }
 
   function formatFee(panel) {
+    if (panel.totalInscriptionFeeEur > 0 && panel.entryCount > 1) {
+      const total =
+        global.ClubTorneoPricing && global.ClubTorneoPricing.formatEur
+          ? global.ClubTorneoPricing.formatEur(panel.totalInscriptionFeeEur)
+          : panel.totalInscriptionFeeLabel || panel.totalInscriptionFeeEur + ' €';
+      const thisFee =
+        global.ClubTorneoPricing && global.ClubTorneoPricing.formatEur
+          ? global.ClubTorneoPricing.formatEur(panel.inscriptionFeeEur)
+          : panel.inscriptionFeeLabel || panel.inscriptionFeeEur + ' €';
+      return thisFee + ' (este equipo) · Total a pagar: ' + total;
+    }
+    if (global.ClubTorneoPricing && global.ClubTorneoPricing.formatEur && panel.inscriptionFeeEur > 0) {
+      return global.ClubTorneoPricing.formatEur(panel.inscriptionFeeEur);
+    }
     if (global.ClubTorneoConfig && global.ClubTorneoConfig.formatFeeLabel) {
       return global.ClubTorneoConfig.formatFeeLabel(panel.inscriptionFeeEur);
     }
     const n = Number(panel.inscriptionFeeEur);
     if (!n || n <= 0) return 'Sin cuota online (el club confirmará el importe)';
-    return n.toFixed(2).replace('.', ',') + ' €';
+    return n.toFixed(0) + ' €';
+  }
+
+  function renderFeeBreakdown(panel) {
+    const el = $('panelFeeBreakdown');
+    if (!el) return;
+    const entries = Array.isArray(panel.teamEntries) ? panel.teamEntries : [];
+    const unpaid = entries.filter(function (e) {
+      return !['enviada_club', 'pagada'].includes(String(e.plantillaStatus || ''));
+    });
+    if (unpaid.length < 2) {
+      el.hidden = true;
+      el.innerHTML = '';
+      return;
+    }
+    el.hidden = false;
+    const fmt =
+      global.ClubTorneoPricing && global.ClubTorneoPricing.formatEur
+        ? function (n) {
+            return global.ClubTorneoPricing.formatEur(n);
+          }
+        : function (n) {
+            return n + ' €';
+          };
+    el.innerHTML =
+      '<strong style="display:block;margin-bottom:6px;">Desglose por equipo:</strong>' +
+      unpaid
+        .map(function (e) {
+          const cats =
+            Array.isArray(e.categoryLabels) && e.categoryLabels.length ? e.categoryLabels.join(', ') : '—';
+          return (
+            '<div style="font-size:0.84rem;margin:4px 0;">' +
+            escapeHtml(e.teamName || 'Equipo') +
+            ' (' +
+            escapeHtml(cats) +
+            '): <strong>' +
+            fmt(e.inscriptionFeeEur || 0) +
+            '</strong></div>'
+          );
+        })
+        .join('') +
+      '<div style="margin-top:8px;font-weight:700;color:#713f12;">Total: ' +
+      fmt(panel.totalInscriptionFeeEur || 0) +
+      '</div>';
   }
 
   function fillCoachForm(coach) {
@@ -73,12 +130,21 @@
     }
     wrap.hidden = false;
     const active = panel.activeAccessCode || panel.accessCode || '';
+    const nameCounts = {};
+    entries.forEach(function (e) {
+      const k = String(e.teamName || '')
+        .trim()
+        .toLowerCase();
+      if (k) nameCounts[k] = (nameCounts[k] || 0) + 1;
+    });
     wrap.innerHTML = entries
-      .map(function (e) {
+      .map(function (e, idx) {
         const labels =
           Array.isArray(e.categoryLabels) && e.categoryLabels.length
             ? e.categoryLabels.join(', ')
             : 'Categoría';
+        const teamLabel = e.teamName || 'Equipo ' + (idx + 1);
+        const dupName = nameCounts[String(e.teamName || '').trim().toLowerCase()] > 1;
         const isActive = String(e.accessCode || '') === String(active);
         return (
           '<button type="button" class="category-tab' +
@@ -86,8 +152,11 @@
           '" data-access-code="' +
           escapeHtml(e.accessCode || '') +
           '">' +
-          escapeHtml(labels) +
+          escapeHtml(teamLabel) +
+          (dupName ? ' #' + (idx + 1) : '') +
           '<small>' +
+          escapeHtml(labels) +
+          ' · ' +
           escapeHtml(e.accessCode || '') +
           '</small></button>'
         );
@@ -119,8 +188,11 @@
       (panel.contactName || '—') +
       ' · ' +
       (panel.responsibleEmail || panel.contactEmail || '') +
-      (panel.entryCount > 1 ? ' · ' + panel.entryCount + ' categorías' : '');
+      (panel.entryCount > 1 ? ' · ' + panel.entryCount + ' equipos' : '');
     renderCategoryTabs(panel);
+    if ($('panelResponsibleCode')) {
+      $('panelResponsibleCode').textContent = panel.responsibleCode || '—';
+    }
     $('panelAccessCode').textContent = panel.accessCode || '—';
     $('panelCategories').textContent = cats;
     $('panelTown').textContent = panel.town || '—';
@@ -131,6 +203,7 @@
     $('panelProgressBar').style.width = pct + '%';
     $('panelProgressLabel').textContent = submitted + ' de ' + total + ' fichas completadas';
     if ($('panelFeeLabel')) $('panelFeeLabel').textContent = formatFee(panel);
+    renderFeeBreakdown(panel);
 
     fillCoachForm(panel.coach);
     if ($('teCoachStatus')) {
@@ -142,64 +215,85 @@
 
     const list = $('panelFichaList');
     const fichas = Array.isArray(panel.fichas) ? panel.fichas : [];
-    if (!fichas.length) {
-      list.innerHTML =
-        '<li class="ficha-item"><span><strong>Sin invitaciones</strong><br><span style="font-size:0.82rem;color:#64748b;">Invita a cada jugador/a con su email.</span></span></li>';
-    } else {
-      list.innerHTML = fichas
-        .map(function (f) {
-          const done = String(f.status || '') === 'enviada';
-          const link = f.inviteUrl
-            ? '<br><button type="button" class="btn-link-copy" data-url="' +
-              escapeHtml(f.inviteUrl) +
-              '">Copiar enlace</button>'
-            : '';
-          return (
-            '<li class="ficha-item">' +
-            '<span><strong>' +
-            escapeHtml(f.label || 'Jugador/a') +
-            '</strong>' +
-            (f.inviteEmail ? '<br><span style="font-size:0.8rem;color:#64748b;">' + escapeHtml(f.inviteEmail) + '</span>' : '') +
-            link +
-            '</span>' +
-            '<span class="ficha-status ' +
-            (done ? 'ficha-status--enviada' : 'ficha-status--pendiente') +
-            '">' +
-            (done ? '✅ Enviada' : '⏳ Pendiente') +
-            '</span></li>'
-          );
-        })
-        .join('');
-      list.querySelectorAll('.btn-link-copy').forEach(function (btn) {
-        btn.addEventListener('click', function () {
-          const url = btn.getAttribute('data-url') || '';
-          if (navigator.clipboard && navigator.clipboard.writeText) {
-            navigator.clipboard.writeText(url).then(function () {
-              alert('Enlace copiado.');
-            });
-          } else {
-            prompt('Copia el enlace:', url);
-          }
+    const inviteFichas = fichas.filter(function (f) {
+      return String(f.source || '') === 'invite' || (f.inviteEmail && String(f.status || '') !== 'enviada');
+    });
+    if (list) {
+      if (!inviteFichas.length) {
+        list.innerHTML = '';
+      } else {
+        list.innerHTML = inviteFichas
+          .map(function (f) {
+            const done = String(f.status || '') === 'enviada';
+            const link = f.inviteUrl
+              ? '<br><button type="button" class="btn-link-copy" data-url="' +
+                escapeHtml(f.inviteUrl) +
+                '">Copiar enlace</button>'
+              : '';
+            return (
+              '<li class="ficha-item">' +
+              '<span><strong>' +
+              escapeHtml(f.label || 'Jugador/a') +
+              '</strong>' +
+              (f.inviteEmail ? '<br><span style="font-size:0.8rem;color:#64748b;">' + escapeHtml(f.inviteEmail) + '</span>' : '') +
+              link +
+              '</span>' +
+              '<span class="ficha-status ' +
+              (done ? 'ficha-status--enviada' : 'ficha-status--pendiente') +
+              '">' +
+              (done ? '✅ Enviada' : '⏳ Pendiente') +
+              '</span></li>'
+            );
+          })
+          .join('');
+        list.querySelectorAll('.btn-link-copy').forEach(function (btn) {
+          btn.addEventListener('click', function () {
+            const url = btn.getAttribute('data-url') || '';
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+              navigator.clipboard.writeText(url).then(function () {
+                alert('Enlace copiado.');
+              });
+            } else {
+              prompt('Copia el enlace:', url);
+            }
+          });
         });
-      });
+      }
+    }
+
+    if (global.TorneoRosterBatch && global.TorneoRosterBatch.render) {
+      global.TorneoRosterBatch.render(panel);
     }
 
     const closeBtn = $('btnClosePlantilla');
     const sent = ['enviada_club', 'pagada'].includes(String(panel.plantillaStatus || ''));
+    const unpaidEntries = (Array.isArray(panel.teamEntries) ? panel.teamEntries : []).filter(function (e) {
+      return !['enviada_club', 'pagada'].includes(String(e.plantillaStatus || ''));
+    });
+    const allTeamsReady =
+      unpaidEntries.length > 0 &&
+      unpaidEntries.every(function (e) {
+        return !!e.canFinalize;
+      });
+    const premiosOk = $('tePremiosAceptados') && $('tePremiosAceptados').checked;
+    const totalPay = panel.totalInscriptionFeeEur || panel.inscriptionFeeEur || 0;
     if (closeBtn) {
-      closeBtn.disabled = sent || !panel.canFinalize;
+      closeBtn.disabled = sent || !allTeamsReady || !premiosOk;
       closeBtn.textContent = sent
         ? '✅ Plantilla enviada al club'
-        : Number(panel.inscriptionFeeEur) > 0
-          ? '💳 Finalizar y pagar con tarjeta'
+        : totalPay > 0
+          ? '💳 Finalizar y pagar ' +
+            (global.ClubTorneoPricing && global.ClubTorneoPricing.formatEur
+              ? global.ClubTorneoPricing.formatEur(totalPay)
+              : totalPay + ' €')
           : '📤 Finalizar y enviar al club';
       closeBtn.title = panel.canFinalize
-        ? 'Enviar plantilla completa al club'
-        : 'Completa responsable técnico y todas las fichas';
-    }
-
-    if ($('teInviteBlock')) {
-      $('teInviteBlock').style.display = sent || fichas.length >= total ? 'none' : 'block';
+        ? premiosOk
+          ? panel.documentsPendingCount > 0
+            ? 'Enviar plantilla al club (aún faltan DNI; podéis subirlos después)'
+            : 'Enviar plantilla completa al club'
+          : 'Marca la casilla de aceptación de términos sobre premios'
+        : 'Completa responsable técnico y todos los jugadores de la plantilla';
     }
   }
 
@@ -333,26 +427,97 @@
       errEl.hidden = true;
       errEl.textContent = '';
     }
+    const premiosCb = $('tePremiosAceptados');
+    if (!premiosCb || !premiosCb.checked) {
+      if (errEl) {
+        errEl.hidden = false;
+        errEl.textContent = 'Debes leer y aceptar los términos sobre premios.';
+      }
+      return;
+    }
     const session = global.TorneoResponsableAccess.readSession();
     const panel = session && session.panel;
-    const fee = panel && Number(panel.inscriptionFeeEur) > 0;
-    const msg = fee
-      ? '¿Finalizar la inscripción y pagar con tarjeta? Se enviará la plantilla al club tras confirmar el pago.'
-      : '¿Finalizar y enviar la plantilla al club?';
-    if (!confirm(msg)) return;
+    const totalPay = (panel && (panel.totalInscriptionFeeEur || panel.inscriptionFeeEur)) || 0;
+    const teamCount = (panel && panel.entryCount) || 1;
+    const teamLabel =
+      panel && panel.teamEntries && panel.teamEntries.length > 1
+        ? panel.teamEntries
+            .map(function (e) {
+              return e.teamName || e.accessCode;
+            })
+            .join(' · ')
+        : panel && panel.teamName
+          ? panel.teamName
+          : 'Tu equipo';
+
+    if (totalPay <= 0) {
+      if (errEl) {
+        errEl.hidden = false;
+        errEl.textContent =
+          'No hay cuota de inscripción configurada para finalizar el pago online. Contacta con el club (cdsanabriafc@gmail.com).';
+      }
+      return;
+    }
+
+    if (!global.TorneoInscripcionPagoModal || !global.TorneoInscripcionPagoModal.show) {
+      if (errEl) {
+        errEl.hidden = false;
+        errEl.textContent = 'El pago con tarjeta no está disponible. Recarga la página o contacta con el club.';
+      }
+      return;
+    }
+
+    const payMethod = await global.TorneoInscripcionPagoModal.show({
+      amountEur: totalPay,
+      teamCount: teamCount,
+      teamLabel: teamLabel
+    });
+    if (!payMethod) return;
+    const offlineOk = payMethod === 'transferencia' || payMethod === 'efectivo';
+    if (payMethod !== 'card' && !offlineOk) {
+      if (errEl) {
+        errEl.hidden = false;
+        errEl.textContent = 'Elige tarjeta, transferencia o efectivo para continuar.';
+      }
+      return;
+    }
+
+    const closeBtn = $('btnClosePlantilla');
+    if (closeBtn) closeBtn.disabled = true;
+
     try {
-      const result = await global.TorneoEquipoManage.finalizeInscription();
+      const result = await global.TorneoEquipoManage.finalizeInscription({
+        inscripcionPremiosAceptados: true,
+        payMethod: payMethod
+      });
       if (result.paymentRequired && result.redirect) {
         global.TorneoEquipoManage.submitRedsysRedirect(result.redirect);
         return;
       }
       if (result.panel) renderPanel(result.panel);
-      alert('✅ Plantilla enviada al club correctamente.');
+      const bank =
+        (global.PaymentMethodPicker && global.PaymentMethodPicker.CLUB_BANK_ACCOUNT) ||
+        'CAJA RURAL ES12 3085 0034 8222 5127 9226';
+      if (payMethod === 'transferencia') {
+        alert(
+          '✅ Plantilla enviada al club.\n\nRealiza la transferencia a:\n' +
+            bank +
+            '\n\nEl club validará el ingreso y confirmará tu inscripción.'
+        );
+      } else if (payMethod === 'efectivo') {
+        alert(
+          '✅ Plantilla enviada al club.\n\nAbona la cuota en efectivo en el club. El club validará el pago y confirmará tu inscripción.'
+        );
+      } else {
+        alert('✅ Plantilla enviada al club correctamente.');
+      }
     } catch (err) {
       if (errEl) {
         errEl.hidden = false;
         errEl.textContent = err.message || 'No se pudo finalizar.';
       }
+    } finally {
+      if (closeBtn) closeBtn.disabled = false;
     }
   }
 
@@ -365,12 +530,23 @@
     if ($('teCoachDocLegal') && global.TorneoDocumentUpload) {
       $('teCoachDocLegal').textContent = global.TorneoDocumentUpload.TORNEO_DOC_LEGAL_TEXT;
     }
+    if (global.TorneoRosterBatch && global.TorneoRosterBatch.init) {
+      global.TorneoRosterBatch.init();
+    }
+    global.TorneoEquipoPanelRefresh = function (panel) {
+      if (panel) renderPanel(panel);
+      else refreshPanel();
+    };
     const params = new URLSearchParams(global.location.search || '');
     const prefill = params.get('equipo') || params.get('code');
+    const prefillEmail = params.get('email');
     if (prefill && $('loginAccessCode')) {
       $('loginAccessCode').value = global.TorneoResponsableAccess
         ? global.TorneoResponsableAccess.normalizeCode(prefill)
         : prefill;
+    }
+    if (prefillEmail && $('loginContactEmail')) {
+      $('loginContactEmail').value = String(prefillEmail).trim();
     }
 
     $('loginForm') && $('loginForm').addEventListener('submit', handleLogin);
@@ -379,6 +555,13 @@
     $('teCoachForm') && $('teCoachForm').addEventListener('submit', handleSaveCoach);
     $('teInviteForm') && $('teInviteForm').addEventListener('submit', handleInvite);
     $('btnClosePlantilla') && $('btnClosePlantilla').addEventListener('click', handleFinalize);
+    const premiosCb = $('tePremiosAceptados');
+    if (premiosCb) {
+      premiosCb.addEventListener('change', function () {
+        const session = global.TorneoResponsableAccess && global.TorneoResponsableAccess.readSession();
+        if (session && session.panel) renderPanel(session.panel);
+      });
+    }
 
     const session = global.TorneoResponsableAccess && global.TorneoResponsableAccess.readSession();
     if (session) {

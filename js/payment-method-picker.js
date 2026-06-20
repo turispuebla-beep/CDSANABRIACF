@@ -7,6 +7,7 @@
   var MODAL_ID = 'paymentOfflinePickerModal';
   var resolvePending = null;
   var VALID = ['transferencia', 'efectivo', 'tpv'];
+  var CLUB_BANK_ACCOUNT = 'CAJA RURAL ES12 3085 0034 8222 5127 9226';
 
   function ensureModal() {
     if (global.document.getElementById(MODAL_ID)) return;
@@ -21,14 +22,18 @@
       'border-radius:12px;box-shadow:0 20px 50px rgba(0,0,0,0.2);position:relative;">' +
       '<span class="close" id="paymentOfflinePickerClose" style="cursor:pointer;font-size:1.5rem;">&times;</span>' +
       '<h2 style="margin:0 0 12px;font-size:1.15rem;color:#1e3a8a;">Forma de pago</h2>' +
-      '<p style="margin:0 0 16px;font-size:0.9rem;color:#64748b;line-height:1.45;">Indica cómo vas a pagar. Marca una opción:</p>' +
+      '<p id="paymentOfflinePickerIntro" style="margin:0 0 16px;font-size:0.9rem;color:#64748b;line-height:1.45;">Indica cómo vas a pagar. Marca una opción:</p>' +
+      '<div id="paymentOfflineBankBox" style="display:none;margin:0 0 14px;padding:10px 12px;background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;font-size:0.85rem;color:#1e40af;line-height:1.45;">' +
+      '<strong>Cuenta del club (transferencia):</strong><br><span style="font-family:monospace;font-size:0.92rem;">' +
+      CLUB_BANK_ACCOUNT +
+      '</span></div>' +
       '<label style="display:flex;align-items:center;gap:10px;margin:10px 0;padding:12px;border:2px solid #e2e8f0;border-radius:8px;cursor:pointer;">' +
       '<input type="checkbox" id="payPickTransferencia" style="width:18px;height:18px;">' +
       '<span><strong>Transferencia bancaria</strong><br><small style="color:#64748b">Ingreso en cuenta del club</small></span></label>' +
       '<label style="display:flex;align-items:center;gap:10px;margin:10px 0;padding:12px;border:2px solid #e2e8f0;border-radius:8px;cursor:pointer;">' +
       '<input type="checkbox" id="payPickEfectivo" style="width:18px;height:18px;">' +
       '<span><strong>Efectivo</strong><br><small style="color:#64748b">Pago en mano al club</small></span></label>' +
-      '<label style="display:flex;align-items:center;gap:10px;margin:10px 0;padding:12px;border:2px solid #e2e8f0;border-radius:8px;cursor:pointer;">' +
+      '<label id="payPickTpvRow" style="display:flex;align-items:center;gap:10px;margin:10px 0;padding:12px;border:2px solid #e2e8f0;border-radius:8px;cursor:pointer;">' +
       '<input type="checkbox" id="payPickTpv" style="width:18px;height:18px;">' +
       '<span><strong>TPV</strong><br><small style="color:#64748b">Pago con datáfono en el club</small></span></label>' +
       '<p id="paymentOfflinePickerErr" style="display:none;color:#dc2626;font-size:0.85rem;margin:8px 0 0;"></p>' +
@@ -72,7 +77,9 @@
       if (!choice) {
         if (err) {
           err.style.display = 'block';
-          err.textContent = 'Marca transferencia, efectivo o TPV para continuar.';
+          var m = global.document.getElementById(MODAL_ID);
+          err.textContent =
+            (m && m._offlineErrText) || 'Marca transferencia, efectivo o TPV para continuar.';
         }
         return;
       }
@@ -105,19 +112,39 @@
     return VALID.indexOf(c) >= 0 ? c : 'transferencia';
   }
 
+  function offlinePickerErrText(opts) {
+    if (opts && opts.hideTpv) {
+      return 'Marca transferencia o efectivo para continuar.';
+    }
+    return 'Marca transferencia, efectivo o TPV para continuar.';
+  }
+
   function showPaymentOfflinePicker(opts) {
     ensureModal();
+    opts = opts || {};
     var m = global.document.getElementById(MODAL_ID);
     var cbT = global.document.getElementById('payPickTransferencia');
     var cbE = global.document.getElementById('payPickEfectivo');
     var cbP = global.document.getElementById('payPickTpv');
     var err = global.document.getElementById('paymentOfflinePickerErr');
+    var intro = global.document.getElementById('paymentOfflinePickerIntro');
+    var bankBox = global.document.getElementById('paymentOfflineBankBox');
+    var tpvRow = global.document.getElementById('payPickTpvRow');
     if (cbT) cbT.checked = false;
     if (cbE) cbE.checked = false;
     if (cbP) cbP.checked = false;
     if (err) err.style.display = 'none';
+    if (tpvRow) tpvRow.style.display = opts.hideTpv ? 'none' : 'flex';
+    if (cbP && opts.hideTpv) cbP.checked = false;
+    if (bankBox) bankBox.style.display = opts.showClubAccount ? 'block' : 'none';
+    if (intro) {
+      intro.textContent = opts.hideTpv
+        ? 'Indica cómo vas a pagar. Marca transferencia o efectivo:'
+        : 'Indica cómo vas a pagar. Marca una opción:';
+    }
     var h2 = m && m.querySelector('h2');
-    if (h2 && opts && opts.title) h2.textContent = opts.title;
+    if (h2 && opts.title) h2.textContent = opts.title;
+    m._offlineErrText = offlinePickerErrText(opts);
     m.style.display = 'block';
     return new Promise(function (resolve) {
       resolvePending = function (choice) {
@@ -128,6 +155,7 @@
 
   global.PaymentMethodPicker = {
     showPaymentOfflinePicker: showPaymentOfflinePicker,
-    normalizeOfflinePayment: normalizeChoice
+    normalizeOfflinePayment: normalizeChoice,
+    CLUB_BANK_ACCOUNT: CLUB_BANK_ACCOUNT
   };
 })(typeof window !== 'undefined' ? window : globalThis);

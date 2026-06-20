@@ -46,6 +46,8 @@
     <script src="js/player-application.js"></script>
     <script src="js/colaborador-solicitud.js"></script>
     <script src="js/admin-torneo-preinscripciones.js"></script>
+    <script src="js/admin-torneo-competition-bridge.js"></script>
+    <script src="js/admin-torneo-f7-wizard.js"></script>
     <script src="js/admin-player-applications.js"></script>
     <script src="js/player-inscription.js"></script>
     <script src="js/club-player-member-sync.js"></script>
@@ -2079,9 +2081,10 @@
                     <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;margin-bottom:12px;">
                         <div>
                             <h3 style="margin:0;">🏆 Preinscripciones torneo Fútbol 7</h3>
-                            <p style="color:#64748b;font-size:0.92rem;margin:6px 0 0;">Datos del torneo Fútbol 7, <strong>separados</strong> de jugadores, entrenadores y equipos del club. Mismo nombre + email = un responsable; cada categoría tiene su código.</p>
+                            <p style="color:#64748b;font-size:0.92rem;margin:6px 0 0;">Preinscripciones F7 · importar a competición · recordatorio plantilla/pago al responsable.</p>
                         </div>
                         <button type="button" class="btn btn-success" onclick="loadTorneoPreinscripcionesAdmin()">🔄 Actualizar listado</button>
+                        <button type="button" class="btn btn-primary" onclick="openTorneoF7Wizard()" style="margin-left:6px;">🧙 Asistente torneo F7</button>
                     </div>
                     <p style="margin:0 0 12px;font-size:0.9rem;"><strong>Total:</strong> <span id="torneoPreinscripcionesCompCount">0</span></p>
                     <div id="torneoPreinscripcionesCompList">
@@ -4153,6 +4156,21 @@
                     
                     <button class="btn" onclick="uploadLogo()" style="background: #059669;">💾 Guardar Logo</button>
                     <button class="btn" onclick="removeLogo()" style="background: #dc3545;">🗑️ Eliminar Logo</button>
+                </div>
+
+                <!-- Privacidad web pública -->
+                <div class="section">
+                    <h3>🔒 Privacidad en la web</h3>
+                    <p><strong>Lista de jugadores/as en la página pública</strong></p>
+                    <p style="font-size: 0.9rem; color: #64748b; margin-bottom: 12px;">
+                        Por defecto los nombres y categorías de jugadores/as <strong>no</strong> se muestran a socios, amigos ni visitantes.
+                        Solo los administradores ven la lista completa en el panel. Activa la casilla cuando quieras publicarla.
+                    </p>
+                    <label style="display: flex; align-items: flex-start; gap: 10px; cursor: pointer; margin-bottom: 16px;">
+                        <input type="checkbox" id="publicPlayersListVisible" style="margin-top: 4px; width: 18px; height: 18px;">
+                        <span>Publicar jugadores/as y sus categorías en la web (sección Equipos)</span>
+                    </label>
+                    <button class="btn" onclick="savePublicPlayersPrivacySettings()" style="background: #059669;">💾 Guardar privacidad</button>
                 </div>
 
                 <!-- Mensaje del Logo -->
@@ -9681,6 +9699,14 @@
             return true;
         }
 
+        window.CdsanCompetitionEngine = {
+            buildPerCategoryTorneoCalendar,
+            saveCompetitionRecord,
+            getCompetitionById,
+            listCompetitionDates,
+            normalizeCalendarMode
+        };
+
         function getAvailableTeamsForCompetition(competition) {
             const teams = JSON.parse(localStorage.getItem('clubTeams') || '[]');
             const categories = Array.isArray(competition.categories) && competition.categories.length
@@ -10743,6 +10769,185 @@
                 applyClassicSequentialScheduling(competition, matches);
             }
             return { matches, phases };
+        }
+
+        /** Cuadro eliminatorio independiente por categoría; finales en fecha final de cada categoría. */
+        function buildPerCategoryTorneoCalendar(competition, categorySchedules) {
+            const schedules =
+                categorySchedules && typeof categorySchedules === 'object' ? categorySchedules : {};
+            const teams = (Array.isArray(competition.teams) ? competition.teams : []).filter((t) => !t.isBye);
+            const byCat = {};
+            teams.forEach((t) => {
+                const cat = String(t.category || '').trim();
+                if (!cat) return;
+                if (!byCat[cat]) byCat[cat] = [];
+                byCat[cat].push(t);
+            });
+
+            const allMatches = [];
+            const allPhases = [];
+            const catKeys = Object.keys(byCat);
+
+            catKeys.forEach((cat) => {
+                const catTeams = byCat[cat];
+                if (catTeams.length < 2) return;
+
+                let slots = catTeams.slice();
+                const bracketSize = Math.pow(2, Math.ceil(Math.log2(slots.length)));
+                while (slots.length < bracketSize) {
+                    slots.push({
+                        id: `BYE_${competition.id}_${normalizeCategoryKey(cat)}_${slots.length}`,
+                        name: 'Bye',
+                        isBye: true,
+                        category: cat
+                    });
+                }
+
+                let roundNumber = 1;
+                let currentRoundSlots = slots.map((t) => ({
+                    slotId: t.id,
+                    slotName: t.name,
+                    teamRef: t.isBye ? null : t,
+                    isBye: !!t.isBye
+                }));
+
+                while (currentRoundSlots.length > 1) {
+                    const stageName = knockoutStageNameByParticipants(currentRoundSlots.length, roundNumber);
+                    const roundMatchIds = [];
+                    const nextRoundSlots = [];
+
+                    for (let i = 0; i < currentRoundSlots.length; i += 2) {
+                        const home = currentRoundSlots[i] || null;
+                        const away = currentRoundSlots[i + 1] || null;
+                        const awayIsBye = !away || away.isBye || away.slotName === 'Bye';
+                        const homeIsBye = !home || home.isBye || home.slotName === 'Bye';
+                        const hasBye = awayIsBye || homeIsBye;
+                        const matchId = `KO_${competition.id}_${normalizeCategoryKey(cat)}_R${roundNumber}_${i / 2 + 1}`;
+
+                        let winnerTeam = null;
+                        if (hasBye) {
+                            winnerTeam = homeIsBye ? away?.teamRef || away : home?.teamRef || home;
+                        }
+
+                        const match = {
+                            id: matchId,
+                            competitionId: competition.id,
+                            round: roundNumber,
+                            stageName,
+                            categoryHint: cat,
+                            homeTeamId: homeIsBye ? null : home?.teamRef?.id || home?.slotId || null,
+                            homeTeamName: homeIsBye ? 'Bye' : home?.slotName || 'Por definir',
+                            awayTeamId: awayIsBye ? null : away?.teamRef?.id || away?.slotId || null,
+                            awayTeamName: awayIsBye ? 'Bye' : away?.slotName || 'Por definir',
+                            homeScore: hasBye && winnerTeam ? 1 : null,
+                            awayScore: hasBye && winnerTeam ? 0 : null,
+                            status: hasBye ? 'completed' : 'scheduled',
+                            winnerTeamId: hasBye && winnerTeam ? winnerTeam.id || winnerTeam.slotId : null,
+                            winnerTeamName: hasBye && winnerTeam ? winnerTeam.name || winnerTeam.slotName : null,
+                            playedAt: hasBye ? new Date().toISOString() : null,
+                            matchDate: '',
+                            matchTime: '',
+                            field: '',
+                            planMatchDate: '',
+                            planMatchTime: '',
+                            planField: ''
+                        };
+
+                        roundMatchIds.push(matchId);
+                        allMatches.push(match);
+
+                        const winnerSlot = hasBye && winnerTeam
+                            ? {
+                                  slotId: winnerTeam.id || winnerTeam.slotId,
+                                  slotName: winnerTeam.name || winnerTeam.slotName,
+                                  teamRef: winnerTeam,
+                                  isBye: false
+                              }
+                            : {
+                                  slotId: `W_${normalizeCategoryKey(cat)}_R${roundNumber}_M${i / 2 + 1}`,
+                                  slotName: `Ganador ${stageName} ${i / 2 + 1}`,
+                                  teamRef: null,
+                                  isBye: false
+                              };
+                        nextRoundSlots.push(winnerSlot);
+                    }
+
+                    allPhases.push({
+                        id: `phase_${normalizeCategoryKey(cat)}_${roundNumber}`,
+                        name: `${cat} — ${stageName}`,
+                        category: cat,
+                        teams: currentRoundSlots.length,
+                        matches: roundMatchIds,
+                        status: roundNumber === 1 ? 'active' : 'pending'
+                    });
+
+                    currentRoundSlots = nextRoundSlots;
+                    roundNumber += 1;
+                }
+            });
+
+            function scheduleCategoryKnockoutDates(matches, schedMap) {
+                const grouped = {};
+                matches.forEach((m) => {
+                    const cat = String(m.categoryHint || '').trim();
+                    if (!cat) return;
+                    if (!grouped[cat]) grouped[cat] = [];
+                    grouped[cat].push(m);
+                });
+                Object.keys(grouped).forEach((cat) => {
+                    const catMatches = grouped[cat].slice().sort((a, b) => Number(a.round) - Number(b.round));
+                    const sched = schedMap[cat] || {};
+                    const start = sched.startDate || competition.startDate;
+                    const end = sched.endDate || competition.endDate;
+                    const dates = listCompetitionDates(start, end);
+                    if (!dates.length) return;
+                    const rounds = Array.from(new Set(catMatches.map((m) => Number(m.round)))).sort((a, b) => a - b);
+                    const maxRound = rounds[rounds.length - 1];
+                    const earlyDates = dates.length > 1 ? dates.slice(0, dates.length - 1) : dates;
+                    rounds.forEach((r) => {
+                        const rMatches = catMatches.filter((m) => Number(m.round) === r);
+                        if (Number(r) === maxRound) {
+                            rMatches.forEach((m) => {
+                                m.matchDate = end;
+                                m.planMatchDate = end;
+                            });
+                            return;
+                        }
+                        rMatches.forEach((m, idx) => {
+                            const d = earlyDates[Math.min(idx, earlyDates.length - 1)] || earlyDates[0];
+                            m.matchDate = d;
+                            m.planMatchDate = d;
+                        });
+                    });
+                });
+            }
+
+            scheduleCategoryKnockoutDates(allMatches, schedules);
+
+            const mode = normalizeCalendarMode(competition.calendarMode);
+            if (mode === 'parallel_occupancy') {
+                applyParallelOccupancyScheduling(competition, allMatches);
+            } else {
+                applyClassicSequentialScheduling(competition, allMatches);
+            }
+
+            Object.keys(schedules).forEach((cat) => {
+                const end = schedules[cat].endDate || competition.endDate;
+                if (!end) return;
+                allMatches.forEach((m) => {
+                    if (normalizeCategoryKey(m.categoryHint) !== normalizeCategoryKey(cat)) return;
+                    const catRounds = allMatches
+                        .filter((x) => normalizeCategoryKey(x.categoryHint) === normalizeCategoryKey(cat))
+                        .map((x) => Number(x.round));
+                    const maxR = Math.max.apply(null, catRounds);
+                    if (Number(m.round) === maxR) {
+                        m.matchDate = end;
+                        m.planMatchDate = end;
+                    }
+                });
+            });
+
+            return { matches: allMatches, phases: allPhases, categories: catKeys };
         }
 
         function syncFirstRoundWithAssignedTeams(competition) {
@@ -19166,6 +19371,7 @@ th,td{border:1px solid #ccc;padding:5px 7px;text-align:left;white-space:nowrap;}
             // Cargar logo existente al cargar la página
             loadExistingLogo();
             loadLogoMessage();
+            loadPublicPlayersPrivacySettings();
             loadThemeSettings();
             loadContactInfo(true);
             loadSocialMediaConfig();
@@ -19243,6 +19449,42 @@ th,td{border:1px solid #ccc;padding:5px 7px;text-align:left;white-space:nowrap;}
                 console.error('❌ Error cargando logo existente:', error);
                 const preview = document.getElementById('logoPreview');
                 if (preview) preview.innerHTML = '<img src="' + ADMIN_CLUB_SHIELD_URL + '?v=3" style="max-width:100%;max-height:100%;object-fit:contain;" alt="Escudo CD Sanabria CF">';
+            }
+        }
+
+        // ===== MÓDULO DE CONFIGURACIÓN - PRIVACIDAD WEB =====
+
+        function loadPublicPlayersPrivacySettings() {
+            try {
+                const teamSettings = JSON.parse(localStorage.getItem('cdsanabriacfSettings') || '{}');
+                const chk = document.getElementById('publicPlayersListVisible');
+                if (chk) chk.checked = teamSettings.publicPlayersListVisible === true;
+            } catch (error) {
+                console.error('❌ Error cargando privacidad de jugadores:', error);
+            }
+        }
+
+        async function savePublicPlayersPrivacySettings() {
+            try {
+                const chk = document.getElementById('publicPlayersListVisible');
+                const teamSettings = JSON.parse(localStorage.getItem('cdsanabriacfSettings') || '{}');
+                teamSettings.publicPlayersListVisible = !!(chk && chk.checked);
+                localStorage.setItem('cdsanabriacfSettings', JSON.stringify(teamSettings));
+
+                if (typeof window.syncLocalSettingsBlobToFirebase === 'function') {
+                    await window.syncLocalSettingsBlobToFirebase('cdsanabriacfSettings');
+                }
+                if (typeof window.refreshPlayersLocalCache === 'function') {
+                    window.refreshPlayersLocalCache();
+                }
+
+                const estado = teamSettings.publicPlayersListVisible
+                    ? 'visible para todos en la web'
+                    : 'oculta (solo administradores)';
+                alert('✅ Privacidad guardada.\n\nLista de jugadores/as: ' + estado + '.');
+            } catch (error) {
+                console.error('❌ Error guardando privacidad de jugadores:', error);
+                alert('❌ Error al guardar la configuración de privacidad.');
             }
         }
 

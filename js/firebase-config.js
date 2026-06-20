@@ -1202,6 +1202,36 @@ async function firebaseUserIsClubAdmin() {
 }
 
 // Configurar listeners en tiempo real para sincronizaciÃ³n mÃ³vil-web
+function applyPlayersToLocalCache(players) {
+  const cached =
+    typeof window !== 'undefined' &&
+    window.ClubPublicPrivacy &&
+    typeof window.ClubPublicPrivacy.filterPlayersForLocalCache === 'function'
+      ? window.ClubPublicPrivacy.filterPlayersForLocalCache(players)
+      : players;
+
+  localStorage.setItem('clubPlayers', JSON.stringify(cached));
+  localStorage.setItem('players', JSON.stringify(cached));
+  localStorage.setItem('jugadores', JSON.stringify(cached));
+
+  if (window.updatePlayersList) {
+    window.updatePlayersList(players);
+  }
+  if (typeof window.updateDatabaseStats === 'function') {
+    try { window.updateDatabaseStats(); } catch (_) {}
+  }
+  if (typeof window.actualizarContadoresTarjetas === 'function') {
+    try { window.actualizarContadoresTarjetas(); } catch (_) {}
+  }
+}
+
+if (typeof window !== 'undefined') {
+  window.refreshPlayersLocalCache = function refreshPlayersLocalCache() {
+    const raw = Array.isArray(window.__lastRawClubPlayers) ? window.__lastRawClubPlayers : [];
+    applyPlayersToLocalCache(raw);
+  };
+}
+
 async function setupRealtimeSync() {
   if (db.isSimulation) {
     console.log('âš ï¸ Modo simulaciÃ³n - sincronizaciÃ³n en tiempo real no disponible');
@@ -1345,19 +1375,9 @@ async function setupRealtimeSync() {
           ...stripSensitivePlayerFields(doc.data(), isAdminUser)
         });
       });
-      
-      localStorage.setItem('clubPlayers', JSON.stringify(players));
-      localStorage.setItem('players', JSON.stringify(players));
-      localStorage.setItem('jugadores', JSON.stringify(players));
-      
-      console.log('ðŸ”„ Jugadores actualizados en tiempo real:', players.length);
-      
-      if (window.updatePlayersList) {
-        window.updatePlayersList(players);
-      }
-      if (typeof window.updateDatabaseStats === 'function') {
-        try { window.updateDatabaseStats(); } catch (_) {}
-      }
+
+      window.__lastRawClubPlayers = players;
+      applyPlayersToLocalCache(players);
     });
 
     const applicationsListener = onSnapshot(collection(db, DB_COLLECTIONS.PLAYER_APPLICATIONS), (snapshot) => {
@@ -1533,6 +1553,9 @@ async function setupRealtimeSync() {
         if (!String(docSnap.id).startsWith('cfg_')) return;
         applyRemoteConfigDocToLocalStorage(docSnap);
       });
+      if (typeof window.refreshPlayersLocalCache === 'function') {
+        window.refreshPlayersLocalCache();
+      }
       window.dispatchEvent(new CustomEvent('settingsBlobUpdated'));
     });
 

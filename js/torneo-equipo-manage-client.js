@@ -47,8 +47,24 @@
     return post('invite_player', { invite: invite });
   }
 
-  async function finalizeInscription() {
-    return post('finalize', {});
+  async function saveRosterBatch(players) {
+    const data = await post('save_roster_batch', { players: players });
+    return data.panel;
+  }
+
+  async function uploadFichaDocuments(fichaId, documents) {
+    const data = await post('upload_ficha_documents', {
+      fichaId: fichaId,
+      documents: documents
+    });
+    return data.panel;
+  }
+
+  async function finalizeInscription(opts) {
+    return post('finalize', {
+      inscripcionPremiosAceptados: !!(opts && opts.inscripcionPremiosAceptados),
+      payMethod: (opts && opts.payMethod) || 'card'
+    });
   }
 
   function submitRedsysRedirect(redirect) {
@@ -72,6 +88,8 @@
     refreshPanel: refreshPanel,
     saveCoach: saveCoach,
     invitePlayer: invitePlayer,
+    saveRosterBatch: saveRosterBatch,
+    uploadFichaDocuments: uploadFichaDocuments,
     finalizeInscription: finalizeInscription,
     submitRedsysRedirect: submitRedsysRedirect
   };

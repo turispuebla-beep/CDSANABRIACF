@@ -23,6 +23,65 @@
     }
   }
 
+  function parseResponsibleNumber(code) {
+    const c = String(code || '')
+      .trim()
+      .toUpperCase();
+    let m = /^TP-R(\d{3})$/.exec(c);
+    if (m) return parseInt(m[1], 10);
+    m = /^TP-R(\d{3})-/.exec(c);
+    if (m) return parseInt(m[1], 10);
+    return 0;
+  }
+
+  function formatResponsibleCode(num) {
+    return 'TP-R' + String(num).padStart(3, '0');
+  }
+
+  async function ensureResponsibleCodes(rows) {
+    if (!global.updateDocument) return rows;
+    const active = rows.filter(isActivePreinscripcion);
+    let maxR = 0;
+    active.forEach(function (r) {
+      maxR = Math.max(maxR, parseResponsibleNumber(r.responsibleCode));
+      maxR = Math.max(maxR, parseResponsibleNumber(r.accessCode));
+    });
+    const byEmail = {};
+    active.forEach(function (r) {
+      const email = String(r.contactEmail || '')
+        .trim()
+        .toLowerCase();
+      if (!email) return;
+      if (!byEmail[email]) byEmail[email] = [];
+      byEmail[email].push(r);
+    });
+    const out = rows.slice();
+    const emails = Object.keys(byEmail);
+    for (let e = 0; e < emails.length; e++) {
+      const group = byEmail[emails[e]];
+      if (group.some(function (r) { return r.responsibleCode; })) continue;
+      const rc = formatResponsibleCode(++maxR);
+      for (let i = 0; i < group.length; i++) {
+        const row = group[i];
+        if (!row.id) continue;
+        try {
+          await global.updateDocument('torneo_preinscripciones', row.id, {
+            responsibleCode: rc,
+            updatedAt: new Date().toISOString()
+          });
+          for (let j = 0; j < out.length; j++) {
+            if (out[j].id === row.id) {
+              out[j] = Object.assign({}, out[j], { responsibleCode: rc });
+            }
+          }
+        } catch (err) {
+          console.warn('[AdminTorneoPreinscripciones] responsibleCode:', err);
+        }
+      }
+    }
+    return out;
+  }
+
   function generateAccessCodeForRow(row) {
     const year = new Date().getFullYear();
     const suffix = String(row.id || row.localId || '')
@@ -141,9 +200,11 @@
       const email = String(r.contactEmail || '')
         .trim()
         .toLowerCase();
-      const key = normalizeTeamName(r.teamName) + '::' + email;
+      const rc = r.responsibleCode || 'legacy-' + email;
+      const key = rc + '::' + email;
       if (!groups[key]) {
         groups[key] = {
+          responsibleCode: r.responsibleCode || '',
           teamName: r.teamName,
           email: email,
           contactName: r.contactName || '',
@@ -208,6 +269,17 @@
         );
       })
       .join('');
+  }
+
+  function fichasDocsPendingCount(row) {
+    const fichas = Array.isArray(row.fichas) ? row.fichas : [];
+    return fichas.filter(function (f) {
+      return (
+        String(f.status || '') === 'enviada' &&
+        f.documentsPending !== false &&
+        !(f.data && f.data.documents && f.data.documents.length)
+      );
+    }).length;
   }
 
   function fichaFieldsHtml(data) {
@@ -314,7 +386,10 @@
         '<tr><td style="padding:4px 8px 4px 0;color:#64748b;"><strong>Equipo</strong></td><td>' +
         escapeHtml(row.teamName) +
         '</td></tr>' +
-        '<tr><td style="padding:4px 8px 4px 0;color:#64748b;"><strong>Código</strong></td><td>' +
+        '<tr><td style="padding:4px 8px 4px 0;color:#64748b;"><strong>Cód. responsable</strong></td><td>' +
+        escapeHtml(row.responsibleCode || '—') +
+        '</td></tr>' +
+        '<tr><td style="padding:4px 8px 4px 0;color:#64748b;"><strong>Cód. equipo</strong></td><td>' +
         escapeHtml(row.accessCode || '—') +
         '</td></tr>' +
         '<tr><td style="padding:4px 8px 4px 0;color:#64748b;"><strong>Categoría</strong></td><td>' +
@@ -332,6 +407,23 @@
         '</td></tr>' +
         '<tr><td style="padding:4px 8px 4px 0;color:#64748b;"><strong>Plantilla</strong></td><td>' +
         escapeHtml(row.plantillaStatus || 'pendiente') +
+        '</td></tr>' +
+        '<tr><td style="padding:4px 8px 4px 0;color:#64748b;"><strong>Pago</strong></td><td>' +
+        escapeHtml(row.paymentStatus || row.paymentMethod || '—') +
+        (row.offlinePaymentChannel ? ' · ' + escapeHtml(row.offlinePaymentChannel) : '') +
+        '</td></tr>' +
+        '<tr><td style="padding:4px 8px 4px 0;color:#64748b;"><strong>Premios (preinscr.)</strong></td><td>' +
+        (row.premiosAceptados
+          ? '✅ Aceptado' + (row.premiosAceptadosAt ? ' · ' + escapeHtml(formatDate(row.premiosAceptadosAt)) : '')
+          : '—') +
+        '</td></tr>' +
+        '<tr><td style="padding:4px 8px 4px 0;color:#64748b;"><strong>Premios (inscr.)</strong></td><td>' +
+        (row.inscripcionPremiosAceptados
+          ? '✅ Aceptado' +
+            (row.inscripcionPremiosAceptadosAt
+              ? ' · ' + escapeHtml(formatDate(row.inscripcionPremiosAceptadosAt))
+              : '')
+          : '—') +
         '</td></tr></table>';
 
       html +=
@@ -359,6 +451,10 @@
       } else {
         fichas.forEach(function (f, i) {
           const done = String(f.status || '') === 'enviada';
+          const docsPending =
+            done &&
+            f.documentsPending !== false &&
+            !(f.data && f.data.documents && f.data.documents.length);
           const fichaDocs = (f.id && docsByOwner[f.id]) || (f.data && f.data.documents) || [];
           html +=
             '<div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:12px 14px;margin:0 0 12px;">' +
@@ -369,8 +465,17 @@
             ' <span style="font-weight:600;color:' +
             (done ? '#059669' : '#b45309') +
             ';">' +
-            (done ? '✅ Enviada' : '⏳ Pendiente') +
-            '</span></p>';
+            (done ? '✅ Datos' : '⏳ Pendiente') +
+            '</span>' +
+            (docsPending
+              ? ' <span style="font-weight:600;color:#c2410c;font-size:0.82rem;">· DNI pendiente</span>'
+              : done
+                ? ' <span style="font-weight:600;color:#059669;font-size:0.82rem;">· DNI OK</span>'
+                : '') +
+            (f.source === 'batch_responsable'
+              ? ' <span style="font-size:0.78rem;color:#64748b;">(plantilla conjunta)</span>'
+              : '') +
+            '</p>';
           if (done && f.data) {
             html += fichaFieldsHtml(f.data);
             html += renderDocumentsHtml(fichaDocs);
@@ -438,13 +543,16 @@
     const teamGroups = buildTeamGroups(rows);
 
     const introNote =
+      '<p style="margin:0 0 10px;padding:10px 12px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;font-size:0.88rem;color:#166534;line-height:1.5;">' +
+      '<strong>Puente con Competiciones.</strong> Podéis importar inscritos como equipos invitados y enviar recordatorio de plantilla + pago al responsable.</p>' +
       '<p style="margin:0 0 10px;padding:10px 12px;background:#fef2f2;border:1px solid #fecaca;border-radius:8px;font-size:0.88rem;color:#991b1b;line-height:1.5;">' +
-      '<strong>Módulo independiente del torneo.</strong> Estos equipos y participantes son datos del evento y ' +
-      '<strong>no se enlazan</strong> con jugadores, entrenadores ni equipos del CD Sanabria CF ni con la pestaña <strong>Competiciones</strong>.</p>' +
+      '<strong>Datos del torneo F7.</strong> No se mezclan con jugadores/entrenadores del club hasta que los importéis abajo.</p>' +
       '<p style="margin:0 0 12px;font-size:0.88rem;color:#475569;line-height:1.5;">' +
-      '<strong>Mismo nombre de equipo</strong> (mayúsculas/minúsculas da igual) = <strong>un solo equipo</strong>. ' +
-      '<strong>Email del responsable</strong> = identificación del contacto del equipo (recibe invitaciones y gestiona plantillas del torneo). ' +
-      'Cada <strong>categoría</strong> tiene su <strong>código TP-2026-XXXX</strong>; el responsable entra con cualquiera de sus códigos y ve todas sus categorías.</p>' +
+      '<strong>Código responsable</strong> (TP-R001): personal, todos sus equipos. ' +
+      '<strong>Código equipo</strong> (TP-R001-INF…): una inscripción/categoría.</p>' +
+      '<p style="margin:0 0 12px;display:flex;flex-wrap:wrap;gap:8px;">' +
+      '<button type="button" class="btn btn-success" style="padding:6px 12px;font-size:0.85rem;" onclick="openImportTorneoModal()">📥 Importar inscritos a competición</button>' +
+      '</p>' +
       (duplicateCount
         ? '<p style="margin:0 0 12px;padding:10px 12px;background:#fffbeb;border:1px solid #fcd34d;border-radius:8px;font-size:0.88rem;color:#92400e;">' +
           '⚠️ Hay <strong>' +
@@ -460,8 +568,9 @@
           '<div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;font-size:0.9rem;">' +
           '<thead><tr style="background:#eff6ff;text-align:left;">' +
           '<th style="padding:8px;border-bottom:1px solid #bfdbfe;">Fecha</th>' +
-          '<th style="padding:8px;border-bottom:1px solid #bfdbfe;">Equipo / Responsable</th>' +
-          '<th style="padding:8px;border-bottom:1px solid #bfdbfe;">Código</th>' +
+          '<th style="padding:8px;border-bottom:1px solid #bfdbfe;">Responsable / contacto</th>' +
+          '<th style="padding:8px;border-bottom:1px solid #bfdbfe;">TP-R</th>' +
+          '<th style="padding:8px;border-bottom:1px solid #bfdbfe;">Equipo</th>' +
           '<th style="padding:8px;border-bottom:1px solid #bfdbfe;">Categoría</th>' +
           '<th style="padding:8px;border-bottom:1px solid #bfdbfe;">Población</th>' +
           '<th style="padding:8px;border-bottom:1px solid #bfdbfe;">Tel.</th>' +
@@ -474,14 +583,19 @@
               const multi = group.entries.length > 1;
               const header =
                 '<tr style="background:#f1f5f9;">' +
-                '<td colspan="9" style="padding:10px 8px;border-bottom:1px solid #e2e8f0;">' +
+                '<td colspan="10" style="padding:10px 8px;border-bottom:1px solid #e2e8f0;">' +
                 '<strong style="color:#1e3a8a;font-size:0.95rem;">' +
-                escapeHtml(group.teamName) +
+                (group.responsibleCode
+                  ? 'Responsable <span style="font-family:ui-monospace,monospace;">' +
+                    escapeHtml(group.responsibleCode) +
+                    '</span> · '
+                  : '') +
+                escapeHtml(group.contactName || group.teamName || 'Equipo') +
                 '</strong>' +
                 (multi
                   ? ' <span style="font-size:0.78rem;color:#475569;">(' +
                     group.entries.length +
-                    ' categorías)</span>'
+                    ' equipos/categorías)</span>'
                   : '') +
                 '<br><span style="font-size:0.82rem;color:#64748b;">Responsable: ' +
                 escapeHtml(group.contactName) +
@@ -490,12 +604,29 @@
                 '">' +
                 escapeHtml(group.email) +
                 '</a></span>' +
+                '<div style="margin-top:8px;display:flex;flex-wrap:wrap;gap:6px;">' +
+                '<button type="button" style="padding:5px 10px;font-size:0.78rem;background:#1e3a8a;color:#fff;border:none;border-radius:6px;cursor:pointer;" onclick="sendTorneoPlantillaReminder(\'' +
+                escapeHtml(group.email).replace(/'/g, "\\'") +
+                '\', \'' +
+                escapeHtml(group.responsibleCode || '').replace(/'/g, "\\'") +
+                '\')">📧 Recordatorio plantilla</button>' +
+                '<button type="button" style="padding:5px 10px;font-size:0.78rem;background:#475569;color:#fff;border:none;border-radius:6px;cursor:pointer;" onclick="copyTorneoPanelLink(\'' +
+                escapeHtml(group.email).replace(/'/g, "\\'") +
+                '\', \'' +
+                escapeHtml(group.responsibleCode || '').replace(/'/g, "\\'") +
+                '\')">🔗 Copiar enlace panel</button>' +
+                '<button type="button" style="padding:5px 10px;font-size:0.78rem;background:#059669;color:#fff;border:none;border-radius:6px;cursor:pointer;" onclick="openImportTorneoModal({contactEmail:\'' +
+                escapeHtml(group.email).replace(/'/g, "\\'") +
+                '\',responsibleCode:\'' +
+                escapeHtml(group.responsibleCode || '').replace(/'/g, "\\'") +
+                '\'})">📥 Importar a competición</button>' +
+                '</div>' +
                 '</td></tr>';
 
               const entryRows = group.entries
                 .slice()
                 .sort(function (a, b) {
-                  return new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime();
+                  return String(a.accessCode || '').localeCompare(String(b.accessCode || ''), 'es');
                 })
                 .map(function (r) {
                   const rowId = r.id || r.localId || '';
@@ -506,6 +637,7 @@
                       ? r.categories.join(', ')
                       : String(r.categories || '—');
                   const accessCode = r.accessCode ? String(r.accessCode) : '';
+                  const respCode = r.responsibleCode ? String(r.responsibleCode) : group.responsibleCode || '';
                   const rowStyle = 'border-bottom:1px solid #e2e8f0;' + (dup ? 'background:#fffbeb;' : '');
                   return (
                     '<tr style="' +
@@ -515,22 +647,17 @@
                     escapeHtml(formatDate(r.createdAt)) +
                     '</td>' +
                     '<td style="padding:8px;font-size:0.82rem;color:#64748b;">' +
+                    escapeHtml(r.teamName || '—') +
                     (dup
-                      ? '<span style="color:#b45309;font-weight:600;">⚠️ Posible duplicado</span><br>'
+                      ? '<br><span style="color:#b45309;font-weight:600;">⚠️ Posible duplicado</span>'
                       : '') +
-                    (dup && dup.codes.length
-                      ? '<span style="color:#92400e;font-size:0.75rem;">Otros códigos: ' +
-                        escapeHtml(dup.codes.join(', ')) +
-                        '</span>'
-                      : multi
-                        ? 'Inscripción categoría'
-                        : '—') +
+                    '</td>' +
+                    '<td style="padding:8px;font-family:ui-monospace,monospace;font-size:0.82rem;">' +
+                    (respCode ? escapeHtml(respCode) : '<span style="color:#94a3b8;">—</span>') +
                     '</td>' +
                     '<td style="padding:8px;font-family:ui-monospace,monospace;font-size:0.82rem;">' +
                     (accessCode
-                      ? '<strong title="Código de esta categoría">' +
-                        escapeHtml(accessCode) +
-                        '</strong>'
+                      ? '<strong>' + escapeHtml(accessCode) + '</strong>'
                       : '<span style="color:#94a3b8;">—</span>') +
                     '</td>' +
                     '<td style="padding:8px;">' +
@@ -558,7 +685,12 @@
                             '/' +
                             String(r.playerCount || r.fichas.length)
                         ) +
-                        ' fichas</span>'
+                        ' fichas</span>' +
+                        (fichasDocsPendingCount(r) > 0
+                          ? '<br><span style="color:#c2410c;">DNI pend.: ' +
+                            fichasDocsPendingCount(r) +
+                            '</span>'
+                          : '')
                       : '') +
                     '</td>' +
                     '<td style="padding:8px;white-space:nowrap;min-width:148px;">' +
@@ -644,7 +776,8 @@
         return;
       }
       const rows = await global.getDocuments('torneo_preinscripciones');
-      const withCodes = await ensureAccessCodes(Array.isArray(rows) ? rows : []);
+      const withResponsible = await ensureResponsibleCodes(Array.isArray(rows) ? rows : []);
+      const withCodes = await ensureAccessCodes(withResponsible);
       global.__torneoPreinscripcionesCache = withCodes;
       renderRows(global.__torneoPreinscripcionesCache);
     } catch (err) {

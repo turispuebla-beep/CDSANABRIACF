@@ -482,6 +482,8 @@ async function sendEventRegistrationPendingEmail(data) {
   }
 }
 
+const { getTorneoFeeForRecord, formatTorneoFeeEur, torneoPricingTableHtml, torneoPricingPlainText } = require('./torneo-pricing');
+
 function formatTorneoCategoryList(data) {
   const labels = Array.isArray(data.categoryLabels) ? data.categoryLabels : [];
   if (labels.length) return labels.join(', ');
@@ -496,6 +498,11 @@ function buildTorneoPreinscripcionConfirmedContent(data) {
   const town = escapeHtml(String(data.town || '').trim());
   const cats = escapeHtml(formatTorneoCategoryList(data));
   const players = escapeHtml(String(data.playerCount != null ? data.playerCount : '—'));
+  const feeEst =
+    data.estimatedFeeEur != null
+      ? Number(data.estimatedFeeEur)
+      : getTorneoFeeForRecord(data);
+  const feeLabel = feeEst > 0 ? formatTorneoFeeEur(feeEst) : '—';
   const contact = escapeHtml(clubContactEmail());
   const siteUrl = String(process.env.SITE_URL || '').replace(/\/$/, '');
 
@@ -510,9 +517,23 @@ function buildTorneoPreinscripcionConfirmedContent(data) {
         <tr><td><strong>Población:</strong></td><td>${town}</td></tr>
         <tr><td><strong>Categorías:</strong></td><td>${cats}</td></tr>
         <tr><td><strong>Jugadores (aprox.):</strong></td><td>${players}</td></tr>
+        <tr><td><strong>Cuota estimada:</strong></td><td>${escapeHtml(feeLabel)} (informativo)</td></tr>
       </table>
+      <p style="margin:12px 0 8px;font-weight:700;color:#713f12;font-size:0.9rem;">Cuotas por categoría</p>
+      ${torneoPricingTableHtml()}
+      <p style="font-size:0.82rem;color:#854d0e;line-height:1.45;margin:8px 0 0;">Puedes inscribir <strong>varios equipos</strong> con el mismo responsable (incluso mismo nombre y categoría): una preinscripción por equipo. Al pagar se suman (p. ej. 4× Infantil = 240 €).</p>
       <p>Esta es una <strong>preinscripción</strong>. Más adelante el club solicitará los datos completos de los integrantes del equipo.</p>
-      ${data.accessCode ? `<p style="margin:16px 0;padding:12px 16px;background:#0f172a;color:#f8fafc;border-radius:8px;font-family:ui-monospace,monospace;">Tu código de responsable: <strong>${escapeHtml(data.accessCode)}</strong><br><span style="font-size:0.85rem;font-family:system-ui,sans-serif;color:#cbd5e1;">Guárdalo para gestionar la plantilla en la web (botón «Soy responsable del equipo»).</span></p>` : ''}
+      ${data.responsibleCode ? `<div style="margin:16px 0;padding:14px 16px;background:#0f172a;color:#f8fafc;border-radius:8px;line-height:1.55;">
+        <p style="margin:0 0 8px;font-family:ui-monospace,monospace;font-size:1.05rem;">Tu código personal de responsable: <strong>${escapeHtml(data.responsibleCode)}</strong></p>
+        <p style="margin:0 0 8px;font-size:0.88rem;font-family:system-ui,sans-serif;color:#e2e8f0;">Es <strong>personal e intransferible</strong>: identifica a la persona de contacto de la preinscripción y sirve para <strong>todos tus equipos</strong> (todas las categorías que inscribas con el mismo email).</p>
+        <p style="margin:0 0 8px;font-size:0.88rem;font-family:system-ui,sans-serif;color:#cbd5e1;">Entra en la web → <strong>Soy responsable del equipo</strong> con:<br>• Código <strong>${escapeHtml(data.responsibleCode)}</strong><br>• Tu email de contacto: <strong>${escapeHtml(String(data.contactEmail || '').trim())}</strong></p>
+        <p style="margin:0;font-size:0.85rem;font-family:system-ui,sans-serif;color:#94a3b8;">No compartas este código en redes ni con otros entrenadores. Quien lo use junto con tu email puede gestionar tus inscripciones.</p>
+      </div>` : ''}
+      ${data.accessCode ? `<div style="margin:12px 0;padding:12px 16px;background:#eff6ff;border:1px solid #93c5fd;border-radius:8px;color:#1e3a8a;line-height:1.5;">
+        <p style="margin:0 0 6px;font-family:ui-monospace,monospace;">Código de <strong>este equipo</strong>: <strong>${escapeHtml(data.accessCode)}</strong></p>
+        <p style="margin:0;font-size:0.85rem;font-family:system-ui,sans-serif;color:#475569;">Identifica esta inscripción concreta (equipo y categoría). También puedes entrar al panel con este código + tu email. Si inscribes otro equipo, recibirás otro código de equipo; tu código personal ${data.responsibleCode ? `<strong>${escapeHtml(data.responsibleCode)}</strong>` : 'TP-Rxxx'} se mantiene.</p>
+      </div>` : ''}
+      ${!data.responsibleCode && data.accessCode ? `<p style="margin:16px 0;padding:12px 16px;background:#0f172a;color:#f8fafc;border-radius:8px;font-family:ui-monospace,monospace;">Código: <strong>${escapeHtml(data.accessCode)}</strong></p>` : ''}
       ${siteUrl ? `<p><a href="${escapeHtml(siteUrl)}" style="font-weight:700;color:#1d4ed8;">Web del club</a></p>` : ''}
       <p style="font-size:0.9rem;color:#64748b">Consultas: <a href="mailto:${contact}">${contact}</a></p>
     </div>`;
@@ -522,8 +543,23 @@ function buildTorneoPreinscripcionConfirmedContent(data) {
     `Equipo: ${data.teamName || ''}\n` +
     `Población: ${data.town || ''}\n` +
     `Categorías: ${formatTorneoCategoryList(data)}\n` +
-    `Jugadores (aprox.): ${data.playerCount != null ? data.playerCount : '—'}\n\n` +
-    (data.accessCode ? `Código responsable: ${data.accessCode}\n(Gestiona la plantilla en la web del club → Soy responsable del equipo)\n\n` : '') +
+    `Jugadores (aprox.): ${data.playerCount != null ? data.playerCount : '—'}\n` +
+    `Cuota estimada: ${feeLabel} (informativo)\n\n` +
+    `Cuotas por categoría:\n${torneoPricingPlainText()}\n\n` +
+    `Varios equipos (mismo responsable): una preinscripción por equipo; las cuotas se suman al pagar.\n\n` +
+    (data.responsibleCode
+      ? `CÓDIGO PERSONAL DE RESPONSABLE: ${data.responsibleCode}\n` +
+        `(Personal e intransferible — válido para todos tus equipos con el email ${String(data.contactEmail || '').trim()})\n` +
+        `Entra en la web → Soy responsable del equipo: código + tu email de contacto.\n` +
+        `No compartas este código; quien lo use con tu email puede gestionar tus inscripciones.\n\n`
+      : '') +
+    (data.accessCode
+      ? `Código de ESTE equipo: ${data.accessCode}\n` +
+        `(Esta inscripción concreta; otro equipo = otro código de equipo)\n\n`
+      : '') +
+    (data.responsibleCode || data.accessCode
+      ? `Panel: ${siteUrl ? siteUrl + '/torneo-equipo.html' : 'web del club → Soy responsable del equipo'}\n\n`
+      : '') +
     `Más adelante pediremos la ficha de cada jugador.\n` +
     `Consultas: ${clubContactEmail()}\n`;
   return { subject, html, text };
@@ -1008,6 +1044,39 @@ async function sendTorneoPlayerInviteEmail(data) {
   }
 }
 
+/** Aviso al club cuando el responsable envía invitación de ficha a un jugador/a. */
+async function sendTorneoPlayerInviteClubNotify(data) {
+  const cfg = getEmailConfig();
+  if (!cfg.ok) return { sent: false, reason: cfg.error };
+  const cats = Array.isArray(data.categoryLabels) ? data.categoryLabels.join(', ') : '—';
+  try {
+    const { sendClubAdminNotification } = require('./club-admin-notify-email');
+    await sendClubAdminNotification({
+      kind: 'torneo_invite_jugador',
+      title: 'Invitación ficha torneo enviada',
+      subject: `Invitación ficha — ${data.label || data.inviteEmail || 'Jugador/a'} — ${data.teamName || 'Equipo'}`,
+      requesterEmail: data.contactEmail,
+      nombre: data.contactName,
+      email: data.contactEmail,
+      fields: [
+        { label: 'Equipo', value: data.teamName || '—' },
+        { label: 'Evento', value: data.eventName || '—' },
+        { label: 'Categorías', value: cats },
+        { label: 'Cód. responsable', value: data.responsibleCode || '—' },
+        { label: 'Cód. equipo', value: data.accessCode || '—' },
+        { label: 'Responsable', value: data.contactName || '—' },
+        { label: 'Email responsable', value: data.contactEmail || '—' },
+        { label: 'Jugador/a invitado/a', value: data.label || '—' },
+        { label: 'Email invitación', value: data.inviteEmail || '—' },
+        { label: 'Enlace ficha', value: data.inviteUrl || '—' }
+      ]
+    });
+    return { sent: true };
+  } catch (err) {
+    return { sent: false, reason: err.message || String(err) };
+  }
+}
+
 async function sendTorneoFichaSubmittedEmails(data) {
   const cfg = getEmailConfig();
   if (!cfg.ok) return { sent: false };
@@ -1020,6 +1089,7 @@ async function sendTorneoFichaSubmittedEmails(data) {
 
   const fichaData = data.fichaData && typeof data.fichaData === 'object' ? data.fichaData : {};
   const playerName = String(data.playerName || 'Jugador/a').trim();
+  const cats = Array.isArray(data.categoryLabels) ? data.categoryLabels.join(', ') : '—';
   const fields = fichaDataToFields(fichaData);
   const docHtml = documentsHtmlPreview(fichaData.documents);
   const userAttachments = collectFichaAttachments(fichaData);
@@ -1041,6 +1111,9 @@ async function sendTorneoFichaSubmittedEmails(data) {
       fields: [
         { label: 'Equipo', value: data.teamName || '—' },
         { label: 'Evento', value: data.eventName || '—' },
+        { label: 'Categorías', value: cats },
+        { label: 'Cód. responsable', value: data.responsibleCode || '—' },
+        { label: 'Cód. equipo', value: data.accessCode || '—' },
         { label: 'Responsable', value: data.contactName || '—' },
         { label: 'Email responsable', value: data.contactEmail || '—' }
       ].concat(fields),
@@ -1107,6 +1180,11 @@ async function sendTorneoPlantillaCerradaEmails(data) {
   } = require('./torneo-email-docs');
 
   const fichas = Array.isArray(data.fichas) ? data.fichas.filter((f) => f.data) : [];
+  const cats = Array.isArray(data.categoryLabels)
+    ? data.categoryLabels.join(', ')
+    : Array.isArray(data.categories)
+      ? data.categories.join(', ')
+      : '—';
   const coachFields = coachToFields(data.coach);
   let extraHtml =
     '<p style="font-size:0.85rem;color:#64748b;line-height:1.45;margin:0 0 16px">' +
@@ -1175,9 +1253,22 @@ async function sendTorneoPlantillaCerradaEmails(data) {
       fields: [
         { label: 'Equipo', value: data.teamName },
         { label: 'Evento', value: data.eventName },
-        { label: 'Código', value: data.accessCode },
+        { label: 'Categorías', value: cats },
+        { label: 'Cód. responsable', value: data.responsibleCode || '—' },
+        { label: 'Cód. equipo', value: data.accessCode },
         { label: 'Jugadores', value: String(fichas.length) },
-        { label: 'Cuota pagada', value: data.inscriptionFeeEur != null ? data.inscriptionFeeEur + ' €' : '—' }
+        {
+          label:
+            data.paymentStatus === 'pending_validation' ? 'Cuota (pendiente)' : 'Cuota pagada',
+          value:
+            data.paymentStatus === 'pending_validation'
+              ? (data.inscriptionFeeEur != null ? data.inscriptionFeeEur + ' €' : '—') +
+                ' — ' +
+                (data.offlinePaymentChannel || data.paymentMethod || 'offline')
+              : data.inscriptionFeeEur != null
+                ? data.inscriptionFeeEur + ' €'
+                : '—'
+        }
       ].concat(coachFields),
       extraHtml,
       extraText: extraText ? 'Plantilla:\n' + extraText : '',
@@ -1187,6 +1278,36 @@ async function sendTorneoPlantillaCerradaEmails(data) {
     console.warn('sendTorneoPlantillaCerradaEmails club:', e.message || e);
   }
   if (cfg.ok && data.contactEmail) {
+    const offlineCh = String(data.offlinePaymentChannel || data.paymentMethod || '')
+      .trim()
+      .toLowerCase();
+    let payHintHtml = '';
+    let payHintText = '';
+    if (data.paymentStatus === 'pending_validation') {
+      const feeTxt = data.inscriptionFeeEur != null ? data.inscriptionFeeEur + ' €' : 'la cuota';
+      if (offlineCh === 'transferencia') {
+        payHintHtml =
+          '<p style="margin:16px 0;padding:12px 14px;background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;color:#1e40af;font-size:0.9rem;line-height:1.45;">' +
+          '<strong>Pago pendiente — transferencia:</strong> ingresa <strong>' +
+          escapeHtml(String(feeTxt)) +
+          '</strong> en la cuenta del club:<br><span style="font-family:monospace;font-size:0.95rem;">' +
+          escapeHtml(CLUB_BANK_ACCOUNT) +
+          '</span></p>';
+        payHintText =
+          '\nPago pendiente por transferencia (' +
+          feeTxt +
+          ') a: ' +
+          CLUB_BANK_ACCOUNT +
+          '\n';
+      } else if (offlineCh === 'efectivo') {
+        payHintHtml =
+          '<p style="margin:16px 0;padding:12px 14px;background:#fffbeb;border:1px solid #fcd34d;border-radius:8px;color:#713f12;font-size:0.9rem;">' +
+          '<strong>Pago pendiente — efectivo:</strong> abona <strong>' +
+          escapeHtml(String(feeTxt)) +
+          '</strong> en el club.</p>';
+        payHintText = '\nPago pendiente en efectivo (' + feeTxt + ') en el club.\n';
+      }
+    }
     try {
       await sendDirectToMemberEmail({
         memberEmail: data.contactEmail,
@@ -1199,15 +1320,306 @@ async function sendTorneoPlantillaCerradaEmails(data) {
           '<p>Hemos recibido la plantilla completa de <strong>' +
           escapeHtml(data.teamName || '') +
           '</strong> para el torneo. El club la revisará pronto.</p>' +
+          payHintHtml +
           extraHtml +
           '<p style="font-size:0.85rem;color:#64748b;margin-top:16px">Todos los datos y documentos PDF/imagen van adjuntos a este correo.</p></div>',
-        text: `Plantilla de ${data.teamName || 'equipo'} recibida por el club.\n\n${extraText}`,
+        text: `Plantilla de ${data.teamName || 'equipo'} recibida por el club.${payHintText}\n${extraText}`,
         attachments: userAttachments,
         replyTo: clubContactEmail()
       });
     } catch (_) {}
   }
   return { sent: true };
+}
+
+async function sendTorneoRosterBatchSavedEmails(data) {
+  const cfg = getEmailConfig();
+  const { fichaDataToFields, documentsHtmlPreview, collectFichaAttachments, DOC_LEGAL_TEXT } =
+    require('./torneo-email-docs');
+
+  const fichas = Array.isArray(data.fichas) ? data.fichas.filter((f) => f.data && String(f.status || '') === 'enviada') : [];
+  const cats = Array.isArray(data.categoryLabels)
+    ? data.categoryLabels.join(', ')
+    : Array.isArray(data.categories)
+      ? data.categories.join(', ')
+      : '—';
+  const docsPending = fichas.filter(function (f) {
+    return f.documentsPending !== false && !(f.data && f.data.documents && f.data.documents.length);
+  }).length;
+
+  let extraHtml =
+    '<p style="font-size:0.85rem;color:#64748b;line-height:1.45;margin:0 0 12px">' +
+    escapeHtml(DOC_LEGAL_TEXT) +
+    '</p>' +
+    '<p style="margin:0 0 16px;padding:12px 14px;background:#fffbeb;border:1px solid #fcd34d;border-radius:8px;color:#713f12;font-size:0.88rem;">' +
+    '<strong>Documentación DNI:</strong> ' +
+    (docsPending
+      ? 'Faltan documentos de ' + docsPending + ' jugador/es. El responsable puede subirlos desde el panel antes del inicio del torneo.'
+      : 'Todos los documentos están subidos.') +
+    '</p>';
+
+  fichas.forEach(function (f, i) {
+    const name = [f.data.name, f.data.surname].filter(Boolean).join(' ') || f.label || 'Jugador/a ' + (i + 1);
+    const fields = fichaDataToFields(f.data);
+    const pending =
+      f.documentsPending !== false && !(f.data.documents && f.data.documents.length);
+    extraHtml +=
+      '<h3 style="color:#1e3a8a;margin:16px 0 8px">Jugador/a ' +
+      (i + 1) +
+      ': ' +
+      escapeHtml(name) +
+      (pending ? ' <span style="color:#b45309;font-size:0.82rem;">(DNI pendiente)</span>' : '') +
+      '</h3>' +
+      '<table style="width:100%;border-collapse:collapse;margin:0 0 12px">' +
+      fields
+        .map(function (fd) {
+          return (
+            '<tr><td style="padding:4px 8px 4px 0;color:#64748b;white-space:nowrap"><strong>' +
+            escapeHtml(fd.label) +
+            '</strong></td><td style="padding:4px 0">' +
+            escapeHtml(fd.value) +
+            '</td></tr>'
+          );
+        })
+        .join('') +
+      '</table>' +
+      documentsHtmlPreview(f.data.documents);
+  });
+
+  const userAttachments = [];
+  fichas.forEach(function (f) {
+    userAttachments.push.apply(userAttachments, collectFichaAttachments(f.data));
+  });
+
+  const extraText = fichas
+    .map(function (f, i) {
+      const n = [f.data.name, f.data.surname].filter(Boolean).join(' ');
+      const pending =
+        f.documentsPending !== false && !(f.data.documents && f.data.documents.length);
+      return (i + 1) + '. ' + (n || f.label || '—') + (pending ? ' [DNI pendiente]' : '');
+    })
+    .join('\n');
+
+  try {
+    const { sendClubAdminNotification } = require('./club-admin-notify-email');
+    await sendClubAdminNotification({
+      kind: 'torneo_roster_batch',
+      title: 'Plantilla torneo registrada',
+      subject: `Plantilla registrada — ${data.teamName || 'Equipo'} — ${fichas.length} jugadores`,
+      requesterEmail: data.contactEmail,
+      nombre: data.contactName,
+      email: data.contactEmail,
+      fields: [
+        { label: 'Equipo', value: data.teamName },
+        { label: 'Evento', value: data.eventName || 'Torneo Fútbol 7 — 2026' },
+        { label: 'Categorías', value: cats },
+        { label: 'Cód. responsable', value: data.responsibleCode || '—' },
+        { label: 'Cód. equipo', value: data.accessCode },
+        { label: 'Jugadores', value: String(fichas.length) },
+        { label: 'DNI pendientes', value: String(docsPending) }
+      ],
+      extraHtml,
+      extraText: extraText ? 'Plantilla:\n' + extraText : '',
+      userAttachments
+    });
+  } catch (e) {
+    console.warn('sendTorneoRosterBatchSavedEmails club:', e.message || e);
+  }
+
+  if (cfg.ok && data.contactEmail) {
+    try {
+      await sendDirectToMemberEmail({
+        memberEmail: data.contactEmail,
+        subject: `Plantilla guardada — ${data.teamName || 'Torneo'} — ${CLUB_NAME}`,
+        html:
+          '<div style="font-family:system-ui,sans-serif;max-width:640px;line-height:1.5;color:#1e293b">' +
+          '<p>Hola, <strong>' +
+          escapeHtml(data.contactName || '') +
+          '</strong>:</p>' +
+          '<p>Has registrado la plantilla de <strong>' +
+          escapeHtml(data.teamName || '') +
+          '</strong> con <strong>' +
+          fichas.length +
+          '</strong> jugadores. El club ha recibido los datos.</p>' +
+          (docsPending
+            ? '<p style="color:#92400e;">Recuerda subir el DNI de cada jugador desde el panel antes del inicio del torneo.</p>'
+            : '') +
+          extraHtml +
+          '</div>',
+        text:
+          'Plantilla guardada para ' +
+          (data.teamName || 'equipo') +
+          ' (' +
+          fichas.length +
+          ' jugadores).\n\n' +
+          extraText,
+        attachments: userAttachments,
+        replyTo: clubContactEmail()
+      });
+    } catch (_) {}
+  }
+  return { sent: true };
+}
+
+async function sendTorneoFichaDocumentsUploadedEmail(data) {
+  const cfg = getEmailConfig();
+  if (!cfg.ok) return { sent: false };
+  const {
+    documentsHtmlPreview,
+    collectFichaAttachments,
+    DOC_LEGAL_TEXT
+  } = require('./torneo-email-docs');
+  const playerName = String(data.playerName || 'Jugador/a').trim();
+  const cats = Array.isArray(data.categoryLabels) ? data.categoryLabels.join(', ') : '—';
+  const fichaData = data.fichaData && typeof data.fichaData === 'object' ? data.fichaData : {};
+  const docHtml = documentsHtmlPreview(fichaData.documents);
+  const userAttachments = collectFichaAttachments(fichaData);
+
+  try {
+    const { sendClubAdminNotification } = require('./club-admin-notify-email');
+    await sendClubAdminNotification({
+      kind: 'torneo_ficha_documentos',
+      title: 'DNI jugador torneo',
+      subject: `DNI recibido — ${playerName} — ${data.teamName || 'Equipo'}`,
+      requesterEmail: data.contactEmail,
+      nombre: playerName,
+      fields: [
+        { label: 'Equipo', value: data.teamName || '—' },
+        { label: 'Categorías', value: cats },
+        { label: 'Cód. equipo', value: data.accessCode || '—' },
+        { label: 'Responsable', value: data.contactName || '—' }
+      ],
+      extraHtml:
+        '<p style="font-size:0.85rem;color:#64748b">' +
+        escapeHtml(DOC_LEGAL_TEXT) +
+        '</p>' +
+        docHtml,
+      userAttachments
+    });
+  } catch (e) {
+    console.warn('sendTorneoFichaDocumentsUploadedEmail club:', e.message || e);
+  }
+  return { sent: true };
+}
+
+function buildTorneoPlantillaReminderContent(data) {
+  const nombre = escapeHtml(String(data.contactName || 'Responsable').trim() || 'Responsable');
+  const panelUrl = escapeHtml(String(data.panelUrl || '').trim());
+  const respCode = data.responsibleCode ? String(data.responsibleCode).trim() : '';
+  const entries = Array.isArray(data.entries) ? data.entries : [];
+  const entryRows = entries
+    .map(function (e) {
+      const cats = Array.isArray(e.categories) ? e.categories.join(', ') : '—';
+      const submitted = e.fichasSubmitted != null ? e.fichasSubmitted : 0;
+      const pc = e.playerCount != null ? e.playerCount : '—';
+      return (
+        '<tr><td style="padding:6px 8px;border-bottom:1px solid #e2e8f0;">' +
+        escapeHtml(e.teamName || 'Equipo') +
+        '</td><td style="padding:6px 8px;border-bottom:1px solid #e2e8f0;">' +
+        escapeHtml(cats) +
+        '</td><td style="padding:6px 8px;border-bottom:1px solid #e2e8f0;font-family:ui-monospace,monospace;font-size:0.85rem;">' +
+        escapeHtml(e.accessCode || '—') +
+        '</td><td style="padding:6px 8px;border-bottom:1px solid #e2e8f0;">' +
+        escapeHtml(e.plantillaStatus || 'pendiente') +
+        ' (' +
+        escapeHtml(String(submitted)) +
+        '/' +
+        escapeHtml(String(pc)) +
+        ' fichas)</td></tr>'
+      );
+    })
+    .join('');
+
+  const subject = `Completa la plantilla del torneo — ${CLUB_NAME}`;
+  const html =
+    '<div style="font-family:system-ui,sans-serif;max-width:600px;color:#1e293b;line-height:1.5">' +
+    '<h2 style="color:#1e3a8a;margin:0 0 12px">⚽ Recordatorio — plantilla y pago</h2>' +
+    '<p>Hola, <strong>' +
+    nombre +
+    '</strong>:</p>' +
+    '<p>Te recordamos completar la <strong>plantilla</strong> de tu(s) equipo(s) inscrito(s) en el <strong>Torneo Fútbol 7 — 2026</strong> del CD Sanabria CF:</p>' +
+    '<ol style="margin:12px 0 16px;padding-left:22px;color:#334155;">' +
+    '<li style="margin-bottom:6px;">Entra en el panel con tu código + email.</li>' +
+    '<li style="margin-bottom:6px;">Rellena los datos del responsable técnico y sube documentación.</li>' +
+    '<li style="margin-bottom:6px;">Rellena la plantilla completa de jugadores en el panel (o invita por email).</li>' +
+    '<li style="margin-bottom:6px;">Sube el DNI de cada jugador antes del inicio del torneo.</li>' +
+    '<li>Cuando esté todo, pulsa <strong>Finalizar</strong> para enviar al club y pagar (si aplica).</li>' +
+    '</ol>' +
+    (respCode
+      ? '<p style="margin:0 0 12px;padding:12px 14px;background:#0f172a;color:#f8fafc;border-radius:8px;font-family:ui-monospace,monospace;">Código responsable: <strong>' +
+        escapeHtml(respCode) +
+        '</strong></p>'
+      : '') +
+    '<table style="width:100%;border-collapse:collapse;font-size:0.88rem;margin:0 0 16px;background:#f8fafc;border-radius:8px;">' +
+    '<thead><tr style="background:#eff6ff;text-align:left;">' +
+    '<th style="padding:8px;">Equipo</th><th style="padding:8px;">Categoría</th><th style="padding:8px;">Código</th><th style="padding:8px;">Plantilla</th></tr></thead><tbody>' +
+    (entryRows || '<tr><td colspan="4" style="padding:10px;">—</td></tr>') +
+    '</tbody></table>' +
+    (panelUrl
+      ? '<p style="margin:20px 0"><a href="' +
+        panelUrl +
+        '" style="display:inline-block;background:#1e3a8a;color:#fff;padding:12px 20px;border-radius:8px;text-decoration:none;font-weight:700">Abrir panel del equipo</a></p>' +
+        '<p style="font-size:0.85rem;color:#64748b">Si el botón no funciona: ' +
+        panelUrl +
+        '</p>'
+      : '') +
+    '<p style="font-size:0.9rem;color:#64748b;margin-top:16px;">Consultas: <a href="mailto:' +
+    escapeHtml(clubContactEmail()) +
+    '">' +
+    escapeHtml(clubContactEmail()) +
+    '</a></p></div>';
+
+  const textLines = entries.map(function (e) {
+    const cats = Array.isArray(e.categories) ? e.categories.join(', ') : '—';
+    return (
+      '- ' +
+      (e.teamName || 'Equipo') +
+      ' | ' +
+      cats +
+      ' | ' +
+      (e.accessCode || '—') +
+      ' | plantilla: ' +
+      (e.plantillaStatus || 'pendiente')
+    );
+  });
+  const text =
+    'Hola, ' +
+    String(data.contactName || 'Responsable') +
+    '.\n\n' +
+    'Completa la plantilla del Torneo Fútbol 7 — 2026:\n' +
+    '1) Entra al panel con código + email\n' +
+    '2) Responsable técnico + documentos\n' +
+    '3) Invita a cada jugador/a\n' +
+    '4) Finalizar y pagar\n\n' +
+    (respCode ? 'Código responsable: ' + respCode + '\n\n' : '') +
+    textLines.join('\n') +
+    '\n\nPanel: ' +
+    (data.panelUrl || '') +
+    '\n\nConsultas: ' +
+    clubContactEmail() +
+    '\n';
+
+  return { subject, html, text };
+}
+
+async function sendTorneoPlantillaReminderEmail(data) {
+  const cfg = getEmailConfig();
+  if (!cfg.ok) return { sent: false, reason: cfg.error };
+  const email = String(data.contactEmail || '').trim().toLowerCase();
+  if (!email.includes('@')) return { sent: false, reason: 'email vacío' };
+  const content = buildTorneoPlantillaReminderContent(data);
+  try {
+    const result = await sendDirectToMemberEmail({
+      memberEmail: email,
+      subject: content.subject,
+      html: content.html,
+      text: content.text,
+      replyTo: clubContactEmail()
+    });
+    return { sent: true, to: result.to, bcc: result.bcc };
+  } catch (err) {
+    return { sent: false, reason: err.message || String(err) };
+  }
 }
 
 module.exports = {
@@ -1225,7 +1637,11 @@ module.exports = {
   sendEventRegistrationConfirmedEmail,
   sendTorneoPreinscripcionConfirmedEmail,
   sendTorneoPlayerInviteEmail,
+  sendTorneoPlayerInviteClubNotify,
   sendTorneoFichaSubmittedEmails,
+  sendTorneoRosterBatchSavedEmails,
+  sendTorneoFichaDocumentsUploadedEmail,
   sendTorneoPlantillaCerradaEmails,
+  sendTorneoPlantillaReminderEmail,
   sendPaymentFailedEmail
 };

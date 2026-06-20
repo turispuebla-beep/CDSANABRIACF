@@ -20,7 +20,7 @@
       const raw = global.sessionStorage.getItem(SESSION_KEY);
       if (!raw) return null;
       const data = JSON.parse(raw);
-      if (!data || !data.accessCode || !data.contactEmail) return null;
+      if (!data || (!data.accessCode && !data.responsibleCode) || !data.contactEmail) return null;
       if (data.expiresAt && Date.now() > data.expiresAt) {
         clearSession();
         return null;
@@ -32,9 +32,15 @@
   }
 
   function writeSession(accessCode, contactEmail, panel) {
-    const activeAccessCode = panel && panel.activeAccessCode ? normalizeCode(panel.activeAccessCode) : normalizeCode(accessCode);
+    const resp =
+      panel && panel.responsibleCode
+        ? normalizeCode(panel.responsibleCode)
+        : normalizeCode(accessCode);
+    const activeAccessCode =
+      panel && panel.activeAccessCode ? normalizeCode(panel.activeAccessCode) : normalizeCode(accessCode);
     const payload = {
-      accessCode: normalizeCode(accessCode),
+      accessCode: resp,
+      responsibleCode: resp,
       activeAccessCode: activeAccessCode,
       contactEmail: String(contactEmail || '')
         .trim()
@@ -152,7 +158,7 @@
     if (!normalizeCode(code)) {
       if (errEl) {
         errEl.hidden = false;
-        errEl.textContent = 'Introduce el código de equipo (ej. TP-2026-A1B2).';
+        errEl.textContent = 'Introduce tu código de responsable (TP-R001) o de equipo (TP-R001-INF).';
       }
       return;
     }

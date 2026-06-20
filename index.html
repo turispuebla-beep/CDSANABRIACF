@@ -26,12 +26,14 @@
     <script src="js/admin-session.js"></script>
     <script src="js/site-update-mode.js"></script>
     <script src="js/player-application.js"></script>
+    <script src="js/club-torneo-pricing.js"></script>
     <script src="js/torneo-preinscripcion.js"></script>
     <script src="js/torneo-responsable-access.js"></script>
     <script src="js/colaborador-solicitud.js"></script>
     <script src="js/club-default-advertisers.js"></script>
     <script src="js/club-social-share.js"></script>
     <script src="js/club-email-notify.js"></script>
+    <script src="js/club-public-privacy.js"></script>
     <script src="js/payment-method-picker.js"></script>
     <!-- Configuración Firebase CDSANABRIACF -->
     <script type="module" src="js/firebase-config.js"></script>
@@ -1248,7 +1250,7 @@
 
         .proximo-evento-club {
             margin: 0 auto 22px;
-            max-width: 560px;
+            max-width: 780px;
             padding: 14px 12px 16px;
             text-align: center;
             background: linear-gradient(160deg, #ffffff 0%, #eff6ff 55%, #ecfdf5 100%);
@@ -2574,7 +2576,7 @@
                         type="button"
                         class="proximo-evento-poster-wrap"
                         onclick="abrirCartelProximoEvento('assets/torneo-inscripciones-2026.jpg')"
-                        aria-label="Ampliar cartel"
+                        aria-label="Ampliar cartel de inscripciones"
                     >
                         <img
                             src="assets/torneo-inscripciones-2026.jpg"
@@ -2584,6 +2586,23 @@
                             aria-hidden="true"
                         >
                     </button>
+                </div>
+                <div class="proximo-evento-col proximo-evento-col--inscrip">
+                    <button
+                        type="button"
+                        class="proximo-evento-poster-wrap"
+                        onclick="abrirCartelProximoEvento('assets/TORNEO.jpg')"
+                        aria-label="Ampliar cartel SAASET del torneo"
+                    >
+                        <img
+                            src="assets/TORNEO.jpg"
+                            alt=""
+                            class="proximo-evento-poster"
+                            loading="lazy"
+                            aria-hidden="true"
+                        >
+                    </button>
+                    <p class="proximo-evento-zoom-hint">Cartel SAASET</p>
                 </div>
             </div>
         </section>
@@ -2867,6 +2886,10 @@
                 <p style="color:#64748b;font-size:0.9rem;line-height:1.45;margin:0 0 16px;">
                     Reserva plaza para tu equipo. No hace falta estar registrado en la web. Después recogeremos los datos completos de todos los integrantes.
                 </p>
+                <div id="tpPricingNotice"></div>
+                <p style="color:#475569;font-size:0.85rem;line-height:1.45;margin:0 0 12px;padding:10px 12px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;">
+                    ¿Varios equipos con el mismo responsable? Envía <strong>una preinscripción por cada equipo</strong> (puede repetir nombre y categoría). Recibirás un <strong>código de responsable</strong> (TP-R001, personal) y un <strong>código de equipo</strong> por inscripción (TP-R001-INF…). Al pagar se suman todas las cuotas (p. ej. 2× Infantil 60 € = 120 €).
+                </p>
                 <p style="color:#475569;font-size:0.85rem;line-height:1.45;margin:0 0 16px;padding:10px 12px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;">
                     El club puede solicitar documentación acreditativa de edad (DNI por ambas caras u otro documento válido) y su presentación física en cualquier momento, aunque ya se hubiera enviado por la web.
                 </p>
@@ -2886,6 +2909,7 @@
                     <span class="tp-categories-hint" style="display:block;font-weight:600;color:#334155;margin-top:12px;">Categorías en las que desea participar *</span>
                     <p class="tp-categories-hint">Puedes marcar más de una si el equipo compite en varias.</p>
                     <div id="tpCategoriesBox" class="tp-categories-box" role="group" aria-label="Categorías del torneo"></div>
+                    <p id="tpSelectedFee" style="margin:8px 0 0;font-size:0.88rem;color:#713f12;font-weight:600;display:none;"></p>
 
                     <label for="tpContactName">Persona de contacto *</label>
                     <input type="text" id="tpContactName" name="tpContactName" required autocomplete="name">
@@ -2901,7 +2925,19 @@
                         <button type="button" onclick="openUneteClubFromTorneoPreinscripcion()">Únete al club →</button>
                     </div>
 
-                    <button type="submit" class="btn-primary" style="width:100%;margin-top:18px;">Enviar preinscripción</button>
+                    <p style="margin:16px 0 12px;padding:12px 14px;background:#fffbeb;border:1px solid #fcd34d;border-radius:8px;font-size:0.85rem;line-height:1.5;color:#713f12;">
+                        <strong style="display:block;margin-bottom:6px;color:#92400e;">Premios del torneo</strong>
+                        Los premios se repartirán con una parte de la recaudación obtenida con las inscripciones al Torneo Fútbol 7 — 2026. El importe destinado a premios dependerá del número final de equipos inscritos y de la cuota recaudada, por lo que las cantidades publicitadas en carteles o comunicaciones son orientativas y podrán ajustarse al cierre de inscripciones.
+                    </p>
+                    <label style="display:flex;align-items:flex-start;gap:10px;margin:0 0 16px;font-size:0.88rem;line-height:1.45;color:#334155;cursor:pointer;">
+                        <input type="checkbox" id="tpPremiosAceptados" name="tpPremiosAceptados" required style="margin-top:3px;width:18px;height:18px;flex-shrink:0;">
+                        <span>He leído y acepto los términos.</span>
+                    </label>
+
+                    <button type="submit" class="btn-primary" style="width:100%;margin-top:4px;">Enviar preinscripción</button>
+                    <p style="margin:12px 0 0;font-size:0.82rem;color:#64748b;line-height:1.45;text-align:center;">
+                        La cuota se paga con <strong>tarjeta</strong>, <strong>transferencia</strong> o <strong>efectivo</strong> al completar la plantilla en el panel del responsable.
+                    </p>
                 </form>
             </div>
         </div>
@@ -2913,8 +2949,11 @@
                 <p id="tpSuccessMainText" style="color:#334155;line-height:1.55;margin:0 0 16px;">
                     Hemos guardado los datos de tu equipo. Más adelante pediremos la ficha de cada jugador.
                 </p>
+                <p id="tpSuccessAnotherTeam" style="color:#475569;font-size:0.88rem;line-height:1.45;margin:0 0 12px;padding:10px 12px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;display:none;">
+                    ¿Otro equipo con el mismo responsable? Pulsa <strong>Inscríbete</strong> de nuevo (mismo nombre y categoría permitido). Mantendrás el mismo código TP-Rxxx; cada inscripción tendrá su código de equipo (TP-Rxxx-INF…).
+                </p>
                 <p id="tpSuccessEmailText" style="color:#64748b;font-size:0.92rem;line-height:1.5;margin:0 0 20px;">
-                    📧 Te enviaremos un correo de confirmación y el club recibirá el aviso automáticamente.
+                    📧 Te enviaremos un correo con tu código personal y el de este equipo. Guárdalos; los necesitarás con tu email para gestionar la plantilla.
                 </p>
                 <a id="tpMailtoClubBtn" class="btn-primary" href="#" style="display:none;text-align:center;text-decoration:none;margin-bottom:10px;width:100%;box-sizing:border-box;">📧 Enviar aviso al club por correo (respaldo)</a>
                 <button type="button" class="btn-secondary" style="width:100%;" onclick="closeTorneoPreinscripcionSuccessModal()">Cerrar</button>
@@ -2927,17 +2966,17 @@
                 <span class="close" onclick="closeTorneoResponsableAccessModal()" aria-label="Cerrar">&times;</span>
                 <h2 id="treModalTitle">👤 Soy responsable del equipo</h2>
                 <p class="tre-access-intro">
-                    Si ya preinscribiste tu equipo, entra con el <strong>código</strong> que recibiste por correo y el <strong>email de contacto</strong> de la preinscripción.
+                    Entra con tu <strong>código de responsable</strong> (TP-R001, personal para todos tus equipos) o con el <strong>código de un equipo</strong> (TP-R001-INF) y el <strong>email de contacto</strong> de la preinscripción.
                 </p>
                 <div class="tre-access-steps" aria-hidden="true">
-                    <div class="tre-access-step"><strong>1</strong> Código del equipo</div>
+                    <div class="tre-access-step"><strong>1</strong> TP-Rxxx o TP-Rxxx-INF</div>
                     <div class="tre-access-step"><strong>2</strong> Tu email de contacto</div>
                     <div class="tre-access-step"><strong>3</strong> Gestiona la plantilla</div>
                 </div>
                 <form id="treAccessForm" class="tre-access-form" onsubmit="submitTorneoResponsableAccess(event)">
-                    <label for="treAccessCode">Código de equipo</label>
-                    <input type="text" id="treAccessCode" name="treAccessCode" placeholder="TP-2026-A1B2" autocomplete="off" autocapitalize="characters" spellcheck="false" required>
-                    <p class="tre-access-code-hint">Formato: TP-2026-XXXX (lo encontrarás en el correo de confirmación).</p>
+                    <label for="treAccessCode">Código de responsable o de equipo</label>
+                    <input type="text" id="treAccessCode" name="treAccessCode" placeholder="TP-R001 o TP-R001-INF" autocomplete="off" autocapitalize="characters" spellcheck="false" required>
+                    <p class="tre-access-code-hint">Responsable: TP-R001 (mismo para todos tus equipos). Equipo: TP-R001-INF, TP-R001-INF-2, TP-R001-JUV…</p>
 
                     <label for="treContactEmail">Email de contacto</label>
                     <input type="email" id="treContactEmail" name="treContactEmail" placeholder="El mismo que usaste al inscribir el equipo" autocomplete="email" required>
@@ -4786,21 +4825,48 @@
 
         function renderTorneoPreinscripcionCategories() {
             const box = document.getElementById('tpCategoriesBox');
+            const pricingEl = document.getElementById('tpPricingNotice');
+            if (pricingEl && window.ClubTorneoPricing && window.ClubTorneoPricing.pricingNoticeHtml) {
+                pricingEl.innerHTML = window.ClubTorneoPricing.pricingNoticeHtml();
+            }
             if (!box || !window.TorneoPreinscripcion) return;
             const cats = window.TorneoPreinscripcion.getCategories();
             box.innerHTML = cats
                 .map(function (c) {
+                    const fee =
+                        c.feeEur && window.ClubTorneoPricing
+                            ? window.ClubTorneoPricing.formatEur(c.feeEur)
+                            : '';
                     return (
                         '<label class="tp-category-option">' +
                         '<input type="checkbox" name="tpCategory" value="' +
                         c.id +
-                        '">' +
+                        '" onchange="updateTorneoPreinscripcionSelectedFee()">' +
                         '<span>' +
                         c.label +
+                        (fee ? ' <em style="font-weight:600;color:#713f12;">(' + fee + ')</em>' : '') +
                         '</span></label>'
                     );
                 })
                 .join('');
+            updateTorneoPreinscripcionSelectedFee();
+        }
+
+        function updateTorneoPreinscripcionSelectedFee() {
+            const el = document.getElementById('tpSelectedFee');
+            if (!el || !window.TorneoPreinscripcion) return;
+            const categories = [];
+            document.querySelectorAll('#tpCategoriesBox input[name="tpCategory"]:checked').forEach(function (input) {
+                categories.push(input.value);
+            });
+            const fee = window.TorneoPreinscripcion.estimateFeeEur(categories);
+            if (fee > 0 && window.ClubTorneoPricing) {
+                el.style.display = 'block';
+                el.textContent = 'Cuota estimada de esta preinscripción: ' + window.ClubTorneoPricing.formatEur(fee);
+            } else {
+                el.style.display = 'none';
+                el.textContent = '';
+            }
         }
 
         function openTorneoPreinscripcionModal() {
@@ -4869,7 +4935,8 @@
                 categories: categories,
                 contactName: document.getElementById('tpContactName').value.trim(),
                 contactEmail: document.getElementById('tpContactEmail').value.trim(),
-                contactPhone: document.getElementById('tpContactPhone').value.trim()
+                contactPhone: document.getElementById('tpContactPhone').value.trim(),
+                premiosAceptados: !!document.getElementById('tpPremiosAceptados')?.checked
             };
         }
 
@@ -4881,9 +4948,35 @@
             let mailtoUrl = '';
 
             if (result && result.serverOk) {
+                const pre = result.preinscripcion || {};
+                const respCode = pre.responsibleCode ? String(pre.responsibleCode) : '';
+                const teamCode = pre.accessCode ? String(pre.accessCode) : '';
                 if (mainText) {
-                    mainText.textContent =
-                        'Hemos guardado los datos de tu equipo en el club. Más adelante pediremos la ficha de cada jugador.';
+                    if (respCode || teamCode) {
+                        let codeHtml =
+                            'Hemos guardado los datos de tu equipo. Más adelante pediremos la ficha de cada jugador.';
+                        if (respCode) {
+                            codeHtml +=
+                                '<br><br><span style="display:block;padding:12px 14px;background:#0f172a;color:#f8fafc;border-radius:8px;font-size:0.9rem;line-height:1.5;">' +
+                                '<strong style="font-family:ui-monospace,monospace;font-size:1rem;">Tu código personal: ' +
+                                respCode +
+                                '</strong><br><span style="display:block;margin-top:8px;font-size:0.85rem;color:#e2e8f0;">Personal e intransferible. Sirve para <strong>todos tus equipos</strong> con el email de esta preinscripción. Entra en «Soy responsable del equipo» con este código + tu email.</span>' +
+                                '<span style="display:block;margin-top:6px;font-size:0.82rem;color:#94a3b8;">No lo compartas en redes ni con otros entrenadores.</span></span>';
+                        }
+                        if (teamCode) {
+                            codeHtml +=
+                                '<span style="display:block;margin-top:8px;padding:12px 14px;background:#eff6ff;color:#1e3a8a;border:1px solid #bfdbfe;border-radius:8px;font-size:0.9rem;line-height:1.5;">' +
+                                'Código de <strong>este equipo</strong>: <strong style="font-family:ui-monospace,monospace;">' +
+                                teamCode +
+                                '</strong><br><span style="font-size:0.85rem;color:#475569;">Esta inscripción concreta. Otro equipo = otro código; tu código personal' +
+                                (respCode ? ' <strong>' + respCode + '</strong>' : '') +
+                                ' se mantiene.</span></span>';
+                        }
+                        mainText.innerHTML = codeHtml;
+                    } else {
+                        mainText.textContent =
+                            'Hemos guardado los datos de tu equipo en el club. Más adelante pediremos la ficha de cada jugador.';
+                    }
                 }
                 if (emailText) {
                     emailText.textContent = result.emailContactSent
@@ -4923,6 +5016,8 @@
             }
 
             const m = document.getElementById('torneoPreinscripcionSuccessModal');
+            const another = document.getElementById('tpSuccessAnotherTeam');
+            if (another) another.style.display = 'block';
             if (m) m.style.display = 'block';
         }
 
@@ -6044,7 +6139,11 @@
                 const teams = JSON.parse(localStorage.getItem('clubTeams') || '[]');
                 const boardMembers = JSON.parse(localStorage.getItem('clubBoard') || '[]')
                     .filter(member => member.visible !== false && member.status !== 'inactive');
-                updateBadge('equipos', players.length + coaches.length + boardMembers.length, 'personas');
+                const playersForBadge =
+                    window.ClubPublicPrivacy && !window.ClubPublicPrivacy.isPublicPlayersListVisible()
+                        ? 0
+                        : players.length;
+                updateBadge('equipos', playersForBadge + coaches.length + boardMembers.length, 'personas');
                 
                 // Calendario: próximos encuentros + eventos activos con fecha futura o hoy
                 const tCal0 = new Date();
@@ -6091,6 +6190,7 @@
                 console.error('Error actualizando contadores:', error);
             }
         }
+        window.actualizarContadoresTarjetas = actualizarContadoresTarjetas;
         
         function updateBadge(id, count, label) {
             const badge = document.getElementById(`badge-${id}`);
@@ -11900,6 +12000,7 @@
         }
 
         function buildPublicTeamSections(players, coaches, teams, boardMembers = []) {
+            const hidePlayerData = window.ClubPublicPrivacy && !window.ClubPublicPrivacy.isPublicPlayersListVisible();
             let html = '';
             if (teams.length > 0) {
                 const activeTeams = teams.filter(t => String(t.status || 'active') === 'active');
@@ -11910,7 +12011,7 @@
                             ${activeTeams.map(team => `
                                 <div style="background:#f8fafc; border:1px solid #e5e7eb; border-radius:10px; padding:12px;">
                                     <strong>${team.name || 'Equipo'}</strong>
-                                    <p style="margin:6px 0; font-size:0.85rem; color:#475569;">Categoría: ${team.category || '-'}</p>
+                                    ${!hidePlayerData && team.category ? `<p style="margin:6px 0; font-size:0.85rem; color:#475569;">Categoría: ${team.category}</p>` : ''}
                                     ${team.coach ? `<p style="margin:4px 0; font-size:0.85rem; color:#475569;">Entrenador: ${team.coach}</p>` : ''}
                                     ${team.schedule ? `<p style="margin:4px 0; font-size:0.8rem; color:#64748b;">${team.schedule}</p>` : ''}
                                 </div>
@@ -11929,7 +12030,7 @@
                                 <div style="background: #f8f9fa; padding: 15px; border-radius: 10px; text-align: center; border-left: 4px solid var(--secondary-color);">
                                     <h5 style="color: var(--text-color); margin-bottom: 8px;">${getPublicCoachName(coach)}</h5>
                                     <p style="color: var(--secondary-color); font-weight: bold; font-size: 0.9rem;">${getPublicCoachRole(coach)}</p>
-                                    ${(coach.team || coach.category) ? `<p style="color: var(--text-light-color); font-size: 0.8rem;">${coach.team || coach.category}</p>` : ''}
+                                    ${!hidePlayerData && (coach.team || coach.category) ? `<p style="color: var(--text-light-color); font-size: 0.8rem;">${coach.team || coach.category}</p>` : ''}
                                 </div>
                             `).join('')}
                         </div>
@@ -12002,6 +12103,8 @@
                         </div>
                     </div>
                 `;
+            } else if (window.ClubPublicPrivacy && !window.ClubPublicPrivacy.isPublicPlayersListVisible()) {
+                html += window.ClubPublicPrivacy.playersHiddenNoticeHtml();
             }
             return html;
         }
@@ -12053,21 +12156,33 @@
         
         // Función para generar vista pública del equipo (SOLO DATOS BÁSICOS)
         function generatePublicTeamView(players, coaches, teams = [], boardMembers = []) {
+            const showPlayerData = !window.ClubPublicPrivacy || window.ClubPublicPrivacy.isPublicPlayersListVisible();
             const categoriesSet = new Set();
-            players.forEach(p => {
-                const c = extractPublicCategory(getPublicPlayerCategory(p));
-                if (c) categoriesSet.add(c);
-            });
-            coaches.forEach(c => {
-                const category = extractPublicCategory(c.team || c.category);
-                if (category) categoriesSet.add(category);
-            });
-            teams.forEach(t => {
-                const c = extractPublicCategory(t.category);
-                if (c) categoriesSet.add(c);
-            });
+            if (showPlayerData) {
+                players.forEach(p => {
+                    const c = extractPublicCategory(getPublicPlayerCategory(p));
+                    if (c) categoriesSet.add(c);
+                });
+                coaches.forEach(c => {
+                    const category = extractPublicCategory(c.team || c.category);
+                    if (category) categoriesSet.add(category);
+                });
+                teams.forEach(t => {
+                    const c = extractPublicCategory(t.category);
+                    if (c) categoriesSet.add(c);
+                });
+            }
             const categories = Array.from(categoriesSet).sort((a, b) => a.localeCompare(b, 'es'));
             window.__publicTeamCache = { players: [...players], coaches: [...coaches], teams: [...teams], boardMembers: [...boardMembers] };
+
+            const categoryFilterHtml = showPlayerData && categories.length > 0 ? `
+                    <div style="display:flex; justify-content:center; align-items:center; gap:8px; margin-bottom:18px; flex-wrap:wrap;">
+                        <label for="publicTeamCategoryFilter" style="font-size:0.9rem; color:#334155;"><strong>Filtrar categoría:</strong></label>
+                        <select id="publicTeamCategoryFilter" onchange="applyPublicTeamCategoryFilter()" style="padding:6px 10px; border:1px solid #cbd5e1; border-radius:8px;">
+                            <option value="all">Todas</option>
+                            ${categories.map(c => `<option value="${c}">${c}</option>`).join('')}
+                        </select>
+                    </div>` : '';
 
             let html = `
                 <div style="max-height: 600px; overflow-y: auto;">
@@ -12075,13 +12190,7 @@
                     <p style="text-align: center; color: var(--text-light-color); margin-bottom: 30px; font-size: 0.9rem;">
                         🔒 <strong>Información pública</strong> - Solo se muestran datos básicos por protección de datos
                     </p>
-                    <div style="display:flex; justify-content:center; align-items:center; gap:8px; margin-bottom:18px; flex-wrap:wrap;">
-                        <label for="publicTeamCategoryFilter" style="font-size:0.9rem; color:#334155;"><strong>Filtrar categoría:</strong></label>
-                        <select id="publicTeamCategoryFilter" onchange="applyPublicTeamCategoryFilter()" style="padding:6px 10px; border:1px solid #cbd5e1; border-radius:8px;">
-                            <option value="all">Todas</option>
-                            ${categories.map(c => `<option value="${c}">${c}</option>`).join('')}
-                        </select>
-                    </div>
+                    ${categoryFilterHtml}
                     <div id="publicTeamDynamicContent">
                         ${buildPublicTeamSections(players, coaches, teams, boardMembers)}
                     </div>
@@ -12103,6 +12212,10 @@
         // Función para mostrar equipos como amigo (vista limitada)
         function viewTeamsAsFriend() {
             console.log('🤝 Ver equipos como amigo - vista limitada');
+            if (window.ClubPublicPrivacy && !window.ClubPublicPrivacy.isPublicPlayersListVisible()) {
+                showModal('⚽ Nuestro Equipo', window.ClubPublicPrivacy.playersHiddenNoticeHtml());
+                return;
+            }
             const players = JSON.parse(localStorage.getItem('clubPlayers') || '[]');
             
             if (players.length === 0) {

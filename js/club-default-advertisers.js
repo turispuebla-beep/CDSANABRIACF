@@ -6,7 +6,7 @@
   'use strict';
 
   const STORAGE_KEY = 'clubAdvertisements';
-  const SEED_VERSION = '2026-anunciantes-v1';
+  const SEED_VERSION = '2026-anunciantes-v3';
 
   const DEFAULT_ADVERTISERS = [
     {
@@ -83,6 +83,21 @@
       mediaName: 'pintu.jpg',
       image: 'assets/anunciantes/PINTU.jpg',
       mediaData: 'assets/anunciantes/PINTU.jpg'
+    },
+    {
+      id: 'AD_SEED_GALENDE',
+      title: 'Hermanos Galende',
+      company: 'Hermanos Galende',
+      description: 'Colaborador del CD Sanabria CF.',
+      url: 'https://www.hermanosgalende.es/',
+      category: 'comercio',
+      position: 6,
+      status: 'active',
+      type: 'carrusel',
+      mediaKind: 'image',
+      mediaName: 'GALENDE.jpg',
+      image: 'assets/GALENDE.jpg',
+      mediaData: 'assets/GALENDE.jpg'
     }
   ];
 

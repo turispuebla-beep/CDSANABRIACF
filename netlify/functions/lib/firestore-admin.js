@@ -2255,13 +2255,13 @@ function torneoPreinscripcionesRef() {
 }
 
 const TORNEO_CATEGORY_LABELS = {
-  prebenjamin: 'Prebenjamín',
+  prebenjamin: 'Prebenjamín (Chupetines)',
   benjamin: 'Benjamín',
   alevin: 'Alevín',
   infantil: 'Infantil',
   cadete: 'Cadete',
   juvenil: 'Juvenil',
-  senior: 'Aficionado',
+  senior: 'Senior',
   aficionado: 'Aficionado'
 };
 
@@ -2294,6 +2294,7 @@ function normalizeTorneoPreinscripcionFields(raw) {
     : [];
   const playerCount = parseInt(d.playerCount, 10);
   const now = new Date().toISOString();
+  const premiosOk = d.premiosAceptados === true || d.premiosAceptados === 'true';
   return {
     eventName: String(d.eventName || 'Torneo Fútbol 7 — 2026').trim(),
     teamName: String(d.teamName || '').trim(),
@@ -2304,6 +2305,8 @@ function normalizeTorneoPreinscripcionFields(raw) {
     contactName: String(d.contactName || '').trim(),
     contactEmail: String(d.contactEmail || '').trim().toLowerCase(),
     contactPhone: String(d.contactPhone || '').trim(),
+    premiosAceptados: premiosOk,
+    premiosAceptadosAt: premiosOk ? String(d.premiosAceptadosAt || now).trim() : null,
     status: String(d.status || 'preinscripcion_enviada').trim(),
     source: String(d.source || 'web').trim(),
     localId: d.localId ? String(d.localId) : null,
@@ -2345,6 +2348,16 @@ function buildTorneoEquipoPanelPayload(record) {
       updatedAt: f.updatedAt || null
     }))
   };
+}
+
+async function listActiveTorneoPreinscripciones() {
+  const snap = await torneoPreinscripcionesRef().get();
+  const out = [];
+  snap.forEach(function (doc) {
+    const row = { id: doc.id, ...(doc.data() || {}) };
+    if (isActiveTorneoPreinscripcion(row)) out.push(row);
+  });
+  return out;
 }
 
 async function findTorneoPreinscripcionByAccessCode(accessCode) {
@@ -2453,23 +2466,41 @@ async function createTorneoPreinscripcionRecord(raw) {
     throw new Error('Email de contacto no válido');
   }
   if (!patch.contactPhone) throw new Error('Teléfono de contacto obligatorio');
-
-  const duplicate = await findDuplicateTorneoPreinscripcion(patch);
-  if (duplicate) {
-    const dupCode = duplicate.accessCode ? ' Código existente: ' + duplicate.accessCode + '.' : '';
-    throw new Error(
-      'Ya hay una preinscripción para este equipo (mismo nombre), responsable (email) y categoría.' + dupCode
-    );
+  if (String(patch.source || 'web') === 'web' && !patch.premiosAceptados) {
+    throw new Error('Debes leer y aceptar los términos sobre premios.');
   }
 
+  // Varias preinscripciones con mismo nombre, categoría y email están permitidas
+  // (varios equipos del mismo responsable: cada una = código de equipo propio).
+
+  const { getTorneoFeeForRecord } = require('./torneo-pricing');
+  const { assignCodesForNewPreinscripcion } = require('./torneo-codes');
+  patch.estimatedFeeEur = getTorneoFeeForRecord(patch);
   patch.teamKey = normalizeTorneoTeamName(patch.teamName);
+
+  const allActive = await listActiveTorneoPreinscripciones();
+  const existingForEmail = allActive.filter(function (r) {
+    return String(r.contactEmail || '').trim().toLowerCase() === patch.contactEmail;
+  });
+  const codes = assignCodesForNewPreinscripcion(patch, existingForEmail, allActive);
+  patch.responsibleCode = codes.responsibleCode;
+  patch.accessCode = codes.accessCode;
 
   const ref = torneoPreinscripcionesRef().doc();
   const id = ref.id;
-  const accessCode = patch.accessCode ? normalizeTorneoAccessCode(patch.accessCode) : generateTorneoAccessCode(id);
-  await ref.set({ ...patch, id, accessCode, plantillaStatus: 'pendiente', fichas: [], panelEnabled: true }, { merge: true });
+  await ref.set(
+    {
+      ...patch,
+      id,
+      plantillaStatus: 'pendiente',
+      fichas: [],
+      panelEnabled: true,
+      isNewResponsible: codes.isNewResponsible
+    },
+    { merge: true }
+  );
   const snap = await ref.get();
-  return { id, ...(snap.exists ? snap.data() : { ...patch, accessCode }) };
+  return { id, ...(snap.exists ? snap.data() : patch), isNewResponsible: codes.isNewResponsible };
 }
 
 function coachesRef() {
