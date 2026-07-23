@@ -445,7 +445,7 @@ async function completeMembershipPayment(payment, redsysParams) {
   }
 }
 
-/** Aviso al usuario cuando la pasarela rechaza o cancela el pago (sin registrar datos). */
+/** Aviso cuando la pasarela rechaza o cancela el pago (ficha puede quedar pendiente). */
 async function sendPaymentFailedNotification(payment) {
   if (!payment || payment.failedEmailSent) return { sent: false, reason: 'ya enviado' };
   const orderId = payment.orderId || payment.id;
@@ -457,6 +457,36 @@ async function sendPaymentFailedNotification(payment) {
       type: payment.type,
       amountEur: payment.amountEur
     });
+
+    // Inscripción jugador: avisar al club del fallo (la ficha ya está pendiente en nube).
+    if (payment.type === 'player_inscription') {
+      const reg = payment.playerRegistration || {};
+      const email = String(reg.email || payment.customerEmail || '').trim().toLowerCase();
+      try {
+        const { sendClubAdminNotification } = require('./club-admin-notify-email');
+        await sendClubAdminNotification({
+          kind: 'inscripcion_jugador',
+          title: 'Pago tarjeta no completado — ficha pendiente',
+          subject: 'Inscripción jugador — pago tarjeta fallido (pendiente)',
+          paymentChannel: 'tarjeta',
+          requesterEmail: email || payment.customerEmail,
+          playerId: payment.playerId || reg.id,
+          nombre: reg.name || reg.nombre,
+          apellidos: reg.surname || reg.apellidos,
+          dni: reg.dni,
+          email: email || payment.customerEmail,
+          telefono: reg.phone || reg.telefono,
+          fields: [
+            { label: 'Estado', value: 'Pendiente de pago (pago pasarela no confirmado)' },
+            { label: 'Pedido', value: orderId || '—' },
+            { label: 'Importe (€)', value: payment.amountEur != null ? payment.amountEur : '—' }
+          ]
+        });
+      } catch (clubErr) {
+        console.warn('Email club tras KO tarjeta:', clubErr.message || clubErr);
+      }
+    }
+
     if (result.sent && orderId) {
       await updatePayment(orderId, { failedEmailSent: true });
     }
@@ -2014,19 +2044,141 @@ async function repairPlayerInscriptionsFromPaymentOrders(orderIds) {
   return { ok: true, repaired: results.length, results };
 }
 
+/** Recupera alta de socio desde pedido Redsys (pagado → activa; pendiente con bundle → ficha pending). */
+async function repairMembershipFromPaymentOrder(orderId) {
+  const oid = String(orderId || '').trim();
+  if (!oid) throw new Error('orderId requerido');
+  const payment = await getPayment(oid);
+  if (!payment) throw new Error('Pago no encontrado: ' + oid);
+  if (payment.type !== 'membership_fee') {
+    throw new Error('El pedido no es cuota de socio/a: ' + oid);
+  }
+  const status = String(payment.status || '').toLowerCase();
+  const bundleMember =
+    payment.registrationBundle && payment.registrationBundle.member
+      ? payment.registrationBundle.member
+      : null;
+
+  if (status === 'paid') {
+    await completeMembershipPayment(payment, {});
+  } else if (bundleMember) {
+    const saved = await upsertMemberRegistrationRecord({
+      ...bundleMember,
+      email: bundleMember.email || payment.customerEmail,
+      status: 'pending_validation',
+      estado: 'pendiente',
+      pagado: false,
+      pendingReason: 'nueva_alta',
+      registrationSource: bundleMember.registrationSource || 'web_modal_socio'
+    });
+    if (saved && saved.id) {
+      await paymentsRef().doc(oid).set({ memberId: saved.id, updatedAt: new Date().toISOString() }, { merge: true });
+    }
+  } else {
+    throw new Error('Pedido sin datos de socio (registrationBundle) y no pagado: ' + oid);
+  }
+
+  const resolved = await resolveMemberDoc({
+    ...payment,
+    memberId: payment.memberId,
+    customerEmail: payment.customerEmail,
+    registrationBundle: payment.registrationBundle
+  });
+  const d = resolved ? resolved.data : null;
+  return {
+    ok: true,
+    orderId: oid,
+    status,
+    memberId: d ? d.id : null,
+    nombre: d ? d.nombre || d.name : bundleMember && (bundleMember.nombre || bundleMember.name),
+    apellidos: d ? d.apellidos || d.surname : bundleMember && (bundleMember.apellidos || bundleMember.surname),
+    email: d ? d.email : (bundleMember && bundleMember.email) || payment.customerEmail,
+    numeroSocio: d ? d.numeroSocio || d.memberNumber : null,
+    memberStatus: d ? d.status || d.estado : null
+  };
+}
+
+async function repairMembershipsFromPaymentOrders(orderIds) {
+  const list = Array.isArray(orderIds) ? orderIds : [];
+  const results = [];
+  for (const oid of list) {
+    try {
+      results.push(await repairMembershipFromPaymentOrder(oid));
+    } catch (err) {
+      results.push({ ok: false, orderId: String(oid), error: err.message || String(err) });
+    }
+  }
+  return { ok: true, repaired: results.filter((r) => r.ok).length, results };
+}
+
+function kitItemsFromPlayerRecord(record) {
+  if (!record || typeof record !== 'object') return [];
+  if (Array.isArray(record.kitOrder) && record.kitOrder.length) return record.kitOrder;
+  if (record.kit && Array.isArray(record.kit.items) && record.kit.items.length) return record.kit.items;
+  return [];
+}
+
+function mergePlayerKitPreserveOnServer(existingData, patch) {
+  const out = { ...patch };
+  const existingItems = kitItemsFromPlayerRecord(existingData || {});
+  const patchItems = kitItemsFromPlayerRecord(patch || {});
+  const patchTs = patch && patch.kitOrderUpdatedAt ? new Date(patch.kitOrderUpdatedAt).getTime() : 0;
+  const existingTs =
+    existingData && existingData.kitOrderUpdatedAt ? new Date(existingData.kitOrderUpdatedAt).getTime() : 0;
+  if (patchItems.length > 0) return out;
+  if (patchTs && patchTs >= existingTs) return out;
+  if (existingItems.length === 0) return out;
+  out.kitOrder = existingData.kitOrder;
+  out.kit = existingData.kit;
+  const flatKitIds = [
+    'train_kit',
+    'tracksuit',
+    'train_jacket',
+    'cazadora',
+    'train_shirt',
+    'train_shorts',
+    'match_shirt',
+    'match_shorts'
+  ];
+  flatKitIds.forEach(function (id) {
+    const k = 'kit_' + id;
+    if (existingData[k] != null && out[k] == null) out[k] = existingData[k];
+  });
+  if (Array.isArray(existingData.kitItemsPaid)) out.kitItemsPaid = existingData.kitItemsPaid;
+  if (typeof existingData.kitPaidEur === 'number') out.kitPaidEur = existingData.kitPaidEur;
+  if (existingData.kitPaymentStatus != null) out.kitPaymentStatus = existingData.kitPaymentStatus;
+  if (existingData.kitPaymentMethod != null) out.kitPaymentMethod = existingData.kitPaymentMethod;
+  if (existingData.kitOrderUpdatedAt) out.kitOrderUpdatedAt = existingData.kitOrderUpdatedAt;
+  if (existingData.kitOrderUpdatedBy) out.kitOrderUpdatedBy = existingData.kitOrderUpdatedBy;
+  const cb = { ...(out.chargeBreakdown || {}) };
+  const exCb = existingData.chargeBreakdown || {};
+  if (exCb.kit != null && Number(exCb.kit) > 0 && (cb.kit == null || Number(cb.kit) <= 0)) {
+    cb.kit = Number(exCb.kit);
+  }
+  if (cb.kit != null || cb.socio != null || cb.ficha != null) {
+    cb.total = Math.round((Number(cb.socio || 0) + Number(cb.ficha || 0) + Number(cb.kit || 0)) * 100) / 100;
+    out.chargeBreakdown = cb;
+  }
+  return out;
+}
+
 async function upsertPlayerInscriptionRecord(player) {
   const patch = normalizePlayerRecordFields(player);
   const dni = patch.dni;
   const email = patch.email;
-  const season = String(patch.inscriptionSeason || patch.temporada || '').trim();
+  const season = String(patch.inscriptionSeason || patch.temporada || patch.season || '').trim();
   if (!dni && !email) throw new Error('Identificador ausente (DNI o email) en inscripción');
   if (!season) throw new Error('Temporada ausente en inscripción');
+  patch.inscriptionSeason = season;
+  patch.temporada = season;
 
   const existing = await findPlayerDocByIdentity(patch);
   let playerId;
+  let mergedPatch = patch;
   if (existing) {
     playerId = existing.data.id;
-    await existing.ref.set(patch, { merge: true });
+    mergedPatch = mergePlayerKitPreserveOnServer(existing.data, patch);
+    await existing.ref.set(mergedPatch, { merge: true });
   } else {
     const ref = playersRef().doc();
     playerId = ref.id;
@@ -2080,6 +2232,13 @@ function normalizeMemberRecordFields(raw) {
   }
   if (isRenovacion) fechaLimitePago = null;
   const pr = isRenovacion ? 'renovacion' : isPending ? 'nueva_alta' : m.pendingReason || null;
+  const isSocioJugador = !!(
+    m.socioJugador === true ||
+    m.isJugador === true ||
+    m.playerId ||
+    m.memberKind === 'jugador' ||
+    m.memberKind === 'player'
+  );
   return {
     ...m,
     appScope: APP_SCOPE,
@@ -2097,6 +2256,10 @@ function normalizeMemberRecordFields(raw) {
     pendingReason: isPending ? pr : m.pendingReason || null,
     fechaLimitePago: isPending ? fechaLimitePago : m.fechaLimitePago || null,
     fechaVencimiento: m.fechaVencimiento || fechaLimitePago || null,
+    socioJugador: isSocioJugador,
+    isJugador: isSocioJugador ? true : !!m.isJugador,
+    playerId: isSocioJugador ? m.playerId || null : null,
+    memberKind: isSocioJugador ? 'jugador' : 'normal',
     updatedAt: now
   };
 }
@@ -2127,13 +2290,24 @@ async function upsertMemberRegistrationRecord(member) {
   const email = patch.email;
   if (!email) throw new Error('Email ausente en alta de socio');
 
-  const adultModal =
-    String(patch.registrationSource || '') === 'web_modal_socio' ||
-    (!patch.socioJugador && !patch.isJugador && !patch.playerId);
-  if (adultModal) {
+  const forcedJugador = !!(
+    patch.socioJugador ||
+    patch.isJugador ||
+    patch.playerId ||
+    patch.memberKind === 'jugador' ||
+    patch.memberKind === 'player' ||
+    String(patch.registrationSource || '').indexOf('jugador') >= 0 ||
+    String(patch.registrationSource || '').indexOf('inscription') >= 0
+  );
+  if (forcedJugador) {
+    patch.socioJugador = true;
+    patch.isJugador = true;
+    patch.memberKind = 'jugador';
+  } else {
     patch.socioJugador = false;
     patch.isJugador = false;
     patch.playerId = null;
+    patch.memberKind = 'normal';
   }
 
   const existing = await findMemberDocForAdultSocioRegistration(patch);
@@ -2433,20 +2607,16 @@ function isActiveTorneoPreinscripcion(record) {
 
 async function findDuplicateTorneoPreinscripcion(patch) {
   const teamKey = normalizeTorneoTeamName(patch.teamName);
-  const email = String(patch.contactEmail || '')
-    .trim()
-    .toLowerCase();
   const newCats = new Set(
     (Array.isArray(patch.categories) ? patch.categories : []).map((c) => String(c || '').trim().toLowerCase())
   );
-  if (!teamKey || !email || !newCats.size) return null;
+  if (!teamKey || !newCats.size) return null;
 
   const snap = await torneoPreinscripcionesRef().get();
   for (const doc of snap.docs) {
     const d = doc.data() || {};
     if (!isActiveTorneoPreinscripcion(d)) continue;
     if (normalizeTorneoTeamName(d.teamName) !== teamKey) continue;
-    if (String(d.contactEmail || '').trim().toLowerCase() !== email) continue;
     const existing = Array.isArray(d.categories) ? d.categories : [];
     const overlap = existing.some((c) => newCats.has(String(c || '').trim().toLowerCase()));
     if (overlap) return { id: doc.id, ...d };
@@ -2470,8 +2640,22 @@ async function createTorneoPreinscripcionRecord(raw) {
     throw new Error('Debes leer y aceptar los términos sobre premios.');
   }
 
-  // Varias preinscripciones con mismo nombre, categoría y email están permitidas
-  // (varios equipos del mismo responsable: cada una = código de equipo propio).
+  const duplicate = await findDuplicateTorneoPreinscripcion(patch);
+  if (duplicate) {
+    const dupCats = torneoCategoryLabels(
+      (Array.isArray(patch.categories) ? patch.categories : []).filter(function (c) {
+        const key = String(c || '').trim().toLowerCase();
+        return (Array.isArray(duplicate.categories) ? duplicate.categories : []).some(function (x) {
+          return String(x || '').trim().toLowerCase() === key;
+        });
+      })
+    );
+    throw new Error(
+      'Ya hay un equipo inscrito con el mismo nombre en ' +
+        (dupCats.length ? dupCats.join(', ') : 'esa categoría') +
+        '. Añade una variante al nombre (p. ej. «Leones A», «Leones B») para identificarlo en el calendario. Puedes usar el mismo nombre en otra categoría distinta.'
+    );
+  }
 
   const { getTorneoFeeForRecord } = require('./torneo-pricing');
   const { assignCodesForNewPreinscripcion } = require('./torneo-codes');
@@ -2790,6 +2974,8 @@ module.exports = {
   assignPendingRegularMemberNumbers,
   repairPlayerInscriptionFromPaymentOrder,
   repairPlayerInscriptionsFromPaymentOrders,
+  repairMembershipFromPaymentOrder,
+  repairMembershipsFromPaymentOrders,
   listAllMembersData,
   upsertMemberSocioJugadorFromPlayer,
   findPlayerDocByIdentity,

@@ -3,9 +3,74 @@
  * Compatible con iOS, Android, HarmonyOS y notificaciones push
  */
 
-const CACHE_NAME = 'cdsanabriacf-v2.1.0';
-const STATIC_CACHE = 'cdsanabriacf-static-v2.1.0';
-const DYNAMIC_CACHE = 'cdsanabriacf-dynamic-v2.1.0';
+/* Firebase Messaging en segundo plano (PWA cerrada o en background) */
+importScripts('https://www.gstatic.com/firebasejs/10.12.3/firebase-app-compat.js');
+importScripts('https://www.gstatic.com/firebasejs/10.12.3/firebase-messaging-compat.js');
+
+firebase.initializeApp({
+  apiKey: 'AIzaSyBlCY7mDrT7edTo79Gy4aVJbWPnFDevbro',
+  authDomain: 'cdsanabriacf2026.firebaseapp.com',
+  projectId: 'cdsanabriacf2026',
+  storageBucket: 'cdsanabriacf2026.firebasestorage.app',
+  messagingSenderId: '452462278881',
+  appId: '1:452462278881:web:51a6452bd360265de4dfa0'
+});
+
+const fcmMessaging = firebase.messaging();
+
+function buildClubPushOptions(payload) {
+  const data = payload.data || {};
+  const title = (payload.notification && payload.notification.title) || data.title || 'CD Sanabria CF';
+  const body = (payload.notification && payload.notification.body) || data.body || 'Nueva notificación del club';
+  const notifId = data.notifId || data.tag || '';
+  const urgent = data.urgent === '1' || data.urgent === true;
+  const icon = data.icon || '/assets/escudo-192.png';
+
+  return {
+    title: title,
+    options: {
+      body: body,
+      icon: icon.startsWith('http') ? icon : self.location.origin + (icon.startsWith('/') ? icon : '/' + icon),
+      badge: self.location.origin + '/assets/escudo-192.png',
+      tag: data.tag || notifId || 'cdsanabriacf-notification',
+      data: Object.assign({}, data, {
+        title: title,
+        body: body,
+        notifId: notifId,
+        url: data.url || (notifId ? '/?notif=' + encodeURIComponent(notifId) : '/')
+      }),
+      vibrate: [200, 100, 200],
+      requireInteraction: urgent,
+      renotify: true,
+      silent: false,
+      timestamp: Date.now()
+    }
+  };
+}
+
+fcmMessaging.onBackgroundMessage(function (payload) {
+  const built = buildClubPushOptions(payload || {});
+  return self.registration.showNotification(built.title, built.options).then(function () {
+    return self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then(function (clients) {
+      clients.forEach(function (client) {
+        client.postMessage({
+          type: 'CLUB_PUSH_RECEIVED',
+          payload: {
+            title: built.title,
+            body: built.options.body,
+            notifId: built.options.data.notifId,
+            tag: built.options.tag,
+            urgent: built.options.data.urgent
+          }
+        });
+      });
+    });
+  });
+});
+
+const CACHE_NAME = 'cdsanabriacf-v2.2.0';
+const STATIC_CACHE = 'cdsanabriacf-static-v2.2.0';
+const DYNAMIC_CACHE = 'cdsanabriacf-dynamic-v2.2.0';
 
 // Archivos críticos para cache (solo rutas que existen en el despliegue)
 const STATIC_ASSETS = [
@@ -13,6 +78,7 @@ const STATIC_ASSETS = [
   '/index.html',
   '/admin-panel.html',
   '/torneo-equipo.html',
+  '/torneo-vista.html',
   '/torneo-jugador.html',
   '/js/club-torneo-config.js',
   '/js/torneo-equipo-manage-client.js',
@@ -23,6 +89,7 @@ const STATIC_ASSETS = [
   '/js/club-contact-defaults.js',
   '/js/torneo-preinscripcion.js',
   '/js/torneo-responsable-access.js',
+  '/js/torneo-public-view.js',
   '/js/torneo-equipo-panel.js',
   '/js/player-application.js',
   '/js/protocol-guard.js',
@@ -33,7 +100,8 @@ const STATIC_ASSETS = [
   '/manifest.json',
   '/assets/escudo-cdsanabriacf.png',
   '/assets/escudo-192.png',
-  '/assets/torneo-futbol-7-2026.jpeg'
+  '/assets/CAMPEONATO.jpg',
+  '/assets/torneo-inscripciones-2026.jpg'
 ];
 
 // URLs dinámicas para cache
@@ -96,8 +164,21 @@ self.addEventListener('activate', (event) => {
 
 // Permite activar inmediatamente una nueva version del SW.
 self.addEventListener('message', (event) => {
-  if (event.data && event.data.type === 'SKIP_WAITING') {
+  if (!event.data) return;
+  if (event.data.type === 'SKIP_WAITING') {
     self.skipWaiting();
+    return;
+  }
+  const { type, payload } = event.data;
+  switch (type) {
+    case 'CACHE_UPDATE':
+      updateCache(payload);
+      break;
+    case 'NOTIFICATION_PERMISSION':
+      handleNotificationPermission();
+      break;
+    default:
+      break;
   }
 });
 
@@ -159,16 +240,22 @@ self.addEventListener('fetch', (event) => {
   }
 });
 
-// 📱 Notificaciones Push para iOS
+// 📱 Notificaciones Push (respaldo si no pasan por Firebase Messaging)
 self.addEventListener('push', (event) => {
-  console.log('🔔 Push recibido:', event);
-  
+  if (!event.data) return;
+
   let notificationData = {};
-  
+
   try {
-    if (event.data) {
-      notificationData = event.data.json();
-    }
+    const raw = event.data.json();
+    notificationData = {
+      title: raw.notification?.title || raw.title || raw.data?.title,
+      body: raw.notification?.body || raw.body || raw.data?.body,
+      icon: raw.notification?.icon || raw.icon || raw.data?.icon,
+      tag: raw.tag || raw.data?.tag,
+      urgent: raw.urgent || raw.data?.urgent === '1',
+      data: raw.data || raw
+    };
   } catch (error) {
     console.error('❌ Error parseando push data:', error);
     notificationData = {
@@ -177,37 +264,29 @@ self.addEventListener('push', (event) => {
       icon: '/assets/escudo-192.png'
     };
   }
-  
-  const options = {
-    body: notificationData.body || 'Nueva notificación',
-    icon: notificationData.icon || '/assets/escudo-192.png',
-    badge: '/assets/escudo-192.png',
-    tag: notificationData.tag || 'cdsanabriacf-notification',
-    data: notificationData.data || {},
-    actions: [
-      {
-        action: 'open',
-        title: 'Abrir',
-        icon: '/assets/escudo-192.png'
-      },
-      {
-        action: 'close',
-        title: 'Cerrar',
-        icon: '/assets/escudo-192.png'
-      }
-    ],
-    vibrate: [200, 100, 200],
-    requireInteraction: notificationData.urgent || false,
-    silent: false,
-    renotify: true,
-    timestamp: Date.now()
-  };
-  
+
+  const built = buildClubPushOptions({
+    notification: { title: notificationData.title, body: notificationData.body },
+    data: notificationData.data || notificationData
+  });
+
   event.waitUntil(
-    self.registration.showNotification(
-      notificationData.title || 'CDSANABRIACF',
-      options
-    )
+    (async function () {
+      await self.registration.showNotification(built.title, built.options);
+      const clients = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
+      clients.forEach(function (client) {
+        client.postMessage({
+          type: 'CLUB_PUSH_RECEIVED',
+          payload: {
+            title: built.title,
+            body: built.options.body,
+            notifId: built.options.data.notifId,
+            tag: built.options.tag,
+            urgent: built.options.data.urgent
+          }
+        });
+      });
+    })()
   );
 });
 
@@ -226,7 +305,9 @@ self.addEventListener('notificationclick', (event) => {
   
   // Determinar URL de destino
   let targetUrl = '/';
-  if (notificationData.url) {
+  if (notificationData.notifId) {
+    targetUrl = '/?notif=' + encodeURIComponent(notificationData.notifId);
+  } else if (notificationData.url) {
     targetUrl = notificationData.url;
   } else if (action === 'open') {
     targetUrl = '/';
@@ -259,29 +340,7 @@ self.addEventListener('sync', (event) => {
   }
 });
 
-// 📡 Message desde la aplicación
-self.addEventListener('message', (event) => {
-  console.log('📨 Mensaje recibido:', event.data);
-  
-  const { type, payload } = event.data;
-  
-  switch (type) {
-    case 'SKIP_WAITING':
-      self.skipWaiting();
-      break;
-      
-    case 'CACHE_UPDATE':
-      updateCache(payload);
-      break;
-      
-    case 'NOTIFICATION_PERMISSION':
-      handleNotificationPermission();
-      break;
-      
-    default:
-      console.log('❓ Tipo de mensaje no reconocido:', type);
-  }
-});
+// 📡 Message desde la aplicación (SKIP_WAITING se maneja arriba)
 
 // 🔧 FUNCIONES DE CACHE
 

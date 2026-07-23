@@ -21,7 +21,8 @@
     lookupIdentity: null,
     payWarningAcknowledged: false,
     lookupCheck: null,
-    portalResetToken: null
+    portalResetToken: null,
+    changePayMethodOnly: false
   };
 
   function $(id) {
@@ -153,6 +154,203 @@
     );
   }
 
+  /** Pendiente offline o tarjeta a medias → se puede (re)pagar con tarjeta. */
+  function getPlayerPayChannel(player) {
+    if (!player || isPlayerPaidLocal(player)) return null;
+    const ins = String(player.inscriptionStatus || '').toLowerCase();
+    const ch = String(player.offlinePaymentChannel || player.pendingReason || '').toLowerCase();
+    const method = String(player.paymentMethod || '').toLowerCase();
+    if (
+      ins === 'pending_payment' ||
+      method === 'gateway_pending' ||
+      ch === 'pasarela_pendiente' ||
+      method.indexOf('redsys') >= 0
+    ) {
+      return 'tarjeta_pendiente';
+    }
+    if (ins === 'pending_cash' || ch === 'efectivo' || method === 'cash') return 'efectivo';
+    if (ins === 'pending_tpv' || ch === 'tpv' || method === 'tpv') return 'tpv';
+    if (
+      ins === 'pending_transfer' ||
+      ch === 'transferencia' ||
+      ch === 'transfer' ||
+      method === 'transfer'
+    ) {
+      return 'transferencia';
+    }
+    return null;
+  }
+
+  function canOfferChangePayMethod(player) {
+    const ch = getPlayerPayChannel(player);
+    return ch === 'efectivo' || ch === 'transferencia' || ch === 'tarjeta_pendiente';
+  }
+
+  function resolvePendingPayTotal(player) {
+    if (!player) return 0;
+    const cb = player.chargeBreakdown || {};
+    if (cb.total != null && Number(cb.total) > 0) return Number(cb.total);
+    if (player.totalCharge != null && Number(player.totalCharge) > 0) return Number(player.totalCharge);
+    return 0;
+  }
+
+  function refreshChangePayMethodUI(player) {
+    const section = $('insChangePayMethodSection');
+    if (!section) return;
+    if (!canOfferChangePayMethod(player)) {
+      show(section, false);
+      return;
+    }
+    show(section, true);
+    const ch = getPlayerPayChannel(player);
+    const status = $('insChangePayMethodStatus');
+    if (status) {
+      if (ch === 'tarjeta_pendiente') {
+        status.innerHTML =
+          'Método actual: <strong>Tarjeta</strong> (pago no completado). Puedes <strong>continuar y terminar el pago</strong>.';
+      } else if (ch === 'efectivo') {
+        status.innerHTML =
+          'Método actual: <strong>Efectivo</strong> (pendiente). Puedes pagarlo ya con tarjeta.';
+      } else {
+        status.innerHTML =
+          'Método actual: <strong>Transferencia</strong> (pendiente). Puedes pagarlo ya con tarjeta.';
+      }
+    }
+    const totalEl = $('insChangePayMethodTotal');
+    const total = resolvePendingPayTotal(player);
+    if (totalEl) {
+      totalEl.textContent =
+        total > 0 ? 'Importe pendiente: ' + formatEur(total) : 'Importe pendiente: según tu ficha';
+    }
+    show($('payChangeToCardBlock'), true);
+    const btn = $('btnChangePayToCard');
+    if (btn) {
+      btn.textContent =
+        ch === 'tarjeta_pendiente' ? '💳 Continuar pago con tarjeta' : '💳 Cambiar a tarjeta y pagar';
+    }
+    const msg = $('insChangePayMethodMsg');
+    if (msg) msg.textContent = '';
+  }
+
+  function enterChangePayMethodMode(player) {
+    state.continuePlayer = player;
+    state.changePayMethodOnly = true;
+    state.editProfileMode = false;
+    state.viewOnlyProfile = false;
+    state.passwordOnlyMode = false;
+    state.continueEditable = false;
+    hideInscriptionFormSections();
+    show($('insSaveProfileSection'), false);
+    show($('insChangePortalPwdSection'), false);
+    show($('insEditProfileBanner'), true);
+    const ch = getPlayerPayChannel(player);
+    const banner = $('insEditProfileBanner');
+    if (banner) {
+      banner.innerHTML =
+        ch === 'tarjeta_pendiente'
+          ? 'Tu ficha está <strong>guardada pendiente de pago con tarjeta</strong>. Puedes <strong>continuar y terminar el pago</strong> ahora.'
+          : 'Tu ficha está <strong>pendiente de pago</strong> (efectivo o transferencia). Puedes <strong>cambiar a tarjeta y pagar ahora</strong>.';
+    }
+    const pwdBanner = $('inscPasswordOnlyBanner');
+    if (pwdBanner) pwdBanner.style.display = 'none';
+    setLookupPanelOpen(false);
+    refreshChangePayMethodUI(player);
+    const msg = $('insLookupMsg');
+    if (msg) {
+      msg.style.color = '#d97706';
+      msg.textContent =
+        ch === 'tarjeta_pendiente'
+          ? 'Pulsa «Continuar pago con tarjeta» para completar el pago online.'
+          : 'Pulsa «Cambiar a tarjeta y pagar» para completar el pago online.';
+    }
+    const section = $('insChangePayMethodSection');
+    if (section && section.scrollIntoView) section.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+
+  function buildRegistrationForPayChange() {
+    const base = state.continuePlayer;
+    if (!base || !base.id) {
+      throw new Error('No hay ficha pendiente para cambiar el método de pago.');
+    }
+    const reg = Object.assign({}, base);
+    if (state.editProfileMode) {
+      try {
+        const f = getFormData();
+        if (f.email) reg.email = f.email;
+        if (f.phone) {
+          reg.phone = f.phone;
+          reg.telefono = f.phone;
+        }
+      } catch (_) {}
+    }
+    if (!reg.chargeBreakdown || !(Number(reg.chargeBreakdown.total) > 0)) {
+      const kitItems =
+        global.PlayerExport && global.PlayerExport.getKitItems
+          ? global.PlayerExport.getKitItems(reg)
+          : Array.isArray(reg.kitOrder)
+            ? reg.kitOrder
+            : (reg.kit && reg.kit.items) || [];
+      const category = reg.category || reg.categoria;
+      const cart = global.PlayerInscription.computeCart(
+        state.settings,
+        category,
+        kitItems,
+        state.settings.chargeFicha !== false,
+        state.settings.chargeSocio !== false
+      );
+      reg.chargeBreakdown = {
+        kit: cart.kitTotal,
+        ficha: cart.fichaFee,
+        socio: cart.socioFee,
+        total: cart.total
+      };
+      reg.totalCharge = cart.total;
+    }
+    return reg;
+  }
+
+  async function changePayMethodToCard() {
+    if (global.SiteUpdateMode && !global.SiteUpdateMode.guard()) return;
+    const player = state.continuePlayer;
+    if (!canOfferChangePayMethod(player)) {
+      alert(
+        '❌ Solo se puede pagar con tarjeta si la ficha está pendiente (efectivo, transferencia o pago con tarjeta no terminado).'
+      );
+      return;
+    }
+    const ch = getPlayerPayChannel(player);
+    const confirmMsg =
+      ch === 'tarjeta_pendiente'
+        ? '¿Continuar y terminar el pago con tarjeta?\n\nSe abrirá la pasarela segura. Al completar el pago, tu ficha quedará pagada.'
+        : '¿Cambiar el método de ' +
+          (ch === 'efectivo' ? 'efectivo' : 'transferencia') +
+          ' a tarjeta y pagar ahora?\n\nSe abrirá la pasarela segura. Al completar el pago, tu ficha quedará pagada.';
+    if (!global.confirm(confirmMsg)) {
+      return;
+    }
+    const msg = $('insChangePayMethodMsg');
+    try {
+      if (msg) {
+        msg.style.color = '#64748b';
+        msg.textContent =
+          ch === 'tarjeta_pendiente' ? 'Abriendo el pago con tarjeta…' : 'Cambiando a tarjeta y abriendo el pago…';
+      }
+      const reg = buildRegistrationForPayChange();
+      delete reg.offlinePaymentChannel;
+      reg.pendingReason = 'pasarela_pendiente';
+      // submitCheckout vuelve a guardar pendiente en nube y abre Redsys
+      const result = await global.PlayerInscription.submitCheckout(reg, 'card');
+      if (result && result.redirect) return;
+      alert('❌ No se pudo abrir el pago con tarjeta. Inténtalo de nuevo o contacta con el club.');
+    } catch (e) {
+      if (msg) {
+        msg.style.color = '#dc2626';
+        msg.textContent = e.message || 'Error al iniciar el pago con tarjeta.';
+      }
+      alert('❌ ' + (e.message || e));
+    }
+  }
+
   function isPlayerProfileReadOnlyLocal(player) {
     if (!player) return true;
     if (player.profileReadOnly) return true;
@@ -168,6 +366,9 @@
     show($('insPortalPwdBlock'), false);
     show($('insChangePortalPwdSection'), false);
     show($('insSaveProfileSection'), true);
+    if (!canOfferChangePayMethod(state.continuePlayer)) {
+      show($('insChangePayMethodSection'), false);
+    }
   }
 
   function applyPaidEditFieldLocks(paid) {
@@ -183,12 +384,14 @@
   function enterViewOnlyProfileMode(player) {
     state.editProfileMode = false;
     state.viewOnlyProfile = true;
+    state.changePayMethodOnly = false;
     state.continuePlayer = player;
     state.continueEditable = false;
     prefillFromPlayer(player);
     setPersonalReadonly(true);
     applyPaidEditFieldLocks(true);
     hidePaymentAndKitSections();
+    show($('insChangePayMethodSection'), false);
     show($('insSaveProfileSection'), false);
     show($('insChangePortalPwdSection'), false);
     show($('insCategorySection'), true);
@@ -212,6 +415,7 @@
   function enterEditProfileMode(player) {
     state.editProfileMode = true;
     state.viewOnlyProfile = false;
+    state.changePayMethodOnly = false;
     state.continuePlayer = player;
     state.continueEditable = true;
     const paid = isPlayerPaidLocal(player);
@@ -229,10 +433,20 @@
     show($('insEditProfileBanner'), true);
     const banner = $('insEditProfileBanner');
     if (banner) {
-      banner.innerHTML = paid
-        ? 'Tu inscripción ya está <strong>pagada</strong>. Puedes cambiar teléfono, email, dirección y datos médicos. DNI y categoría requieren validación del club.'
-        : 'Puedes corregir tus datos. Los cambios se notificarán al club.';
+      if (paid) {
+        banner.innerHTML =
+          'Tu inscripción ya está <strong>pagada</strong>. Puedes cambiar teléfono, email, dirección y datos médicos. DNI y categoría requieren validación del club.';
+      } else if (canOfferChangePayMethod(player)) {
+        const chEdit = getPlayerPayChannel(player);
+        banner.innerHTML =
+          chEdit === 'tarjeta_pendiente'
+            ? 'Tu pago con tarjeta está <strong>pendiente</strong>. Puedes corregir tus datos y, abajo, <strong>continuar el pago</strong>.'
+            : 'Tu pago está <strong>pendiente</strong> (efectivo o transferencia). Puedes corregir tus datos y, abajo, <strong>cambiar a tarjeta y pagar</strong>.';
+      } else {
+        banner.innerHTML = 'Puedes corregir tus datos. Los cambios se notificarán al club.';
+      }
     }
+    refreshChangePayMethodUI(player);
     setLookupPanelOpen(false);
     if ($('inscPageTitle')) $('inscPageTitle').textContent = 'Buscar mi ficha';
     const msg = $('insLookupMsg');
@@ -488,6 +702,10 @@
       global.PlayerInscription.requiresPasswordForInscriptionAccess &&
       global.PlayerInscription.requiresPasswordForInscriptionAccess(player.dni, season)
     ) {
+      if (canOfferChangePayMethod(player)) {
+        enterChangePayMethodMode(player);
+        return;
+      }
       enforceInscriptionCompletedMode();
       return;
     }
@@ -499,6 +717,11 @@
           'El club aún no te ha admitido. Cuando te acepten, vuelve a pulsar Finalizar ficha en Nuevo jugador/a.';
       }
       hideInscriptionFormSections();
+      return;
+    }
+
+    if (canOfferChangePayMethod(player)) {
+      enterChangePayMethodMode(player);
       return;
     }
 
@@ -1695,12 +1918,19 @@
 
   function notifyClubPlayerInscription(reg, paymentChannel) {
     if (!global.CdsanClubEmail || !reg || !reg.email) return;
+    const raw = String(paymentChannel || '').toLowerCase();
     const ch =
-      paymentChannel === 'efectivo' ? 'efectivo' : paymentChannel === 'tpv' ? 'tpv' : 'transferencia';
+      raw === 'efectivo'
+        ? 'efectivo'
+        : raw === 'tpv'
+          ? 'tpv'
+          : raw === 'tarjeta' || raw === 'card' || raw === 'gateway_pending' || raw === 'pasarela_pendiente'
+            ? 'tarjeta'
+            : 'transferencia';
     global.CdsanClubEmail.sendClubAdminNotify({
       kind: 'inscripcion_jugador',
       title: 'Nueva inscripción jugador/a (pendiente de pago)',
-      subject: 'Inscripción jugador — ' + offlinePaymentSubjectLabel(ch),
+      subject: 'Inscripción jugador — ' + (ch === 'tarjeta' ? 'tarjeta (pendiente)' : offlinePaymentSubjectLabel(ch)),
       paymentChannel: ch,
       requesterEmail: reg.email,
       playerId: reg.id,
@@ -1731,8 +1961,15 @@
 
   function notifyPlayerInscriptionPending(reg, paymentChannel) {
     if (!global.CdsanClubEmail || !global.CdsanClubEmail.sendPlayerInscriptionPending || !reg) return;
+    const raw = String(paymentChannel || '').toLowerCase();
     const ch =
-      paymentChannel === 'efectivo' ? 'efectivo' : paymentChannel === 'tpv' ? 'tpv' : 'transferencia';
+      raw === 'efectivo'
+        ? 'efectivo'
+        : raw === 'tpv'
+          ? 'tpv'
+          : raw === 'tarjeta' || raw === 'card' || raw === 'gateway_pending' || raw === 'pasarela_pendiente'
+            ? 'tarjeta'
+            : 'transferencia';
     const cb = reg.chargeBreakdown || {};
     const total = cb.total != null ? cb.total : reg.totalCharge;
     global.CdsanClubEmail.sendPlayerInscriptionPending({
@@ -1747,6 +1984,7 @@
       category: reg.category || reg.categoria,
       totalEur: total,
       paymentChannel: ch,
+      paymentMethod: ch === 'tarjeta' ? 'gateway_pending' : ch,
       kitSummary: playerInscriptionKitSummary(reg),
       fields: buildPlayerClubNotifyFields(reg)
     }).catch(function (e) {
@@ -1929,6 +2167,12 @@
             ? '💳 Pagar con tarjeta o Bizum'
             : '💳 Pagar con tarjeta';
         }
+      });
+    }
+    if ($('btnChangePayToCard') && !$('btnChangePayToCard').dataset.bound) {
+      $('btnChangePayToCard').dataset.bound = '1';
+      $('btnChangePayToCard').addEventListener('click', function () {
+        changePayMethodToCard();
       });
     }
   }

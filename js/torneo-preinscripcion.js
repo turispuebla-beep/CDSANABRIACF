@@ -141,7 +141,7 @@
       });
     }
     return [
-      'Preinscripción — ' + EVENT_NAME,
+      'Inscripción — ' + EVENT_NAME,
       'CD Sanabria CF',
       '',
       'Evento: ' + EVENT_NAME,
@@ -298,7 +298,7 @@
 
   function buildClubNotifyMailto(data) {
     const subject =
-      'Preinscripción ' +
+      'Inscripción ' +
       EVENT_NAME +
       ' — ' +
       (data.teamName || 'Equipo') +

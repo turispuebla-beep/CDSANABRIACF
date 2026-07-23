@@ -53,11 +53,42 @@ async function verifyAdminRequest(event) {
     return {
       ok: true,
       uid: decoded.uid,
-      email: decoded.email || snap.data().email || ''
+      email: decoded.email || snap.data().email || '',
+      adminDoc: snap.data() || {}
     };
   } catch (e) {
     console.warn('verifyAdminRequest:', e.message || e);
     return { ok: false, statusCode: 401, error: 'Token de administrador inválido o caducado' };
+  }
+}
+
+/**
+ * Admin del club u organizador de competiciones (sanabria_admins/{uid}).
+ */
+async function verifyAdminOrOrganizerRequest(event) {
+  const token = bearerToken(event);
+  if (!token) {
+    return { ok: false, statusCode: 401, error: 'Se requiere sesión de administrador (Bearer token)' };
+  }
+  try {
+    const adm = ensureFirebaseAdmin();
+    const decoded = await adm.auth().verifyIdToken(token);
+    const snap = await adm.firestore().collection('sanabria_admins').doc(decoded.uid).get();
+    const doc = snap.exists ? snap.data() : null;
+    if (!doc || !isClubAdminOrOrganizerDoc(doc)) {
+      return { ok: false, statusCode: 403, error: 'Sin permisos de administrador u organizador' };
+    }
+    return {
+      ok: true,
+      uid: decoded.uid,
+      email: decoded.email || doc.email || '',
+      adminDoc: doc,
+      isClubAdmin: isClubAdminDoc(doc),
+      isOrganizer: isCompetitionOrganizerDoc(doc)
+    };
+  } catch (e) {
+    console.warn('verifyAdminOrOrganizerRequest:', e.message || e);
+    return { ok: false, statusCode: 401, error: 'Token inválido o caducado' };
   }
 }
 
@@ -95,6 +126,7 @@ async function verifySeasonRenewalRequest(event) {
 module.exports = {
   ensureFirebaseAdmin,
   verifyAdminRequest,
+  verifyAdminOrOrganizerRequest,
   verifySeasonRenewalRequest,
   isNetlifyScheduledInvocation,
   isClubAdminDoc,

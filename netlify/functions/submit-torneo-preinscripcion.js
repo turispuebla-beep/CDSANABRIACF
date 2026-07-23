@@ -39,7 +39,7 @@ exports.handler = async (event) => {
   if (event.httpMethod === 'OPTIONS') {
     return { statusCode: 204, headers: corsHeaders(origin), body: '' };
   }
-  if (event.httpMethod !== 'POST') {
+    if (event.httpMethod !== 'POST') {
     return json(405, { ok: false, error: 'Method not allowed' }, origin);
   }
 
@@ -57,6 +57,8 @@ exports.handler = async (event) => {
       contactEmail: raw.contactEmail,
       contactPhone: raw.contactPhone,
       localId: raw.localId || raw.id,
+      premiosAceptados: raw.premiosAceptados,
+      premiosAceptadosAt: raw.premiosAceptadosAt,
       source: 'web'
     });
 
@@ -117,7 +119,10 @@ exports.handler = async (event) => {
     if (isSiteUpdateModeError(err)) {
       return json(503, { ok: false, error: err.message, code: 'site_update_mode' }, origin);
     }
+    const msg = err.message || 'Error interno';
+    const isValidation =
+      /nombre|categoría|categoría|obligatorio|válido|aceptar|Selecciona/i.test(msg);
     console.error('submit-torneo-preinscripcion:', err);
-    return json(500, { ok: false, error: err.message || 'Error interno' }, origin);
+    return json(isValidation ? 400 : 500, { ok: false, error: msg }, origin);
   }
 };

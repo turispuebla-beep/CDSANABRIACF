@@ -15,7 +15,13 @@
   }
 
   function isClubAdminSession() {
-    return global.localStorage.getItem('isAdmin') === 'true';
+    if (global.localStorage.getItem('isAdmin') === 'true') return true;
+    try {
+      const cur = JSON.parse(global.localStorage.getItem('currentAdmin') || global.localStorage.getItem('adminUser') || '{}');
+      return !!(cur && (cur.email || cur.uid || cur.isAdmin === true || cur.role === 'admin' || cur.role === 'super_admin'));
+    } catch (_) {
+      return false;
+    }
   }
 
   /** false por defecto: nadie ve nombres de jugadores en la web hasta que el admin lo active. */

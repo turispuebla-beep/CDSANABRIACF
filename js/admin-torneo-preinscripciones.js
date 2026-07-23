@@ -152,19 +152,86 @@
     return st !== 'descartada' && st !== 'eliminada' && st !== 'cancelada';
   }
 
-  /** Mismo nombre (sin distinguir mayúsculas) + mismo email responsable + misma categoría. */
+  function isFullClubAdmin() {
+    return !!(global.AdminOrganizerAccess && global.AdminOrganizerAccess.isFullClubAdmin());
+  }
+
+  function isOrganizerOnly() {
+    return !!(
+      global.AdminOrganizerAccess &&
+      global.AdminOrganizerAccess.isCompetitionOrganizer() &&
+      !isFullClubAdmin()
+    );
+  }
+
+  function getAdminActorLabel() {
+    try {
+      const s =
+        global.AdminOrganizerAccess && global.AdminOrganizerAccess.getStoredSession
+          ? global.AdminOrganizerAccess.getStoredSession()
+          : JSON.parse(global.localStorage.getItem('currentAdmin') || '{}');
+      return String(s.email || s.name || 'admin').trim();
+    } catch (_) {
+      return 'admin';
+    }
+  }
+
+  const VALIDATE_API = '/.netlify/functions/torneo-preinscripcion-validate';
+
+  async function callTorneoValidateApi(action, row) {
+    if (!global.CdsanAdminApiAuth || !global.CdsanAdminApiAuth.adminFetch) {
+      throw new Error('Inicia sesión como administrador del club en la nube para esta acción.');
+    }
+    const res = await global.CdsanAdminApiAuth.adminFetch(VALIDATE_API, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: action, preinscripcionId: row.id })
+    });
+    const data = await res.json().catch(function () {
+      return {};
+    });
+    if (!res.ok || !data.ok) {
+      throw new Error(data.error || 'No se pudo completar la validación');
+    }
+    return data;
+  }
+
+  function paymentStatusLabel(row) {
+    const ps = String(row.paymentStatus || '').toLowerCase();
+    const pm = String(row.paymentMethod || row.offlinePaymentChannel || '').toLowerCase();
+    if (ps === 'paid') return '✅ Pagado';
+    if (ps === 'pending_validation') return '⏳ Pendiente validación';
+    if (pm.indexOf('redsys') >= 0 || pm === 'card') return '💳 Tarjeta (automático)';
+    if (pm === 'transferencia' || pm === 'efectivo') return '⏳ Pendiente validación';
+    return '—';
+  }
+
+  function equipoValidationLabel(row) {
+    return row.equipoValidado ? '✅ Validado' : '⏳ Pendiente';
+  }
+
+  function canValidateTorneoEquipo(row) {
+    if (row.equipoValidado) return false;
+    const st = String(row.plantillaStatus || '').toLowerCase();
+    return st === 'enviada_club' || st === 'pagada';
+  }
+
+  function canValidateTorneoPayment(row) {
+    if (String(row.paymentStatus || '').toLowerCase() !== 'pending_validation') return false;
+    const pm = String(row.paymentMethod || row.offlinePaymentChannel || '').toLowerCase();
+    return pm === 'transferencia' || pm === 'efectivo';
+  }
+
+  /** Mismo nombre exacto + misma categoría (cualquier responsable). */
   function buildDuplicateMap(rows) {
     const active = rows.filter(isActivePreinscripcion);
     const map = {};
     active.forEach(function (r) {
       const nameKey = normalizeTeamName(r.teamName);
-      const email = String(r.contactEmail || '')
-        .trim()
-        .toLowerCase();
       const cats = getCategoryKeys(r);
-      if (!nameKey || !email || !cats.length) return;
+      if (!nameKey || !cats.length) return;
       cats.forEach(function (cat) {
-        const groupKey = nameKey + '::' + email + '::' + cat;
+        const groupKey = nameKey + '::' + cat;
         if (!map[groupKey]) map[groupKey] = [];
         map[groupKey].push(r);
       });
@@ -409,8 +476,23 @@
         escapeHtml(row.plantillaStatus || 'pendiente') +
         '</td></tr>' +
         '<tr><td style="padding:4px 8px 4px 0;color:#64748b;"><strong>Pago</strong></td><td>' +
-        escapeHtml(row.paymentStatus || row.paymentMethod || '—') +
+        escapeHtml(paymentStatusLabel(row)) +
         (row.offlinePaymentChannel ? ' · ' + escapeHtml(row.offlinePaymentChannel) : '') +
+        (row.paymentValidatedAt
+          ? '<br><span style="font-size:0.82rem;color:#64748b;">Validado: ' +
+            escapeHtml(formatDate(row.paymentValidatedAt)) +
+            (row.paymentValidatedPor ? ' · ' + escapeHtml(row.paymentValidatedPor) : '') +
+            '</span>'
+          : '') +
+        '</td></tr>' +
+        '<tr><td style="padding:4px 8px 4px 0;color:#64748b;"><strong>Equipo (torneo)</strong></td><td>' +
+        escapeHtml(equipoValidationLabel(row)) +
+        (row.equipoValidadoAt
+          ? '<br><span style="font-size:0.82rem;color:#64748b;">' +
+            escapeHtml(formatDate(row.equipoValidadoAt)) +
+            (row.equipoValidadoPor ? ' · ' + escapeHtml(row.equipoValidadoPor) : '') +
+            '</span>'
+          : '') +
         '</td></tr>' +
         '<tr><td style="padding:4px 8px 4px 0;color:#64748b;"><strong>Premios (preinscr.)</strong></td><td>' +
         (row.premiosAceptados
@@ -520,16 +602,32 @@
         safeId +
         '\')">👁️ Ver detalle</button>'
     );
-    parts.push(
-      '<button type="button" class="btn" style="padding:4px 8px;font-size:0.78rem;background:#b45309;color:#fff;border:none;border-radius:4px;cursor:pointer;margin:0 0 4px 0;display:block;width:100%;" onclick="discardTorneoPreinscripcion(\'' +
-        safeId +
-        '\', \'duplicado\')">🗑️ Eliminar (duplicado)</button>'
-    );
-    parts.push(
-      '<button type="button" class="btn" style="padding:4px 8px;font-size:0.78rem;background:#dc2626;color:#fff;border:none;border-radius:4px;cursor:pointer;display:block;width:100%;" onclick="discardTorneoPreinscripcion(\'' +
-        safeId +
-        '\', \'no_juega\')">🗑️ Eliminar (no juega)</button>'
-    );
+    if (isFullClubAdmin() && canValidateTorneoEquipo(r)) {
+      parts.push(
+        '<button type="button" class="btn" style="padding:4px 8px;font-size:0.78rem;background:#059669;color:#fff;border:none;border-radius:4px;cursor:pointer;margin:0 0 4px 0;display:block;width:100%;" onclick="validateTorneoPreinscripcionEquipo(\'' +
+          safeId +
+          '\')">✅ Validar equipo</button>'
+      );
+    }
+    if (isFullClubAdmin() && canValidateTorneoPayment(r)) {
+      parts.push(
+        '<button type="button" class="btn" style="padding:4px 8px;font-size:0.78rem;background:#1e3a8a;color:#fff;border:none;border-radius:4px;cursor:pointer;margin:0 0 4px 0;display:block;width:100%;" onclick="validateTorneoPreinscripcionPayment(\'' +
+          safeId +
+          '\')">💰 Validar pago</button>'
+      );
+    }
+    if (!isOrganizerOnly()) {
+      parts.push(
+        '<button type="button" class="btn" style="padding:4px 8px;font-size:0.78rem;background:#b45309;color:#fff;border:none;border-radius:4px;cursor:pointer;margin:0 0 4px 0;display:block;width:100%;" onclick="discardTorneoPreinscripcion(\'' +
+          safeId +
+          '\', \'duplicado\')">🗑️ Eliminar (duplicado)</button>'
+      );
+      parts.push(
+        '<button type="button" class="btn" style="padding:4px 8px;font-size:0.78rem;background:#dc2626;color:#fff;border:none;border-radius:4px;cursor:pointer;display:block;width:100%;" onclick="discardTorneoPreinscripcion(\'' +
+          safeId +
+          '\', \'no_juega\')">🗑️ Eliminar (no juega)</button>'
+      );
+    }
     return parts.join('');
   }
 
@@ -545,6 +643,12 @@
     const introNote =
       '<p style="margin:0 0 10px;padding:10px 12px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;font-size:0.88rem;color:#166534;line-height:1.5;">' +
       '<strong>Puente con Competiciones.</strong> Podéis importar inscritos como equipos invitados y enviar recordatorio de plantilla + pago al responsable.</p>' +
+      '<p style="margin:0 0 10px;padding:10px 12px;background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;font-size:0.88rem;color:#1e3a8a;line-height:1.5;">' +
+      '<strong>Validación.</strong> Solo los <strong>administradores del club</strong> validan equipos y pagos (efectivo/transferencia). ' +
+      (isOrganizerOnly()
+        ? 'Como <strong>organizador/a</strong> puedes consultar el listado, importar equipos al cuadro y gestionar la competición.'
+        : 'Tarjeta y Bizum quedan pagados automáticamente al confirmar Redsys.') +
+      ' Cada validación envía correo al club y al responsable.</p>' +
       '<p style="margin:0 0 10px;padding:10px 12px;background:#fef2f2;border:1px solid #fecaca;border-radius:8px;font-size:0.88rem;color:#991b1b;line-height:1.5;">' +
       '<strong>Datos del torneo F7.</strong> No se mezclan con jugadores/entrenadores del club hasta que los importéis abajo.</p>' +
       '<p style="margin:0 0 12px;font-size:0.88rem;color:#475569;line-height:1.5;">' +
@@ -557,13 +661,13 @@
         ? '<p style="margin:0 0 12px;padding:10px 12px;background:#fffbeb;border:1px solid #fcd34d;border-radius:8px;font-size:0.88rem;color:#92400e;">' +
           '⚠️ Hay <strong>' +
           String(duplicateCount) +
-          '</strong> fila(s) con posible <strong>envío duplicado</strong> (mismo equipo, mismo email y misma categoría). ' +
+          '</strong> fila(s) con posible <strong>nombre duplicado</strong> (mismo nombre exacto en la misma categoría). ' +
           'Conservad un código y eliminad el resto.</p>'
         : '');
 
     const tableHtml =
       !activeRows.length
-        ? introNote + '<p style="color:#64748b;margin:0;">No hay preinscripciones activas en Firestore.</p>'
+        ? introNote + '<p style="color:#64748b;margin:0;">No hay preinscripciones activas en la nube.</p>'
         : introNote +
           '<div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;font-size:0.9rem;">' +
           '<thead><tr style="background:#eff6ff;text-align:left;">' +
@@ -576,6 +680,8 @@
           '<th style="padding:8px;border-bottom:1px solid #bfdbfe;">Tel.</th>' +
           '<th style="padding:8px;border-bottom:1px solid #bfdbfe;">Jug.</th>' +
           '<th style="padding:8px;border-bottom:1px solid #bfdbfe;">Plantilla</th>' +
+          '<th style="padding:8px;border-bottom:1px solid #bfdbfe;">Equipo</th>' +
+          '<th style="padding:8px;border-bottom:1px solid #bfdbfe;">Pago</th>' +
           '<th style="padding:8px;border-bottom:1px solid #bfdbfe;">Acciones</th>' +
           '</tr></thead><tbody>' +
           teamGroups
@@ -583,7 +689,7 @@
               const multi = group.entries.length > 1;
               const header =
                 '<tr style="background:#f1f5f9;">' +
-                '<td colspan="10" style="padding:10px 8px;border-bottom:1px solid #e2e8f0;">' +
+                '<td colspan="12" style="padding:10px 8px;border-bottom:1px solid #e2e8f0;">' +
                 '<strong style="color:#1e3a8a;font-size:0.95rem;">' +
                 (group.responsibleCode
                   ? 'Responsable <span style="font-family:ui-monospace,monospace;">' +
@@ -693,6 +799,12 @@
                           : '')
                       : '') +
                     '</td>' +
+                    '<td style="padding:8px;font-size:0.82rem;">' +
+                    escapeHtml(equipoValidationLabel(r)) +
+                    '</td>' +
+                    '<td style="padding:8px;font-size:0.82rem;">' +
+                    escapeHtml(paymentStatusLabel(r)) +
+                    '</td>' +
                     '<td style="padding:8px;white-space:nowrap;min-width:148px;">' +
                     rowActionsHtml(r, rowId, dup) +
                     '</td>' +
@@ -715,6 +827,10 @@
   }
 
   async function discardTorneoPreinscripcion(preinscripcionId, reason) {
+    if (!isFullClubAdmin()) {
+      alert('🔒 Solo los administradores del club pueden eliminar preinscripciones.');
+      return;
+    }
     const rows = global.__torneoPreinscripcionesCache || [];
     const row = rows.find(function (r) {
       return String(r.id) === String(preinscripcionId) || String(r.localId) === String(preinscripcionId);
@@ -727,7 +843,7 @@
     const code = row.accessCode ? String(row.accessCode) : '(sin código)';
     const reasonLabel =
       reason === 'duplicado'
-        ? 'envío duplicado (mismo nombre y categoría)'
+        ? 'nombre duplicado (mismo nombre y categoría)'
         : reason === 'no_juega'
           ? 'el equipo no va a jugar'
           : String(reason || 'descartada');
@@ -745,7 +861,7 @@
     if (!global.confirm(msg)) return;
 
     if (typeof global.deleteDocument !== 'function') {
-      alert('❌ No se puede eliminar: Firebase no disponible.');
+      alert('❌ No se puede eliminar: la nube no está disponible.');
       return;
     }
 
@@ -761,6 +877,95 @@
     });
     renderRows(global.__torneoPreinscripcionesCache);
     alert('✅ Preinscripción eliminada.\nCódigo ' + code + ' ya no es válido.');
+  }
+
+  async function validateTorneoPreinscripcionEquipo(preinscripcionId) {
+    if (!isFullClubAdmin()) {
+      alert('🔒 Solo los administradores del club pueden validar equipos.');
+      return;
+    }
+    const rows = global.__torneoPreinscripcionesCache || [];
+    const row = rows.find(function (r) {
+      return String(r.id) === String(preinscripcionId) || String(r.localId) === String(preinscripcionId);
+    });
+    if (!row) {
+      alert('❌ Preinscripción no encontrada. Pulsa «Actualizar listado».');
+      return;
+    }
+    if (!canValidateTorneoEquipo(row)) {
+      alert('ℹ️ Este equipo no puede validarse todavía (plantilla no enviada al club) o ya está validado.');
+      return;
+    }
+    const msg =
+      '¿Validar este equipo para el torneo?\n\n' +
+      'Equipo: ' +
+      (row.teamName || '—') +
+      '\nCódigo: ' +
+      (row.accessCode || '—') +
+      '\n\nNo confirma el pago; solo da el visto bueno deportivo/organizativo.';
+    if (!global.confirm(msg)) return;
+    try {
+      const data = await callTorneoValidateApi('equipo', row);
+      const merged = data.record || {};
+      global.__torneoPreinscripcionesCache = rows.map(function (r) {
+        return String(r.id) === String(row.id) ? Object.assign({}, r, merged) : r;
+      });
+      renderRows(global.__torneoPreinscripcionesCache);
+      alert(
+        '✅ Equipo validado para el torneo.\n\n' +
+          (data.emailSent
+            ? '📧 Aviso enviado al club y al responsable.'
+            : '⚠️ Validación guardada; el correo no se pudo enviar (revisa SendGrid en Netlify).')
+      );
+    } catch (err) {
+      alert('❌ Error al validar equipo: ' + (err && err.message ? err.message : String(err)));
+    }
+  }
+
+  async function validateTorneoPreinscripcionPayment(preinscripcionId) {
+    if (!isFullClubAdmin()) {
+      alert('🔒 Solo los administradores del club pueden validar pagos.');
+      return;
+    }
+    const rows = global.__torneoPreinscripcionesCache || [];
+    const row = rows.find(function (r) {
+      return String(r.id) === String(preinscripcionId) || String(r.localId) === String(preinscripcionId);
+    });
+    if (!row) {
+      alert('❌ Preinscripción no encontrada. Pulsa «Actualizar listado».');
+      return;
+    }
+    if (!canValidateTorneoPayment(row)) {
+      alert('ℹ️ Este registro no tiene pago pendiente de validación (transferencia/efectivo).');
+      return;
+    }
+    const channel = row.offlinePaymentChannel || row.paymentMethod || 'offline';
+    const msg =
+      '¿Confirmar que has recibido el pago?\n\n' +
+      'Equipo: ' +
+      (row.teamName || '—') +
+      '\nForma: ' +
+      channel +
+      '\nCuota: ' +
+      (row.inscriptionFeeEur != null ? row.inscriptionFeeEur + ' €' : '—') +
+      '\n\nMarca la inscripción como pagada.';
+    if (!global.confirm(msg)) return;
+    try {
+      const data = await callTorneoValidateApi('pago', row);
+      const merged = data.record || {};
+      global.__torneoPreinscripcionesCache = rows.map(function (r) {
+        return String(r.id) === String(row.id) ? Object.assign({}, r, merged) : r;
+      });
+      renderRows(global.__torneoPreinscripcionesCache);
+      alert(
+        '✅ Pago validado. Inscripción marcada como pagada.\n\n' +
+          (data.emailSent
+            ? '📧 Aviso enviado al club y al responsable.'
+            : '⚠️ Validación guardada; el correo no se pudo enviar (revisa SendGrid en Netlify).')
+      );
+    } catch (err) {
+      alert('❌ Error al validar pago: ' + (err && err.message ? err.message : String(err)));
+    }
   }
 
   async function loadTorneoPreinscripcionesAdmin() {
@@ -794,6 +999,8 @@
 
   global.loadTorneoPreinscripcionesAdmin = loadTorneoPreinscripcionesAdmin;
   global.discardTorneoPreinscripcion = discardTorneoPreinscripcion;
+  global.validateTorneoPreinscripcionEquipo = validateTorneoPreinscripcionEquipo;
+  global.validateTorneoPreinscripcionPayment = validateTorneoPreinscripcionPayment;
   global.showTorneoPreinscripcionDetail = showTorneoPreinscripcionDetail;
   global.closeTorneoPreinscripcionDetail = closeTorneoPreinscripcionDetail;
 })(typeof window !== 'undefined' ? window : globalThis);

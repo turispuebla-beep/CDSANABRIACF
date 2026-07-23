@@ -1,5 +1,5 @@
 /**
- * Cabecera Authorization para funciones Netlify que requieren admin Firebase.
+ * Cabecera Authorization para funciones Netlify que requieren admin la nube.
  */
 (function (global) {
   'use strict';
@@ -8,7 +8,7 @@
     const out = { ...(extra || {}) };
     const auth = global.firebaseAuth;
     if (!auth || auth.isSimulation) {
-      throw new Error('Inicia sesión como administrador en Firebase para esta acción.');
+      throw new Error('Inicia sesión como administrador en la nube para esta acción.');
     }
     const user = auth.currentUser;
     if (!user) {

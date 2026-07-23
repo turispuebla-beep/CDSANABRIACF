@@ -26,6 +26,7 @@ $copyItems = @(
     'inscripcion-jugador.html',
     'inscripcion-jugador-demo.html',
     'torneo-equipo.html',
+    'torneo-vista.html',
     'torneo-jugador.html',
     'sw.js',
     'manifest.json'
@@ -174,7 +175,7 @@ Write-Host "      Eliminados (aprox.): $removed archivos" -ForegroundColor Gray
 # Raíz de netlify-dist: solo lo publicable (evita basura de subidas anteriores)
 $keepRoot = @(
     'index.html', 'admin-panel.html', 'pago-resultado.html', 'pago-cuota-socio.html',
-    'inscripcion-jugador.html', 'inscripcion-jugador-demo.html', 'torneo-equipo.html', 'torneo-jugador.html',
+    'inscripcion-jugador.html', 'inscripcion-jugador-demo.html', 'torneo-equipo.html', 'torneo-vista.html', 'torneo-jugador.html',
     'sw.js', 'manifest.json', 'favicon.ico',
     '_redirects', '.netlifyignore', '404.html', 'deploy-version.json'
 )

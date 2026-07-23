@@ -107,7 +107,7 @@ class CDSANABRIACFDatabase {
             await this.createDefaultTeams();
             
             // Crear administradores por defecto
-            // Admins solo vía Firebase Authentication + sanabria_admins (sin contraseñas en IndexedDB).
+            // Admins solo vía la nube + sanabria_admins (sin contraseñas en IndexedDB).
 
             console.log('✅ Datos iniciales cargados correctamente');
         } catch (error) {
@@ -161,9 +161,9 @@ class CDSANABRIACFDatabase {
         console.log('✅ Equipos por defecto creados');
     }
 
-    /** Obsoleto: no crear admins con contraseña en la base local. Usar Firebase Auth. */
+    /** Obsoleto: no crear admins con contraseña en la base local. Usar la nube. */
     async createDefaultAdmins() {
-        console.log('ℹ️ Administradores: usar Firebase Authentication + colección sanabria_admins');
+        console.log('ℹ️ Administradores: usar la nube + colección sanabria_admins');
     }
 
     // ===== MÉTODOS CRUD PARA SOCIOS =====
@@ -662,38 +662,38 @@ window.limpiarSociosYResetearContador = async function() {
 
 window.sincronizarSociosConBackend = async function() {
     try {
-        console.log('🔄 Subiendo socios locales a Firebase...');
+        console.log('🔄 Subiendo socios locales a la nube...');
         if (typeof window.syncLocalArrayKeyToFirebase === 'function') {
             const r = await window.syncLocalArrayKeyToFirebase('clubMembers');
-            alert('✅ Socios sincronizados con Firebase (' + (r.synced || 0) + ' documentos)');
+            alert('✅ Socios sincronizados con la nube (' + (r.synced || 0) + ' documentos)');
             return;
         }
-        alert('⚠️ Firebase no está disponible en esta página. Abre la web principal e inténtalo de nuevo.');
+        alert('⚠️ La nube no está disponible en esta página. Abre la web principal e inténtalo de nuevo.');
     } catch (error) {
-        console.error('❌ Error sincronizando con Firebase:', error);
-        alert('❌ Error sincronizando con Firebase');
+        console.error('❌ Error sincronizando con la nube:', error);
+        alert('❌ Error sincronizando con la nube');
     }
 };
 
 window.obtenerSociosDelBackend = async function() {
     try {
-        console.log('📥 Descargando socios desde Firebase...');
+        console.log('📥 Descargando socios desde la nube...');
         if (typeof window.syncFromFirebase === 'function') {
             await window.syncFromFirebase();
             const n = JSON.parse(localStorage.getItem('clubMembers') || '[]').length;
-            alert('✅ ' + n + ' socios cargados desde Firebase');
+            alert('✅ ' + n + ' socios cargados desde la nube');
             return;
         }
         if (window.cdsanabriacfFirebase && window.cdsanabriacfFirebase.getSocios) {
             const socios = await window.cdsanabriacfFirebase.getSocios();
             localStorage.setItem('clubMembers', JSON.stringify(socios || []));
-            alert('✅ ' + (socios ? socios.length : 0) + ' socios cargados desde Firebase');
+            alert('✅ ' + (socios ? socios.length : 0) + ' socios cargados desde la nube');
             return;
         }
-        alert('⚠️ Firebase no está disponible en esta página.');
+        alert('⚠️ La nube no está disponible en esta página.');
     } catch (error) {
-        console.error('❌ Error obteniendo socios desde Firebase:', error);
-        alert('❌ Error obteniendo datos desde Firebase');
+        console.error('❌ Error obteniendo socios desde la nube:', error);
+        alert('❌ Error obteniendo datos desde la nube');
     }
 };
 

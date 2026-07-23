@@ -117,9 +117,35 @@
     global.location.href = 'torneo-equipo.html';
   }
 
+  function goToTorneoView() {
+    global.location.href = 'torneo-vista.html';
+  }
+
+  function showAccessChoice(panel) {
+    const form = global.document.getElementById('treAccessForm');
+    const choice = global.document.getElementById('treAccessChoice');
+    const welcome = global.document.getElementById('treAccessChoiceWelcome');
+    if (form) form.style.display = 'none';
+    if (choice) choice.hidden = false;
+    if (welcome && panel) {
+      const name = panel.contactName || panel.teamName || '';
+      welcome.textContent = name
+        ? 'Acceso correcto, ' + name + '. ¿Qué quieres consultar?'
+        : 'Acceso correcto. ¿Qué quieres consultar?';
+    }
+  }
+
+  function resetAccessModal() {
+    const form = global.document.getElementById('treAccessForm');
+    const choice = global.document.getElementById('treAccessChoice');
+    if (form) form.style.display = '';
+    if (choice) choice.hidden = true;
+  }
+
   function openAccessModal(prefillCode) {
     const modal = global.document.getElementById('torneoResponsableAccessModal');
     if (!modal) return;
+    resetAccessModal();
     const codeInput = global.document.getElementById('treAccessCode');
     const emailInput = global.document.getElementById('treContactEmail');
     const errEl = global.document.getElementById('treAccessError');
@@ -139,6 +165,7 @@
   function closeAccessModal() {
     const modal = global.document.getElementById('torneoResponsableAccessModal');
     if (modal) modal.style.display = 'none';
+    resetAccessModal();
   }
 
   async function submitAccessModal(ev) {
@@ -175,9 +202,8 @@
       btn.textContent = 'Comprobando…';
     }
     try {
-      await loginAndSave(code, email);
-      closeAccessModal();
-      goToPanel();
+      const panel = await loginAndSave(code, email);
+      showAccessChoice(panel);
     } catch (err) {
       if (errEl) {
         errEl.hidden = false;
@@ -222,6 +248,8 @@
     verifyAccess: verifyAccess,
     loginAndSave: loginAndSave,
     goToPanel: goToPanel,
+    goToTorneoView: goToTorneoView,
+    showAccessChoice: showAccessChoice,
     openAccessModal: openAccessModal,
     closeAccessModal: closeAccessModal,
     submitAccessModal: submitAccessModal,

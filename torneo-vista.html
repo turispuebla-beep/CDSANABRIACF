@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Torneo Fútbol 7 — Calendario — CD Sanabria CF</title>
+    <style>
+        :root { --primary: #1e3a8a; --bg: #f1f5f9; }
+        * { box-sizing: border-box; }
+        body { font-family: system-ui, -apple-system, sans-serif; margin: 0; background: var(--bg); color: #1e293b; line-height: 1.5; }
+        .wrap { max-width: 760px; margin: 0 auto; padding: 20px 16px 48px; }
+        .topbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 16px; flex-wrap: wrap; }
+        .topbar a, .topbar button.linkish { color: var(--primary); text-decoration: none; font-weight: 600; font-size: 0.92rem; background: none; border: none; cursor: pointer; padding: 0; }
+        .card { background: #fff; border-radius: 14px; padding: 22px; margin-bottom: 16px; box-shadow: 0 4px 18px rgba(0,0,0,.06); }
+        h1 { color: var(--primary); font-size: 1.45rem; margin: 0 0 6px; }
+        .sub { color: #64748b; font-size: 0.95rem; margin: 0 0 16px; }
+        label { display: block; font-weight: 600; font-size: 0.88rem; margin: 12px 0 6px; }
+        input { width: 100%; padding: 12px; border: 1px solid #cbd5e1; border-radius: 10px; font-size: 1rem; }
+        .btn { display: inline-flex; align-items: center; justify-content: center; padding: 12px 20px; border-radius: 999px; border: none; font-weight: 700; font-size: 0.95rem; cursor: pointer; text-decoration: none; width: 100%; margin-top: 8px; }
+        .btn-primary { background: linear-gradient(135deg, #1e3a8a, #2563eb); color: #fff; }
+        .btn-outline { background: #fff; color: var(--primary); border: 2px solid #93c5fd; margin-top: 10px; }
+        .error-box { background: #fef2f2; border: 1px solid #fecaca; color: #b91c1c; padding: 10px 12px; border-radius: 10px; font-size: 0.9rem; margin-top: 10px; }
+        .nav-tabs { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 14px; }
+        .nav-tabs a { padding: 8px 14px; border-radius: 999px; font-size: 0.88rem; font-weight: 700; text-decoration: none; background: #e2e8f0; color: #334155; }
+        .nav-tabs a.active { background: #1e3a8a; color: #fff; }
+    </style>
+    <script src="https://www.gstatic.com/firebasejs/10.12.3/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.3/firebase-database.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.3/firebase-auth.js"></script>
+    <script type="module" src="js/firebase-config.js"></script>
+</head>
+<body>
+    <div class="wrap">
+        <div class="topbar">
+            <a href="index.html">← Web del club</a>
+            <div style="display:flex;gap:12px;flex-wrap:wrap;">
+                <a href="torneo-equipo.html" id="linkPlantilla" hidden>Mi plantilla</a>
+                <button type="button" class="linkish" id="btnLogout" hidden>Cerrar sesión</button>
+            </div>
+        </div>
+
+        <div id="loginView" class="card">
+            <h1>Torneo Fútbol 7 — 2026</h1>
+            <p class="sub">Accede con tu código <strong>TP-Rxxx</strong> (responsable) o de equipo y el email de la preinscripción. No hace falta ser socio/a del club.</p>
+            <form id="loginForm">
+                <label for="loginAccessCode">Código</label>
+                <input type="text" id="loginAccessCode" placeholder="TP-R001 o TP-R001-INF" autocomplete="off" autocapitalize="characters" spellcheck="false" required>
+                <label for="loginContactEmail">Email de contacto</label>
+                <input type="email" id="loginContactEmail" placeholder="El de la preinscripción" autocomplete="email" required>
+                <div id="loginError" class="error-box" hidden></div>
+                <button type="submit" class="btn btn-primary">Ver calendario y resultados</button>
+            </form>
+        </div>
+
+        <div id="mainView" hidden>
+            <div class="nav-tabs">
+                <a href="torneo-vista.html" class="active">📅 Calendario del torneo</a>
+                <a href="torneo-equipo.html">📋 Mi plantilla</a>
+            </div>
+            <div id="torneoPublicRoot"></div>
+        </div>
+    </div>
+
+    <script src="js/torneo-responsable-access.js"></script>
+    <script src="js/torneo-public-view.js"></script>
+    <script>
+        (function () {
+            var loginView = document.getElementById('loginView');
+            var mainView = document.getElementById('mainView');
+            var root = document.getElementById('torneoPublicRoot');
+            var linkPlantilla = document.getElementById('linkPlantilla');
+            var btnLogout = document.getElementById('btnLogout');
+
+            function showMain() {
+                loginView.hidden = true;
+                mainView.hidden = false;
+                linkPlantilla.hidden = false;
+                btnLogout.hidden = false;
+                if (window.TorneoPublicView) window.TorneoPublicView.render(root);
+            }
+
+            function showLogin() {
+                loginView.hidden = false;
+                mainView.hidden = true;
+                linkPlantilla.hidden = true;
+                btnLogout.hidden = true;
+            }
+
+            function refreshFromSession() {
+                var session = window.TorneoResponsableAccess && window.TorneoResponsableAccess.readSession();
+                if (session) showMain();
+                else showLogin();
+            }
+
+            document.getElementById('loginForm').addEventListener('submit', async function (ev) {
+                ev.preventDefault();
+                var errEl = document.getElementById('loginError');
+                var btn = ev.target.querySelector('button[type=submit]');
+                if (errEl) { errEl.hidden = true; errEl.textContent = ''; }
+                if (btn) { btn.disabled = true; btn.textContent = 'Comprobando…'; }
+                try {
+                    await window.TorneoResponsableAccess.loginAndSave(
+                        document.getElementById('loginAccessCode').value,
+                        document.getElementById('loginContactEmail').value
+                    );
+                    showMain();
+                } catch (err) {
+                    if (errEl) { errEl.hidden = false; errEl.textContent = err.message || 'No se pudo acceder.'; }
+                } finally {
+                    if (btn) { btn.disabled = false; btn.textContent = 'Ver calendario y resultados'; }
+                }
+            });
+
+            btnLogout.addEventListener('click', function () {
+                if (window.TorneoResponsableAccess) window.TorneoResponsableAccess.clearSession();
+                showLogin();
+            });
+
+            window.addEventListener('competitionsUpdated', function () {
+                if (!mainView.hidden && window.TorneoPublicView) window.TorneoPublicView.render(root);
+            });
+
+            var params = new URLSearchParams(location.search || '');
+            var prefill = params.get('equipo') || params.get('code');
+            var prefillEmail = params.get('email');
+            if (prefill && document.getElementById('loginAccessCode')) {
+                document.getElementById('loginAccessCode').value = window.TorneoResponsableAccess
+                    ? window.TorneoResponsableAccess.normalizeCode(prefill) : prefill;
+            }
+            if (prefillEmail && document.getElementById('loginContactEmail')) {
+                document.getElementById('loginContactEmail').value = prefillEmail;
+            }
+
+            refreshFromSession();
+        })();
+    </script>
+</body>
+</html>

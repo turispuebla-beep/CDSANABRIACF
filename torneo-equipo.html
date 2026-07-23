@@ -371,6 +371,10 @@
         </div>
 
         <div id="panelView" hidden>
+            <div class="nav-tabs" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px;">
+                <a href="torneo-vista.html" style="padding:8px 14px;border-radius:999px;font-size:0.88rem;font-weight:700;text-decoration:none;background:#e2e8f0;color:#334155;">📅 Calendario del torneo</a>
+                <span style="padding:8px 14px;border-radius:999px;font-size:0.88rem;font-weight:700;background:#1e3a8a;color:#fff;">📋 Mi plantilla</span>
+            </div>
             <div class="card">
                 <span class="hero-badge" id="panelEventName">Torneo Fútbol 7 — 2026</span>
                 <h1 id="panelTeamName">Mi equipo</h1>
@@ -396,7 +400,7 @@
                     <strong>Cuota de inscripción:</strong> <span id="panelFeeLabel">—</span>
                     <div id="panelFeeBreakdown" hidden style="margin-top:10px;"></div>
                     <div id="panelFeePricingTable" style="margin-top:10px;font-size:0.84rem;"></div>
-                    <span style="display:block;font-size:0.82rem;color:#713f12;margin-top:8px;line-height:1.45;">Prebenjamín–Cadete: 60 € · Juvenil y Senior: 100 €. Puedes inscribir el mismo nombre y categoría varias veces (una preinscripción por equipo); al pagar se suma el total de todos los pendientes.</span>
+                    <span style="display:block;font-size:0.82rem;color:#713f12;margin-top:8px;line-height:1.45;">Prebenjamín–Cadete: 60 € · Juvenil y Senior: 100 €. Una preinscripción por equipo; el nombre debe ser distinto si repites categoría. El pago se realiza al completar la inscripción.</span>
                 </div>
             </div>
 
@@ -461,6 +465,11 @@
                     <span>He leído y acepto los términos.</span>
                 </label>
                 <div id="teFinalizeError" class="error-box" hidden style="margin-top:12px;"></div>
+                <div id="teChangePayCardBlock" hidden style="margin:14px 0 0;padding:14px;background:#eff6ff;border:1px solid #93c5fd;border-radius:10px;">
+                    <p id="teChangePayCardStatus" style="margin:0 0 10px;font-size:0.9rem;color:#1e3a8a;line-height:1.45;"></p>
+                    <button type="button" class="btn btn-primary" id="btnChangePayToCard" style="width:100%;">💳 Cambiar a tarjeta y pagar</button>
+                    <p id="teChangePayCardMsg" class="sub" style="margin:10px 0 0;font-size:0.82rem;"></p>
+                </div>
                 <div class="actions-row">
                     <button type="button" class="btn btn-outline" id="btnRefreshPanel">🔄 Actualizar</button>
                     <button type="button" class="btn btn-primary" id="btnClosePlantilla" disabled>📤 Finalizar inscripción</button>

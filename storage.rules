@@ -1,0 +1,26 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    function isClubAdmin() {
+      return request.auth != null
+        && firestore.exists(/databases/(default)/documents/sanabria_admins/$(request.auth.uid))
+        && firestore.get(/databases/(default)/documents/sanabria_admins/$(request.auth.uid)).data.appScope == 'cdsanabriacf'
+        && (
+          firestore.get(/databases/(default)/documents/sanabria_admins/$(request.auth.uid)).data.isAdmin == true
+          || firestore.get(/databases/(default)/documents/sanabria_admins/$(request.auth.uid)).data.isSuperAdmin == true
+          || firestore.get(/databases/(default)/documents/sanabria_admins/$(request.auth.uid)).data.role in ['admin', 'super_admin']
+        );
+    }
+
+    match /cdsanabriacf/notifications/{broadcastId}/{fileName} {
+      allow read: if true;
+      allow write: if isClubAdmin()
+        && request.resource.size < 12 * 1024 * 1024
+        && (
+          request.resource.contentType.matches('image/.*')
+          || request.resource.contentType == 'application/pdf'
+        );
+      allow delete: if isClubAdmin();
+    }
+  }
+}

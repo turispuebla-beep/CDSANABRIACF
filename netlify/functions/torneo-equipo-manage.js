@@ -7,6 +7,7 @@ const {
   saveTorneoPlantillaBatch,
   uploadTorneoFichaDocuments,
   prepareTorneoFinalize,
+  prepareTorneoCardRepay,
   finalizeTorneoPlantillaFree,
   finalizeTorneoPlantillaOffline,
   getTorneoInscriptionFeeEur
@@ -102,7 +103,8 @@ exports.handler = async (event) => {
     }
 
     if (action === 'finalize') {
-      if (!body.inscripcionPremiosAceptados) {
+      const changePayToCard = !!(body.changePayToCard || body.repayOnline);
+      if (!body.inscripcionPremiosAceptados && !changePayToCard) {
         return json(
           400,
           { ok: false, error: 'Debes leer y aceptar los términos sobre premios.' },
@@ -114,6 +116,17 @@ exports.handler = async (event) => {
         .toLowerCase();
       const offlineMethods = ['transferencia', 'efectivo'];
       const nowIso = new Date().toISOString();
+
+      if (changePayToCard && payMethod !== 'card' && payMethod !== 'bizum') {
+        return json(
+          400,
+          {
+            ok: false,
+            error: 'Para cambiar el método solo puedes pagar con tarjeta (o Bizum cuando esté activo).'
+          },
+          origin
+        );
+      }
 
       if (payMethod === 'gratis') {
         return json(
@@ -133,10 +146,22 @@ exports.handler = async (event) => {
         );
       }
 
-      const { record, panel, fee, unpaidRecords, unpaidPanels } = await prepareTorneoFinalize(
-        accessCode,
-        contactEmail
-      );
+      let record;
+      let fee;
+      let unpaidRecords;
+      let unpaidPanels;
+
+      if (changePayToCard) {
+        ({ record, fee, unpaidRecords, unpaidPanels } = await prepareTorneoCardRepay(
+          accessCode,
+          contactEmail
+        ));
+      } else {
+        ({ record, fee, unpaidRecords, unpaidPanels } = await prepareTorneoFinalize(
+          accessCode,
+          contactEmail
+        ));
+      }
 
       if (fee <= 0) {
         return json(
@@ -148,8 +173,8 @@ exports.handler = async (event) => {
 
       const activeCode = body.activeAccessCode || accessCode;
 
-      if (offlineMethods.includes(payMethod)) {
-        const updatedPanel = await finalizeTorneoPlantillaOffline(
+      if (!changePayToCard && offlineMethods.includes(payMethod)) {
+        const updatedData = await finalizeTorneoPlantillaOffline(
           accessCode,
           contactEmail,
           {
@@ -161,7 +186,7 @@ exports.handler = async (event) => {
         );
         return json(
           200,
-          { ok: true, panel: updatedPanel, offlinePayment: payMethod },
+          { ok: true, panel: updatedData, offlinePayment: payMethod },
           origin
         );
       }
@@ -200,13 +225,19 @@ exports.handler = async (event) => {
         amountEur: fee,
         amountCents: amountToCents(fee),
         customerEmail: String(record.contactEmail || contactEmail).trim().toLowerCase(),
+        contactName: String(record.contactName || '').trim(),
+        contactPhone: String(record.contactPhone || '').trim(),
         description,
         torneoPreinscripcionId: record.id,
         torneoPreinscripcionIds: unpaidIds,
         preinscripcionId: record.id,
         teamName: teamLabels,
         eventName: record.eventName,
-        accessCode: record.accessCode
+        accessCode: record.accessCode,
+        changePayToCard: changePayToCard,
+        previousPaymentMethod: changePayToCard
+          ? String(record.paymentMethod || record.offlinePaymentChannel || 'offline')
+          : null
       };
 
       await savePendingPayment(orderId, paymentDoc);
@@ -234,15 +265,59 @@ exports.handler = async (event) => {
 
       const preRef = require('./lib/firestore-admin').torneoPreinscripcionesRef();
       const now = new Date().toISOString();
-      for (let i = 0; i < unpaidIds.length; i++) {
-        await preRef.doc(unpaidIds[i]).set(
+      const whoEmail = String(record.contactEmail || contactEmail)
+        .trim()
+        .toLowerCase();
+      const whoName = String(record.contactName || '').trim();
+
+      for (let i = 0; i < unpaidRecords.length; i++) {
+        const r = unpaidRecords[i];
+        const prevMethod = String(r.paymentMethod || r.offlinePaymentChannel || 'offline');
+        await preRef.doc(r.id).set(
           {
             plantillaStatus: 'pendiente_pago',
             pendingPaymentOrderId: orderId,
+            paymentMethod: 'gateway_pending',
+            paymentStatus: 'pending_gateway',
+            offlinePaymentChannel: null,
+            previousPaymentMethod: prevMethod,
+            paymentMethodChangedAt: now,
+            paymentMethodChangedByEmail: whoEmail,
+            paymentMethodChangedByName: whoName,
             updatedAt: now
           },
           { merge: true }
         );
+      }
+
+      if (changePayToCard) {
+        try {
+          const { sendTorneoPaymentMethodChangedEmails } = require('./lib/member-email');
+          for (let i = 0; i < unpaidRecords.length; i++) {
+            const r = unpaidRecords[i];
+            await sendTorneoPaymentMethodChangedEmails({
+              ...r,
+              teamName: r.teamName || teamLabels,
+              eventName: r.eventName || record.eventName,
+              contactName: whoName || r.contactName,
+              contactEmail: whoEmail || r.contactEmail,
+              contactPhone: r.contactPhone || record.contactPhone,
+              previousPaymentMethod: r.paymentMethod || r.offlinePaymentChannel || 'offline',
+              previousOfflineChannel: r.offlinePaymentChannel,
+              newPaymentMethod: onlineMethod,
+              toMethod: onlineMethod,
+              inscriptionFeeEur: getTorneoInscriptionFeeEur(r),
+              amountEur: getTorneoInscriptionFeeEur(r),
+              pendingPaymentOrderId: orderId,
+              orderId: orderId,
+              paymentMethodChangedAt: now,
+              changedByName: whoName,
+              changedByEmail: whoEmail
+            });
+          }
+        } catch (mailErr) {
+          console.warn('changePayToCard emails:', mailErr.message || mailErr);
+        }
       }
 
       return json(
@@ -254,7 +329,8 @@ exports.handler = async (event) => {
           orderId,
           redirect: form,
           cardEnabled: publicCfg.cardEnabled,
-          teamCount: unpaidIds.length
+          teamCount: unpaidIds.length,
+          changePayToCard: changePayToCard
         },
         origin
       );

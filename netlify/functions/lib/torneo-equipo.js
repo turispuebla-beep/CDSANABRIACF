@@ -227,6 +227,50 @@ function pickCanonicalTeamName(records) {
   return sorted[0].teamName || '';
 }
 
+/** Ya pagado online (tarjeta/Bizum) o marcado pagado. */
+function isTorneoPaidOnlineOrSettled(record) {
+  if (!record) return false;
+  const st = String(record.plantillaStatus || '').toLowerCase();
+  const payStatus = String(record.paymentStatus || '').toLowerCase();
+  const method = String(record.paymentMethod || '').toLowerCase();
+  if (st === 'pagada' || payStatus === 'paid') return true;
+  if (method.indexOf('redsys') >= 0 && payStatus === 'paid') return true;
+  return false;
+}
+
+/**
+ * Plantilla enviada con transferencia/efectivo (o pago tarjeta abandonado)
+ * y aún sin validar/pagar online → puede cambiar a tarjeta.
+ */
+function isTorneoOfflinePendingUnpaid(record) {
+  if (!record || isTorneoPaidOnlineOrSettled(record)) return false;
+  const st = String(record.plantillaStatus || '').toLowerCase();
+  const method = String(record.paymentMethod || '').toLowerCase();
+  const offline = String(record.offlinePaymentChannel || '').toLowerCase();
+  const payStatus = String(record.paymentStatus || '').toLowerCase();
+
+  if (method.indexOf('redsys') >= 0 && payStatus === 'paid') return false;
+
+  if (st === 'pendiente_pago') return true;
+
+  if (st === 'enviada_club') {
+    if (payStatus === 'paid') return false;
+    if (
+      offline === 'efectivo' ||
+      offline === 'transferencia' ||
+      method === 'efectivo' ||
+      method === 'cash' ||
+      method === 'transferencia' ||
+      method === 'transfer' ||
+      payStatus === 'pending_validation' ||
+      !method
+    ) {
+      return true;
+    }
+  }
+  return false;
+}
+
 async function buildGroupedPanel(accessCode, contactEmail, activeAccessCodeOptional) {
   const record = await loadRecordByAccess(accessCode, contactEmail);
   const allRecords = await findTeamEntriesForRecord(record);
@@ -260,7 +304,9 @@ async function buildGroupedPanel(accessCode, contactEmail, activeAccessCodeOptio
     const st = String(r.plantillaStatus || '').toLowerCase();
     return st !== 'enviada_club' && st !== 'pagada';
   });
+  const offlinePendingRecords = allRecords.filter(isTorneoOfflinePendingUnpaid);
   const totalInscriptionFeeEur = getTorneoFeeForRecords(unpaidEntries);
+  const changePayToCardFeeEur = getTorneoFeeForRecords(offlinePendingRecords);
   const responsibleCode =
     record.responsibleCode ||
     (allRecords.find(function (r) {
@@ -281,6 +327,9 @@ async function buildGroupedPanel(accessCode, contactEmail, activeAccessCodeOptio
     coach: coachEntry.coach,
     totalInscriptionFeeEur: totalInscriptionFeeEur,
     totalInscriptionFeeLabel: totalInscriptionFeeEur > 0 ? formatTorneoFeeEur(totalInscriptionFeeEur) : null,
+    canChangePayToCard: offlinePendingRecords.length > 0,
+    changePayToCardFeeEur: changePayToCardFeeEur,
+    changePayToCardFeeLabel: changePayToCardFeeEur > 0 ? formatTorneoFeeEur(changePayToCardFeeEur) : null,
     teamEntries: entries.map(function (e) {
       const fee = getTorneoFeeForRecord(e);
       return {
@@ -298,6 +347,11 @@ async function buildGroupedPanel(accessCode, contactEmail, activeAccessCodeOptio
         fichasPending: e.fichasPending,
         documentsPendingCount: e.documentsPendingCount || 0,
         canFinalize: e.canFinalize,
+        canChangePayToCard: !!e.canChangePayToCard,
+        paymentMethod: e.paymentMethod || null,
+        paymentStatus: e.paymentStatus || null,
+        offlinePaymentChannel: e.offlinePaymentChannel || null,
+        pendingPayMethodLabel: e.pendingPayMethodLabel || null,
         fichas: e.fichas,
         inscriptionFeeEur: fee,
         inscriptionFeeLabel: fee > 0 ? formatTorneoFeeEur(fee) : null
@@ -346,6 +400,9 @@ function buildPanelPayload(record) {
   const fee = getTorneoInscriptionFeeEur(record);
   const base = siteUrl();
   const coach = normalizeCoach(record.coach || {});
+  const offlinePending = isTorneoOfflinePendingUnpaid(record);
+  const payMethod = String(record.paymentMethod || '').toLowerCase();
+  const offlineCh = String(record.offlinePaymentChannel || '').toLowerCase();
 
   return {
     id: record.id || '',
@@ -369,6 +426,20 @@ function buildPanelPayload(record) {
     documentsPendingCount: docsPendingCount,
     inscriptionFeeEur: fee,
     inscriptionFeeLabel: fee > 0 ? formatTorneoFeeEur(fee) : null,
+    paymentMethod: record.paymentMethod || null,
+    paymentStatus: record.paymentStatus || null,
+    offlinePaymentChannel: record.offlinePaymentChannel || null,
+    canChangePayToCard: offlinePending,
+    pendingPayMethodLabel:
+      offlineCh === 'efectivo' || payMethod === 'cash' || payMethod === 'efectivo'
+        ? 'efectivo'
+        : offlineCh === 'transferencia' || payMethod === 'transfer' || payMethod === 'transferencia'
+          ? 'transferencia'
+          : String(record.plantillaStatus || '').toLowerCase() === 'pendiente_pago'
+            ? 'tarjeta (pendiente)'
+            : offlinePending
+              ? 'pendiente'
+              : null,
     coach: {
       name: coach.name,
       surname: coach.surname,
@@ -617,9 +688,15 @@ async function completeTorneoPlantilla(recordId, paymentMeta) {
   if (!snap.exists) throw new Error('Preinscripción no encontrada');
   const record = { id: snap.id, ...snap.data() };
   const now = new Date().toISOString();
+  const prevStatus = String(record.plantillaStatus || '').toLowerCase();
+  const alreadyHadPlantilla =
+    !!record.plantillaSentAt ||
+    prevStatus === 'enviada_club' ||
+    prevStatus === 'pagada' ||
+    prevStatus === 'pendiente_pago';
   const patch = {
     plantillaStatus: 'enviada_club',
-    plantillaSentAt: now,
+    plantillaSentAt: record.plantillaSentAt || now,
     updatedAt: now,
     paymentOrderId: paymentMeta && paymentMeta.orderId ? paymentMeta.orderId : record.paymentOrderId || null,
     paymentMethod: paymentMeta && paymentMeta.payMethod ? paymentMeta.payMethod : record.paymentMethod || null,
@@ -632,20 +709,36 @@ async function completeTorneoPlantilla(recordId, paymentMeta) {
   }
   if (paymentMeta && paymentMeta.paymentStatus) {
     patch.paymentStatus = paymentMeta.paymentStatus;
+    if (String(paymentMeta.paymentStatus).toLowerCase() === 'paid') {
+      patch.plantillaStatus = 'pagada';
+      patch.paymentValidatedAt = paymentMeta.paymentValidatedAt || now;
+      patch.offlinePaymentChannel = null;
+      if (paymentMeta.paymentValidatedPor) patch.paymentValidatedPor = paymentMeta.paymentValidatedPor;
+      if (paymentMeta.paidByEmail) patch.paidByEmail = paymentMeta.paidByEmail;
+      if (paymentMeta.paidByName) patch.paidByName = paymentMeta.paidByName;
+    }
   }
   if (paymentMeta && paymentMeta.offlinePaymentChannel) {
     patch.offlinePaymentChannel = paymentMeta.offlinePaymentChannel;
   }
+  if (paymentMeta && paymentMeta.paidByEmail) patch.paidByEmail = paymentMeta.paidByEmail;
+  if (paymentMeta && paymentMeta.paidByName) patch.paidByName = paymentMeta.paidByName;
   await ref.set(patch, { merge: true });
   const merged = { ...record, ...patch };
 
-  try {
-    const { sendTorneoPlantillaCerradaEmails } = require('./member-email');
-    const { hydrateRecordForEmail } = require('./torneo-document-store');
-    const hydrated = await hydrateRecordForEmail(merged);
-    await sendTorneoPlantillaCerradaEmails(hydrated);
-  } catch (e) {
-    console.warn('completeTorneoPlantilla email:', e.message || e);
+  const skipPlantillaEmail =
+    !!(paymentMeta && paymentMeta.skipPlantillaEmail) ||
+    (String((paymentMeta && paymentMeta.paymentStatus) || '').toLowerCase() === 'paid' && alreadyHadPlantilla);
+
+  if (!skipPlantillaEmail) {
+    try {
+      const { sendTorneoPlantillaCerradaEmails } = require('./member-email');
+      const { hydrateRecordForEmail } = require('./torneo-document-store');
+      const hydrated = await hydrateRecordForEmail(merged);
+      await sendTorneoPlantillaCerradaEmails(hydrated);
+    } catch (e) {
+      console.warn('completeTorneoPlantilla email:', e.message || e);
+    }
   }
 
   return merged;
@@ -689,6 +782,36 @@ async function prepareTorneoFinalize(accessCode, contactEmail) {
     return !['enviada_club', 'pagada'].includes(String(r.plantillaStatus || ''));
   });
   return { record, panel: activePanel, fee, unpaidRecords, unpaidPanels };
+}
+
+/** Pago online (tarjeta) cuando ya eligieron transferencia/efectivo o quedó pendiente_pago. */
+async function prepareTorneoCardRepay(accessCode, contactEmail) {
+  const record = await loadRecordByAccess(accessCode, contactEmail);
+  const siblings = await findTeamEntriesForRecord(record);
+  const repayRecords = siblings.filter(isTorneoOfflinePendingUnpaid);
+  if (!repayRecords.length) {
+    throw new Error(
+      'No hay cuota pendiente para pagar con tarjeta. Si ya pagaste con tarjeta o Bizum, no hace falta volver a pagar.'
+    );
+  }
+  const panels = repayRecords.map(function (r) {
+    return buildPanelPayload(r);
+  });
+  const fee = getTorneoFeeForRecords(repayRecords);
+  if (!(fee > 0)) {
+    throw new Error('Cuota de inscripción no configurada. Contacta con el club.');
+  }
+  const activePanel =
+    panels.find(function (p) {
+      return normalizeTorneoAccessCode(p.accessCode) === normalizeTorneoAccessCode(accessCode);
+    }) || panels[0];
+  return {
+    record,
+    panel: activePanel,
+    fee,
+    unpaidRecords: repayRecords,
+    unpaidPanels: panels
+  };
 }
 
 async function saveTorneoPlantillaBatch(accessCode, contactEmail, playersRaw, activeAccessCodeOptional) {
@@ -858,7 +981,9 @@ async function finalizeTorneoPlantillaOffline(accessCode, contactEmail, opts, ac
       paymentStatus: 'pending_validation',
       offlinePaymentChannel: payMethod,
       inscripcionPremiosAceptados: !!acceptMeta.inscripcionPremiosAceptados,
-      inscripcionPremiosAceptadosAt: acceptMeta.inscripcionPremiosAceptadosAt || now
+      inscripcionPremiosAceptadosAt: acceptMeta.inscripcionPremiosAceptadosAt || now,
+      paidByEmail: unpaidRecords[i].contactEmail || '',
+      paidByName: unpaidRecords[i].contactName || ''
     });
   }
   const activeCode = activeAccessCodeOptional || accessCode;
@@ -909,20 +1034,58 @@ async function completeTorneoTeamInscriptionPayment(payment) {
     : [payment.torneoPreinscripcionId || payment.preinscripcionId].filter(Boolean);
   if (!ids.length) throw new Error('torneoPreinscripcionId ausente');
   const results = [];
+  const payMethodLabel = payment.payMethod === 'bizum' ? 'redsys_bizum' : 'redsys_card';
   for (let i = 0; i < ids.length; i++) {
     const id = ids[i];
     let amountEur = payment.amountEur;
-    if (ids.length > 1) {
-      const snap = await torneoPreinscripcionesRef().doc(String(id)).get();
-      amountEur = snap.exists ? getTorneoFeeForRecord({ id: snap.id, ...snap.data() }) : payment.amountEur;
+    let beforeSnap = null;
+    try {
+      beforeSnap = await torneoPreinscripcionesRef().doc(String(id)).get();
+    } catch (_) {}
+    if (ids.length > 1 && beforeSnap && beforeSnap.exists) {
+      amountEur = getTorneoFeeForRecord({ id: beforeSnap.id, ...beforeSnap.data() });
     }
+    const before = beforeSnap && beforeSnap.exists ? beforeSnap.data() || {} : {};
+    const alreadySent =
+      !!before.plantillaSentAt ||
+      ['enviada_club', 'pagada', 'pendiente_pago'].includes(String(before.plantillaStatus || '').toLowerCase());
     results.push(
       await completeTorneoPlantilla(id, {
         orderId: payment.orderId,
-        payMethod: payment.payMethod === 'bizum' ? 'redsys_bizum' : 'redsys_card',
-        amountEur: amountEur
+        payMethod: payMethodLabel,
+        amountEur: amountEur,
+        paymentStatus: 'paid',
+        skipPlantillaEmail: alreadySent || !!payment.changePayToCard,
+        paymentValidatedPor: payment.changePayToCard
+          ? 'Pasarela Redsys (cambio a tarjeta)'
+          : 'Pasarela Redsys',
+        paidByEmail: payment.customerEmail || before.contactEmail || '',
+        paidByName: payment.contactName || before.contactName || ''
       })
     );
+    try {
+      const { sendTorneoPagoValidadoEmails } = require('./member-email');
+      const paidRecord = results[results.length - 1];
+      await sendTorneoPagoValidadoEmails(
+        Object.assign({}, paidRecord, {
+          paymentAuto: true,
+          payMethod: payMethodLabel,
+          paymentMethod: payMethodLabel,
+          paymentOrderId: payment.orderId,
+          orderId: payment.orderId,
+          paymentValidatedAt: new Date().toISOString(),
+          paymentValidatedPor: payment.changePayToCard
+            ? 'Pasarela Redsys (cambio a tarjeta)'
+            : 'Pasarela Redsys',
+          contactName: payment.contactName || paidRecord.contactName,
+          contactEmail: payment.customerEmail || paidRecord.contactEmail,
+          paymentChangedByName: payment.contactName || paidRecord.contactName,
+          paymentChangedByEmail: payment.customerEmail || paidRecord.contactEmail
+        })
+      );
+    } catch (e) {
+      console.warn('completeTorneoTeamInscriptionPayment email:', e.message || e);
+    }
   }
   return results[0];
 }
@@ -937,10 +1100,12 @@ module.exports = {
   getTorneoFichaByInvite,
   submitTorneoFichaByInvite,
   prepareTorneoFinalize,
+  prepareTorneoCardRepay,
   finalizeTorneoPlantillaFree,
   finalizeTorneoPlantillaOffline,
   recordInscripcionPremiosAcceptance,
   completeTorneoTeamInscriptionPayment,
   buildPanelPayload,
-  coachIsComplete
+  coachIsComplete,
+  isTorneoOfflinePendingUnpaid
 };

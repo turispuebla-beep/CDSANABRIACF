@@ -1,5 +1,5 @@
 /**
- * Persistencia panel admin → Firebase vía Netlify (Admin SDK).
+ * Persistencia panel admin → la nube vía Netlify (Admin SDK).
  * Socios/amigos/jugadores/entrenadores dados de alta manualmente en el panel.
  * Entrenadores: solo passwordHash (clave asignada por el club), nunca texto plano.
  */
@@ -40,21 +40,37 @@
       return { ok: false };
     });
     if (!res.ok || !json.ok) {
-      const err = new Error(json.error || 'No se pudo guardar en la nube del club');
+      const detail = json.error || json.message || ('HTTP ' + res.status);
+      const err = new Error(detail || 'No se pudo guardar en la nube del club');
       err.code = 'admin_cloud_persist_failed';
+      err.httpStatus = res.status;
       throw err;
     }
     return json;
   }
 
-  function mergeIntoLocal(localKey, syncFn, eventName, remote, matchFn) {
+  function mergeIntoLocal(localKey, syncFn, eventName, remote, matchFn, sourceRecord) {
     if (!remote || !remote.id) return remote;
     const list = JSON.parse(global.localStorage.getItem(localKey) || '[]');
     let ix = list.findIndex(function (x) {
       return x && x.id === remote.id;
     });
     if (ix < 0 && matchFn) ix = matchFn(list, remote);
-    const merged = { ...(ix >= 0 ? list[ix] : {}), ...remote };
+    const localRow = ix >= 0 ? list[ix] : {};
+    let merged;
+    if (
+      localKey === 'clubPlayers' &&
+      global.ClubPlayerKitPersist &&
+      typeof global.ClubPlayerKitPersist.mergePlayerKitFields === 'function'
+    ) {
+      merged = global.ClubPlayerKitPersist.mergePlayerKitFields(
+        global.ClubPlayerKitPersist.mergePlayerKitFields(remote, localRow),
+        sourceRecord || {}
+      );
+      if (remote.id) merged.id = remote.id;
+    } else {
+      merged = { ...localRow, ...remote };
+    }
     if (ix >= 0) list[ix] = merged;
     else list.push(merged);
     if (typeof syncFn === 'function') syncFn(list);
@@ -66,9 +82,6 @@
   }
 
   async function persistMember(record) {
-    if (global.ClubMemberCloudPersist && global.ClubMemberCloudPersist.persistMemberViaNetlify) {
-      return global.ClubMemberCloudPersist.persistMemberViaNetlify(stripPlainSecrets(record));
-    }
     const json = await postPayload({ kind: 'member', record: stripPlainSecrets(record) });
     const remote = json.member || json.record || { id: json.memberId, ...record };
     return mergeIntoLocal(
@@ -78,17 +91,17 @@
       remote,
       function (list, r) {
         const em = String(r.email || '').trim().toLowerCase();
+        const dni = String(r.dni || '').trim().toUpperCase();
         return list.findIndex(function (s) {
-          return String(s.email || '').trim().toLowerCase() === em;
+          if (s.id && r.id && String(s.id) === String(r.id)) return true;
+          if (dni && String(s.dni || '').trim().toUpperCase() === dni) return true;
+          return em && String(s.email || '').trim().toLowerCase() === em;
         });
       }
     );
   }
 
   async function persistFriend(record) {
-    if (global.ClubFriendCloudPersist && global.ClubFriendCloudPersist.persistFriendViaNetlify) {
-      return global.ClubFriendCloudPersist.persistFriendViaNetlify(stripPlainSecrets(record));
-    }
     const json = await postPayload({ kind: 'friend', record: stripPlainSecrets(record) });
     const remote = json.friend || json.record || { id: json.friendId, ...record };
     return mergeIntoLocal(
@@ -118,7 +131,8 @@
         return list.findIndex(function (p) {
           return String(p.dni || '').trim().toUpperCase() === dni;
         });
-      }
+      },
+      record
     );
   }
 
@@ -223,6 +237,27 @@
     return json;
   }
 
+  async function repairMembershipRegistrations(orderIds) {
+    const headers = { 'Content-Type': 'application/json' };
+    if (global.CdsanAdminApiAuth && global.CdsanAdminApiAuth.getAdminAuthHeaders) {
+      Object.assign(headers, await global.CdsanAdminApiAuth.getAdminAuthHeaders());
+    }
+    const res = await fetch('/.netlify/functions/repair-membership-registrations', {
+      method: 'POST',
+      headers: headers,
+      body: JSON.stringify({ orderIds: orderIds || [] })
+    });
+    const json = await res.json().catch(function () {
+      return { ok: false };
+    });
+    if (!res.ok || !json.ok) {
+      const err = new Error(json.error || 'No se pudieron reparar altas de socio');
+      err.code = 'repair_membership_registrations_failed';
+      throw err;
+    }
+    return json;
+  }
+
   global.AdminClubCloudPersist = {
     persist: persist,
     persistMember: persistMember,
@@ -235,6 +270,7 @@
     deletePlayer: deletePlayer,
     assignPendingMemberNumbers: assignPendingMemberNumbers,
     repairPlayerInscriptions: repairPlayerInscriptions,
+    repairMembershipRegistrations: repairMembershipRegistrations,
     cloudRequired: cloudRequired
   };
 })(typeof window !== 'undefined' ? window : globalThis);

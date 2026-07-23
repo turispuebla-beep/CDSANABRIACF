@@ -290,8 +290,21 @@ service cloud.firestore {
       allow delete: if hasRequestedScope() && isAdmin();
     }
     match /sanabria_players/{docId} {
-      allow read: if hasScope();
+      allow read: if hasScope() && isAdmin();
       allow create, update, delete: if hasRequestedScope() && isAdmin();
+    }
+    // Vista pública del club: solo nombre, categoría, dorsal (sin DNI/email). No incluye torneo F7.
+    match /sanabria_players_public/{docId} {
+      allow read: if hasScope();
+      allow create, update, delete: if hasScope() && isAdmin() && hasRequestedScope()
+        && request.resource.data.appScope == 'cdsanabriacf'
+        && request.resource.data.source == 'club_player'
+        && request.resource.data.clubPlayerId is string
+        && !('dni' in request.resource.data)
+        && !('email' in request.resource.data)
+        && !('telefono' in request.resource.data)
+        && !('phone' in request.resource.data)
+        && !('portalPasswordHash' in request.resource.data);
     }
     match /sanabria_player_applications/{docId} {
       allow read: if hasScope() && isAdmin();
@@ -301,10 +314,12 @@ service cloud.firestore {
     match /sanabria_player_portal_resets/{docId} {
       allow read, write: if false;
     }
+    // Torneo F7: fichas en sanabria_torneo_preinscripciones + docs en sanabria_torneo_documents.
+    // No se mezclan con sanabria_players (plantilla del club).
     match /sanabria_torneo_preinscripciones/{docId} {
       allow read: if hasScope() && canManageCompetitions();
       allow create: if publicRegistrationsOpen() && torneoPreinscripcionValid();
-      allow update, delete: if hasScope() && canManageCompetitions() && hasRequestedScope();
+      allow update, delete: if hasScope() && isAdmin() && hasRequestedScope();
     }
     match /sanabria_coaches/{docId} {
       allow read: if hasScope();
@@ -326,7 +341,7 @@ service cloud.firestore {
       allow delete: if hasScope() && canManageCompetitions();
     }
     match /sanabria_notifications/{docId} {
-      allow read: if hasScope() && isSignedIn();
+      allow read: if hasScope();
       allow create, update, delete: if hasRequestedScope() && isAdmin();
     }
     match /sanabria_fcm_tokens/{docId} {

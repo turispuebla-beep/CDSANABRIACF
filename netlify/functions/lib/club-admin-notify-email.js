@@ -36,6 +36,94 @@ function pickDataValue(data, keys) {
   return '';
 }
 
+function fieldLabelKey(label) {
+  const l = String(label || '')
+    .trim()
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '');
+  if (l === 'domicilio' || l === 'direccion' || l.startsWith('direccion ')) return 'direccion';
+  if (l === 'nombre completo') return 'nombre_completo';
+  if (l.startsWith('nombre')) return 'nombre';
+  if (l.startsWith('apellido')) return 'apellidos';
+  if (l === 'dni' || l === 'dni/nie' || l === 'dni tutor/a') return 'dni';
+  if (l.startsWith('tel')) return 'telefono';
+  if (l === 'email' || l === 'correo') return 'email';
+  if (l.includes('socio') && (l.startsWith('n') || l.includes('numero'))) return 'numero_socio';
+  if (l.includes('amigo') && (l.startsWith('n') || l.includes('numero'))) return 'numero_amigo';
+  if (l === 'sexo') return 'sexo';
+  if (l.includes('nacimiento') || l === 'nacimiento') return 'fecha_nacimiento';
+  return l;
+}
+
+/** Nombre visible en asunto y cabecera del correo al club. */
+function buildPersonDisplayName(data) {
+  const src = data && typeof data === 'object' ? data : {};
+  const nombre = pickDataValue(src, ['nombre', 'name']);
+  const apellidos = pickDataValue(src, ['apellidos', 'surname']);
+  let full = [nombre, apellidos].filter(Boolean).join(' ').trim();
+  if (full) return full;
+
+  full = pickDataValue(src, [
+    'playerName',
+    'buyerName',
+    'label',
+    'contactName',
+    'teamName',
+    'guardianName'
+  ]);
+  if (full) return full;
+
+  if (Array.isArray(src.fields)) {
+    const byLabel = (re) => {
+      const row = src.fields.find(function (f) {
+        return f && f.label && re.test(String(f.label)) && f.value != null && String(f.value).trim();
+      });
+      return row ? String(row.value).trim() : '';
+    };
+    full =
+      byLabel(/jugador\s*\/\s*a\s+invitado/i) ||
+      byLabel(/^jugador/i) ||
+      byLabel(/nombre completo/i);
+    if (full) return full;
+    let fn = '';
+    let ln = '';
+    src.fields.forEach(function (f) {
+      const k = fieldLabelKey(f.label);
+      if (k === 'nombre') fn = String(f.value || '').trim();
+      if (k === 'apellidos') ln = String(f.value || '').trim();
+    });
+    full = [fn, ln].filter(Boolean).join(' ').trim();
+    if (full) return full;
+  }
+
+  const email = pickDataValue(src, ['email', 'requesterEmail', 'customerEmail', 'inviteEmail']);
+  if (email && email.includes('@')) {
+    const local = email.split('@')[0].replace(/[._+-]/g, ' ').trim();
+    if (local.length >= 2) return local;
+  }
+  return '';
+}
+
+/** Asunto legible en móvil: nombre primero, acción después. */
+function normalizeAdminSubject(data) {
+  const person = buildPersonDisplayName(data);
+  let action = String(data.subject || data.title || 'Nuevo aviso').trim();
+  action = action.replace(/^\[CD Sanabria CF\]\s*/i, '').trim();
+
+  if (person) {
+    const escaped = person.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    action = action.replace(new RegExp('\\s*[—\\-–]\\s*' + escaped + '\\s*$', 'i'), '').trim();
+    action = action.replace(new RegExp('^' + escaped + '\\s*[—\\-–]\\s*', 'i'), '').trim();
+    action = action.replace(
+      new RegExp('^[\\w\\s/]+\\s*[—\\-–]\\s*' + escaped + '\\s*[—\\-–]\\s*', 'i'),
+      ''
+    ).trim();
+    return `[${CLUB_NAME}] ${person} — ${action}`;
+  }
+  return `[${CLUB_NAME}] ${action}`;
+}
+
 function composeFullAddress(data) {
   const line = pickDataValue(data, ['direccion', 'address', 'domicilio']);
   const cp = pickDataValue(data, ['codigoPostal', 'postalCode', 'cp']);
@@ -63,26 +151,6 @@ function formatFriendNumberDisplay(data) {
   return num;
 }
 
-function fieldLabelKey(label) {
-  const l = String(label || '')
-    .trim()
-    .toLowerCase()
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '');
-  if (l === 'domicilio' || l === 'direccion' || l.startsWith('direccion ')) return 'direccion';
-  if (l === 'nombre completo') return 'nombre_completo';
-  if (l.startsWith('nombre')) return 'nombre';
-  if (l.startsWith('apellido')) return 'apellidos';
-  if (l === 'dni' || l === 'dni/nie' || l === 'dni tutor/a') return 'dni';
-  if (l.startsWith('tel')) return 'telefono';
-  if (l === 'email' || l === 'correo') return 'email';
-  if (l.includes('socio') && (l.startsWith('n') || l.includes('numero'))) return 'numero_socio';
-  if (l.includes('amigo') && (l.startsWith('n') || l.includes('numero'))) return 'numero_amigo';
-  if (l === 'sexo') return 'sexo';
-  if (l.includes('nacimiento') || l === 'nacimiento') return 'fecha_nacimiento';
-  return l;
-}
-
 /** Bloque estándar: identidad + números de socio/amigo. */
 function buildStandardIdentityFields(data) {
   const src = data && typeof data === 'object' ? data : {};
@@ -98,11 +166,16 @@ function buildStandardIdentityFields(data) {
   const numeroAmigo = formatFriendNumberDisplay(src);
 
   const out = [];
+  const fullName = [nombre, apellidos].filter(Boolean).join(' ').trim();
+  if (fullName) {
+    out.push({ label: 'Nombre completo', value: fullName });
+  } else {
+    if (nombre) out.push({ label: 'Nombre', value: nombre });
+    if (apellidos) out.push({ label: 'Apellidos', value: apellidos });
+  }
+  if (dni) out.push({ label: 'DNI', value: dni });
   if (numeroSocio) out.push({ label: 'Nº socio', value: numeroSocio });
   if (numeroAmigo) out.push({ label: 'Nº amigo/a', value: numeroAmigo });
-  if (nombre) out.push({ label: 'Nombre', value: nombre });
-  if (apellidos) out.push({ label: 'Apellidos', value: apellidos });
-  if (dni) out.push({ label: 'DNI', value: dni });
   if (sexo) out.push({ label: 'Sexo', value: sexo });
   if (fechaNac) out.push({ label: 'Fecha nacimiento', value: fechaNac });
   if (direccion) out.push({ label: 'Dirección completa', value: direccion });
@@ -193,23 +266,32 @@ function buildExportAttachments(fields, data) {
 }
 
 function buildClubAdminContent(data) {
+  const personName = buildPersonDisplayName(data);
   const title = escapeHtml(String(data.title || data.kind || 'Aviso web').trim());
   const kind = escapeHtml(String(data.kind || 'registro').trim());
   const paymentLabel = escapeHtml(formatPaymentLabel(data.paymentChannel || data.paymentMethod));
   const fields = mergeNotifyFields(data);
   const requester = String(data.requesterEmail || data.email || '').trim();
 
+  const personBanner = personName
+    ? `<div style="background:linear-gradient(135deg,#1e3a8a 0%,#1e40af 100%);color:#fff;border-radius:10px;padding:14px 16px;margin:0 0 16px">
+         <div style="font-size:0.72rem;text-transform:uppercase;letter-spacing:0.06em;opacity:0.88;margin-bottom:4px">Persona</div>
+         <div style="font-size:1.45rem;font-weight:800;line-height:1.25;word-break:break-word">${escapeHtml(personName)}</div>
+       </div>`
+    : '';
+
   const rows = fields
     .map(
       (f) =>
-        `<tr><td style="padding:6px 12px 6px 0;color:#64748b;vertical-align:top;white-space:nowrap"><strong>${escapeHtml(f.label)}</strong></td><td style="padding:6px 0;color:#1e293b">${escapeHtml(f.value)}</td></tr>`
+        `<tr><td style="padding:6px 12px 6px 0;color:#64748b;vertical-align:top;white-space:nowrap"><strong>${escapeHtml(f.label)}</strong></td><td style="padding:6px 0;color:#1e293b;word-break:break-word">${escapeHtml(f.value)}</td></tr>`
     )
     .join('');
 
-  const subject = `[${CLUB_NAME}] ${String(data.subject || data.title || 'Nuevo aviso').trim()}`;
+  const subject = normalizeAdminSubject(data);
 
   const html = `
     <div style="font-family:system-ui,sans-serif;max-width:640px;color:#1e293b;line-height:1.5">
+      ${personBanner}
       <h2 style="color:#1e3a8a;margin:0 0 8px">${title}</h2>
       <p style="margin:0 0 16px;font-size:0.9rem;color:#64748b">Tipo: ${kind} · ${new Date().toLocaleString('es-ES')}</p>
       <table style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;padding:12px 16px;margin:0 0 16px;width:100%">
@@ -226,12 +308,11 @@ function buildClubAdminContent(data) {
       <p style="font-size:0.85rem;color:#94a3b8">Mensaje automático desde la web del club.</p>
     </div>`;
 
-  const textLines = [
-    title,
-    'Tipo: ' + String(data.kind || ''),
-    'Forma de pago: ' + formatPaymentLabel(data.paymentChannel || data.paymentMethod),
-    ''
-  ];
+  const textLines = [];
+  if (personName) {
+    textLines.push('PERSONA: ' + personName, '');
+  }
+  textLines.push(title, 'Tipo: ' + String(data.kind || ''), 'Forma de pago: ' + formatPaymentLabel(data.paymentChannel || data.paymentMethod), '');
   fields.forEach((f) => {
     textLines.push(f.label + ': ' + f.value);
   });
@@ -292,6 +373,8 @@ async function sendClubAdminNotification(data) {
 
 module.exports = {
   formatPaymentLabel,
+  buildPersonDisplayName,
+  normalizeAdminSubject,
   buildStandardIdentityFields,
   mergeNotifyFields,
   buildClubAdminContent,

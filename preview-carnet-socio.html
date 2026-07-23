@@ -4,13 +4,16 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Vista previa — Carnet de socio CD Sanabria CF</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@600;700;800;900&display=swap" rel="stylesheet">
     <style>
         * { box-sizing: border-box; }
         body {
             margin: 0;
             min-height: 100vh;
             font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
-            background: linear-gradient(135deg, #1e3a8a 0%, #dc2626 100%);
+            background: linear-gradient(135deg, #1e3a8a 0%, #8b0000 100%);
             padding: 24px 16px 40px;
             color: #1e293b;
         }
@@ -33,7 +36,7 @@
             gap: 28px;
             justify-content: center;
             align-items: flex-start;
-            max-width: 1000px;
+            max-width: 1200px;
             margin: 0 auto;
         }
         .sample {
@@ -41,6 +44,8 @@
             border-radius: 16px;
             padding: 16px;
             backdrop-filter: blur(6px);
+            max-width: 592px;
+            width: 100%;
         }
         .sample h2 {
             color: #fff;
@@ -50,7 +55,7 @@
             font-weight: 600;
         }
         .note {
-            max-width: 520px;
+            max-width: 640px;
             margin: 28px auto 0;
             background: #fff;
             border-radius: 12px;
@@ -65,27 +70,33 @@
 </head>
 <body>
     <h1>🎫 Vista previa del carnet de socio</h1>
-    <p class="sub">CD Sanabria CF — mismo diseño y prefijos (D. / Dña.) que en la web</p>
+    <p class="sub">Solo ejemplos de diseño. En la web/panel cada carnet usa el nombre, DNI, nº socio y temporada de ese socio.</p>
 
     <div class="grid">
         <div class="sample">
-            <h2>Socio/a regular — mujer (N.º SOC. 000051)</h2>
+            <h2>Socio/a regular — mujer (N.º 000051)</h2>
             <div id="preview-card-regular"></div>
         </div>
         <div class="sample">
-            <h2>Socio/a de honor — hombre (N.º SOC. 000003)</h2>
+            <h2>Socio de honor — hombre (N.º 000003) · HONORÍFICO dorado</h2>
             <div id="preview-card-honor"></div>
+        </div>
+        <div class="sample">
+            <h2>EJEMPLO socio-jugador (datos ficticios de muestra)</h2>
+            <div id="preview-card-jugador"></div>
         </div>
     </div>
 
     <p class="note">
-        Abre este archivo desde <code>CDSANABRIACF1/preview-carnet-socio.html</code> (no copies el HTML a otra carpeta).<br>
-        Si el escudo no carga, usa un servidor local: en esta carpeta ejecuta <code>npx --yes serve -l 3456</code> y abre <code>http://localhost:3456/preview-carnet-socio.html</code>.<br>
-        Los nombres usan <strong>Dña.</strong> (mujer) y <strong>D.</strong> (hombre), igual que el carnet en producción.<br>
+        Abre este archivo desde <code>CDSANABRIACF1/preview-carnet-socio.html</code>.<br>
+        Si la plantilla no carga, usa un servidor local: <code>npx --yes serve -l 3456</code> y abre
+        <code>http://localhost:3456/preview-carnet-socio.html</code>.<br>
+        En producción el carnet se rellena con los datos de cada socio/jugador del panel o de la sesión.<br>
         <a href="index.html">Ir a la web del club</a>
     </p>
 
     <script src="js/club-member-numbers.js"></script>
+    <script src="js/club-inscription-config.js"></script>
     <script src="js/club-member-card.js"></script>
     <script>
         (function () {
@@ -98,7 +109,8 @@
                 dni: '12345678A',
                 numeroSocio: 51,
                 status: 'active',
-                estado: 'activo'
+                estado: 'activo',
+                season: '2026-2027'
             }, 'cdsanPreviewRegular');
 
             memberCardGenerator.renderPreviewCard('preview-card-honor', {
@@ -109,8 +121,23 @@
                 socioDeHonor: true,
                 numeroSocioHonor: 3,
                 status: 'active',
-                estado: 'activo'
+                estado: 'activo',
+                season: '2026-2027'
             }, 'cdsanPreviewHonor');
+
+            memberCardGenerator.renderPreviewCard('preview-card-jugador', {
+                nombre: 'Asier',
+                apellidos: 'Pisabarro Rodríguez',
+                sexo: 'hombre',
+                dni: '71039864V',
+                numeroSocio: 63,
+                socioJugador: true,
+                isJugador: true,
+                memberKind: 'jugador',
+                status: 'active',
+                estado: 'activo',
+                season: '2026-2027'
+            }, 'cdsanPreviewJugador');
         })();
     </script>
 </body>

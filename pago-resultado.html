@@ -26,11 +26,11 @@
             if (result === 'ok') {
                 title.textContent = 'Pago enviado correctamente';
                 title.className = 'ok';
-                msg.textContent = 'El banco ha aceptado la operación. En unos segundos activaremos tu alta como socio/a en el club.';
+                msg.textContent = 'El banco ha aceptado la operación. En unos segundos confirmaremos el pago y te enviaremos un correo.';
             } else {
                 title.textContent = 'Pago no completado';
                 title.className = 'ko';
-                msg.textContent = 'La operación fue cancelada o rechazada. No se ha registrado ningún dato. Recibirás un correo de aviso y podrás intentarlo de nuevo desde la web.';
+                msg.textContent = 'La operación fue cancelada o rechazada. Si es una inscripción o alta, tu ficha puede haber quedado como pendiente (no pagada). Recibirás un correo y podrás retomar el pago desde la web.';
             }
 
             if (order && window.CdsanRedsys) {

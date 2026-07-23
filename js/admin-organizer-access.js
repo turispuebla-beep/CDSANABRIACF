@@ -58,8 +58,26 @@
     return 'Usuario del panel';
   }
 
+  function activateOrganizerCompeticionesTab() {
+    if (!global.document) return;
+    const tabs = global.document.querySelectorAll('.tab-content');
+    tabs.forEach(function (tab) {
+      tab.style.display = tab.id === ORGANIZER_TAB ? 'block' : 'none';
+      tab.classList.toggle('active', tab.id === ORGANIZER_TAB);
+    });
+    const navButtons = global.document.querySelectorAll('.nav-tab');
+    navButtons.forEach(function (btn) {
+      const onclick = btn.getAttribute('onclick') || '';
+      const isComp = onclick.indexOf("'" + ORGANIZER_TAB + "'") >= 0;
+      btn.classList.toggle('active', isComp);
+    });
+  }
+
   function applyNavRestrictions() {
     if (!isCompetitionOrganizer()) return;
+    if (global.document && global.document.documentElement) {
+      global.document.documentElement.classList.remove('admin-organizer-pending');
+    }
     if (global.document && global.document.body) {
       global.document.body.classList.add('admin-organizer-mode');
     }
@@ -71,6 +89,9 @@
     });
     const notifWrap = global.document && global.document.querySelector('.admin-notif-wrap');
     if (notifWrap) notifWrap.style.display = 'none';
+    const renewalBanner = global.document && global.document.getElementById('cuotaRenewalBanner');
+    if (renewalBanner) renewalBanner.style.display = 'none';
+    activateOrganizerCompeticionesTab();
     const info = global.document && global.document.getElementById('currentAdminInfo');
     if (info) {
       const s = getStoredSession();
@@ -95,7 +116,7 @@
       '<li><strong>Campos:</strong> en cada competición, «Varios campos» o «Por categorías» + listado de campos (uno por línea).</li>' +
       '<li><strong>Programación:</strong> líneas <code>Categoría | Campo | Hora</code> o calendario <strong>paralelo por campos</strong> para repartir partidos.</li>' +
       '<li><strong>Partidos:</strong> actas, goles, tarjetas y replanificación de pendientes según el modo elegido.</li>' +
-      '<li><strong>Preinscripciones:</strong> listado del torneo más abajo; puedes pasar equipos al cuadro.</li>' +
+      '<li><strong>Preinscripciones:</strong> listado del torneo más abajo; importa equipos al cuadro (validación solo administradores).</li>' +
       '</ul>';
     root.insertBefore(banner, root.firstChild);
   }
@@ -123,6 +144,7 @@
     guardTabAccess: guardTabAccess,
     roleLabel: roleLabel,
     applyNavRestrictions: applyNavRestrictions,
+    activateOrganizerCompeticionesTab: activateOrganizerCompeticionesTab,
     applyCompetitionTabChrome: applyCompetitionTabChrome,
     isOrganizerFirestoreDoc: isOrganizerFirestoreDoc,
     isAllowedFirestoreAdminDoc: isAllowedFirestoreAdminDoc

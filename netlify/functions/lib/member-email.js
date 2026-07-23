@@ -352,7 +352,17 @@ function formatEventPaymentLabel(channel) {
   if (c === 'efectivo' || c === 'cash' || c === 'cash_manual') return 'Efectivo en el club';
   if (c === 'tpv' || c === 'pending_tpv') return 'TPV (datáfono en el club)';
   if (c === 'bizum' || c === 'redsys_bizum') return 'Bizum';
-  if (c === 'tarjeta' || c === 'card' || c === 'redsys_card' || c === 'redsys_caja_rural') return 'Tarjeta';
+  if (
+    c === 'tarjeta' ||
+    c === 'card' ||
+    c === 'redsys_card' ||
+    c === 'redsys_caja_rural' ||
+    c === 'gateway_pending' ||
+    c === 'pasarela_pendiente' ||
+    c === 'pasarela'
+  ) {
+    return 'Tarjeta';
+  }
   if (c === 'gratuito' || c === 'free') return 'Gratuito';
   if (c) return c;
   return '—';
@@ -521,7 +531,7 @@ function buildTorneoPreinscripcionConfirmedContent(data) {
       </table>
       <p style="margin:12px 0 8px;font-weight:700;color:#713f12;font-size:0.9rem;">Cuotas por categoría</p>
       ${torneoPricingTableHtml()}
-      <p style="font-size:0.82rem;color:#854d0e;line-height:1.45;margin:8px 0 0;">Puedes inscribir <strong>varios equipos</strong> con el mismo responsable (incluso mismo nombre y categoría): una preinscripción por equipo. Al pagar se suman (p. ej. 4× Infantil = 240 €).</p>
+      <p style="font-size:0.82rem;color:#854d0e;line-height:1.45;margin:8px 0 0;">Envía <strong>una preinscripción por equipo</strong>. El nombre debe ser distinto si repites categoría. Solo se realizará el pago al completar la inscripción.</p>
       <p>Esta es una <strong>preinscripción</strong>. Más adelante el club solicitará los datos completos de los integrantes del equipo.</p>
       ${data.responsibleCode ? `<div style="margin:16px 0;padding:14px 16px;background:#0f172a;color:#f8fafc;border-radius:8px;line-height:1.55;">
         <p style="margin:0 0 8px;font-family:ui-monospace,monospace;font-size:1.05rem;">Tu código personal de responsable: <strong>${escapeHtml(data.responsibleCode)}</strong></p>
@@ -546,7 +556,7 @@ function buildTorneoPreinscripcionConfirmedContent(data) {
     `Jugadores (aprox.): ${data.playerCount != null ? data.playerCount : '—'}\n` +
     `Cuota estimada: ${feeLabel} (informativo)\n\n` +
     `Cuotas por categoría:\n${torneoPricingPlainText()}\n\n` +
-    `Varios equipos (mismo responsable): una preinscripción por equipo; las cuotas se suman al pagar.\n\n` +
+    `Varios equipos: una preinscripción por equipo; nombre distinto si repites categoría. Pago al completar la inscripción.\n\n` +
     (data.responsibleCode
       ? `CÓDIGO PERSONAL DE RESPONSABLE: ${data.responsibleCode}\n` +
         `(Personal e intransferible — válido para todos tus equipos con el email ${String(data.contactEmail || '').trim()})\n` +
@@ -676,6 +686,23 @@ function offlineInscriptionPaymentHint(channel) {
   if (c === 'tpv' || c === 'pending_tpv') {
     return 'Realiza el pago con <strong>TPV (datáfono)</strong> en el club. Un administrador validará tu inscripción.';
   }
+  if (
+    c === 'tarjeta' ||
+    c === 'card' ||
+    c === 'gateway_pending' ||
+    c === 'pasarela_pendiente' ||
+    c === 'pasarela' ||
+    c === 'bizum' ||
+    c === 'redsys_bizum' ||
+    c === 'redsys_card' ||
+    c === 'redsys_caja_rural'
+  ) {
+    return (
+      'Has elegido pagar con <strong>tarjeta</strong>. Si el pago no se completó en el banco, tu ficha queda ' +
+      '<strong>guardada como pendiente (no pagada)</strong>. Entra de nuevo en «Inscripción jugador/a» con DNI y contraseña ' +
+      'y pulsa <strong>Continuar pago con tarjeta</strong>.'
+    );
+  }
   return (
     'Realiza el ingreso por <strong>transferencia bancaria</strong> a la cuenta del club. ' +
     'Un administrador validará tu inscripción al ver el pago.'
@@ -689,6 +716,22 @@ function offlineInscriptionPaymentHintText(channel) {
   }
   if (c === 'tpv' || c === 'pending_tpv') {
     return 'Realiza el pago con TPV (datáfono) en el club. Un administrador validará tu inscripción.';
+  }
+  if (
+    c === 'tarjeta' ||
+    c === 'card' ||
+    c === 'gateway_pending' ||
+    c === 'pasarela_pendiente' ||
+    c === 'pasarela' ||
+    c === 'bizum' ||
+    c === 'redsys_bizum' ||
+    c === 'redsys_card' ||
+    c === 'redsys_caja_rural'
+  ) {
+    return (
+      'Has elegido pagar con tarjeta. Si el pago no se completó, tu ficha queda pendiente (no pagada). ' +
+      'Vuelve a la inscripción con DNI y contraseña y pulsa «Continuar pago con tarjeta».'
+    );
   }
   return 'Realiza el ingreso por transferencia bancaria a la cuenta del club. Un administrador validará tu inscripción al ver el pago.';
 }
@@ -729,8 +772,19 @@ function buildPlayerInscriptionPendingContent(data) {
   const bank = escapeHtml(CLUB_BANK_ACCOUNT);
   const siteUrl = String(process.env.SITE_URL || '').replace(/\/$/, '');
   const ch = String(data.paymentChannel || data.paymentMethod || '').trim().toLowerCase();
+  const isCardPending =
+    ch === 'tarjeta' ||
+    ch === 'card' ||
+    ch === 'gateway_pending' ||
+    ch === 'pasarela_pendiente' ||
+    ch === 'pasarela' ||
+    ch === 'bizum' ||
+    ch === 'redsys_bizum' ||
+    ch === 'redsys_card' ||
+    ch === 'redsys_caja_rural';
   const showBank =
-    ch === 'transferencia' || ch === 'transfer' || ch === 'pending_transfer' || !ch || ch === 'transfer_manual';
+    !isCardPending &&
+    (ch === 'transferencia' || ch === 'transfer' || ch === 'pending_transfer' || !ch || ch === 'transfer_manual');
   const payHint = offlineInscriptionPaymentHint(data.paymentChannel || data.paymentMethod);
   const extraFields = normalizeNotifyFields(data.fields);
   const hasExtraFields = extraFields.length > 0;
@@ -964,25 +1018,44 @@ function paymentTypeLabel(type) {
 }
 
 function buildPaymentFailedContent(data) {
-  const concept = paymentTypeLabel(data.type);
+  const type = String(data.type || '').trim();
+  const concept = paymentTypeLabel(type);
   const amount = Number(data.amountEur);
   const amountTxt = Number.isFinite(amount) ? `${amount.toFixed(2)} €` : null;
   const siteUrl = String(process.env.SITE_URL || '').replace(/\/$/, '');
-  const subject = `Pago no completado — ${CLUB_NAME}`;
+  const hasPendingRecord = type === 'player_inscription' || type === 'membership_fee';
+  const resumeUrl =
+    type === 'player_inscription'
+      ? siteUrl
+        ? `${siteUrl}/inscripcion-jugador.html?flow=lookup`
+        : ''
+      : siteUrl || '';
+  const subject = `Pago no completado — pendiente — ${CLUB_NAME}`;
+  const pendingHtml = hasPendingRecord
+    ? `<p>Tu ficha <strong>sí quedó guardada como pendiente de pago</strong> (no está activa ni marcada como pagada). ` +
+      `Puedes volver a la web y <strong>terminar el pago</strong> cuando quieras.</p>` +
+      (resumeUrl
+        ? `<p><a href="${escapeHtml(resumeUrl)}" style="font-weight:700;color:#1d4ed8;">Continuar / retomar el pago</a></p>`
+        : '')
+    : `<p><strong>No se ha activado ningún alta</strong> por este intento. Puedes volver a la web e intentarlo de nuevo cuando quieras.</p>`;
+  const pendingText = hasPendingRecord
+    ? `Tu ficha quedó guardada como pendiente de pago (no pagada). Puedes retomar el pago desde la web.\n` +
+      (resumeUrl ? `${resumeUrl}\n` : '')
+    : `No se ha activado ningún alta por este intento. Puedes intentarlo de nuevo desde la web.\n`;
   const html = `
     <div style="font-family:system-ui,sans-serif;max-width:560px;color:#1e293b;line-height:1.5">
       <h2 style="color:#dc2626;margin:0 0 12px">Pago no completado</h2>
       <p>Hola:</p>
       <p>El banco <strong>no ha confirmado</strong> el pago de tu <strong>${escapeHtml(concept)}</strong>${amountTxt ? ` (${escapeHtml(amountTxt)})` : ''}.</p>
-      <p><strong>No se ha registrado ningún dato</strong> en el club por este intento. Puedes volver a la web e intentarlo de nuevo cuando quieras.</p>
-      ${siteUrl ? `<p><a href="${escapeHtml(siteUrl)}">Volver a la web del club</a></p>` : ''}
+      ${pendingHtml}
+      ${siteUrl && !resumeUrl ? `<p><a href="${escapeHtml(siteUrl)}">Volver a la web del club</a></p>` : ''}
       <p style="font-size:0.9rem;color:#64748b">Si crees que es un error o necesitas ayuda: <a href="mailto:${escapeHtml(clubContactEmail())}">${escapeHtml(clubContactEmail())}</a></p>
     </div>`;
   const text =
     `Pago no completado — ${CLUB_NAME}\n\n` +
     `El banco no ha confirmado el pago de tu ${concept}${amountTxt ? ' (' + amountTxt + ')' : ''}.\n\n` +
-    `No se ha registrado ningún dato en el club por este intento.\n\n` +
-    `Consultas: ${clubContactEmail()}\n`;
+    pendingText +
+    `\nConsultas: ${clubContactEmail()}\n`;
   return { subject, html, text };
 }
 
@@ -1268,7 +1341,9 @@ async function sendTorneoPlantillaCerradaEmails(data) {
               : data.inscriptionFeeEur != null
                 ? data.inscriptionFeeEur + ' €'
                 : '—'
-        }
+        },
+        { label: 'Quién envía / responsable', value: data.contactName || '—' },
+        { label: 'Email de quien envía', value: data.contactEmail || '—' }
       ].concat(coachFields),
       extraHtml,
       extraText: extraText ? 'Plantilla:\n' + extraText : '',
@@ -1622,6 +1697,328 @@ async function sendTorneoPlantillaReminderEmail(data) {
   }
 }
 
+function torneoCatsLabel(data) {
+  return Array.isArray(data.categoryLabels)
+    ? data.categoryLabels.join(', ')
+    : Array.isArray(data.categories)
+      ? data.categories.join(', ')
+      : '—';
+}
+
+function torneoBaseEmailFields(data) {
+  return [
+    { label: 'Equipo', value: data.teamName },
+    { label: 'Evento', value: data.eventName || 'Torneo Fútbol 7' },
+    { label: 'Categorías', value: torneoCatsLabel(data) },
+    { label: 'Cód. responsable', value: data.responsibleCode || '—' },
+    { label: 'Cód. equipo', value: data.accessCode || '—' },
+    { label: 'Responsable', value: data.contactName || '—' },
+    { label: 'Email responsable', value: data.contactEmail || '—' },
+    { label: 'Teléfono', value: data.contactPhone || '—' }
+  ];
+}
+
+function torneoPayMethodLabel(data) {
+  const pm = String(data.paymentMethod || data.offlinePaymentChannel || data.payMethod || '')
+    .trim()
+    .toLowerCase();
+  if (pm.indexOf('redsys_card') >= 0 || pm === 'card') return 'Tarjeta (Redsys)';
+  if (pm.indexOf('redsys_bizum') >= 0 || pm === 'bizum') return 'Bizum (Redsys)';
+  if (pm === 'gateway_pending') return 'Tarjeta (pendiente de confirmar)';
+  if (pm === 'transferencia' || pm === 'transfer') return 'Transferencia bancaria';
+  if (pm === 'efectivo' || pm === 'cash') return 'Efectivo en el club';
+  if (pm === 'offline') return 'Transferencia o efectivo';
+  return pm || '—';
+}
+
+function formatIsoEs(iso) {
+  if (!iso) return '—';
+  try {
+    return new Date(iso).toLocaleString('es-ES', { timeZone: 'Europe/Madrid' });
+  } catch (_) {
+    return String(iso);
+  }
+}
+
+async function sendTorneoEquipoValidadoEmails(data) {
+  const cfg = getEmailConfig();
+  const validatedBy = data.equipoValidadoPor || data.validatedBy || 'Organización del torneo';
+  const validatedAt = data.equipoValidadoAt || data.validatedAt || new Date().toISOString();
+  const teamName = data.teamName || 'Equipo';
+  const eventName = data.eventName || 'Torneo Fútbol 7';
+  const fields = torneoBaseEmailFields(data).concat([
+    { label: 'Validado por', value: validatedBy },
+    { label: 'Fecha', value: formatIsoEs(validatedAt) }
+  ]);
+
+  try {
+    const { sendClubAdminNotification } = require('./club-admin-notify-email');
+    await sendClubAdminNotification({
+      kind: 'torneo_equipo_validado',
+      title: 'Equipo validado (torneo)',
+      subject: `Equipo validado — ${teamName} — ${eventName}`,
+      requesterEmail: data.contactEmail,
+      nombre: data.contactName,
+      telefono: data.contactPhone,
+      email: data.contactEmail,
+      fields: fields,
+      extraHtml:
+        '<p style="margin:12px 0;padding:12px 14px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;color:#166534;line-height:1.45;">' +
+        'Validación <strong>deportiva/organizativa</strong> del equipo para el torneo. ' +
+        'No implica por sí sola la confirmación del pago si este seguía pendiente.</p>',
+      extraText: 'Equipo validado para el torneo (validación organizativa).'
+    });
+  } catch (e) {
+    console.warn('sendTorneoEquipoValidadoEmails club:', e.message || e);
+  }
+
+  if (cfg.ok && data.contactEmail) {
+    const feeTxt =
+      data.inscriptionFeeEur != null ? String(data.inscriptionFeeEur) + ' €' : 'la cuota del torneo';
+    const payPending = String(data.paymentStatus || '').toLowerCase() === 'pending_validation';
+    let payNoteHtml = '';
+    let payNoteText = '';
+    if (payPending) {
+      payNoteHtml =
+        '<p style="margin:16px 0;padding:12px 14px;background:#fffbeb;border:1px solid #fcd34d;border-radius:8px;color:#713f12;font-size:0.9rem;line-height:1.45;">' +
+        '<strong>Pago:</strong> tu equipo está validado para el torneo, pero la cuota (' +
+        escapeHtml(feeTxt) +
+        ') sigue pendiente de confirmación por el club.</p>';
+      payNoteText = '\nNota: la cuota del torneo sigue pendiente de confirmación por el club.\n';
+    }
+    try {
+      await sendDirectToMemberEmail({
+        memberEmail: data.contactEmail,
+        subject: `Equipo validado — ${teamName} — ${CLUB_NAME}`,
+        html:
+          '<div style="font-family:system-ui,sans-serif;max-width:640px;line-height:1.5;color:#1e293b">' +
+          '<p>Hola, <strong>' +
+          escapeHtml(data.contactName || '') +
+          '</strong>:</p>' +
+          '<p>Tu equipo <strong>' +
+          escapeHtml(teamName) +
+          '</strong> ha sido <strong>validado</strong> para participar en <strong>' +
+          escapeHtml(eventName) +
+          '</strong>.</p>' +
+          '<p>Código equipo: <span style="font-family:monospace;">' +
+          escapeHtml(data.accessCode || '—') +
+          '</span></p>' +
+          payNoteHtml +
+          '<p style="font-size:0.85rem;color:#64748b;margin-top:16px">Consultas: <a href="mailto:' +
+          escapeHtml(clubContactEmail()) +
+          '">' +
+          escapeHtml(clubContactEmail()) +
+          '</a></p></div>',
+        text:
+          `Hola, ${data.contactName || ''}.\n\n` +
+          `Tu equipo ${teamName} ha sido validado para ${eventName}.\n` +
+          `Código: ${data.accessCode || '—'}.${payNoteText}\n` +
+          `Consultas: ${clubContactEmail()}\n`,
+        replyTo: clubContactEmail()
+      });
+    } catch (e) {
+      console.warn('sendTorneoEquipoValidadoEmails responsable:', e.message || e);
+    }
+  }
+  return { sent: true };
+}
+
+async function sendTorneoPagoValidadoEmails(data) {
+  const cfg = getEmailConfig();
+  const teamName = data.teamName || 'Equipo';
+  const eventName = data.eventName || 'Torneo Fútbol 7';
+  const payLabel = torneoPayMethodLabel(data);
+  const auto = !!data.paymentAuto;
+  const validatedBy = data.paymentValidatedPor || data.validatedBy || (auto ? 'Pasarela Redsys' : 'Administración del club');
+  const validatedAt = data.paymentValidatedAt || data.validatedAt || new Date().toISOString();
+  const feeTxt = data.inscriptionFeeEur != null ? String(data.inscriptionFeeEur) + ' €' : '—';
+  const whoName = data.contactName || data.paymentChangedByName || '—';
+  const whoEmail = data.contactEmail || data.paymentChangedByEmail || '—';
+  const fields = torneoBaseEmailFields(data).concat([
+    { label: 'Cuota', value: feeTxt },
+    { label: 'Forma de pago', value: payLabel },
+    { label: 'Quién realiza el pago', value: whoName },
+    { label: 'Email de quien paga', value: whoEmail },
+    { label: 'Confirmado por', value: validatedBy },
+    { label: 'Fecha', value: formatIsoEs(validatedAt) },
+    { label: 'Pedido', value: data.paymentOrderId || data.orderId || '—' }
+  ]);
+
+  try {
+    const { sendClubAdminNotification } = require('./club-admin-notify-email');
+    await sendClubAdminNotification({
+      kind: 'torneo_pago_validado',
+      title: auto ? 'Pago torneo confirmado (automático)' : 'Pago torneo validado',
+      subject: `${auto ? 'Pago confirmado' : 'Pago validado'} — ${teamName} — ${whoName}`,
+      requesterEmail: data.contactEmail,
+      nombre: data.contactName,
+      telefono: data.contactPhone,
+      email: data.contactEmail,
+      fields: fields,
+      extraHtml:
+        '<p style="margin:12px 0;padding:12px 14px;background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;color:#1e40af;line-height:1.45;">' +
+        (auto
+          ? 'Pago registrado <strong>automáticamente</strong> tras confirmación en la pasarela bancaria.'
+          : 'Un administrador del club ha <strong>confirmado el ingreso</strong> de la cuota del torneo.') +
+        '<br><strong>Quién:</strong> ' +
+        escapeHtml(whoName) +
+        ' (' +
+        escapeHtml(whoEmail) +
+        ')</p>',
+      extraText:
+        (auto ? 'Pago torneo confirmado automáticamente.' : 'Pago torneo validado por administrador.') +
+        '\nQuién: ' +
+        whoName +
+        ' <' +
+        whoEmail +
+        '>'
+    });
+  } catch (e) {
+    console.warn('sendTorneoPagoValidadoEmails club:', e.message || e);
+  }
+
+  if (cfg.ok && data.contactEmail) {
+    try {
+      await sendDirectToMemberEmail({
+        memberEmail: data.contactEmail,
+        subject: `Pago confirmado — ${teamName} — ${CLUB_NAME}`,
+        html:
+          '<div style="font-family:system-ui,sans-serif;max-width:640px;line-height:1.5;color:#1e293b">' +
+          '<p>Hola, <strong>' +
+          escapeHtml(data.contactName || '') +
+          '</strong>:</p>' +
+          '<p>Hemos <strong>confirmado el pago</strong> de la inscripción de <strong>' +
+          escapeHtml(teamName) +
+          '</strong> en <strong>' +
+          escapeHtml(eventName) +
+          '</strong>.</p>' +
+          '<table style="background:#f8fafc;border-radius:8px;padding:12px 16px;margin:16px 0;width:100%;border-collapse:collapse">' +
+          '<tr><td style="padding:4px 8px 4px 0;color:#64748b"><strong>Cuota:</strong></td><td>' +
+          escapeHtml(feeTxt) +
+          '</td></tr>' +
+          '<tr><td style="padding:4px 8px 4px 0;color:#64748b"><strong>Forma:</strong></td><td>' +
+          escapeHtml(payLabel) +
+          '</td></tr>' +
+          '<tr><td style="padding:4px 8px 4px 0;color:#64748b"><strong>A nombre de:</strong></td><td>' +
+          escapeHtml(whoName) +
+          ' &lt;' +
+          escapeHtml(whoEmail) +
+          '&gt;</td></tr>' +
+          '<tr><td style="padding:4px 8px 4px 0;color:#64748b"><strong>Cód. equipo:</strong></td><td style="font-family:monospace">' +
+          escapeHtml(data.accessCode || '—') +
+          '</td></tr></table>' +
+          '<p>Tu inscripción queda registrada como <strong>pagada</strong> en el club.</p>' +
+          '<p style="font-size:0.85rem;color:#64748b;margin-top:16px">Consultas: <a href="mailto:' +
+          escapeHtml(clubContactEmail()) +
+          '">' +
+          escapeHtml(clubContactEmail()) +
+          '</a></p></div>',
+        text:
+          `Hola, ${data.contactName || ''}.\n\n` +
+          `Pago confirmado para ${teamName} (${eventName}).\n` +
+          `Cuota: ${feeTxt}. Forma: ${payLabel}.\n` +
+          `A nombre de: ${whoName} <${whoEmail}>.\n` +
+          `Código equipo: ${data.accessCode || '—'}.\n\n` +
+          `Consultas: ${clubContactEmail()}\n`,
+        replyTo: clubContactEmail()
+      });
+    } catch (e) {
+      console.warn('sendTorneoPagoValidadoEmails responsable:', e.message || e);
+    }
+  }
+  return { sent: true };
+}
+
+/** Aviso club + responsable: cambio de método (p. ej. efectivo/transferencia → tarjeta). */
+async function sendTorneoPaymentMethodChangedEmails(data) {
+  const cfg = getEmailConfig();
+  const teamName = data.teamName || 'Equipo';
+  const eventName = data.eventName || 'Torneo Fútbol 7';
+  const fromLabel = torneoPayMethodLabel({
+    paymentMethod: data.previousPaymentMethod || data.fromMethod,
+    offlinePaymentChannel: data.previousOfflineChannel || data.fromMethod
+  });
+  const toLabel = torneoPayMethodLabel({
+    paymentMethod: data.newPaymentMethod || data.toMethod || 'card',
+    payMethod: data.newPaymentMethod || data.toMethod || 'card'
+  });
+  const whoName = data.contactName || data.changedByName || '—';
+  const whoEmail = data.contactEmail || data.changedByEmail || '—';
+  const feeTxt = data.inscriptionFeeEur != null ? String(data.inscriptionFeeEur) + ' €' : data.amountEur != null ? String(data.amountEur) + ' €' : '—';
+  const fields = torneoBaseEmailFields(data).concat([
+    { label: 'Método anterior', value: fromLabel },
+    { label: 'Método nuevo', value: toLabel },
+    { label: 'Importe', value: feeTxt },
+    { label: 'Quién cambia el método', value: whoName },
+    { label: 'Email de quien cambia', value: whoEmail },
+    { label: 'Pedido', value: data.pendingPaymentOrderId || data.orderId || '—' },
+    { label: 'Fecha', value: formatIsoEs(data.paymentMethodChangedAt || new Date().toISOString()) }
+  ]);
+
+  try {
+    const { sendClubAdminNotification } = require('./club-admin-notify-email');
+    await sendClubAdminNotification({
+      kind: 'torneo_cambio_metodo_pago',
+      title: 'Cambio método de pago torneo',
+      subject: `Cambio a ${toLabel} — ${teamName} — ${whoName}`,
+      requesterEmail: whoEmail !== '—' ? whoEmail : data.contactEmail,
+      nombre: whoName,
+      telefono: data.contactPhone,
+      email: whoEmail !== '—' ? whoEmail : data.contactEmail,
+      fields: fields,
+      extraHtml:
+        '<p style="margin:12px 0;padding:12px 14px;background:#fffbeb;border:1px solid #fcd34d;border-radius:8px;color:#92400e;line-height:1.45;">' +
+        'El responsable ha cambiado el método de <strong>' +
+        escapeHtml(fromLabel) +
+        '</strong> a <strong>' +
+        escapeHtml(toLabel) +
+        '</strong> y va a completar el pago online.</p>',
+      extraText:
+        'Cambio de método: ' + fromLabel + ' → ' + toLabel + '\nQuién: ' + whoName + ' <' + whoEmail + '>'
+    });
+  } catch (e) {
+    console.warn('sendTorneoPaymentMethodChangedEmails club:', e.message || e);
+  }
+
+  if (cfg.ok && data.contactEmail) {
+    try {
+      await sendDirectToMemberEmail({
+        memberEmail: data.contactEmail,
+        subject: `Cambio a ${toLabel} — ${teamName} — ${CLUB_NAME}`,
+        html:
+          '<div style="font-family:system-ui,sans-serif;max-width:640px;line-height:1.5;color:#1e293b">' +
+          '<p>Hola, <strong>' +
+          escapeHtml(data.contactName || '') +
+          '</strong>:</p>' +
+          '<p>Has cambiado el método de pago de la inscripción de <strong>' +
+          escapeHtml(teamName) +
+          '</strong> de <strong>' +
+          escapeHtml(fromLabel) +
+          '</strong> a <strong>' +
+          escapeHtml(toLabel) +
+          '</strong>.</p>' +
+          '<p>Importe: <strong>' +
+          escapeHtml(feeTxt) +
+          '</strong>. Completa el pago en la pasarela segura del banco. Cuando se confirme, recibirás otro correo y el club también.</p>' +
+          '<p style="font-size:0.85rem;color:#64748b;margin-top:16px">Registrado a tu nombre: ' +
+          escapeHtml(whoName) +
+          ' (' +
+          escapeHtml(whoEmail) +
+          ').</p></div>',
+        text:
+          `Hola, ${data.contactName || ''}.\n\n` +
+          `Has cambiado el método de pago de ${teamName}: ${fromLabel} → ${toLabel}.\n` +
+          `Importe: ${feeTxt}. Completa el pago en la pasarela.\n` +
+          `A nombre de: ${whoName} <${whoEmail}>.\n`,
+        replyTo: clubContactEmail()
+      });
+    } catch (e) {
+      console.warn('sendTorneoPaymentMethodChangedEmails responsable:', e.message || e);
+    }
+  }
+  return { sent: true };
+}
+
 module.exports = {
   sendMemberRegistrationEmail,
   sendFriendRegistrationEmail,
@@ -1643,5 +2040,8 @@ module.exports = {
   sendTorneoFichaDocumentsUploadedEmail,
   sendTorneoPlantillaCerradaEmails,
   sendTorneoPlantillaReminderEmail,
+  sendTorneoEquipoValidadoEmails,
+  sendTorneoPagoValidadoEmails,
+  sendTorneoPaymentMethodChangedEmails,
   sendPaymentFailedEmail
 };

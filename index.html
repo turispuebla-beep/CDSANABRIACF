@@ -6,7 +6,7 @@
     <meta http-equiv="Pragma" content="no-cache">
     <meta http-equiv="Expires" content="0">
     <title>CDSANABRIACF - Club Deportivo Sanabriacf</title>
-    <!-- Firebase SDK -->
+    <!-- la nube SDK -->
     <script src="https://www.gstatic.com/firebasejs/10.12.3/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.12.3/firebase-database.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.12.3/firebase-auth.js"></script>
@@ -34,14 +34,16 @@
     <script src="js/club-social-share.js"></script>
     <script src="js/club-email-notify.js"></script>
     <script src="js/club-public-privacy.js"></script>
+    <script src="js/club-players-public-sync.js"></script>
     <script src="js/payment-method-picker.js"></script>
-    <!-- Configuración Firebase CDSANABRIACF -->
+    <!-- Configuración la nube CDSANABRIACF -->
     <script type="module" src="js/firebase-config.js"></script>
     <script src="js/member-cloud-persist.js"></script>
     <script src="js/cdsan-membership-env.js"></script>
     <script src="js/club-membership-season.js"></script>
     <script src="js/club-accounting.js"></script>
     <script src="js/notification-system.js" defer></script>
+    <script src="js/club-notification-detail.js" defer></script>
     <script src="js/support-mode.js" defer></script>
     <!-- <script src="firebase-offline-mode.js"></script> --> <!-- Archivo no necesario, usando persistencemanager.js -->
     
@@ -213,6 +215,15 @@
             background: #fff;
         }
 
+        .club-notif-bell.has-unread {
+            animation: club-notif-pulse 1.6s ease-in-out infinite;
+        }
+
+        @keyframes club-notif-pulse {
+            0%, 100% { box-shadow: 0 2px 10px rgba(0, 0, 0, 0.18); }
+            50% { box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.45), 0 2px 12px rgba(0, 0, 0, 0.22); }
+        }
+
         .club-notif-badge {
             position: absolute;
             top: -3px;
@@ -240,6 +251,84 @@
             background: white;
             color: #1f2937;
             border-radius: 12px;
+        }
+
+        .club-notify-prompt-backdrop {
+            position: fixed;
+            inset: 0;
+            z-index: 100010;
+            background: rgba(15, 23, 42, 0.55);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 16px;
+        }
+
+        .club-notify-prompt-card {
+            background: #fff;
+            border-radius: 16px;
+            max-width: 420px;
+            width: 100%;
+            padding: 24px 20px 20px;
+            text-align: center;
+            box-shadow: 0 20px 50px rgba(0, 0, 0, 0.25);
+        }
+
+        .club-notify-prompt-escudo {
+            border-radius: 14px;
+            object-fit: cover;
+            margin: 0 auto 14px;
+            display: block;
+            border: 3px solid #dc2626;
+        }
+
+        .club-notify-prompt-title {
+            font-size: 1.15rem;
+            color: #1e3a8a;
+            margin: 0 0 10px;
+            line-height: 1.35;
+        }
+
+        .club-notify-prompt-body {
+            font-size: 0.92rem;
+            color: #475569;
+            line-height: 1.55;
+            margin: 0 0 18px;
+        }
+
+        .club-notify-prompt-actions {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .club-notify-prompt-btn {
+            border: none;
+            border-radius: 10px;
+            padding: 12px 14px;
+            font-size: 0.95rem;
+            font-weight: 700;
+            cursor: pointer;
+        }
+
+        .club-notify-prompt-btn.primary {
+            background: linear-gradient(135deg, #dc2626, #b91c1c);
+            color: #fff;
+        }
+
+        .club-notify-prompt-btn.secondary {
+            background: #f1f5f9;
+            color: #475569;
+        }
+
+        .club-notify-prompt-btn.link {
+            background: transparent;
+            color: #1e3a8a;
+            font-weight: 600;
+            text-decoration: underline;
+        }
+
+        .club-notif-panel {
             box-shadow: 0 16px 40px rgba(0, 0, 0, 0.22);
             z-index: 10001;
             overflow: hidden;
@@ -343,6 +432,118 @@
             color: #64748b;
             padding: 24px 12px;
             font-size: 0.9rem;
+        }
+
+        body.club-notif-detail-open {
+            overflow: hidden;
+        }
+
+        .club-notif-detail-modal {
+            position: fixed;
+            inset: 0;
+            z-index: 10150;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 16px;
+        }
+
+        .club-notif-detail-modal[hidden] {
+            display: none !important;
+        }
+
+        .club-notif-detail-backdrop {
+            position: absolute;
+            inset: 0;
+            background: rgba(15, 23, 42, 0.75);
+        }
+
+        .club-notif-detail-card {
+            position: relative;
+            width: min(96vw, 520px);
+            max-height: 90vh;
+            overflow: auto;
+            background: #fff;
+            border-radius: 16px;
+            padding: 20px 18px 18px;
+            box-shadow: 0 20px 50px rgba(0, 0, 0, 0.35);
+        }
+
+        .club-notif-detail-close {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            width: 38px;
+            height: 38px;
+            border: none;
+            border-radius: 50%;
+            background: #f1f5f9;
+            color: #1e3a8a;
+            font-size: 1.4rem;
+            cursor: pointer;
+        }
+
+        .club-notif-detail-header {
+            display: flex;
+            gap: 12px;
+            align-items: center;
+            margin-bottom: 14px;
+            padding-right: 36px;
+        }
+
+        .club-notif-detail-escudo {
+            border-radius: 50%;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+        }
+
+        .club-notif-detail-kicker {
+            margin: 0;
+            font-size: 0.72rem;
+            font-weight: 700;
+            color: #059669;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+        }
+
+        .club-notif-detail-header h2 {
+            margin: 2px 0 0;
+            font-size: 1.1rem;
+            color: #1e3a8a;
+            line-height: 1.25;
+        }
+
+        .club-notif-detail-body p {
+            margin: 0 0 10px;
+            color: #334155;
+            line-height: 1.5;
+        }
+
+        .club-notif-detail-time {
+            font-size: 0.8rem;
+            color: #94a3b8 !important;
+        }
+
+        .club-notif-detail-img {
+            display: block;
+            width: 100%;
+            max-height: 50vh;
+            object-fit: contain;
+            border-radius: 10px;
+            margin-top: 8px;
+        }
+
+        .club-notif-detail-pdf {
+            display: block;
+            width: 100%;
+            min-height: 320px;
+            border: 1px solid #e2e8f0;
+            border-radius: 10px;
+            margin-top: 8px;
+        }
+
+        .club-notif-detail-pdf-link {
+            color: #1d4ed8;
+            font-weight: 700;
         }
 
         #databaseStatusIndicator {
@@ -1248,9 +1449,119 @@
             color: #64748b;
         }
 
+        body.campeonato-splash-open {
+            overflow: hidden;
+        }
+
+        .campeonato-splash-overlay {
+            display: none;
+            position: fixed;
+            inset: 0;
+            z-index: 10100;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 24px 16px 20px;
+            background: rgba(15, 23, 42, 0.93);
+            backdrop-filter: blur(6px);
+        }
+
+        .campeonato-splash-overlay:not([hidden]) {
+            display: flex;
+        }
+
+        .campeonato-splash-close {
+            position: absolute;
+            top: 14px;
+            right: 14px;
+            width: 44px;
+            height: 44px;
+            border: none;
+            border-radius: 50%;
+            background: #fff;
+            color: #1e3a8a;
+            font-size: 1.6rem;
+            line-height: 1;
+            cursor: pointer;
+            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.35s ease, background 0.2s ease;
+        }
+
+        .campeonato-splash-close:hover {
+            background: #f1f5f9;
+        }
+
+        .campeonato-splash-overlay.is-settled .campeonato-splash-close {
+            opacity: 1;
+            pointer-events: auto;
+        }
+
+        .campeonato-splash-top,
+        .campeonato-splash-bottom {
+            margin: 0;
+            font-size: clamp(1rem, 4vw, 1.35rem);
+            font-weight: 900;
+            color: #fff;
+            text-align: center;
+            letter-spacing: 0.06em;
+            text-shadow: 0 2px 10px rgba(0, 0, 0, 0.45);
+            opacity: 0;
+            transform: translateY(10px);
+            transition: opacity 0.45s ease, transform 0.45s ease;
+        }
+
+        .campeonato-splash-top {
+            margin-bottom: 14px;
+        }
+
+        .campeonato-splash-bottom {
+            margin-top: 16px;
+            font-size: clamp(0.95rem, 3.6vw, 1.2rem);
+            letter-spacing: 0.04em;
+            color: #fde68a;
+        }
+
+        .campeonato-splash-overlay.is-settled .campeonato-splash-top,
+        .campeonato-splash-overlay.is-settled .campeonato-splash-bottom {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        .campeonato-splash-card {
+            max-width: min(88vw, 340px);
+        }
+
+        .campeonato-splash-img {
+            display: block;
+            width: 100%;
+            height: auto;
+            border-radius: 14px;
+            box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5);
+            transform: scale(0.68);
+        }
+
+        .campeonato-splash-img.is-pulsing {
+            animation: campeonato-splash-pulse 2.1s ease-in-out 1 forwards;
+        }
+
+        @keyframes campeonato-splash-pulse {
+            0% { transform: scale(0.62); }
+            18% { transform: scale(1.1); }
+            36% { transform: scale(0.7); }
+            54% { transform: scale(1.1); }
+            72%, 100% { transform: scale(1); }
+        }
+
+        .campeonato-splash-overlay.is-settled .campeonato-splash-img {
+            animation: none;
+            transform: scale(1);
+        }
+
         .proximo-evento-club {
             margin: 0 auto 22px;
-            max-width: 780px;
+            max-width: 960px;
             padding: 14px 12px 16px;
             text-align: center;
             background: linear-gradient(160deg, #ffffff 0%, #eff6ff 55%, #ecfdf5 100%);
@@ -2439,6 +2750,50 @@
     </style>
 </head>
 <body>
+    <div
+        id="campeonatoSplash"
+        class="campeonato-splash-overlay"
+        role="dialog"
+        aria-modal="true"
+        aria-label="Cartel Torneo Fútbol 7 2026"
+        hidden
+    >
+        <button
+            type="button"
+            class="campeonato-splash-close"
+            onclick="cerrarCampeonatoSplash()"
+            aria-label="Cerrar cartel"
+        >&times;</button>
+        <p class="campeonato-splash-top">WWW.CDSANABRIACF.COM</p>
+        <div class="campeonato-splash-card">
+            <img
+                src="assets/CAMPEONATO.jpg"
+                alt="Cartel Torneo Fútbol 7 — 2026 — CD Sanabria CF"
+                class="campeonato-splash-img is-pulsing"
+                width="480"
+                height="680"
+            >
+        </div>
+        <p class="campeonato-splash-bottom">FECHA LÍMITE HASTA EL 15 DE AGOSTO</p>
+    </div>
+    <script>
+        (function () {
+            window.CAMPEONATO_PROMO_UNTIL_MS = Date.parse('2026-08-15T23:59:59.999+02:00');
+            window.isCampeonatoPromoActive = function () {
+                return Date.now() <= window.CAMPEONATO_PROMO_UNTIL_MS;
+            };
+            var splashKey = 'cdsan_campeonato_splash_dismissed';
+            try {
+                if (window.isCampeonatoPromoActive() && !sessionStorage.getItem(splashKey)) {
+                    var splash = document.getElementById('campeonatoSplash');
+                    if (splash) {
+                        splash.hidden = false;
+                        document.body.classList.add('campeonato-splash-open');
+                    }
+                }
+            } catch (e) {}
+        })();
+    </script>
     <script>
         (function () {
             var mq = window.matchMedia('(display-mode: standalone), (display-mode: fullscreen), (display-mode: minimal-ui)');
@@ -2550,11 +2905,11 @@
                     <button
                         type="button"
                         class="proximo-evento-poster-wrap"
-                        onclick="abrirCartelProximoEvento('assets/torneo-futbol-7-2026.jpeg')"
+                        onclick="abrirCartelProximoEvento('assets/CAMPEONATO.jpg')"
                         aria-label="Ampliar cartel del Torneo Fútbol 7 2026"
                     >
                         <img
-                            src="assets/torneo-futbol-7-2026.jpeg"
+                            src="assets/CAMPEONATO.jpg"
                             alt=""
                             class="proximo-evento-poster"
                             width="480"
@@ -2569,7 +2924,7 @@
                             Inscríbete
                         </button>
                     </div>
-                    <p class="proximo-evento-hint">Preinscripción abierta a todos. Si ya tienes código de equipo, entra como responsable desde la tarjeta <strong>Competiciones</strong> más abajo.</p>
+                    <p class="proximo-evento-hint"><strong>INSCRIPCIÓN</strong> abierta a todos. Fecha límite hasta el 15 de agosto. Si ya tienes código de equipo, entra como responsable desde la tarjeta <strong>Competiciones</strong> más abajo.</p>
                 </div>
                 <div class="proximo-evento-col proximo-evento-col--inscrip">
                     <button
@@ -2586,23 +2941,6 @@
                             aria-hidden="true"
                         >
                     </button>
-                </div>
-                <div class="proximo-evento-col proximo-evento-col--inscrip">
-                    <button
-                        type="button"
-                        class="proximo-evento-poster-wrap"
-                        onclick="abrirCartelProximoEvento('assets/TORNEO.jpg')"
-                        aria-label="Ampliar cartel SAASET del torneo"
-                    >
-                        <img
-                            src="assets/TORNEO.jpg"
-                            alt=""
-                            class="proximo-evento-poster"
-                            loading="lazy"
-                            aria-hidden="true"
-                        >
-                    </button>
-                    <p class="proximo-evento-zoom-hint">Cartel SAASET</p>
                 </div>
             </div>
         </section>
@@ -2625,7 +2963,7 @@
                 <img
                     id="proximoEventoLightboxImg"
                     class="proximo-evento-lightbox-img"
-                    src="assets/torneo-futbol-7-2026.jpeg"
+                    src="assets/CAMPEONATO.jpg"
                     alt=""
                 >
             </div>
@@ -2882,13 +3220,16 @@
         <div id="torneoPreinscripcionModal" class="modal" style="display: none;" role="dialog" aria-labelledby="tpModalTitle" aria-modal="true">
             <div class="modal-content" style="max-width: 520px; max-height: 92vh; overflow-y: auto;">
                 <span class="close" onclick="closeTorneoPreinscripcionModal()" aria-label="Cerrar">&times;</span>
-                <h2 id="tpModalTitle">⚽ Preinscripción — Torneo Fútbol 7</h2>
-                <p style="color:#64748b;font-size:0.9rem;line-height:1.45;margin:0 0 16px;">
+                <h2 id="tpModalTitle">⚽ INSCRIPCIÓN</h2>
+                <p style="color:#64748b;font-size:0.9rem;line-height:1.45;margin:0 0 8px;">
                     Reserva plaza para tu equipo. No hace falta estar registrado en la web. Después recogeremos los datos completos de todos los integrantes.
+                </p>
+                <p style="color:#92400e;font-size:0.95rem;font-weight:800;line-height:1.4;margin:0 0 16px;padding:10px 12px;background:#fffbeb;border:1px solid #fcd34d;border-radius:8px;text-align:center;letter-spacing:0.02em;">
+                    FECHA LÍMITE HASTA EL 15 DE AGOSTO
                 </p>
                 <div id="tpPricingNotice"></div>
                 <p style="color:#475569;font-size:0.85rem;line-height:1.45;margin:0 0 12px;padding:10px 12px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;">
-                    ¿Varios equipos con el mismo responsable? Envía <strong>una preinscripción por cada equipo</strong> (puede repetir nombre y categoría). Recibirás un <strong>código de responsable</strong> (TP-R001, personal) y un <strong>código de equipo</strong> por inscripción (TP-R001-INF…). Al pagar se suman todas las cuotas (p. ej. 2× Infantil 60 € = 120 €).
+                    Envía tu preinscripción por cada equipo. Recibirás un código como responsable del equipo o equipos (TP-R001, personal) y un código de equipo por inscripción. Solo se realizará el pago al completar la inscripción.
                 </p>
                 <p style="color:#475569;font-size:0.85rem;line-height:1.45;margin:0 0 16px;padding:10px 12px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;">
                     El club puede solicitar documentación acreditativa de edad (DNI por ambas caras u otro documento válido) y su presentación física en cualquier momento, aunque ya se hubiera enviado por la web.
@@ -2898,7 +3239,8 @@
                 </p>
                 <form id="torneoPreinscripcionForm" class="tp-preinscripcion-form" onsubmit="submitTorneoPreinscripcion(event)">
                     <label for="tpTeamName">Nombre del equipo *</label>
-                    <input type="text" id="tpTeamName" name="tpTeamName" required autocomplete="organization">
+                    <input type="text" id="tpTeamName" name="tpTeamName" required autocomplete="organization" placeholder="Ej.: Leones A, CD Sanabria Infantil…">
+                    <p style="margin:4px 0 0;font-size:0.8rem;color:#64748b;line-height:1.4;">Debe ser único por categoría. Si inscribes varios equipos en la misma categoría, añade una variante (A, B, color, etc.). Puedes repetir el nombre en otra categoría distinta.</p>
 
                     <label for="tpPlayerCount">Número de jugadores *</label>
                     <input type="number" id="tpPlayerCount" name="tpPlayerCount" min="1" max="30" required inputmode="numeric">
@@ -2950,7 +3292,7 @@
                     Hemos guardado los datos de tu equipo. Más adelante pediremos la ficha de cada jugador.
                 </p>
                 <p id="tpSuccessAnotherTeam" style="color:#475569;font-size:0.88rem;line-height:1.45;margin:0 0 12px;padding:10px 12px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;display:none;">
-                    ¿Otro equipo con el mismo responsable? Pulsa <strong>Inscríbete</strong> de nuevo (mismo nombre y categoría permitido). Mantendrás el mismo código TP-Rxxx; cada inscripción tendrá su código de equipo (TP-Rxxx-INF…).
+                    ¿Otro equipo? Pulsa <strong>Inscríbete</strong> de nuevo (una preinscripción por equipo). Mantendrás el mismo código TP-Rxxx; cada inscripción tendrá su código de equipo. Usa un nombre distinto si repites categoría.
                 </p>
                 <p id="tpSuccessEmailText" style="color:#64748b;font-size:0.92rem;line-height:1.5;margin:0 0 20px;">
                     📧 Te enviaremos un correo con tu código personal y el de este equipo. Guárdalos; los necesitarás con tu email para gestionar la plantilla.
@@ -2966,12 +3308,12 @@
                 <span class="close" onclick="closeTorneoResponsableAccessModal()" aria-label="Cerrar">&times;</span>
                 <h2 id="treModalTitle">👤 Soy responsable del equipo</h2>
                 <p class="tre-access-intro">
-                    Entra con tu <strong>código de responsable</strong> (TP-R001, personal para todos tus equipos) o con el <strong>código de un equipo</strong> (TP-R001-INF) y el <strong>email de contacto</strong> de la preinscripción.
+                    No hace falta registrarte como socio/a. Entra con tu <strong>código TP-Rxxx</strong> (responsable) o de equipo y el <strong>email de la preinscripción</strong> para gestionar la plantilla o consultar calendario, equipos inscritos y resultados (sin datos de jugadores).
                 </p>
                 <div class="tre-access-steps" aria-hidden="true">
                     <div class="tre-access-step"><strong>1</strong> TP-Rxxx o TP-Rxxx-INF</div>
                     <div class="tre-access-step"><strong>2</strong> Tu email de contacto</div>
-                    <div class="tre-access-step"><strong>3</strong> Gestiona la plantilla</div>
+                    <div class="tre-access-step"><strong>3</strong> Plantilla o calendario</div>
                 </div>
                 <form id="treAccessForm" class="tre-access-form" onsubmit="submitTorneoResponsableAccess(event)">
                     <label for="treAccessCode">Código de responsable o de equipo</label>
@@ -2982,8 +3324,14 @@
                     <input type="email" id="treContactEmail" name="treContactEmail" placeholder="El mismo que usaste al inscribir el equipo" autocomplete="email" required>
 
                     <div id="treAccessError" class="tre-access-error" hidden role="alert"></div>
-                    <button type="submit" class="tre-access-submit" id="treAccessSubmitBtn">Acceder a mi equipo</button>
+                    <button type="submit" class="tre-access-submit" id="treAccessSubmitBtn">Continuar</button>
                 </form>
+                <div id="treAccessChoice" hidden style="margin-top:4px;">
+                    <p id="treAccessChoiceWelcome" style="margin:0 0 14px;font-size:0.92rem;color:#334155;line-height:1.5;font-weight:600;"></p>
+                    <button type="button" class="tre-access-submit" style="margin-bottom:10px;" onclick="TorneoResponsableAccess.goToPanel()">📋 Gestionar plantilla e inscripción</button>
+                    <button type="button" class="tre-access-submit" style="background:linear-gradient(135deg,#059669,#10b981);" onclick="TorneoResponsableAccess.goToTorneoView()">📅 Calendario, equipos y resultados</button>
+                    <button type="button" style="width:100%;margin-top:12px;padding:10px;border:none;background:#e2e8f0;border-radius:999px;font-weight:600;color:#475569;cursor:pointer;" onclick="closeTorneoResponsableAccessModal()">Cancelar</button>
+                </div>
                 <p class="tre-access-footer">
                     ¿Aún no tienes equipo inscrito? Pulsa <strong>Inscríbete</strong> en la tarjeta del torneo. ¿Problemas? Escribe a <a href="mailto:cdsanabriafc@gmail.com">cdsanabriafc@gmail.com</a>.
                 </p>
@@ -3328,7 +3676,7 @@
             </div>
         </div>
 
-        <!-- Recuperación de contraseña (socios / amigos): enlace Firebase + contacto manual con el club -->
+        <!-- Recuperación de contraseña (socios / amigos): enlace la nube + contacto manual con el club -->
         <div id="recuperarPasswordModal" class="modal" style="display: none;">
             <div class="modal-content">
                 <span class="close" onclick="closeRecuperarPasswordModal()">&times;</span>
@@ -3613,18 +3961,18 @@
         // Función para sincronizar datos entre localStorage y Firebase
         async function syncDataBetweenStorage() {
             try {
-                console.log('🔄 Sincronizando datos entre localStorage y Firebase...');
+                console.log('🔄 Sincronizando datos entre localStorage y la nube...');
 
                 const fbReady = typeof window.waitForFirebaseReady === 'function'
                     ? await window.waitForFirebaseReady(20000)
                     : { ok: !!window.cdsanabriacfFirebase };
                 if (!fbReady.ok) {
-                    console.warn('⚠️ Firebase no disponible aún, usando solo localStorage');
+                    console.warn('⚠️ La nube no está disponible aún, usando solo localStorage');
                     return;
                 }
                 
                 if (!window.cdsanabriacfFirebase) {
-                    console.warn('⚠️ Firebase no disponible, usando solo localStorage');
+                    console.warn('⚠️ La nube no está disponible, usando solo localStorage');
                     return;
                 }
                 
@@ -3639,13 +3987,13 @@
                 try {
                     sociosFirebase = await window.cdsanabriacfFirebase.getSocios();
                 } catch (error) {
-                    console.warn('⚠️ Error obteniendo socios de Firebase:', error);
+                    console.warn('⚠️ Error obteniendo socios de la nube:', error);
                 }
                 
                 // Comparar y sincronizar datos
                 if (sociosLocal.length > 0 && sociosFirebase.length === 0) {
-                    // Si hay datos en localStorage pero no en Firebase, migrar a Firebase
-                    console.log(`🔄 Migrando ${sociosLocal.length} socios a Firebase...`);
+                    // Si hay datos en localStorage pero no en la nube, migrar a la nube
+                    console.log(`🔄 Migrando ${sociosLocal.length} socios a la nube...`);
                     for (const socio of sociosLocal) {
                         try {
                             await window.cdsanabriacfFirebase.addSocio(socio);
@@ -3653,9 +4001,9 @@
                             console.log(`⚠️ Socio ya existe: ${socio.nombre} ${socio.apellidos}`);
                         }
                     }
-                    console.log(`✅ Migrados ${sociosLocal.length} socios a Firebase`);
+                    console.log(`✅ Migrados ${sociosLocal.length} socios a la nube`);
                 } else if (sociosFirebase.length > 0 && sociosLocal.length === 0) {
-                    // Si hay datos en Firebase pero no en localStorage, migrar a localStorage
+                    // Si hay datos en la nube pero no en localStorage, migrar a localStorage
                     localStorage.setItem('clubMembers', JSON.stringify(sociosFirebase));
                     console.log(`✅ Migrados ${sociosFirebase.length} socios a localStorage`);
                 } else if (sociosLocal.length > 0 && sociosFirebase.length > 0) {
@@ -3678,11 +4026,11 @@
                 try {
                     amigosFirebase = await window.cdsanabriacfFirebase.getAmigos();
                 } catch (error) {
-                    console.warn('⚠️ Error obteniendo amigos de Firebase:', error);
+                    console.warn('⚠️ Error obteniendo amigos de la nube:', error);
                 }
                 
                 if (amigosLocal.length > 0 && amigosFirebase.length === 0) {
-                    console.log(`🔄 Migrando ${amigosLocal.length} amigos a Firebase...`);
+                    console.log(`🔄 Migrando ${amigosLocal.length} amigos a la nube...`);
                     for (const amigo of amigosLocal) {
                         try {
                             await window.cdsanabriacfFirebase.addAmigo(amigo);
@@ -3690,7 +4038,7 @@
                             console.log(`⚠️ Amigo ya existe: ${amigo.nombre} ${amigo.apellidos}`);
                         }
                     }
-                    console.log(`✅ Migrados ${amigosLocal.length} amigos a Firebase`);
+                    console.log(`✅ Migrados ${amigosLocal.length} amigos a la nube`);
                 } else if (amigosFirebase.length > 0 && amigosLocal.length === 0) {
                     localStorage.setItem('clubFriends', JSON.stringify(amigosFirebase));
                     console.log(`✅ Migrados ${amigosFirebase.length} amigos a localStorage`);
@@ -3711,7 +4059,7 @@
             }
         }
 
-        // Función para mostrar estado de Firebase y localStorage
+        // Función para mostrar estado de la nube y localStorage
         async function showDatabaseStatus() {
             // Añadir indicador visual de estado
             const statusHost =
@@ -3818,23 +4166,23 @@
             }
         }
 
-        // Función para cargar datos desde Firebase
+        // Función para cargar datos desde la nube
         async function loadPersistentData() {
             try {
-                console.log('🔄 Cargando datos desde Firebase...');
+                console.log('🔄 Cargando datos desde la nube...');
 
                 const fbReady = typeof window.waitForFirebaseReady === 'function'
                     ? await window.waitForFirebaseReady(20000)
                     : { ok: !!window.getDocuments };
                 if (!fbReady.ok) {
-                    console.warn('⚠️ Firebase no disponible, usando datos de localStorage');
+                    console.warn('⚠️ La nube no está disponible, usando datos de localStorage');
                     return;
                 }
                 
                 // Usar la nueva función getDocuments de firebase-config.js
                 if (window.getDocuments) {
                     try {
-                        // Cargar socios desde Firebase
+                        // Cargar socios desde la nube
                         const sociosFirebase = await window.getDocuments('members');
                         if (sociosFirebase && sociosFirebase.length > 0) {
                             // Filtrar datos de ejemplo antes de guardar
@@ -3852,10 +4200,10 @@
                             localStorage.setItem('clubMembers', JSON.stringify(sociosLimpios));
                             localStorage.setItem('members', JSON.stringify(sociosLimpios));
                             localStorage.setItem('socios', JSON.stringify(sociosLimpios));
-                            console.log(`✅ Cargados ${sociosLimpios.length} socios válidos desde Firebase (${sociosFirebase.length - sociosLimpios.length} datos de ejemplo filtrados)`);
+                            console.log(`✅ Cargados ${sociosLimpios.length} socios válidos desde la nube (${sociosFirebase.length - sociosLimpios.length} datos de ejemplo filtrados)`);
                     }
                     
-                    // Cargar amigos desde Firebase
+                    // Cargar amigos desde la nube
                         const amigosFirebase = await window.getDocuments('friends');
                         if (amigosFirebase && amigosFirebase.length > 0) {
                             // Filtrar datos de ejemplo antes de guardar
@@ -3873,26 +4221,26 @@
                             localStorage.setItem('clubFriends', JSON.stringify(amigosLimpios));
                             localStorage.setItem('friends', JSON.stringify(amigosLimpios));
                             localStorage.setItem('amigos', JSON.stringify(amigosLimpios));
-                            console.log(`✅ Cargados ${amigosLimpios.length} amigos válidos desde Firebase (${amigosFirebase.length - amigosLimpios.length} datos de ejemplo filtrados)`);
+                            console.log(`✅ Cargados ${amigosLimpios.length} amigos válidos desde la nube (${amigosFirebase.length - amigosLimpios.length} datos de ejemplo filtrados)`);
                         }
 
                         if (typeof window.fetchEventsAndEncuentrosToLocalStorage === 'function') {
                             try {
                                 await window.fetchEventsAndEncuentrosToLocalStorage();
                             } catch (feErr) {
-                                console.warn('⚠️ Eventos/encuentros (Firebase):', feErr);
+                                console.warn('⚠️ Eventos/encuentros (nube):', feErr);
                             }
                         }
                         
-                        console.log('✅ Datos de Firebase cargados correctamente (datos de ejemplo filtrados)');
+                        console.log('✅ Datos de la nube cargados correctamente (datos de ejemplo filtrados)');
                     } catch (error) {
-                        console.warn('⚠️ Error cargando datos de Firebase:', error);
+                        console.warn('⚠️ Error cargando datos de la nube:', error);
                     }
                 } else {
-                    console.warn('⚠️ Firebase no disponible, usando datos de localStorage');
+                    console.warn('⚠️ La nube no está disponible, usando datos de localStorage');
                 }
             } catch (error) {
-                console.error('❌ Error cargando datos de Firebase:', error);
+                console.error('❌ Error cargando datos de la nube:', error);
                 console.log('💾 Usando datos de localStorage como respaldo');
             }
         }
@@ -3910,11 +4258,11 @@
                 console.log(`  - Socios: ${sociosLocal.length}`);
                 console.log(`  - Amigos: ${amigosLocal.length}`);
                 
-                // Verificar Firebase si está disponible
+                // Verificar la nube si está disponible
                 if (window.cdsanabriacfFirebase && window.cdsanabriacfFirebase.isInitialized) {
                     try {
                         const estadisticas = await window.cdsanabriacfFirebase.getEstadisticas();
-                        console.log(`📊 Estado de Firebase:`);
+                        console.log(`📊 Estado de la nube:`);
                         console.log(`  - Modo: ${estadisticas.modo}`);
                         console.log(`  - Online: ${estadisticas.isOnline ? 'Sí' : 'No'}`);
                         console.log(`  - Operaciones pendientes: ${estadisticas.offlineQueue}`);
@@ -4574,7 +4922,7 @@
 
                 if (!adminSnap.exists()) {
                     await signOut(window.firebaseAuth);
-                    throw new Error('Sin perfil admin en Firestore. Crea sanabria_admins/' + uid + ' con appScope y isAdmin (ver docs/ACCESO-LOCAL-Y-ADMIN.md)');
+                    throw new Error('Sin perfil admin en la nube. Crea sanabria_admins/' + uid + ' con appScope y isAdmin (ver docs/ACCESO-LOCAL-Y-ADMIN.md)');
                 }
 
                 const adminData = adminSnap.data() || {};
@@ -4608,7 +4956,7 @@
                 }
 
                 closeAdminModal();
-                console.log('✅ Autenticación admin por Firebase correcta');
+                console.log('✅ Autenticación admin por la nube correcta');
                 if (window.SiteUpdateMode && window.SiteUpdateMode.refreshUi) {
                     window.SiteUpdateMode.refreshUi();
                 }
@@ -4625,18 +4973,18 @@
             } catch (error) {
                 console.error('❌ Error login admin:', error);
                 const code = error && error.code ? String(error.code) : '';
-                let hint = 'Verifica correo, contraseña y documento en Firestore → sanabria_admins (ID = UID). Ver docs/ACCESO-LOCAL-Y-ADMIN.md';
+                let hint = 'Verifica correo, contraseña y permisos de administrador en la nube.';
                 if (code === 'auth/invalid-credential' || code === 'auth/wrong-password' || code === 'auth/user-not-found') {
                     hint = 'Correo o contraseña incorrectos.';
                 } else if (code === 'auth/network-request-failed') {
                     hint =
-                        'No hay conexión con Firebase (red bloqueada o web abierta sin HTTPS).\n\n' +
+                        'No hay conexión con la nube (red bloqueada o web abierta sin HTTPS).\n\n' +
                         '1. Abre la web publicada: https://www.cdsanabriacf.com (no abras index.html desde el Escritorio).\n' +
                         '2. Comprueba internet y desactiva bloqueadores de anuncios / VPN.\n' +
                         '3. Prueba otro navegador o ventana de incógnito.\n' +
                         '4. Si sigue fallando: F12 → Red → intenta entrar y mira si falla identitytoolkit.googleapis.com';
                 } else if (error && error.message) {
-                    hint = error.message;
+                    hint = String(error.message).replace(/\bFirebase\b/gi, 'nube').replace(/\bFirestore\b/gi, 'nube');
                 }
                 showAdminMessage(hint, true);
                 document.getElementById('adminPassword').value = '';
@@ -4813,11 +5161,63 @@
             const lb = document.getElementById('proximoEventoLightbox');
             if (!lb) return;
             lb.classList.remove('is-open');
-            document.body.style.overflow = '';
+            if (!document.getElementById('campeonatoSplash') || document.getElementById('campeonatoSplash').hidden) {
+                document.body.style.overflow = '';
+            }
         }
+
+        function cerrarCampeonatoSplash() {
+            const splash = document.getElementById('campeonatoSplash');
+            if (!splash || splash.hidden) return;
+            try {
+                sessionStorage.setItem('cdsan_campeonato_splash_dismissed', '1');
+            } catch (e) {}
+            splash.hidden = true;
+            splash.classList.remove('is-settled');
+            const img = splash.querySelector('.campeonato-splash-img');
+            if (img) img.classList.add('is-pulsing');
+            document.body.classList.remove('campeonato-splash-open');
+            const lb = document.getElementById('proximoEventoLightbox');
+            if (!lb || !lb.classList.contains('is-open')) {
+                document.body.style.overflow = '';
+            }
+        }
+
+        function applyCampeonatoPromoVisibility() {
+            const active = typeof window.isCampeonatoPromoActive === 'function' && window.isCampeonatoPromoActive();
+            const splash = document.getElementById('campeonatoSplash');
+            if (!active) {
+                if (splash) {
+                    splash.hidden = true;
+                    splash.classList.remove('is-settled');
+                }
+                document.body.classList.remove('campeonato-splash-open');
+            }
+        }
+
+        (function initCampeonatoSplash() {
+            applyCampeonatoPromoVisibility();
+            const splash = document.getElementById('campeonatoSplash');
+            if (!splash || splash.hidden) return;
+            const img = splash.querySelector('.campeonato-splash-img');
+            if (!img) return;
+
+            function settleSplash() {
+                img.classList.remove('is-pulsing');
+                splash.classList.add('is-settled');
+            }
+
+            img.addEventListener('animationend', settleSplash, { once: true });
+            setTimeout(settleSplash, 2400);
+        })();
 
         document.addEventListener('keydown', function (e) {
             if (e.key !== 'Escape') return;
+            const splash = document.getElementById('campeonatoSplash');
+            if (splash && !splash.hidden) {
+                cerrarCampeonatoSplash();
+                return;
+            }
             const lb = document.getElementById('proximoEventoLightbox');
             if (lb && lb.classList.contains('is-open')) cerrarCartelProximoEvento();
             if (typeof closeTorneoResponsableAccessModal === 'function') closeTorneoResponsableAccessModal();
@@ -4889,10 +5289,6 @@
         }
 
         function openTorneoResponsableAccessModal(prefillCode) {
-            if (!canAccessTorneoResponsableContent()) {
-                showRestrictedAccessModal('torneo_responsable');
-                return;
-            }
             if (window.TorneoResponsableAccess && window.TorneoResponsableAccess.openAccessModal) {
                 window.TorneoResponsableAccess.openAccessModal(prefillCode || '');
                 return;
@@ -5164,7 +5560,9 @@
             el.style.display = 'block';
             el.style.background = isError ? '#fee2e2' : '#dcfce7';
             el.style.color = isError ? '#991b1b' : '#166534';
-            el.textContent = text;
+            el.textContent = String(text == null ? '' : text)
+                .replace(/\bFirebase\b/gi, 'nube')
+                .replace(/\bFirestore\b/gi, 'nube');
         }
 
         // Función para cerrar modal de amigos
@@ -5246,11 +5644,24 @@
             const ch = String(paymentChannel || '').toLowerCase();
             if (ch === 'tarjeta' || ch === 'card' || ch === 'pasarela') {
                 estado = 'Pago con tarjeta iniciado (pendiente confirmación banco)';
+            } else if (ch === 'efectivo') {
+                estado = 'Pendiente: pago en efectivo';
+            } else if (ch === 'tpv') {
+                estado = 'Pendiente: pago por TPV';
+            } else if (ch === 'transferencia' || ch === 'transfer') {
+                estado = 'Pendiente: pago por transferencia';
             }
             return [
+                { label: 'Nombre', value: formData.nombre || formData.name },
+                { label: 'Apellidos', value: formData.apellidos || formData.surname },
+                { label: 'Email', value: formData.email },
+                { label: 'Teléfono', value: formData.telefono || formData.phone },
+                { label: 'DNI', value: formData.dni },
+                { label: 'Dirección', value: formData.direccion || formData.address },
                 { label: 'Sexo', value: formData.sexo },
-                { label: 'Fecha nacimiento', value: formData.fechaNacimiento },
+                { label: 'Fecha nacimiento', value: formData.fechaNacimiento || formData.birthDate },
                 { label: 'Cuota (€)', value: formData.cuota },
+                { label: 'Método de pago', value: ch || '—' },
                 { label: 'Notificaciones push', value: formData.notificaciones ? 'Sí' : 'No' },
                 { label: 'Estado', value: estado },
                 { label: 'ID registro', value: formData.id || '—' },
@@ -5328,7 +5739,10 @@
         }
 
         function notifyClubSocioRegistration(formData, paymentChannel) {
-            if (!window.CdsanClubEmail || !formData || !formData.email) return;
+            if (!window.CdsanClubEmail || !formData || !formData.email) {
+                console.warn('Correo club socio: CdsanClubEmail o email ausente');
+                return Promise.resolve({ ok: false });
+            }
             const ch =
                 paymentChannel === 'efectivo'
                     ? 'efectivo'
@@ -5341,7 +5755,7 @@
                 ch === 'tarjeta'
                     ? 'Registro socio — pago con tarjeta'
                     : 'Registro socio — ' + offlineSocioPaymentLabel(ch);
-            window.CdsanClubEmail.sendClubAdminNotify({
+            return window.CdsanClubEmail.sendClubAdminNotify({
                 kind: 'registro_socio',
                 title: 'Nuevo registro de socio/a',
                 subject: subjectLabel,
@@ -5360,7 +5774,22 @@
                 fields: buildSocioClubNotifyFields(formData, ch)
             }).catch(function (e) {
                 console.warn('Correo aviso club socio:', e);
+                return { ok: false, error: e };
             });
+        }
+
+        /** Envía siempre correo al socio + aviso al club (cualquier método de pago). */
+        async function notifySocioRegistrationEmailsAlways(formData, memberId, paymentChannel) {
+            const ch = String(paymentChannel || 'transferencia').toLowerCase();
+            let clubCh = 'transferencia';
+            if (ch === 'tarjeta' || ch === 'card' || ch === 'pasarela') clubCh = 'tarjeta';
+            else if (ch === 'efectivo') clubCh = 'efectivo';
+            else if (ch === 'tpv') clubCh = 'tpv';
+            const nextStep = clubCh === 'tarjeta' ? 'card' : 'transfer';
+            await Promise.all([
+                notifySocioRegisteredEmail(formData, memberId, nextStep),
+                notifyClubSocioRegistration(formData, clubCh)
+            ]);
         }
 
         async function solicitarRegistroSocioTransferencia() {
@@ -5376,12 +5805,8 @@
             }
             window._socioRegistroModoPago = 'transfer';
             window._socioOfflinePaymentChannel = choice;
-            const form = document.getElementById('sociosForm');
-            if (form && typeof form.requestSubmit === 'function') {
-                form.requestSubmit();
-            } else if (form) {
-                form.dispatchEvent(new Event('submit', { cancelable: true, bubbles: true }));
-            }
+            // Igual que tarjeta: llamar registerSocio (requestSubmit no hace nada porque el form solo hace preventDefault).
+            registerSocio({ preventDefault: function () {} });
         }
 
         // Función para cerrar modal de socios
@@ -5402,7 +5827,7 @@
             return 'visitante';
         }
 
-        // Login de socio: implementación unificada más abajo (Firebase Auth + migración desde local).
+        // Login de socio: implementación unificada más abajo (la nube + migración desde local).
 
         // Función para actualizar la interfaz cuando el usuario cambia de estado
         function updateUserInterface() {
@@ -5489,19 +5914,53 @@
             }
 
             ensureProtectedContentHidden();
+
+            if (window.clubNotificationSystem && typeof window.clubNotificationSystem.setCurrentUser === 'function') {
+                let clubUser = null;
+                if (userStatus === 'socio' && currentSocio.email) {
+                    const socioRoles = ['member'];
+                    if (currentSocio.isJugador) socioRoles.push('player');
+                    if (currentSocio.isEntrenador) socioRoles.push('coach');
+                    clubUser = {
+                        id: currentSocio.id,
+                        email: currentSocio.email,
+                        name: currentSocio.nombre || '',
+                        role: 'member',
+                        roles: socioRoles
+                    };
+                } else if (userStatus === 'amigo' && currentAmigo.email) {
+                    clubUser = {
+                        id: currentAmigo.id,
+                        email: currentAmigo.email,
+                        name: currentAmigo.nombre || '',
+                        role: 'friend'
+                    };
+                } else if (userStatus === 'entrenador' && currentCoach.email) {
+                    clubUser = {
+                        id: currentCoach.id,
+                        email: currentCoach.email,
+                        name: currentCoach.name || currentCoach.nombre || '',
+                        role: 'coach'
+                    };
+                }
+                if (clubUser) {
+                    window.clubNotificationSystem.setCurrentUser(clubUser);
+                    if (Notification.permission === 'granted') {
+                        window.clubNotificationSystem.refreshFcmTokenIfPermitted().catch(() => {});
+                    } else if (
+                        window.clubNotificationSystem.userWantsPushNotifications() &&
+                        typeof window.mostrarAvisoNotificacionesClub === 'function'
+                    ) {
+                        setTimeout(function () {
+                            window.mostrarAvisoNotificacionesClub();
+                        }, 800);
+                    }
+                }
+            }
         }
 
         function canAccessTorneoResponsableContent() {
-            const userStatus = getUserStatus();
-            if (userStatus === 'visitante') return false;
-            if (userStatus === 'amigo') {
-                const currentAmigo = JSON.parse(localStorage.getItem('currentAmigo') || '{}');
-                return !!(
-                    currentAmigo.torneoResponsableEnabled ||
-                    currentAmigo.canTorneoResponsable
-                );
-            }
-            return userStatus === 'socio' || userStatus === 'entrenador';
+            return true;
         }
 
         function ensureProtectedContentHidden() {
@@ -5514,9 +5973,6 @@
                         galeriaSection.style.display = 'none';
                     }
                 }
-            }
-            if (!canAccessTorneoResponsableContent()) {
-                closeTorneoResponsableAccessModal();
             }
         }
 
@@ -5691,7 +6147,7 @@
                 body;
         }
 
-        // Login de amigo: implementación unificada más abajo (Firebase Auth + migración desde local).
+        // Login de amigo: implementación unificada más abajo (la nube + migración desde local).
 
         function openEquipacionJugador() {
             const currentSocio = JSON.parse(localStorage.getItem('currentSocio') || '{}');
@@ -8429,7 +8885,7 @@
             }
         }
 
-        // ===== FUNCIONES DE LOGIN PARA SOCIOS (Firebase Auth; migración desde contraseña solo local) =====
+        // ===== FUNCIONES DE LOGIN PARA SOCIOS (la nube; migración desde contraseña solo local) =====
         async function loginSocio(event) {
             event.preventDefault();
 
@@ -8529,6 +8985,7 @@
                     authUid: result.uid || null,
                     loginTime: currentMember.loginTime,
                     rememberSession,
+                    notificaciones: socio.notificaciones === true,
                     isDirectiva: rolesLogin.isDirectiva,
                     isBoardMember: rolesLogin.isBoardMember,
                     boardRole: rolesLogin.boardRole,
@@ -8547,10 +9004,39 @@
                 sessionStorage.setItem('rememberedSocio', JSON.stringify(currentMember));
             }
 
+            if (socio.notificaciones === true && currentMember.email) {
+                const prefs = JSON.parse(localStorage.getItem('notificationPreferences') || '{}');
+                prefs[String(currentMember.email).trim().toLowerCase()] = {
+                    enabled: true,
+                    tipoUsuario: 'socio',
+                    fechaActivacion: new Date().toISOString()
+                };
+                localStorage.setItem('notificationPreferences', JSON.stringify(prefs));
+            }
+
             closeLoginModal();
             updateLoginStatus();
             updateUserInterface();
             refreshSocioCarnetBanner();
+
+            try {
+                if (
+                    window.clubNotificationSystem &&
+                    typeof window.clubNotificationSystem.registerPushAfterLogin === 'function'
+                ) {
+                    await window.clubNotificationSystem.registerPushAfterLogin();
+                } else if (
+                    window.clubNotificationSystem &&
+                    clubNotificationSystem.userWantsPushNotifications() &&
+                    typeof window.mostrarAvisoNotificacionesClub === 'function'
+                ) {
+                    setTimeout(function () {
+                        window.mostrarAvisoNotificacionesClub();
+                    }, 600);
+                }
+            } catch (pushErr) {
+                console.warn('Registro push tras login socio:', pushErr);
+            }
 
             let returnUrl = '';
             try {
@@ -8662,8 +9148,19 @@
                 ),
                 authUid: result.uid || null,
                 loginTime: new Date().toISOString(),
-                rememberSession
+                rememberSession,
+                notificaciones: amigo.notificaciones === true
             };
+
+            if (amigo.notificaciones === true && sessionData.email) {
+                const prefs = JSON.parse(localStorage.getItem('notificationPreferences') || '{}');
+                prefs[String(sessionData.email).trim().toLowerCase()] = {
+                    enabled: true,
+                    tipoUsuario: 'amigo',
+                    fechaActivacion: new Date().toISOString()
+                };
+                localStorage.setItem('notificationPreferences', JSON.stringify(prefs));
+            }
 
             localStorage.setItem('currentAmigo', JSON.stringify(sessionData));
             if (rememberSession) {
@@ -8674,6 +9171,16 @@
             alert('✅ ¡Bienvenido de vuelta! Acceso concedido como amigo del club.');
             updateLoginStatus();
             updateUserInterface();
+            try {
+                if (
+                    window.clubNotificationSystem &&
+                    typeof window.clubNotificationSystem.registerPushAfterLogin === 'function'
+                ) {
+                    await window.clubNotificationSystem.registerPushAfterLogin();
+                }
+            } catch (pushErr) {
+                console.warn('Registro push tras login amigo:', pushErr);
+            }
         }
 
         // ===== FUNCIONES DE LOGIN PARA ENTRENADORES =====
@@ -8697,12 +9204,12 @@
 
             let coaches = [];
 
-            // Intentar Firebase primero (fuente principal)
+            // Intentar la nube primero (fuente principal)
             if (typeof window.getDocuments === 'function') {
                 try {
                     coaches = await window.getDocuments('coaches');
                 } catch (error) {
-                    console.warn('⚠️ No se pudieron cargar entrenadores desde Firebase, usando local:', error);
+                    console.warn('⚠️ No se pudieron cargar entrenadores desde la nube, usando local:', error);
                 }
             }
             if (!Array.isArray(coaches) || !coaches.length) {
@@ -8765,7 +9272,7 @@
             const updatedCoaches = localCoaches.map(c => c.id === coach.id ? { ...c, ...coach } : c);
             localStorage.setItem('clubCoaches', JSON.stringify(updatedCoaches));
 
-            // Persistir en Firebase si está disponible
+            // Persistir en la nube si está disponible
             if (typeof window.updateDocument === 'function' && coach.id) {
                 try {
                     if (!coach.passwordHash && coach.password) {
@@ -9196,7 +9703,7 @@
                         source: 'coach_panel'
                     });
                 } catch (e) {
-                    console.warn('Sync entrenamiento coach a Firebase:', e);
+                    console.warn('Sync entrenamiento coach a la nube:', e);
                 }
             }
             renderCoachDashboard();
@@ -9279,7 +9786,7 @@
                         source: 'coach_panel'
                     });
                 } catch (e) {
-                    console.warn('Sync plan individual coach a Firebase:', e);
+                    console.warn('Sync plan individual coach a la nube:', e);
                 }
             }
             renderCoachDashboard();
@@ -10439,10 +10946,10 @@
             showSyncIndicator();
         });
 
-        // Cargar datos desde Firebase (sin backend Railway; solo Netlify + Firebase)
+        // Cargar datos desde la nube (sin backend Railway; solo Netlify + Firebase)
         async function loadServerData() {
             try {
-                console.log('📥 Sincronizando datos desde Firebase...');
+                console.log('📥 Sincronizando datos desde la nube...');
                 if (typeof window.syncFromFirebase === 'function') {
                     await window.syncFromFirebase();
                 } else if (window.cdsanabriacfFirebase && window.cdsanabriacfFirebase.isInitialized) {
@@ -10458,9 +10965,9 @@
                 if (typeof window.fetchEventsAndEncuentrosToLocalStorage === 'function') {
                     await window.fetchEventsAndEncuentrosToLocalStorage();
                 }
-                console.log('✅ Datos cargados desde Firebase');
+                console.log('✅ Datos cargados desde la nube');
             } catch (error) {
-                console.error('❌ Error cargando datos desde Firebase:', error);
+                console.error('❌ Error cargando datos desde la nube:', error);
             }
         }
 
@@ -10619,9 +11126,9 @@
                 console.log(`📅 Eventos: ${eventos.length}`);
                 console.log(`👨‍🏫 Entrenadores: ${entrenadores.length}`);
                 
-                // Verificar si Firebase está funcionando
+                // Verificar si la nube está funcionando
                 if (window.firebaseDb && !window.firebaseDb.isSimulation) {
-                    console.log('✅ Firebase CDSANABRIACF (cdsanabriacf2026) — sincronización en tiempo real activa');
+                    console.log('✅ la nube CDSANABRIACF (cdsanabriacf2026) — sincronización en tiempo real activa');
                 } else {
                     console.log('⚠️ Modo simulación - Sincronización local activa');
                 }
@@ -10753,7 +11260,7 @@
                     // 2. LIMPIAR FIREBASE COMPLETAMENTE
                     if (window.getDocuments && window.createDocument) {
                         try {
-                            console.log('🗑️ Limpiando Firebase completamente...');
+                            console.log('🗑️ Limpiando la nube completamente...');
                             
                             // Obtener todos los documentos actuales
                             const sociosFirebase = await window.getDocuments('members');
@@ -10773,7 +11280,7 @@
                             localStorage.setItem('socios', JSON.stringify(sociosVacios));
                             localStorage.setItem('amigos', JSON.stringify(amigosVacios));
                             
-                            console.log('✅ Firebase limpiado completamente');
+                            console.log('✅ la nube limpiado completamente');
                             
                         } catch (error) {
                             console.warn('⚠️ Error limpiando Firebase:', error);
@@ -11103,8 +11610,11 @@
 
         /** Correo automático al socio (SendGrid); no bloquea si falla. */
         function notifySocioRegisteredEmail(formData, memberId, nextStep) {
-            if (!window.CdsanClubEmail || !formData || !formData.email) return;
-            window.CdsanClubEmail.sendMemberRegistered({
+            if (!window.CdsanClubEmail || !formData || !formData.email) {
+                console.warn('Correo socio: CdsanClubEmail o email ausente');
+                return Promise.resolve({ ok: false });
+            }
+            return window.CdsanClubEmail.sendMemberRegistered({
                 email: formData.email,
                 memberId: memberId,
                 nombre: formData.nombre,
@@ -11114,6 +11624,7 @@
                 nextStep: nextStep === 'card' ? 'card' : 'transfer'
             }).catch(function (e) {
                 console.warn('Correo registro socio:', e);
+                return { ok: false, error: e };
             });
         }
 
@@ -11161,7 +11672,8 @@
                 registrationSource: 'web_modal_socio',
                 socioJugador: false,
                 isJugador: false,
-                playerId: null
+                playerId: null,
+                memberKind: 'normal'
             };
 
             if (formData.password !== document.getElementById('socioPasswordConfirm').value) {
@@ -11239,15 +11751,20 @@
                     }
                     delete formData.password;
                 } catch (e) {
-                    console.error('registerSocio Firebase:', e);
+                    console.error('registerSocio Auth:', e);
                     if (e && e.code === 'auth/email-already-in-use') {
-                        alert('❌ Ese correo ya tiene una cuenta. Inicia sesión o usa «¿Olvidaste tu contraseña?».');
+                        // Reintento (p. ej. pago con tarjeta abandonado): seguir y actualizar ficha en la nube.
+                        if (typeof window.hashClubAccessKey === 'function' && pwdRegistro) {
+                            formData.passwordHash = await window.hashClubAccessKey(pwdRegistro);
+                        }
+                        delete formData.password;
                     } else if (e && e.code === 'auth/weak-password') {
                         alert('❌ El sistema de acceso no acepta esa contraseña (suele exigir al menos 6 caracteres). Prueba con otra.');
+                        return;
                     } else {
                         alert('❌ No se pudo crear la cuenta de acceso. Comprueba la conexión o inténtalo más tarde.');
+                        return;
                     }
-                    return;
                 }
             } else {
                 if (typeof window.hashClubAccessKey === 'function' && pwdRegistro) {
@@ -11256,38 +11773,21 @@
                 delete formData.password;
             }
 
-            // Tarjeta/Bizum: no registrar ni enviar datos hasta que el banco confirme el pago (webhook Redsys).
-            if (modoPago === 'card' && cuota > 0) {
-                window._socioOfflinePaymentChannel = null;
-                notifySocioRegisteredEmail(formData, null, 'card');
-                notifyClubSocioRegistration(formData, 'tarjeta');
-                if (window.firebaseAuth && !window.firebaseAuth.isSimulation) {
-                    try {
-                        const { signOut } = await import('https://www.gstatic.com/firebasejs/10.12.3/firebase-auth.js');
-                        await signOut(window.firebaseAuth);
-                    } catch (e) { console.warn('signOut tras registro socio:', e); }
-                }
-                closeSociosModal();
-                try {
-                    await window.CdsanRedsys.payMembership({
-                        payMethod: 'card',
-                        amountEur: cuota,
-                        email: formData.email,
-                        memberId: null,
-                        registrationBundle: { member: formData },
-                        description: 'Cuota socio CD Sanabria CF — ' + (formData.numeroSocio || '')
-                    });
-                } catch (payErr) {
-                    console.warn('Pago cuota socio:', payErr);
-                    alert(
-                        '❌ No se pudo iniciar el pago con tarjeta.\n\n' +
-                            (payErr && payErr.message ? payErr.message + '\n\n' : '') +
-                            'Puedes intentarlo de nuevo o contactar con cdsanabriafc@gmail.com.'
-                    );
-                }
-                return;
+            // Transferencia / efectivo / TPV: etiquetar método antes del primer guardado en la nube.
+            if (modoPago === 'transfer') {
+                const rawCh = window._socioOfflinePaymentChannel || 'transferencia';
+                const offlineCh =
+                    rawCh === 'efectivo' ? 'efectivo' : rawCh === 'tpv' ? 'tpv' : 'transferencia';
+                formData.offlinePaymentChannel = offlineCh;
+                formData.paymentMethod =
+                    offlineCh === 'efectivo' ? 'cash' : offlineCh === 'tpv' ? 'tpv' : 'transfer';
+                formData.pendingReason = 'nueva_alta';
+                formData.pagado = false;
+                formData.estado = 'pendiente';
+                formData.status = 'pending_validation';
             }
 
+            // Siempre guardar en la nube primero (también con tarjeta) para que aparezca en Socios del panel.
             let okFirebase = true;
             try {
                 okFirebase = await enviarSocioABaseDatos(formData);
@@ -11301,6 +11801,56 @@
                 return;
             }
 
+            if (!okFirebase) {
+                alert(
+                    '❌ No se pudo guardar tu alta de socio/a en la nube del club.\n\nReintenta o contacta con cdsanabriafc@gmail.com.'
+                );
+                return;
+            }
+
+            const syncedEarly = JSON.parse(localStorage.getItem('clubMembers') || '[]');
+            const savedEarly = syncedEarly.find(function (s) {
+                return clubMembersSameIdentity(s, formData);
+            });
+            if (savedEarly) Object.assign(formData, savedEarly);
+            const memberIdEarly = (savedEarly && savedEarly.id) || formData.id;
+
+            // Tarjeta: ficha ya en nube (pendiente); el webhook Redsys la activa al confirmar el banco.
+            if (modoPago === 'card' && cuota > 0) {
+                window._socioOfflinePaymentChannel = null;
+                try {
+                    await notifySocioRegistrationEmailsAlways(formData, memberIdEarly, 'tarjeta');
+                } catch (mailErr) {
+                    console.warn('Correos alta socio (tarjeta):', mailErr);
+                }
+                if (window.firebaseAuth && !window.firebaseAuth.isSimulation) {
+                    try {
+                        const { signOut } = await import('https://www.gstatic.com/firebasejs/10.12.3/firebase-auth.js');
+                        await signOut(window.firebaseAuth);
+                    } catch (e) { console.warn('signOut tras registro socio:', e); }
+                }
+                closeSociosModal();
+                try {
+                    await window.CdsanRedsys.payMembership({
+                        payMethod: 'card',
+                        amountEur: cuota,
+                        email: formData.email,
+                        memberId: memberIdEarly,
+                        registrationBundle: { member: formData },
+                        description: 'Cuota socio CD Sanabria CF — ' + (formData.numeroSocio || '')
+                    });
+                } catch (payErr) {
+                    console.warn('Pago cuota socio:', payErr);
+                    alert(
+                        '✅ Tu alta ya está registrada en el club (pendiente de pago).\n\n' +
+                            '❌ No se pudo abrir el pago con tarjeta.\n\n' +
+                            (payErr && payErr.message ? payErr.message + '\n\n' : '') +
+                            'Puedes abonar por transferencia/efectivo o contactar con cdsanabriafc@gmail.com.'
+                    );
+                }
+                return;
+            }
+
             if (window.firebaseAuth && !window.firebaseAuth.isSimulation) {
                 try {
                     const { signOut } = await import('https://www.gstatic.com/firebasejs/10.12.3/firebase-auth.js');
@@ -11308,27 +11858,7 @@
                 } catch (e) { console.warn('signOut tras registro socio:', e); }
             }
 
-            if (!okFirebase) {
-                if (location.protocol === 'file:') {
-                    sociosExistentes.push(formData);
-                    if (typeof window.syncClubMembersLocal === 'function') {
-                        window.syncClubMembersLocal(sociosExistentes);
-                    } else {
-                        localStorage.setItem('clubMembers', JSON.stringify(sociosExistentes));
-                        localStorage.setItem('socios', JSON.stringify(sociosExistentes));
-                    }
-                }
-                alert(
-                    '❌ No se pudo guardar tu alta de socio/a en la nube del club.\n\nReintenta o contacta con cdsanabriafc@gmail.com.'
-                );
-                return;
-            }
-
-            const synced = JSON.parse(localStorage.getItem('clubMembers') || '[]');
-            const saved = synced.find(function (s) {
-                return clubMembersSameIdentity(s, formData);
-            });
-            if (saved) Object.assign(formData, saved);
+            window._socioOfflinePaymentChannel = null;
 
             if (formData.notificaciones) {
                 activarNotificacionesPush('socio', formData.email, formData.nombre);
@@ -11337,58 +11867,14 @@
             const mensajeNotificaciones = formData.notificaciones
                 ? '\n\n🔔 Notificaciones push activadas - Recibirás información del club'
                 : '\n\n📧 Recibirás información por email';
-            const syncedMember = JSON.parse(localStorage.getItem('clubMembers') || '[]').find(function (s) {
-                return clubMembersSameIdentity(s, formData);
-            });
-            const memberId = (syncedMember && syncedMember.id) || formData.id;
-
-            if (modoPago === 'transfer') {
-                const rawCh = window._socioOfflinePaymentChannel || 'transferencia';
-                window._socioOfflinePaymentChannel = null;
-                const offlineCh =
-                    rawCh === 'efectivo' ? 'efectivo' : rawCh === 'tpv' ? 'tpv' : 'transferencia';
-                formData.offlinePaymentChannel = offlineCh;
-                formData.paymentMethod =
-                    offlineCh === 'efectivo' ? 'cash' : offlineCh === 'tpv' ? 'tpv' : 'transfer';
-                formData.pendingReason = 'nueva_alta';
-                formData.pagado = false;
-                formData.estado = 'pendiente';
-                formData.status = 'pending_validation';
-                const list = JSON.parse(localStorage.getItem('clubMembers') || '[]');
-                const ix = list.findIndex(function (s) {
-                    return clubMembersSameIdentity(s, formData);
-                });
-                if (ix >= 0) {
-                    Object.assign(list[ix], formData);
-                    if (typeof window.syncClubMembersLocal === 'function') {
-                        window.syncClubMembersLocal(list);
-                    } else {
-                        localStorage.setItem('clubMembers', JSON.stringify(list));
-                        localStorage.setItem('socios', JSON.stringify(list));
-                    }
-                    try {
-                        const okTransfer = await enviarSocioABaseDatos(list[ix]);
-                        if (!okTransfer) {
-                            alert(
-                                '❌ No se pudo confirmar el método de pago en la nube. Reintenta o contacta con cdsanabriafc@gmail.com.'
-                            );
-                            return;
-                        }
-                    } catch (syncErr) {
-                        console.warn('Sync transferencia socio:', syncErr);
-                        alert(
-                            '❌ No se pudo confirmar el método de pago en la nube.\n\n' +
-                                (syncErr && syncErr.message ? syncErr.message : '') +
-                                '\n\nContacta con cdsanabriafc@gmail.com.'
-                        );
-                        return;
-                    }
-                }
-            }
+            const memberId = memberIdEarly || formData.id;
 
             const offlineCh = formData.offlinePaymentChannel || 'transferencia';
-            notifySocioRegisteredEmail(formData, memberId, 'transfer');
-            notifyClubSocioRegistration(formData, offlineCh);
+            try {
+                await notifySocioRegistrationEmailsAlways(formData, memberId, offlineCh);
+            } catch (mailErr) {
+                console.warn('Correos alta socio (offline):', mailErr);
+            }
 
             const pagoHumano = offlineSocioPaymentHint(offlineCh);
 
@@ -11467,15 +11953,19 @@
             formData.consentimientoFecha = new Date().toISOString();
             formData.consentimientoIP = 'navegador-cliente';
 
-            const amigosExistentes = JSON.parse(localStorage.getItem('clubFriends') || '[]');
-            if (amigosExistentes.some(a => a.email === formData.email)) {
-                alert('❌ Ya existe un amigo registrado con este email');
-                return;
-            }
-
             formData.email = String(formData.email).trim().toLowerCase();
             formData.dni = String(formData.dni).trim().toLowerCase();
             formData.telefono = String(formData.telefono).trim();
+
+            const amigosExistentes = JSON.parse(localStorage.getItem('clubFriends') || '[]');
+            if (
+                amigosExistentes.some(function (a) {
+                    return String(a.email || '').trim().toLowerCase() === formData.email;
+                })
+            ) {
+                alert('❌ Ya existe un amigo registrado con este email');
+                return;
+            }
 
             const pwdRegistro = String(formData.password);
             if (window.cdsanClubAuth && window.firebaseAuth && !window.firebaseAuth.isSimulation) {
@@ -11558,7 +12048,7 @@
                 : '\n\n📧 Recibirás información por email';
 
             alert(
-                `✅ ¡Registro de amigo/a completado!\n\nTu alta figura ya en el sistema del club (Firebase y panel de administración).\n\n📋 ${formatNumeroAmigoDisplay(formData.numeroAmigo)}\n\n🤝 ¡Bienvenido/a al club!\n\nAhora puedes acceder a competiciones y encuentros.\n\n📧 Hemos enviado un aviso al club y a tu correo con los datos del registro.${mensajeNotificaciones}`
+                `✅ ¡Registro de amigo/a completado!\n\nTu alta figura ya en el sistema del club (nube y panel de administración).\n\n📋 ${formatNumeroAmigoDisplay(formData.numeroAmigo)}\n\n🤝 ¡Bienvenido/a al club!\n\nAhora puedes acceder a competiciones y encuentros.\n\n📧 Hemos enviado un aviso al club y a tu correo con los datos del registro.${mensajeNotificaciones}`
             );
 
             closeAmigosModal();
@@ -11586,79 +12076,143 @@
         // ===== FUNCIÓN PARA ACTIVAR NOTIFICACIONES PUSH =====
         async function activarNotificacionesPush(tipoUsuario, email, nombre) {
             console.log(`🔔 Activando notificaciones push para ${tipoUsuario}: ${nombre}`);
-            
+
             try {
-                // Verificar si el navegador soporta notificaciones
                 if (!('Notification' in window)) {
                     console.warn('⚠️ Este navegador no soporta notificaciones push');
                     return false;
                 }
-                
-                // Solicitar permiso si no está concedido
-                if (Notification.permission === 'default') {
-                    const permission = await Notification.requestPermission();
-                    if (permission !== 'granted') {
-                        console.log('📵 Usuario rechazó permisos de notificación');
-                        return false;
-                    }
-                } else if (Notification.permission === 'denied') {
-                    console.log('📵 Permisos de notificación denegados previamente');
-                    return false;
-                }
-                
-                // Suscribir a topics según tipo de usuario usando el sistema de comunicaciones
-                if (window.communicationsSystem) {
-                    const topicsToSubscribe = ['all', 'news', 'events'];
-                    
-                    if (tipoUsuario === 'socio') {
-                        topicsToSubscribe.push('members', 'matches');
-                    } else if (tipoUsuario === 'amigo') {
-                        topicsToSubscribe.push('friends');
-                    }
-                    
-                    for (const topic of topicsToSubscribe) {
-                        await window.communicationsSystem.subscribeToTopic(topic);
-                    }
-                    
-                    console.log(`✅ Usuario ${nombre} suscrito a topics: ${topicsToSubscribe.join(', ')}`);
-                    
-                    // Mostrar notificación de bienvenida
-                    window.communicationsSystem.showLocalNotification(
-                        '⚽ ¡Bienvenido/a al CD Sanabria CF!',
-                        `Hola ${nombre}, gracias por unirte como ${tipoUsuario}. Recibirás notificaciones sobre eventos y partidos.`,
-                        {
-                            tag: 'welcome-notification',
-                            icon: '/assets/escudo-192.png'
-                        }
-                    );
-                }
-                
-                // Guardar preferencia de notificaciones
+
                 const notificationPrefs = JSON.parse(localStorage.getItem('notificationPreferences') || '{}');
-                notificationPrefs[email] = {
+                notificationPrefs[String(email || '').trim().toLowerCase()] = {
                     enabled: true,
                     tipoUsuario: tipoUsuario,
-                    fechaActivacion: new Date().toISOString(),
-                    topics: tipoUsuario === 'socio' ? ['all', 'news', 'events', 'members', 'matches'] : ['all', 'news', 'events', 'friends']
+                    fechaActivacion: new Date().toISOString()
                 };
                 localStorage.setItem('notificationPreferences', JSON.stringify(notificationPrefs));
-                
-                // Log de auditoría
-                if (window.permissionManager) {
-                    window.permissionManager.logAudit('PUSH_NOTIFICATIONS_ENABLED', {
-                        email: email,
-                        nombre: nombre,
-                        tipoUsuario: tipoUsuario
-                    });
+
+                if (
+                    window.clubNotificationSystem &&
+                    typeof window.clubNotificationSystem.activatePushFromUserConsent === 'function'
+                ) {
+                    const result = await window.clubNotificationSystem.activatePushFromUserConsent();
+                    return result === 'granted';
                 }
-                
-                console.log(`🔔 Notificaciones push activadas correctamente para ${nombre}`);
-                return true;
-                
+
+                if (Notification.permission === 'default') {
+                    const permission = await Notification.requestPermission();
+                    return permission === 'granted';
+                }
+                return Notification.permission === 'granted';
             } catch (error) {
                 console.error('❌ Error activando notificaciones push:', error);
                 return false;
             }
+        }
+
+        function mostrarAvisoNotificacionesClub() {
+            if (!window.clubNotificationSystem) return;
+            if (!clubNotificationSystem.shouldShowNotificationPrompt()) {
+                if (Notification.permission === 'granted') {
+                    clubNotificationSystem.refreshFcmTokenIfPermitted().catch(() => {});
+                }
+                return;
+            }
+            if (document.getElementById('clubNotifyPromptModal')) return;
+
+            const wants = clubNotificationSystem.userWantsPushNotifications();
+            const loggedIn = typeof getUserStatus === 'function' && getUserStatus() !== 'guest';
+            const denied = Notification.permission === 'denied';
+            const title = wants
+                ? '🔔 Activa los avisos del club en este móvil'
+                : '🔔 ¿Quieres avisos del CD Sanabria CF?';
+            const body = denied
+                ? 'Marcaste que quieres recibir notificaciones del club, pero el navegador las tiene bloqueadas. Ve a Ajustes del móvil → aplicaciones → navegador o PWA del club → Notificaciones → Permitir.'
+                : wants
+                  ? 'Al registrarte indicaste que deseas recibir avisos de partidos, eventos y novedades. Pulsa el botón para activarlos en este dispositivo.'
+                  : loggedIn
+                    ? 'Recibe en tu móvil avisos de partidos amistosos, eventos y novedades del club.'
+                    : 'Entérate al momento de partidos, eventos y novedades. Inicia sesión como socio/a o amigo/a del club y activa los avisos.';
+
+            const modal = document.createElement('div');
+            modal.id = 'clubNotifyPromptModal';
+            modal.setAttribute('role', 'dialog');
+            modal.setAttribute('aria-modal', 'true');
+            modal.innerHTML =
+                '<div class="club-notify-prompt-backdrop">' +
+                '<div class="club-notify-prompt-card">' +
+                '<img src="assets/escudo-cdsanabriacf.png?v=3" alt="Escudo CD Sanabria CF" width="72" height="72" class="club-notify-prompt-escudo">' +
+                '<h2 class="club-notify-prompt-title">' + title + '</h2>' +
+                '<p class="club-notify-prompt-body">' + body + '</p>' +
+                '<div class="club-notify-prompt-actions">' +
+                (denied
+                    ? '<button type="button" class="club-notify-prompt-btn primary" id="clubNotifyPromptClose">Entendido</button>'
+                    : '<button type="button" class="club-notify-prompt-btn primary" id="clubNotifyPromptAccept">✅ Activar avisos</button>' +
+                      '<button type="button" class="club-notify-prompt-btn secondary" id="clubNotifyPromptLater">Ahora no</button>') +
+                (!loggedIn && !denied
+                    ? '<button type="button" class="club-notify-prompt-btn link" id="clubNotifyPromptLogin">Iniciar sesión</button>'
+                    : '') +
+                '</div></div></div>';
+            document.body.appendChild(modal);
+
+            function cerrarAvisoNotificacionesClub() {
+                const el = document.getElementById('clubNotifyPromptModal');
+                if (el) el.remove();
+            }
+
+            document.getElementById('clubNotifyPromptClose')?.addEventListener('click', function () {
+                sessionStorage.setItem('cdsan_notify_denied_help_shown', '1');
+                cerrarAvisoNotificacionesClub();
+            });
+
+            document.getElementById('clubNotifyPromptLater')?.addEventListener('click', function () {
+                if (window.clubNotificationSystem) clubNotificationSystem.markNotificationPromptDismissed();
+                cerrarAvisoNotificacionesClub();
+            });
+
+            document.getElementById('clubNotifyPromptLogin')?.addEventListener('click', function () {
+                cerrarAvisoNotificacionesClub();
+                if (typeof showLoginModal === 'function') showLoginModal();
+            });
+
+            document.getElementById('clubNotifyPromptAccept')?.addEventListener('click', async function () {
+                const btn = document.getElementById('clubNotifyPromptAccept');
+                if (btn) {
+                    btn.disabled = true;
+                    btn.textContent = 'Activando…';
+                }
+                try {
+                    if (!loggedIn) {
+                        cerrarAvisoNotificacionesClub();
+                        alert('Inicia sesión como socio/a o amigo/a del club para recibir los avisos en tu móvil.');
+                        if (typeof showLoginModal === 'function') showLoginModal();
+                        return;
+                    }
+                    let result = 'default';
+                    if (
+                        window.clubNotificationSystem &&
+                        typeof window.clubNotificationSystem.activatePushFromUserConsent === 'function'
+                    ) {
+                        result = await window.clubNotificationSystem.activatePushFromUserConsent();
+                    }
+                    cerrarAvisoNotificacionesClub();
+                    if (result === 'granted') {
+                        alert('✅ Avisos activados. Recibirás partidos, eventos y novedades del club.');
+                    } else if (result === 'denied') {
+                        alert('Las notificaciones están bloqueadas. Actívalas en Ajustes del móvil para esta app o navegador.');
+                    }
+                } catch (err) {
+                    console.warn('Activar avisos:', err);
+                    cerrarAvisoNotificacionesClub();
+                }
+            });
+
+            modal.querySelector('.club-notify-prompt-backdrop')?.addEventListener('click', function (e) {
+                if (e.target === modal.firstElementChild) {
+                    if (window.clubNotificationSystem) clubNotificationSystem.markNotificationPromptDismissed();
+                    cerrarAvisoNotificacionesClub();
+                }
+            });
         }
 
         async function enviarSocioABaseDatos(socioData) {
@@ -11680,7 +12234,7 @@
             if (window.ClubMemberCloudPersist && typeof window.ClubMemberCloudPersist.persistMemberViaNetlify === 'function') {
                 try {
                     await window.ClubMemberCloudPersist.persistMemberViaNetlify(socioSafe);
-                    console.log('✅ Socio guardado en Firebase (Netlify):', socioSafe.nombre);
+                    console.log('✅ Socio guardado en la nube (Netlify):', socioSafe.nombre);
                     return true;
                 } catch (netlifyErr) {
                     console.warn('⚠️ Netlify socio:', netlifyErr);
@@ -11731,7 +12285,7 @@
             if (window.ClubFriendCloudPersist && typeof window.ClubFriendCloudPersist.persistFriendViaNetlify === 'function') {
                 try {
                     const result = await window.ClubFriendCloudPersist.persistFriendViaNetlify(amigoSafe);
-                    console.log('✅ Amigo guardado en Firebase (Netlify):', amigoSafe.nombre);
+                    console.log('✅ Amigo guardado en la nube (Netlify):', amigoSafe.nombre);
                     return { ok: true, emailsSent: !!(result && result.emailsSent) };
                 } catch (netlifyErr) {
                     console.warn('⚠️ Netlify amigo:', netlifyErr);
@@ -11765,7 +12319,7 @@
         }
 
         function enviarConReintentos(_tipo, _data) {
-            // Solo Firebase (Netlify estático + Firestore); sin backend externo.
+            // Solo la nube (Netlify estático + Firestore); sin backend externo.
             return Promise.resolve();
         }
 
@@ -12617,14 +13171,14 @@
                 console.log('⚠️ Sistema de sincronización: NO ACTIVO');
             }
             
-            // Verificar configuración de Firebase
+            // Verificar configuración de la nube
             if (typeof firebaseConfig !== 'undefined') {
-                console.log('🔥 Firebase configurado para sincronización en tiempo real');
+                console.log('🔥 la nube configurado para sincronización en tiempo real');
                 console.log('📊 Base de datos: Firestore');
-                console.log('🔐 Autenticación: Firebase Auth');
+                console.log('🔐 Autenticación: la nube');
                 console.log('📱 Notificaciones: Cloud Messaging');
             } else {
-                console.log('⚠️ Firebase no configurado - usando sincronización local');
+                console.log('⚠️ la nube no configurado - usando sincronización local');
             }
             
             console.log('✅ Verificación APK vs WEB completada');
@@ -12888,7 +13442,7 @@
                     <div style="background: #f8f9fa; padding: 15px; border-radius: 10px; margin-bottom: 15px;">
                         <div style="display: flex; justify-content: space-between; align-items: center;">
                             <div>
-                                <strong>🔐 Cookies de Firebase (Terceros)</strong>
+                                <strong>🔐 Cookies de la nube (Terceros)</strong>
                                 <p style="font-size: 0.85rem; color: #6b7280; margin-top: 5px;">
                                     Necesarias para autenticación y sincronización de datos.
                                 </p>
@@ -13118,7 +13672,15 @@
             notifyBtn?.addEventListener('click', async (e) => {
                 e.stopPropagation();
                 try {
-                    if (window.clubNotificationSystem && typeof window.clubNotificationSystem.solicitarPermisoNotificacionesNavegador === 'function') {
+                    if (window.clubNotificationSystem && typeof window.clubNotificationSystem.activatePushFromUserConsent === 'function') {
+                        const r = await window.clubNotificationSystem.activatePushFromUserConsent();
+                        if (r === 'denied') {
+                            alert('Las notificaciones están bloqueadas. Puedes activarlas en Ajustes del navegador para este sitio.');
+                        } else if (r === 'granted') {
+                            notifyBtn.textContent = '✅ Avisos activados';
+                            setTimeout(function () { notifyBtn.remove(); }, 1500);
+                        }
+                    } else if (window.clubNotificationSystem && typeof window.clubNotificationSystem.solicitarPermisoNotificacionesNavegador === 'function') {
                         const r = await window.clubNotificationSystem.solicitarPermisoNotificacionesNavegador();
                         if (r === 'denied') {
                             alert('Las notificaciones están bloqueadas. Puedes activarlas en Ajustes del navegador para este sitio.');
@@ -13174,6 +13736,22 @@
             try { if (typeof diagnosticarSociosAmigos === 'function') diagnosticarSociosAmigos(); } catch (_) {}
             try { if (typeof verificarPersistenciaCompleta === 'function') verificarPersistenciaCompleta(); } catch (_) {}
             try { if (typeof verificarSincronizacionAPK === 'function') verificarSincronizacionAPK(); } catch (_) {}
+            try {
+                if (
+                    window.clubNotificationSystem &&
+                    typeof window.clubNotificationSystem.syncClubAnnouncementsFromFirebase === 'function'
+                ) {
+                    window.clubNotificationSystem.syncClubAnnouncementsFromFirebase();
+                }
+            } catch (_) {}
+            try {
+                if (
+                    window.clubNotificationSystem &&
+                    typeof window.clubNotificationSystem.promptNotificationsOnAppOpen === 'function'
+                ) {
+                    window.clubNotificationSystem.promptNotificationsOnAppOpen();
+                }
+            } catch (_) {}
         }
 
         window.addEventListener('beforeinstallprompt', (event) => {
@@ -13240,13 +13818,25 @@
 
         // Mostrar banner al cargar
         document.addEventListener('DOMContentLoaded', function() {
+            if (typeof applyCampeonatoPromoVisibility === 'function') applyCampeonatoPromoVisibility();
             registrarServiceWorker();
             mostrarBannerInstalacion();
             refrescarDatosAlAbrir('domcontentloaded');
             if (typeof ensureProtectedContentHidden === 'function') ensureProtectedContentHidden();
             setTimeout(mostrarBannerCookies, 1500);
+            setTimeout(function () {
+                if (
+                    window.clubNotificationSystem &&
+                    typeof window.clubNotificationSystem.promptNotificationsOnAppOpen === 'function'
+                ) {
+                    window.clubNotificationSystem.promptNotificationsOnAppOpen();
+                }
+            }, 2500);
             if (window.clubNotificationSystem && typeof window.clubNotificationSystem.loadNotificationsForUser === 'function') {
                 window.clubNotificationSystem.loadNotificationsForUser();
+            }
+            if (window.ClubNotificationDetail && typeof window.ClubNotificationDetail.initFromUrl === 'function') {
+                window.ClubNotificationDetail.initFromUrl();
             }
             document.addEventListener('click', function (e) {
                 const panel = document.getElementById('clubNotificationsPanel');

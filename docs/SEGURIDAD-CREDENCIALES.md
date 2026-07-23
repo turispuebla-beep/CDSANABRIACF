@@ -23,3 +23,16 @@ No subas a Netlify archivos con credenciales de prueba (`CREDENCIALES-*.md`, etc
 ## API key de Firebase
 
 La clave en `js/firebase-config.js` es pública por diseño; restringe dominios en Google Cloud Console.
+
+**Guía paso a paso:** [FIREBASE-API-KEY-DOMINIOS.md](FIREBASE-API-KEY-DOMINIOS.md)
+
+## Jugadores del club vs torneo F7
+
+| Datos | Colección | Quién lee |
+|-------|-----------|-----------|
+| Ficha completa jugador/a del club | `sanabria_players` | Solo administradores |
+| Lista pública (nombre, categoría, dorsal) | `sanabria_players_public` | Web (sin DNI ni email) |
+| Inscripción / plantilla torneo | `sanabria_torneo_preinscripciones` | Admin / organizador |
+| DNI torneo | `sanabria_torneo_documents` | Solo servidor (Netlify) |
+
+Los participantes del **torneo no son** los mismos registros que `sanabria_players`, aunque alguna persona juegue en ambos.

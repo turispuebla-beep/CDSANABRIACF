@@ -291,7 +291,7 @@
 
   function openTorneoF7Wizard() {
     if (!global.__torneoPreinscripcionesCache) {
-      if (global.confirm('¿Cargar preinscripciones desde Firestore antes de abrir el asistente?')) {
+      if (global.confirm('¿Cargar preinscripciones desde la nube antes de abrir el asistente?')) {
         if (typeof global.loadTorneoPreinscripcionesAdmin === 'function') {
           global.loadTorneoPreinscripcionesAdmin().then(function () {
             openTorneoF7Wizard();

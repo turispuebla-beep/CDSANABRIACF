@@ -103,9 +103,11 @@ exports.handler = async (event) => {
     }
 
     if (type === 'member_registered') {
+      // No bloquear el correo si la ficha aún no está indexada: el aviso debe salir
+      // con cualquier método de pago (tarjeta / transferencia / efectivo / TPV).
       const exists = await memberExistsForEmail(email, body.memberId);
       if (!exists) {
-        return jsonResponse(404, { ok: false, error: 'Socio no encontrado' }, origin);
+        console.warn('member_registered: socio aún no en nube, se envía correo igual:', email);
       }
       const nextStep = body.nextStep === 'card' ? 'card' : 'transfer';
       const result = await sendMemberRegistrationEmail({

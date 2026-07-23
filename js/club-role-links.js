@@ -210,6 +210,16 @@
     payload.isJugador = !!m.isJugador;
     payload.playerId = m.playerId || null;
     payload.playerCategory = m.playerCategory || '';
+    const isSocioJugador = !!(
+      m.socioJugador ||
+      m.isJugador ||
+      m.playerId ||
+      m.memberKind === 'jugador' ||
+      m.memberKind === 'player'
+    );
+    payload.socioJugador = isSocioJugador;
+    payload.memberKind = isSocioJugador ? 'jugador' : 'normal';
+    if (!isSocioJugador) payload.playerId = null;
     payload.detectedBy = m.detectedBy || 'none';
     payload.roleFlagsUpdatedAt = m.roleFlagsUpdatedAt || new Date().toISOString();
     return payload;

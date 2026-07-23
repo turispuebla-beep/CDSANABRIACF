@@ -103,7 +103,7 @@ exports.handler = async (event) => {
       await savePendingPayment(orderId, paymentDoc);
     } catch (e) {
       console.error('savePendingPayment paygold:', e);
-      return jsonResponse(503, { ok: false, error: 'No se pudo registrar el cobro (Firebase)' }, origin);
+      return jsonResponse(503, { ok: false, error: 'No se pudo registrar el cobro (nube)' }, origin);
     }
 
     const merchantParams = {

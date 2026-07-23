@@ -295,6 +295,103 @@
           : 'Marca la casilla de aceptación de términos sobre premios'
         : 'Completa responsable técnico y todos los jugadores de la plantilla';
     }
+    refreshChangePayToCardUI(panel);
+  }
+
+  function refreshChangePayToCardUI(panel) {
+    const block = $('teChangePayCardBlock');
+    const statusEl = $('teChangePayCardStatus');
+    const msgEl = $('teChangePayCardMsg');
+    const btn = $('btnChangePayToCard');
+    if (!block) return;
+    const canChange = !!panel.canChangePayToCard;
+    block.hidden = !canChange;
+    if (!canChange) {
+      if (msgEl) msgEl.textContent = '';
+      return;
+    }
+    const fee =
+      panel.changePayToCardFeeEur > 0
+        ? panel.changePayToCardFeeEur
+        : panel.totalInscriptionFeeEur || panel.inscriptionFeeEur || 0;
+    const feeLabel =
+      panel.changePayToCardFeeLabel ||
+      (global.ClubTorneoPricing && global.ClubTorneoPricing.formatEur
+        ? global.ClubTorneoPricing.formatEur(fee)
+        : fee + ' €');
+    const entries = Array.isArray(panel.teamEntries) ? panel.teamEntries : [];
+    const pending = entries.filter(function (e) {
+      return !!e.canChangePayToCard;
+    });
+    const labels = pending
+      .map(function (e) {
+        return e.pendingPayMethodLabel || 'pendiente';
+      })
+      .filter(Boolean);
+    const methodHint = labels.length
+      ? labels.indexOf('efectivo') >= 0 && labels.indexOf('transferencia') >= 0
+        ? 'efectivo/transferencia'
+        : labels[0]
+      : panel.pendingPayMethodLabel || 'transferencia o efectivo';
+    if (statusEl) {
+      statusEl.innerHTML =
+        'Tu inscripción está <strong>pendiente de pago</strong> (' +
+        escapeHtml(methodHint) +
+        '). Puedes <strong>cambiar a tarjeta y pagar ahora</strong>' +
+        (fee > 0 ? ' · Importe: <strong>' + escapeHtml(feeLabel) + '</strong>' : '') +
+        '.';
+    }
+    if (btn) {
+      btn.disabled = false;
+      btn.textContent =
+        fee > 0 ? '💳 Cambiar a tarjeta y pagar ' + feeLabel : '💳 Cambiar a tarjeta y pagar';
+    }
+    if (msgEl) msgEl.textContent = '';
+  }
+
+  async function handleChangePayToCard() {
+    const errEl = $('teFinalizeError');
+    const msgEl = $('teChangePayCardMsg');
+    const btn = $('btnChangePayToCard');
+    if (errEl) {
+      errEl.hidden = true;
+      errEl.textContent = '';
+    }
+    if (
+      !global.confirm(
+        '¿Cambiar el método de pago a tarjeta y pagar ahora?\n\nSe abrirá la pasarela segura. Al completar el pago, la inscripción quedará pagada.'
+      )
+    ) {
+      return;
+    }
+    if (btn) btn.disabled = true;
+    if (msgEl) {
+      msgEl.style.color = '#64748b';
+      msgEl.textContent = 'Abriendo pago con tarjeta…';
+    }
+    try {
+      if (!global.TorneoEquipoManage || !global.TorneoEquipoManage.changePayMethodToCard) {
+        throw new Error('Servicio de pago no disponible. Recarga la página.');
+      }
+      const result = await global.TorneoEquipoManage.changePayMethodToCard();
+      if (result.paymentRequired && result.redirect) {
+        global.TorneoEquipoManage.submitRedsysRedirect(result.redirect);
+        return;
+      }
+      if (result.panel) renderPanel(result.panel);
+      throw new Error('No se pudo abrir el pago con tarjeta. Inténtalo de nuevo.');
+    } catch (err) {
+      if (msgEl) {
+        msgEl.style.color = '#dc2626';
+        msgEl.textContent = err.message || 'No se pudo cambiar a tarjeta.';
+      }
+      if (errEl) {
+        errEl.hidden = false;
+        errEl.textContent = err.message || 'No se pudo cambiar a tarjeta.';
+      }
+    } finally {
+      if (btn) btn.disabled = false;
+    }
   }
 
   function showLogin() {
@@ -555,6 +652,7 @@
     $('teCoachForm') && $('teCoachForm').addEventListener('submit', handleSaveCoach);
     $('teInviteForm') && $('teInviteForm').addEventListener('submit', handleInvite);
     $('btnClosePlantilla') && $('btnClosePlantilla').addEventListener('click', handleFinalize);
+    $('btnChangePayToCard') && $('btnChangePayToCard').addEventListener('click', handleChangePayToCard);
     const premiosCb = $('tePremiosAceptados');
     if (premiosCb) {
       premiosCb.addEventListener('change', function () {

@@ -133,6 +133,36 @@ Cuenta con acceso **solo a la pestaña Competiciones** del panel (`admin-panel.h
 3. Entra en la web con **Acceso administrador** (mismo flujo que un admin).
 4. Despliega las **reglas de Firestore** actualizadas (`firestore.rules`) para permitir escritura en `sanabria_competitions` y lectura/edición de preinscripciones.
 
+### Restablecer contraseña del organizador
+
+Si el login falla (`auth/wrong-password`, `auth/user-not-found`, etc.):
+
+1. Abre [Firebase Console → Authentication → Users](https://console.firebase.google.com/project/cdsanabriacf2026/authentication/users).
+2. Busca el email del organizador (p. ej. `cdsanabriafc+torneo@gmail.com`).
+3. Menú **⋮** del usuario → **Reset password** (envía correo de restablecimiento) **o** **Change password** (poner contraseña nueva manualmente).
+4. Comprueba que existe el documento en `sanabria_admins/{UID}` con `"role": "competition_organizer"` y `"appScope": "cdsanabriacf"`.
+5. Entra en la web con **Acceso administrador** (botón 🔧 Admin) usando la contraseña nueva.
+
+Para crear la cuenta desde cero (usuario + documento admin):
+
+```bash
+node scripts/create-competition-organizer.js
+```
+
+(Variables de entorno Firebase Admin según el script; revisa el email/contraseña que imprime al final.)
+
+### Validación torneo: organizador vs administrador
+
+| Acción | Organizador competiciones | Admin del club |
+|--------|---------------------------|----------------|
+| **Ver preinscripciones / importar al cuadro** | ✅ Sí | ✅ Sí |
+| **Validar equipo** | ❌ No | ✅ Sí |
+| **Validar pago** (transferencia/efectivo) | ❌ No | ✅ Sí |
+| **Eliminar preinscripción** | ❌ No | ✅ Sí |
+| **Pago tarjeta / Bizum** | Automático al confirmar Redsys | Automático |
+
+En la pestaña **Competiciones**, listado de preinscripciones: botones **✅ Validar equipo** y **💰 Validar pago** (solo admin). Cada validación envía **correo al club** y al **responsable del equipo**.
+
 ---
 
 ## Comprobar que Firebase cargó

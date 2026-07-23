@@ -1,9 +1,9 @@
 ﻿/**
  * ðŸ”¥ CONFIGURACIÃ“N FIREBASE - CDSANABRIACF
- * ConfiguraciÃ³n completa para Firebase con el proyecto mejorado
+ * ConfiguraciÃ³n completa para la nube con el proyecto mejorado
  */
 
-// ðŸ”¥ ConfiguraciÃ³n Firebase para CDSANABRIACF2026 - CREDENCIALES REALES
+// ðŸ”¥ ConfiguraciÃ³n la nube para CDSANABRIACF2026 - CREDENCIALES REALES
 const firebaseConfig = {
   apiKey: "AIzaSyBlCY7mDrT7edTo79Gy4aVJbWPnFDevbro",
   authDomain: "cdsanabriacf2026.firebaseapp.com",
@@ -21,7 +21,7 @@ const firebaseConfig = {
 // 5. Agrega una app web y copia la configuraciÃ³n aquÃ­
 // 6. Reemplaza todos los valores de arriba con los reales
 
-// ðŸš€ Inicializar Firebase (SDK 10.12.x: Firestore con caché persistente en IndexedDB)
+// ðŸš€ Inicializar la nube (SDK 10.12.x: Firestore con caché persistente en IndexedDB)
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.3/firebase-app.js';
 import {
   initializeFirestore,
@@ -61,7 +61,7 @@ import {
 import { getStorage, connectStorageEmulator } from 'https://www.gstatic.com/firebasejs/10.12.3/firebase-storage.js';
 import { getMessaging, getToken, onMessage } from 'https://www.gstatic.com/firebasejs/10.12.3/firebase-messaging.js';
 
-// Inicializar Firebase para CDSANABRIACF2026
+// Inicializar la nube para CDSANABRIACF2026
 let app, db, auth, storage;
 
 try {
@@ -88,7 +88,7 @@ try {
   db = { isSimulation: true };
   auth = { isSimulation: true };
   storage = { isSimulation: true };
-  console.log('ðŸ”¥ Firebase en modo simulaciÃ³n - usando persistencia local robusta');
+  console.log('ðŸ”¥ la nube en modo simulaciÃ³n - usando persistencia local robusta');
 }
 
 // Inicializar Cloud Messaging (para notificaciones push)
@@ -100,7 +100,7 @@ try {
 }
 
 // ðŸ“Š Estructura de la Base de Datos Firestore - CD SANABRIA CF
-// CD Sanabria CF — Firebase cdsanabriacf2026, appScope cdsanabriacf, colecciones sanabria_*
+// CD Sanabria CF — la nube cdsanabriacf2026, appScope cdsanabriacf, colecciones sanabria_*
 const DB_COLLECTIONS = {
   // Usuarios SOLO de Sanabria (NO compartido)
   USERS: 'sanabria_users',
@@ -109,6 +109,7 @@ const DB_COLLECTIONS = {
   // Datos del club CD SANABRIA CF
   MEMBERS: 'sanabria_members',        // Socios del club
   PLAYERS: 'sanabria_players',        // Jugadores
+  PLAYERS_PUBLIC: 'sanabria_players_public', // Vista pública (sin DNI; no torneo F7)
   PLAYER_APPLICATIONS: 'sanabria_player_applications', // Solicitudes nuevo jugador
   TORNEO_PREINSCRIPTIONS: 'sanabria_torneo_preinscripciones', // Preinscripciones torneo F7
   TORNEO_DOCUMENTS: 'sanabria_torneo_documents', // Documentos torneo (DNI, etc.)
@@ -148,6 +149,7 @@ function normalizeCollectionName(rawName) {
     members: DB_COLLECTIONS.MEMBERS,
     friends: DB_COLLECTIONS.FRIENDS,
     players: DB_COLLECTIONS.PLAYERS,
+    players_public: DB_COLLECTIONS.PLAYERS_PUBLIC,
     player_applications: DB_COLLECTIONS.PLAYER_APPLICATIONS,
     clubPlayerApplications: DB_COLLECTIONS.PLAYER_APPLICATIONS,
     torneo_preinscripciones: DB_COLLECTIONS.TORNEO_PREINSCRIPTIONS,
@@ -177,6 +179,8 @@ function normalizeCollectionName(rawName) {
     notifications: DB_COLLECTIONS.NOTIFICATIONS,
     pushmessages: DB_COLLECTIONS.NOTIFICATIONS,
     club_notifications: DB_COLLECTIONS.NOTIFICATIONS,
+    fcm_tokens: DB_COLLECTIONS.FCM_TOKENS,
+    fcmtokens: DB_COLLECTIONS.FCM_TOKENS,
     settings: DB_COLLECTIONS.SETTINGS,
     config: DB_COLLECTIONS.SETTINGS,
     clubsettings: DB_COLLECTIONS.SETTINGS,
@@ -378,7 +382,7 @@ async function findDuplicateDocId(collectionName, data) {
     return found?.id ? String(found.id) : null;
   }
 
-  // Firebase real
+  // la nube real
   if (dni) {
     const byDni = await getDocs(query(
       collection(db, resolved),
@@ -465,11 +469,19 @@ function mirrorLocalUpsert(collectionName, docId, data) {
   const current = readLocalCollection(collectionName);
   const id = String(docId || scoped.id || Date.now());
   const idx = current.findIndex(d => String(d?.id) === id);
-  const nextDoc = {
+  let nextDoc = {
     ...(idx >= 0 ? current[idx] : {}),
     ...scoped,
     id
   };
+  if (
+    (collectionName === 'sanabria_players' || collectionName === 'players') &&
+    typeof window !== 'undefined' &&
+    window.ClubPlayerKitPersist &&
+    typeof window.ClubPlayerKitPersist.mergePlayerKitFields === 'function'
+  ) {
+    nextDoc = window.ClubPlayerKitPersist.mergePlayerKitFields(nextDoc, idx >= 0 ? current[idx] : {});
+  }
   if (!nextDoc.createdAt) {
     nextDoc.createdAt = new Date().toISOString();
   }
@@ -683,7 +695,7 @@ async function syncLocalArrayKeyToFirebase(localKey) {
     }
     return { synced, failed, errors };
   } catch (error) {
-    console.error(`âŒ Error sincronizando clave local "${localKey}" con Firebase:`, error);
+    console.error(`âŒ Error sincronizando clave local "${localKey}" con la nube:`, error);
     return { synced: 0, failed: 0, error: String(error?.message || error) };
   }
 }
@@ -758,7 +770,7 @@ async function syncLocalSettingsBlobToFirebase(localKey) {
 
     return { synced: 1 };
   } catch (error) {
-    console.error(`Error sincronizando objeto local "${localKey}" con Firebase:`, error);
+    console.error(`Error sincronizando objeto local "${localKey}" con la nube:`, error);
     return { synced: 0, error: String(error?.message || error) };
   }
 }
@@ -792,10 +804,10 @@ function applyRemoteConfigDocToLocalStorage(docSnap) {
 
 // Configurar autenticaciÃ³n
 function setupAuth() {
-  console.log('ðŸ” Configurando autenticaciÃ³n Firebase...');
+  console.log('ðŸ” Configurando autenticaciÃ³n la nube...');
 
   if (auth && auth.isSimulation) {
-    console.log('Auth en modo simulación: sin Firebase Auth');
+    console.log('Auth en modo simulación: sin la nube');
     return;
   }
 
@@ -829,84 +841,36 @@ function setupAuth() {
   });
 }
 
-// Configurar Cloud Messaging
+// Configurar Cloud Messaging (delegado en notification-system.js)
 async function setupMessaging() {
-  if (!messaging) return;
-  
-  try {
-    console.log('ðŸ”” Configurando notificaciones push...');
-    
-    // Solicitar permisos
-    const permission = await Notification.requestPermission();
-    
-    if (permission === 'granted') {
-      // Obtener token FCM
-      // âœ… VAPID Key configurada
-      const VAPID_KEY = 'BK6QOHZGAPCgqsDEtjGfIST2F5G0t6ICn7Gn-nZksTEwqxd6A8w9yb7YNlHqQimbhqmrRWigHTy1DIAXfbN0LFQ';
-      
-      const token = await getToken(messaging, {
-        vapidKey: VAPID_KEY
-      });
-      
-      console.log('✅ Token FCM obtenido correctamente');
-      
-      // Guardar token en Firestore
-      await saveUserToken(token);
-      
-      // Escuchar mensajes en primer plano
-      onMessage(messaging, (payload) => {
-        console.log('ðŸ”” Mensaje recibido:', payload);
-        
-        // Mostrar notificaciÃ³n personalizada
-        showCustomNotification(payload);
-      });
-      
-    } else {
-      console.log('âŒ Permisos de notificaciÃ³n denegados');
-    }
-    
-  } catch (error) {
-    console.error('âŒ Error configurando messaging:', error);
-  }
-}
-
-// Guardar token del usuario en Firestore
-async function saveUserToken(token) {
-  try {
-    const user = auth.currentUser;
-    if (user) {
-      await setDoc(doc(db, DB_COLLECTIONS.USERS, user.uid), {
-        fcmToken: token,
-        lastTokenUpdate: new Date().toISOString()
-      }, { merge: true });
-      
-      console.log('âœ… Token guardado en Firestore');
-    }
-  } catch (error) {
-    console.error('âŒ Error guardando token:', error);
+  if (
+    window.clubNotificationSystem &&
+    typeof window.clubNotificationSystem.refreshFcmTokenIfPermitted === 'function'
+  ) {
+    return window.clubNotificationSystem.refreshFcmTokenIfPermitted();
   }
 }
 
 // Mostrar notificaciÃ³n personalizada
 function showCustomNotification(payload) {
-  const { title, body, icon, data } = payload.notification || {};
-  
-  // Crear notificaciÃ³n del sistema
+  const { title, body, data } = payload.notification || {};
+  const icon = '/assets/escudo-192.png';
+
   if ('Notification' in window && Notification.permission === 'granted') {
     new Notification(title || 'CDSANABRIACF', {
-      body: body || 'Nueva notificaciÃ³n del club',
-      icon: icon || '/images/icon-192x192.png',
-      badge: '/images/badge-72x72.png',
-      tag: 'cdsanabriacf-notification',
-      data: data || {},
-      vibrate: [200, 100, 200],
-      requireInteraction: false
+      body: body || payload.data?.body || 'Nueva notificación del club',
+      icon: icon,
+      badge: icon,
+      tag: payload.data?.notifId || 'cdsanabriacf-notification',
+      data: data || payload.data || {},
+      silent: false
     });
   }
-  
-  // Mostrar tambiÃ©n en la interfaz
-  if (window.showNotification) {
-    window.showNotification(body || 'Nueva notificaciÃ³n', 'info');
+
+  if (window.clubNotificationSystem && typeof window.clubNotificationSystem.handleFirebaseMessage === 'function') {
+    window.clubNotificationSystem.handleFirebaseMessage(payload);
+  } else if (window.showNotification) {
+    window.showNotification(body || 'Nueva notificación', 'info');
   }
 }
 
@@ -957,7 +921,7 @@ async function createDocument(collectionKey, data) {
         return docId;
       }
     } else {
-      // Firebase real - CDSANABRIACF2026
+      // la nube real - CDSANABRIACF2026
       if (duplicateDocId) {
         await updateDoc(doc(db, collectionName, duplicateDocId), {
           ...withScopeForCollection(collectionName, normalizedData),
@@ -965,6 +929,7 @@ async function createDocument(collectionKey, data) {
         });
         mirrorLocalUpsert(collectionName, duplicateDocId, normalizedData);
         console.log(`â™»ï¸ Documento duplicado detectado en ${collectionName}; actualizado:`, duplicateDocId);
+        await maybeSyncClubPlayerPublicMirror(collectionName, duplicateDocId, normalizedData);
         return duplicateDocId;
       }
 
@@ -974,10 +939,11 @@ async function createDocument(collectionKey, data) {
         updatedAt: serverTimestamp()
       };
       const docRef = await addDoc(collection(db, collectionName), payload);
-      // Espejo local siempre (aunque haya Firebase): respaldo y soporte offline de lectura.
+      // Espejo local siempre (aunque haya la nube): respaldo y soporte offline de lectura.
       mirrorLocalUpsert(collectionName, docRef.id, normalizedData);
       
-      console.log('âœ… Documento creado en Firebase CDSANABRIACF2026:', docRef.id);
+      console.log('âœ… Documento creado en la nube CDSANABRIACF2026:', docRef.id);
+      await maybeSyncClubPlayerPublicMirror(collectionName, docRef.id, normalizedData);
       return docRef.id;
     }
     
@@ -1023,7 +989,7 @@ async function getDocuments(collectionName, filters = []) {
         return filteredDocuments;
       }
     } else {
-      // Firebase real - CDSANABRIACF2026
+      // la nube real - CDSANABRIACF2026
       let q = query(collection(db, resolvedCollection), where('appScope', '==', APP_SCOPE));
       
       // Aplicar filtros
@@ -1055,6 +1021,52 @@ async function getDocuments(collectionName, filters = []) {
   }
 }
 
+async function maybeSyncClubPlayerPublicMirror(collectionName, docId, data) {
+  try {
+    const resolved = normalizeCollectionName(collectionName);
+    if (resolved !== DB_COLLECTIONS.PLAYERS) return;
+    if (typeof window === 'undefined' || !window.ClubPlayersPublicSync) return;
+    const merged = Object.assign({}, data || {}, { id: docId });
+    await window.ClubPlayersPublicSync.afterClubPlayerWrite(merged);
+  } catch (e) {
+    console.warn('maybeSyncClubPlayerPublicMirror:', e.message || e);
+  }
+}
+
+async function maybeRemoveClubPlayerPublicMirror(collectionName, docId) {
+  try {
+    const resolved = normalizeCollectionName(collectionName);
+    if (resolved !== DB_COLLECTIONS.PLAYERS) return;
+    if (typeof window === 'undefined' || !window.ClubPlayersPublicSync) return;
+    await window.ClubPlayersPublicSync.afterClubPlayerDelete(docId);
+  } catch (e) {
+    console.warn('maybeRemoveClubPlayerPublicMirror:', e.message || e);
+  }
+}
+
+/** Crear o actualizar documento con ID fijo (merge). Útil p. ej. avisos MSG_ADMIN_* */
+async function upsertDocument(collectionName, docId, data) {
+  try {
+    const resolvedCollection = normalizeCollectionName(collectionName);
+    const id = String(docId || (data && data.id) || '').trim();
+    if (!id) throw new Error('ID de documento obligatorio');
+    const normalizedData = normalizeIdentityFields(resolvedCollection, data || {});
+    const scoped = withScopeForCollection(resolvedCollection, { ...normalizedData, id });
+    if (db.isSimulation) {
+      mirrorLocalUpsert(resolvedCollection, id, scoped);
+      return id;
+    }
+    const payload = { ...scoped, updatedAt: serverTimestamp() };
+    if (!normalizedData.createdAt) payload.createdAt = serverTimestamp();
+    await setDoc(doc(db, resolvedCollection, id), payload, { merge: true });
+    mirrorLocalUpsert(resolvedCollection, id, normalizedData);
+    return id;
+  } catch (error) {
+    console.error('Error upsert documento:', error);
+    throw error;
+  }
+}
+
 // Actualizar documento
 async function updateDocument(collectionName, docId, data) {
   try {
@@ -1064,9 +1076,9 @@ async function updateDocument(collectionName, docId, data) {
       updatedAt: serverTimestamp()
     });
     mirrorLocalUpsert(resolvedCollection, docId, data);
-    
+
     console.log('âœ… Documento actualizado:', docId);
-    
+    await maybeSyncClubPlayerPublicMirror(resolvedCollection, docId, data);
   } catch (error) {
     console.error('âŒ Error actualizando documento:', error);
     throw error;
@@ -1084,8 +1096,9 @@ async function deleteDocument(collectionName, docId, userRole) {
     
     await deleteDoc(doc(db, resolvedCollection, docId));
     mirrorLocalDelete(resolvedCollection, docId);
-    
+
     console.log('âœ… Documento eliminado:', docId);
+    await maybeRemoveClubPlayerPublicMirror(resolvedCollection, docId);
     
     // Log de auditorÃ­a
     await createDocument(DB_COLLECTIONS.AUDIT_LOGS, {
@@ -1104,16 +1117,16 @@ async function deleteDocument(collectionName, docId, userRole) {
 
 // ðŸ”„ SincronizaciÃ³n con sistema local
 
-// Sincronizar datos locales con Firebase
+// Sincronizar datos locales con la nube
 async function syncWithFirebase() {
   try {
-    console.log('ðŸ”„ Sincronizando con Firebase...');
+    console.log('ðŸ”„ Sincronizando con la nube...');
     
     // Obtener datos locales no sincronizados
     if (window.persistenceManager) {
       const unsyncedRecords = await window.persistenceManager.getUnsyncedRecords();
       
-      // Enviar cada registro a Firebase
+      // Enviar cada registro a la nube
       for (const record of unsyncedRecords) {
         try {
           await createDocument(record.store, record.data);
@@ -1127,17 +1140,17 @@ async function syncWithFirebase() {
       }
     }
     
-    console.log('âœ… SincronizaciÃ³n con Firebase completada');
+    console.log('âœ… SincronizaciÃ³n con la nube completada');
     
   } catch (error) {
     console.error('âŒ Error en sincronizaciÃ³n:', error);
   }
 }
 
-// Obtener datos de Firebase y actualizar local
+// Obtener datos de la nube y actualizar local
 async function syncFromFirebase() {
   try {
-    console.log('ðŸ“¥ Obteniendo datos de Firebase...');
+    console.log('ðŸ“¥ Obteniendo datos de la nube...');
     
     // Sincronizar cada colecciÃ³n
     const collections = [
@@ -1175,11 +1188,11 @@ async function syncFromFirebase() {
       window.dispatchEvent(new CustomEvent('panelDataSynced'));
     } catch (_) {}
   } catch (error) {
-    console.error('âŒ Error obteniendo datos de Firebase:', error);
+    console.error('âŒ Error obteniendo datos de la nube:', error);
   }
 }
 
-// ðŸ”„ SincronizaciÃ³n en tiempo real con Firebase
+// ðŸ”„ SincronizaciÃ³n en tiempo real con la nube
 let realtimeListeners = {};
 
 async function firebaseUserIsClubAdmin() {
@@ -1203,16 +1216,34 @@ async function firebaseUserIsClubAdmin() {
 
 // Configurar listeners en tiempo real para sincronizaciÃ³n mÃ³vil-web
 function applyPlayersToLocalCache(players) {
+  let merged = Array.isArray(players) ? players : [];
+  if (typeof window !== 'undefined' && window.ClubPlayerKitPersist) {
+    try {
+      const local = JSON.parse(localStorage.getItem('clubPlayers') || '[]');
+      if (window.ClubPlayerKitPersist.mergePlayersListPreserveKit) {
+        merged = window.ClubPlayerKitPersist.mergePlayersListPreserveKit(local, merged);
+      }
+      if (window.ClubPlayerKitPersist.applyKitSnapshotsToList) {
+        merged = window.ClubPlayerKitPersist.applyKitSnapshotsToList(merged);
+      }
+    } catch (e) {
+      console.warn('mergePlayersListPreserveKit:', e);
+    }
+  }
   const cached =
     typeof window !== 'undefined' &&
     window.ClubPublicPrivacy &&
     typeof window.ClubPublicPrivacy.filterPlayersForLocalCache === 'function'
-      ? window.ClubPublicPrivacy.filterPlayersForLocalCache(players)
-      : players;
+      ? window.ClubPublicPrivacy.filterPlayersForLocalCache(merged)
+      : merged;
 
   localStorage.setItem('clubPlayers', JSON.stringify(cached));
   localStorage.setItem('players', JSON.stringify(cached));
   localStorage.setItem('jugadores', JSON.stringify(cached));
+
+  if (typeof window !== 'undefined') {
+    window.__lastRawClubPlayers = merged;
+  }
 
   if (window.updatePlayersList) {
     window.updatePlayersList(players);
@@ -1279,6 +1310,27 @@ async function setupRealtimeSync() {
         }
         members.push(row);
       });
+
+      // Conservar altas locales aún no subidas (MEMBER_*) para que no desaparezcan al refrescar.
+      try {
+        const prev = JSON.parse(localStorage.getItem('clubMembers') || '[]');
+        if (Array.isArray(prev)) {
+          prev.forEach((local) => {
+            if (!local || !local.id) return;
+            const lid = String(local.id);
+            if (!lid.startsWith('MEMBER_')) return;
+            const em = String(local.email || '').trim().toLowerCase();
+            const dni = String(local.dni || '').trim().toUpperCase();
+            const already = members.some((r) => {
+              if (!r) return false;
+              if (em && String(r.email || '').trim().toLowerCase() === em) return true;
+              if (dni && String(r.dni || '').trim().toUpperCase() === dni) return true;
+              return false;
+            });
+            if (!already) members.push(local);
+          });
+        }
+      } catch (_) {}
       
       if (typeof window.syncClubMembersLocal === 'function') {
         window.syncClubMembersLocal(members);
@@ -1322,6 +1374,27 @@ async function setupRealtimeSync() {
           fechaRegistro: data.fechaRegistro || new Date().toISOString()
         });
       });
+
+      // Conservar altas locales aún no subidas (FRIEND_/AMIGO_*) para que no desaparezcan al refrescar.
+      try {
+        const prev = JSON.parse(localStorage.getItem('clubFriends') || '[]');
+        if (Array.isArray(prev)) {
+          prev.forEach((local) => {
+            if (!local || !local.id) return;
+            const lid = String(local.id);
+            if (!lid.startsWith('FRIEND_') && !lid.startsWith('AMIGO_')) return;
+            const em = String(local.email || '').trim().toLowerCase();
+            const dni = String(local.dni || '').trim().toUpperCase();
+            const already = friends.some((r) => {
+              if (!r) return false;
+              if (em && String(r.email || '').trim().toLowerCase() === em) return true;
+              if (dni && String(r.dni || '').trim().toUpperCase() === dni) return true;
+              return false;
+            });
+            if (!already) friends.push(local);
+          });
+        }
+      } catch (_) {}
       
       // Actualizar localStorage en TODAS las claves para compatibilidad
       localStorage.setItem('clubFriends', JSON.stringify(friends));
@@ -1343,20 +1416,9 @@ async function setupRealtimeSync() {
       window.dispatchEvent(new CustomEvent('friendsUpdated', { detail: friends }));
     }, (err) => console.warn('Listener amigos:', err && err.message ? err.message : err));
     } else {
-      console.log('Sincronizacion socios/amigos en tiempo real: solo con sesion admin Firebase');
+      console.log('Sincronizacion socios/amigos en tiempo real: solo con sesion admin la nube');
     }
     
-    function stripSensitivePlayerFields(data, adminUser) {
-      const row = { ...(data || {}) };
-      if (!adminUser) {
-        delete row.portalPasswordHash;
-        delete row.passwordHash;
-        delete row.password;
-        delete row.plainPassword;
-      }
-      return row;
-    }
-
     function stripSensitiveCoachFields(data, adminUser) {
       const row = { ...(data || {}) };
       if (!adminUser) {
@@ -1367,32 +1429,53 @@ async function setupRealtimeSync() {
       return row;
     }
 
-    const playersListener = onSnapshot(collection(db, 'sanabria_players'), (snapshot) => {
+    if (isAdminUser) {
+      const playersListener = onSnapshot(collection(db, 'sanabria_players'), (snapshot) => {
+        const players = [];
+        snapshot.forEach((doc) => {
+          players.push({
+            id: doc.id,
+            ...stripSensitivePlayerFields(doc.data(), true)
+          });
+        });
+
+        window.__lastRawClubPlayers = players;
+        applyPlayersToLocalCache(players);
+      });
+
+      const applicationsListener = onSnapshot(collection(db, DB_COLLECTIONS.PLAYER_APPLICATIONS), (snapshot) => {
+        const applications = [];
+        snapshot.forEach((docSnap) => {
+          applications.push({ id: docSnap.id, ...docSnap.data() });
+        });
+        localStorage.setItem('clubPlayerApplications', JSON.stringify(applications));
+        if (window.renderPlayerApplicationsAdmin) {
+          try {
+            window.renderPlayerApplicationsAdmin(applications);
+          } catch (_) {}
+        }
+        window.dispatchEvent(new CustomEvent('playerApplicationsUpdated', { detail: applications }));
+      }, (err) => console.warn('Listener solicitudes jugador:', err && err.message ? err.message : err));
+    } else {
+      console.log('Jugadores completos (sanabria_players): solo con sesión admin en la nube');
+    }
+
+    // Ficha pública del club (sin DNI). Torneo F7 usa sanabria_torneo_preinscripciones — colección distinta.
+    const publicPlayersListener = onSnapshot(collection(db, DB_COLLECTIONS.PLAYERS_PUBLIC), (snapshot) => {
+      if (isAdminUser) return;
       const players = [];
-      snapshot.forEach((doc) => {
+      snapshot.forEach((docSnap) => {
+        const data = docSnap.data() || {};
+        const clubId = data.clubPlayerId || docSnap.id;
         players.push({
-          id: doc.id,
-          ...stripSensitivePlayerFields(doc.data(), isAdminUser)
+          id: clubId,
+          ...data,
+          source: 'club_player_public'
         });
       });
-
       window.__lastRawClubPlayers = players;
       applyPlayersToLocalCache(players);
-    });
-
-    const applicationsListener = onSnapshot(collection(db, DB_COLLECTIONS.PLAYER_APPLICATIONS), (snapshot) => {
-      const applications = [];
-      snapshot.forEach((docSnap) => {
-        applications.push({ id: docSnap.id, ...docSnap.data() });
-      });
-      localStorage.setItem('clubPlayerApplications', JSON.stringify(applications));
-      if (window.renderPlayerApplicationsAdmin) {
-        try {
-          window.renderPlayerApplicationsAdmin(applications);
-        } catch (_) {}
-      }
-      window.dispatchEvent(new CustomEvent('playerApplicationsUpdated', { detail: applications }));
-    }, (err) => console.warn('Listener solicitudes jugador:', err && err.message ? err.message : err));
+    }, (err) => console.warn('Listener jugadores públicos:', err && err.message ? err.message : err));
     
     // Listener para equipos (teams) - SANABRIA
     const teamsListener = onSnapshot(collection(db, 'sanabria_teams'), (snapshot) => {
@@ -1705,7 +1788,7 @@ async function resolveMemberProfileAfterLogin(collectionKey, uid, email) {
 }
 
 /**
- * Login socio o amigo: Firebase Auth + migración automática si solo existía contraseña en local.
+ * Login socio o amigo: la nube + migración automática si solo existía contraseña en local.
  */
 async function loginClubIdentity({ collectionKey, localKey, email, password }) {
   const em = String(email).trim();
@@ -1842,7 +1925,7 @@ async function clubMemberChangePassword(session, currentPwd, newPwd) {
   }
   const u = auth.currentUser;
   if (!u || !session?.email) {
-    const err = new Error('Sesión Firebase no activa');
+    const err = new Error('Sesión en la nube no activa');
     err.code = 'auth/no-user';
     throw err;
   }
@@ -1877,7 +1960,7 @@ window.cdsanClubAuth = {
 
 // ðŸš€ InicializaciÃ³n automÃ¡tica
 document.addEventListener('DOMContentLoaded', async () => {
-  console.log('ðŸ”¥ Inicializando Firebase para CDSANABRIACF...');
+  console.log('ðŸ”¥ Inicializando la nube para CDSANABRIACF...');
   
   try {
     // Configurar servicios
@@ -1895,7 +1978,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       await syncWithFirebase();
     }, 2000);
     
-    console.log('âœ… Firebase configurado correctamente con sincronizaciÃ³n en tiempo real');
+    console.log('âœ… la nube configurado correctamente con sincronizaciÃ³n en tiempo real');
 
     if (typeof window.sanitizeClubLocalCredentials === 'function') {
       window.sanitizeClubLocalCredentials().catch((e) => console.warn('sanitizeClubLocalCredentials:', e));
@@ -1917,6 +2000,7 @@ window.firebaseConfig = firebaseConfig;
 window.DB_COLLECTIONS = DB_COLLECTIONS;
 window.createDocument = createDocument;
 window.getDocuments = getDocuments;
+window.upsertDocument = upsertDocument;
 window.updateDocument = updateDocument;
 window.withScopeForCollection = withScopeForCollection;
 window.deleteDocument = deleteDocument;
@@ -1985,7 +2069,7 @@ window.cdsanabriacfFirebase = {
   }
 };
 
-console.log('ðŸ”¥ ConfiguraciÃ³n Firebase cargada - Sistema integrado con persistencia local');
+console.log('ðŸ”¥ ConfiguraciÃ³n la nube cargada - Sistema integrado con persistencia local');
 
 if (typeof window !== 'undefined') {
   window.dispatchEvent(new CustomEvent('firebaseReady'));

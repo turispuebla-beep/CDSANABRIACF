@@ -263,7 +263,7 @@
     const existing = form.dni ? findPlayerByDni(form.dni) : null;
     const id = existing && existing.id ? existing.id : 'PLAYER_' + Date.now() + '_' + Math.random().toString(36).slice(2, 9);
 
-    return {
+    const record = {
       id: id,
       name: form.name,
       nombre: form.name,
@@ -337,6 +337,7 @@
       paySocioSelected: cart.paySocio,
       socioJugador: true,
       isJugador: true,
+      memberKind: 'jugador',
       membershipKind: 'socio',
       playerCategory: form.category,
       registrationSource: 'web_inscription',
@@ -359,6 +360,10 @@
       previousSeasonPlayed: form.previousSeasonPlayed || '',
       updatedAt: new Date().toISOString()
     };
+    (cart.kitItems || []).forEach(function (it) {
+      if (it && it.id && it.size) record['kit_' + it.id] = String(it.size).trim();
+    });
+    return record;
   }
 
   function requiresPasswordForInscriptionAccess(dni, season) {
@@ -447,12 +452,17 @@
       );
     }
     if (idx >= 0) {
-      players[idx] = {
+      const merged = {
         ...players[idx],
         ...player,
         id: players[idx].id,
         portalPasswordHash: player.portalPasswordHash || players[idx].portalPasswordHash || ''
       };
+      if (global.ClubPlayerKitPersist && global.ClubPlayerKitPersist.mergePlayerKitFields) {
+        players[idx] = global.ClubPlayerKitPersist.mergePlayerKitFields(merged, players[idx]);
+      } else {
+        players[idx] = merged;
+      }
     } else {
       players.push(player);
     }
@@ -704,7 +714,7 @@
 
     if (typeof global.persistRecordToFirebase === 'function') {
       try {
-        await global.persistRecordToFirebase('clubPlayers', 'players', normalized);
+        await global.persistRecordToFirebase('clubPlayers', 'players', normalized, { skipNetlify: !requireCloud });
         return normalized;
       } catch (e) {
         console.warn('persistRecordToFirebase:', e);
@@ -970,6 +980,7 @@
         registrationDate: now,
         socioJugador: true,
         isJugador: true,
+        memberKind: 'jugador',
         playerId: player.id,
         playerCategory: player.category,
         categoriaJugador: player.category,
@@ -992,15 +1003,26 @@
     return member;
   }
 
-  async function persistMemberFirebase(member) {
+  async function persistMemberFirebase(member, opts) {
     if (!member) return member;
+    const requireCloud = opts && opts.requireCloud === true;
     if (typeof global.persistMemberToFirebase === 'function') {
-      await global.persistMemberToFirebase(member);
-      return member;
+      try {
+        await global.persistMemberToFirebase(member);
+        return member;
+      } catch (e) {
+        console.warn('persistMemberToFirebase:', e);
+        if (requireCloud) throw e;
+      }
     }
     if (typeof global.persistRecordToFirebase === 'function') {
-      await global.persistRecordToFirebase('clubMembers', 'members', member);
-      return member;
+      try {
+        await global.persistRecordToFirebase('clubMembers', 'members', member, { skipNetlify: true });
+        return member;
+      } catch (e) {
+        console.warn('persistRecordToFirebase member:', e);
+        if (requireCloud) throw e;
+      }
     }
     if (typeof global.createDocument !== 'function' || typeof global.updateDocument !== 'function') {
       return member;
@@ -1080,13 +1102,16 @@
       player.inscriptionPaid = false;
       player.pendingReason = offlineCh;
     } else {
+      // Nunca marcar como pagado al guardar antes del TPV u otros pendientes.
       player.inscriptionStatus = 'pending_payment';
       player.status = 'pending_validation';
       player.estado = 'pendiente';
       player.paymentStatus = 'pending';
       player.inscriptionPaid = false;
+      player.pagado = false;
       if (method === 'gateway_pending') {
         player.pendingReason = 'pasarela_pendiente';
+        player.paymentMethod = 'gateway_pending';
       }
     }
 
@@ -1098,6 +1123,18 @@
       player.paidAt = null;
       player.validatedDate = null;
       player.validatedBy = null;
+      player.inscriptionPaid = false;
+      player.pagado = false;
+      if (String(player.paymentStatus || '').toLowerCase() === 'paid') {
+        player.paymentStatus = 'pending';
+      }
+      if (String(player.inscriptionStatus || '').toLowerCase() === 'paid') {
+        player.inscriptionStatus = 'pending_payment';
+      }
+      if (String(player.status || '').toLowerCase() === 'active') {
+        player.status = 'pending_validation';
+        player.estado = 'pendiente';
+      }
     }
     player.updatedAt = now;
     player.inscriptionWebSubmittedAt = player.inscriptionWebSubmittedAt || now;
@@ -1124,9 +1161,21 @@
       }
     }
 
-    await persistPlayerFirebase(saved, { requireCloud: true });
+    const persistOpts =
+      opts && opts.persistOpts
+        ? opts.persistOpts
+        : { requireCloud: String(player.registrationSource || '') === 'web_inscription' };
+    const cloudSaved = await persistPlayerFirebase(saved, persistOpts);
+    if (cloudSaved && cloudSaved.id) {
+      Object.assign(saved, cloudSaved);
+      upsertPlayerLocal(saved);
+    }
     if (member && paid) {
-      await persistMemberFirebase(member);
+      const memberPersistOpts =
+        opts && opts.persistOpts && opts.persistOpts.requireCloud === false
+          ? { requireCloud: false }
+          : undefined;
+      await persistMemberFirebase(member, memberPersistOpts);
     }
 
     if (typeof global.refreshMembersRoleFlagsForIdentity === 'function') {
@@ -1197,22 +1246,185 @@
     });
   }
 
+  /**
+   * Avisos de ficha pendiente (tarjeta no cobrada): jugador/a, socio-jugador y club.
+   * No marca nada como pagado. Idempotente con gatewayPendingNotifySent.
+   */
+  function gatewayPendingNotifyStorageKey(player) {
+    const dni = normalizeDni(player && player.dni);
+    const season = String((player && (player.inscriptionSeason || player.temporada)) || '').trim();
+    if (!dni || !season) return '';
+    return 'cdsan_gw_pending_mail_' + dni + '_' + season;
+  }
+
+  async function notifyInscriptionGatewayPending(player, opts) {
+    if (!player || !global.CdsanClubEmail) return { sent: false };
+    const force = !!(opts && opts.force);
+    const mailKey = gatewayPendingNotifyStorageKey(player);
+    if (!force) {
+      if (player.gatewayPendingNotifySent) {
+        return { sent: false, skipped: 'already' };
+      }
+      try {
+        if (mailKey && global.localStorage.getItem(mailKey)) {
+          return { sent: false, skipped: 'already_storage' };
+        }
+      } catch (_) {}
+    }
+    const cb = player.chargeBreakdown || {};
+    const total = cb.total != null ? cb.total : player.totalCharge;
+    const fields = playerInscriptionNotifyFields(player, { paid: false });
+    const kitSummary = playerInscriptionKitSummary(player);
+    const tasks = [];
+
+    if (global.CdsanClubEmail.sendPlayerInscriptionPending && player.email) {
+      tasks.push(
+        global.CdsanClubEmail
+          .sendPlayerInscriptionPending({
+            email: player.email,
+            guardianEmail: player.guardianEmail,
+            dni: player.dni,
+            playerId: player.id,
+            nombre: player.name || player.nombre,
+            apellidos: player.surname || player.apellidos,
+            season: player.inscriptionSeason || player.temporada,
+            inscriptionSeason: player.inscriptionSeason || player.temporada,
+            category: player.category || player.categoria,
+            totalEur: total,
+            paymentChannel: 'tarjeta',
+            paymentMethod: 'gateway_pending',
+            kitSummary: kitSummary,
+            fields: fields
+          })
+          .catch(function (e) {
+            console.warn('Correo jugador pendiente tarjeta:', e);
+          })
+      );
+    }
+
+    const member = findSocioJugadorMemberForPlayer(readMembers(), player);
+    if (global.CdsanClubEmail.sendMemberRegistered && member && member.email) {
+      const cuotaSocio =
+        cb.socio != null
+          ? cb.socio
+          : member.cuota != null
+            ? member.cuota
+            : null;
+      tasks.push(
+        global.CdsanClubEmail
+          .sendMemberRegistered({
+            email: member.email,
+            memberId: member.id,
+            nombre: member.nombre || member.name || player.name || player.nombre,
+            apellidos: member.apellidos || member.surname || player.surname || player.apellidos,
+            numeroSocio: member.numeroSocio || member.memberNumber,
+            cuota: cuotaSocio,
+            nextStep: 'card'
+          })
+          .catch(function (e) {
+            console.warn('Correo socio pendiente tarjeta:', e);
+          })
+      );
+    }
+
+    if (global.CdsanClubEmail.sendClubAdminNotify) {
+      tasks.push(
+        global.CdsanClubEmail
+          .sendClubAdminNotify({
+            kind: 'inscripcion_jugador',
+            title: 'Inscripción jugador/a pendiente de pago (tarjeta)',
+            subject: 'Inscripción jugador — pendiente tarjeta',
+            paymentChannel: 'tarjeta',
+            requesterEmail: player.email,
+            playerId: player.id,
+            nombre: player.name || player.nombre,
+            apellidos: player.surname || player.apellidos,
+            dni: player.dni,
+            fechaNacimiento: player.birthDate || player.fechaNacimiento,
+            direccion: player.domicilio || player.address,
+            localidad: player.localidad,
+            provincia: player.provincia,
+            telefono: player.phone || player.telefono,
+            email: player.email,
+            numeroSocio:
+              (member && (member.numeroSocio || member.memberNumber)) ||
+              player.numeroSocio ||
+              player.memberNumber,
+            memberNumber:
+              (member && (member.memberNumber || member.numeroSocio)) ||
+              player.memberNumber ||
+              player.numeroSocio,
+            fields: fields
+          })
+          .catch(function (e) {
+            console.warn('Correo club pendiente tarjeta:', e);
+          })
+      );
+    }
+
+    await Promise.all(tasks);
+    player.gatewayPendingNotifySent = new Date().toISOString();
+    try {
+      upsertPlayerLocal(player);
+    } catch (_) {}
+    try {
+      if (mailKey) global.localStorage.setItem(mailKey, player.gatewayPendingNotifySent);
+    } catch (_) {}
+    return { sent: true };
+  }
+
   /** Activa jugador/a y socio-jugador vinculado (ficha + cuota pagadas a la vez). */
   async function activatePlayerAndSocioByAdmin(playerId, adminMeta) {
     const players = readPlayers();
-    const ix = players.findIndex((p) => p.id === playerId);
+    const ix = players.findIndex(function (p) {
+      return String(p.id) === String(playerId);
+    });
     if (ix < 0) throw new Error('Jugador no encontrado');
+    const snapshot = JSON.parse(JSON.stringify(players[ix]));
+    const membersBefore = readMembers();
+    let memberSnapshot = null;
+    const linkedId = String(snapshot.linkedMemberId || '').trim();
+    if (linkedId) {
+      const mix = membersBefore.findIndex(function (m) {
+        return m && String(m.id) === linkedId;
+      });
+      if (mix >= 0) memberSnapshot = JSON.parse(JSON.stringify(membersBefore[mix]));
+    } else {
+      const found = findSocioJugadorMemberForPlayer(membersBefore, snapshot);
+      if (found) memberSnapshot = JSON.parse(JSON.stringify(found));
+    }
     const methodMap = { 1: 'transfer_manual', 2: 'cash_manual', 3: 'admin_manual' };
     let method = adminMeta?.method || 'admin_manual';
-    if (adminMeta?.methodChoice) {
+    if (adminMeta?.methodChoice && !adminMeta?.method) {
       method = methodMap[String(adminMeta.methodChoice)] || method;
     }
-    return finalizeInscription(players[ix], {
-      paid: true,
-      method: method,
-      validatedBy: adminMeta?.validatedBy || 'admin',
-      validatedAt: adminMeta?.validatedAt
-    });
+    try {
+      return await finalizeInscription(
+        players[ix],
+        {
+          paid: true,
+          method: method,
+          validatedBy: adminMeta?.validatedBy || 'admin',
+          validatedAt: adminMeta?.validatedAt
+        },
+        { persistOpts: { requireCloud: true } }
+      );
+    } catch (err) {
+      try {
+        upsertPlayerLocal(snapshot);
+        if (memberSnapshot && memberSnapshot.id) {
+          const members = readMembers();
+          const mix = members.findIndex(function (m) {
+            return m && String(m.id) === String(memberSnapshot.id);
+          });
+          if (mix >= 0) members[mix] = memberSnapshot;
+          else members.push(memberSnapshot);
+          global.localStorage.setItem('clubMembers', JSON.stringify(members));
+          global.localStorage.setItem('socios', JSON.stringify(members));
+        }
+      } catch (_) {}
+      throw err;
+    }
   }
 
   /** Validación manual por administrador (transferencia, efectivo, etc.) */
@@ -1284,20 +1496,66 @@
       registration.id = 'PENDING_' + Date.now();
     }
     registration.registrationDate = registration.registrationDate || new Date().toISOString();
+    registration.registrationSource = registration.registrationSource || 'web_inscription';
+
+    // Guardar ficha pendiente en la nube antes del TPV (nunca como pagada; permite retomar).
+    const pendingSaved = await finalizeInscription(
+      registration,
+      { paid: false, method: 'gateway_pending' },
+      { persistOpts: { requireCloud: true }, keepPending: true }
+    );
+    Object.assign(registration, pendingSaved || {});
+    if (
+      registration.inscriptionPaid ||
+      String(registration.paymentStatus || '').toLowerCase() === 'paid' ||
+      String(registration.inscriptionStatus || '').toLowerCase() === 'paid'
+    ) {
+      registration.inscriptionPaid = false;
+      registration.pagado = false;
+      registration.paymentStatus = 'pending';
+      registration.inscriptionStatus = 'pending_payment';
+      registration.status = 'pending_validation';
+      registration.estado = 'pendiente';
+      registration.pendingReason = 'pasarela_pendiente';
+      registration.paymentMethod = 'gateway_pending';
+      upsertPlayerLocal(registration);
+    }
+
+    // Correos pendiente: jugador/a + socio-jugador + club (antes o si falla la pasarela).
+    try {
+      await notifyInscriptionGatewayPending(registration);
+    } catch (mailErr) {
+      console.warn('Avisos pendiente tarjeta:', mailErr);
+    }
+
     savePending({
       registration: registration,
       payMethod: payMethod,
       savedAt: new Date().toISOString()
     });
 
-    await global.CdsanRedsys.payPlayerInscription({
-      payMethod: payMethod,
-      amountEur: total,
-      email: registration.email,
-      playerId: registration.id,
-      playerRegistration: registration,
-      description: 'Inscripción ' + registration.inscriptionSeason + ' — CD Sanabria CF'
-    });
+    try {
+      await global.CdsanRedsys.payPlayerInscription({
+        payMethod: payMethod,
+        amountEur: total,
+        email: registration.email,
+        playerId: registration.id,
+        playerRegistration: registration,
+        description: 'Inscripción ' + registration.inscriptionSeason + ' — CD Sanabria CF'
+      });
+    } catch (payErr) {
+      try {
+        // Si el aviso no salió al guardar, reintentar (sin duplicar si ya se envió).
+        await notifyInscriptionGatewayPending(registration);
+      } catch (_) {}
+      const base = payErr && payErr.message ? String(payErr.message) : 'No se pudo abrir la pasarela de pago.';
+      const err = new Error(
+        base +
+          '\n\nTu ficha quedó guardada como pendiente (no pagada). Te hemos enviado un correo. Puedes volver con DNI + contraseña y terminar el pago con tarjeta.'
+      );
+      err.code = payErr && payErr.code ? payErr.code : 'payment_redirect_failed';
+      throw err;
+    }
     return { ok: true, redirect: true };
   }
 
@@ -1375,6 +1633,7 @@
     computeCart: computeCart,
     buildPlayerRecord: buildPlayerRecord,
     finalizeInscription: finalizeInscription,
+    notifyInscriptionGatewayPending: notifyInscriptionGatewayPending,
     submitCheckout: submitCheckout,
     submitKitCheckout: submitKitCheckout,
     finalizeFromPendingOrder: finalizeFromPendingOrder,

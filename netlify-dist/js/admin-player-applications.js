@@ -193,7 +193,7 @@
 
     if (!firebaseOk) {
       throw new Error(
-        'No se pudo guardar la ficha en Firebase. Comprueba que tienes sesión de administrador en la nube.'
+        'No se pudo guardar la ficha en la nube. Comprueba que tienes sesión de administrador en la nube.'
       );
     }
 

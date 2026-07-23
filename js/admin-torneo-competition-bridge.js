@@ -231,7 +231,7 @@
       '<label style="display:block;font-weight:600;margin:0 0 6px;color:#334155;">Competición destino</label>' +
       '<select id="torneoImportCompSelect" style="width:100%;padding:8px 10px;border:1px solid #cbd5e1;border-radius:8px;margin:0 0 12px;"></select>' +
       '<label style="display:flex;align-items:center;gap:8px;margin:0 0 8px;font-size:0.88rem;color:#475569;cursor:pointer;">' +
-      '<input type="checkbox" id="torneoImportSkipExisting" checked> Si ya están importados, <strong>actualizar plantilla</strong> desde Firebase (no duplicar equipos)</label>' +
+      '<input type="checkbox" id="torneoImportSkipExisting" checked> Si ya están importados, <strong>actualizar plantilla</strong> desde la nube (no duplicar equipos)</label>' +
       '<p id="torneoImportCompSummary" style="margin:0 0 16px;font-size:0.85rem;color:#475569;"></p>' +
       '<div style="display:flex;gap:10px;flex-wrap:wrap;">' +
       '<button type="button" id="torneoImportCompConfirm" class="btn btn-success" style="flex:1;">Importar</button>' +
@@ -491,7 +491,7 @@
           body: JSON.stringify(payload)
         });
       } else {
-        alert('Inicia sesión como administrador en Firebase para enviar correos automáticos.');
+        alert('Inicia sesión como administrador en la nube para enviar correos automáticos.');
         return;
       }
       const data = await res.json().catch(function () {

@@ -84,7 +84,7 @@
       '<p style="margin:0 0 8px;font-weight:700;color:#713f12;font-size:0.9rem;">Cuotas de inscripción (informativo)</p>' +
       pricingTableHtml() +
       '<p style="margin:8px 0 0;font-size:0.8rem;color:#854d0e;line-height:1.4;">' +
-      'Si inscribes <strong>varios equipos</strong> con el mismo responsable (incluso mismo nombre y categoría), envía <strong>una preinscripción por equipo</strong>. Cada una tiene su cuota y se suman al pagar (p. ej. 4× Infantil = 240 €).</p></div>'
+      'Envía <strong>una preinscripción por equipo</strong>. El nombre debe ser distinto si repites categoría (p. ej. «Leones A» y «Leones B»). El pago se realiza al completar la inscripción.</p></div>'
     );
   }
 

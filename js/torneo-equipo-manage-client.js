@@ -63,7 +63,16 @@
   async function finalizeInscription(opts) {
     return post('finalize', {
       inscripcionPremiosAceptados: !!(opts && opts.inscripcionPremiosAceptados),
-      payMethod: (opts && opts.payMethod) || 'card'
+      payMethod: (opts && opts.payMethod) || 'card',
+      changePayToCard: !!(opts && opts.changePayToCard)
+    });
+  }
+
+  async function changePayMethodToCard() {
+    return finalizeInscription({
+      payMethod: 'card',
+      changePayToCard: true,
+      inscripcionPremiosAceptados: true
     });
   }
 
@@ -91,6 +100,7 @@
     saveRosterBatch: saveRosterBatch,
     uploadFichaDocuments: uploadFichaDocuments,
     finalizeInscription: finalizeInscription,
+    changePayMethodToCard: changePayMethodToCard,
     submitRedsysRedirect: submitRedsysRedirect
   };
 })(typeof window !== 'undefined' ? window : globalThis);

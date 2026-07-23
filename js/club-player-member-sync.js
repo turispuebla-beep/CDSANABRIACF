@@ -138,14 +138,24 @@
     return false;
   }
 
-  /** Intento abortado: pasarela sin pago y sin inscripción offline confirmada. */
+  /** Intento abortado: pasarela sin ficha real (no aplica a pendientes guardados para retomar pago). */
   function isAbandonedInscriptionAttempt(p) {
     if (!p || isPaidPlayer(p)) return false;
     const method = String(p.paymentMethod || '').trim().toLowerCase();
     const offline = String(p.offlinePaymentChannel || '').trim().toLowerCase();
     const ins = String(p.inscriptionStatus || '').trim().toLowerCase();
+    const reason = String(p.pendingReason || '').trim().toLowerCase();
     if (offline === 'transferencia' || offline === 'efectivo' || offline === 'tpv') return false;
     if (ins === 'pending_transfer' || ins === 'pending_cash' || ins === 'pending_tpv') return false;
+    // Guardado a propósito antes del TPV (pendiente de tarjeta): conservar.
+    if (
+      ins === 'pending_payment' ||
+      reason === 'pasarela_pendiente' ||
+      p.inscriptionWebSubmittedAt ||
+      p.gatewayPendingNotifySent
+    ) {
+      return false;
+    }
     if (method === 'gateway_pending' || method === 'pasarela') return true;
     const id = String(p.id || '');
     if (id.startsWith('PENDING_') && !p.inscriptionWebSubmittedAt) return true;
@@ -339,6 +349,19 @@
         if (!keep.linkedMemberId && other.linkedMemberId) keep.linkedMemberId = other.linkedMemberId;
         if (!keep.dni && other.dni) keep.dni = other.dni;
         if (!keep.chargeBreakdown && other.chargeBreakdown) keep.chargeBreakdown = other.chargeBreakdown;
+        if (global.ClubPlayerKitPersist && global.ClubPlayerKitPersist.mergePlayerKitFields) {
+          const merged = global.ClubPlayerKitPersist.mergePlayerKitFields(keep, other);
+          Object.assign(keep, merged);
+        } else {
+          if ((!keep.kitOrder || !keep.kitOrder.length) && other.kitOrder && other.kitOrder.length) {
+            keep.kitOrder = other.kitOrder;
+          }
+          if ((!keep.kit || !keep.kit.items || !keep.kit.items.length) && other.kit) keep.kit = other.kit;
+          if ((!keep.kitItemsPaid || !keep.kitItemsPaid.length) && other.kitItemsPaid && other.kitItemsPaid.length) {
+            keep.kitItemsPaid = other.kitItemsPaid;
+          }
+          if (keep.kitPaidEur == null && other.kitPaidEur != null) keep.kitPaidEur = other.kitPaidEur;
+        }
         if (!keep.guardianName && other.guardianName) keep.guardianName = other.guardianName;
         if (!keep.guardianPhone && other.guardianPhone) keep.guardianPhone = other.guardianPhone;
       }

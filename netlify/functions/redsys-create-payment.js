@@ -8,7 +8,11 @@ const {
   buildRedirectForm,
   amountToCents
 } = require('./lib/redsys');
-const { savePendingPayment } = require('./lib/firestore-admin');
+const {
+  savePendingPayment,
+  upsertMemberRegistrationRecord,
+  upsertPlayerInscriptionRecord
+} = require('./lib/firestore-admin');
 const { assertPublicActionsAllowed, isSiteUpdateModeError } = require('./lib/site-public-mode');
 
 const CORS = {
@@ -62,6 +66,97 @@ exports.handler = async (event) => {
     const cents = amountToCents(amountEur);
     const orderId = generateRedsysOrderId();
 
+    let memberId = body.memberId || null;
+    let registrationBundle = body.registrationBundle || null;
+    let playerId = body.playerId || null;
+    let playerRegistration = body.playerRegistration || null;
+
+    // Cuota socio: asegurar ficha en sanabria_members (pendiente) antes del TPV,
+    // para que aparezca en Socios del panel aunque el pago se abandone después.
+    if (type === 'membership_fee' && registrationBundle && registrationBundle.member) {
+      try {
+        const memberPayload = {
+          ...registrationBundle.member,
+          email: registrationBundle.member.email || email,
+          status: registrationBundle.member.status || 'pending_validation',
+          estado: registrationBundle.member.estado || 'pendiente',
+          pagado: false,
+          pendingReason: registrationBundle.member.pendingReason || 'nueva_alta',
+          registrationSource: registrationBundle.member.registrationSource || 'web_modal_socio'
+        };
+        const saved = await upsertMemberRegistrationRecord(memberPayload);
+        memberId = saved.id || memberId;
+        registrationBundle = {
+          ...registrationBundle,
+          member: { ...memberPayload, ...saved, id: saved.id }
+        };
+      } catch (memberErr) {
+        console.error('redsys-create-payment upsert socio:', memberErr);
+        return {
+          statusCode: 503,
+          headers: CORS,
+          body: JSON.stringify({
+            ok: false,
+            error: 'No se pudo registrar el socio en la nube antes del pago. Reintenta o contacta con el club.'
+          })
+        };
+      }
+    }
+
+    // Inscripción jugador: ficha pendiente en nube antes del TPV (retomar pago si se abandona).
+    if (type === 'player_inscription' && playerRegistration) {
+      try {
+        // Solo pendiente: nunca confiar en flags de pagado del cliente antes del cobro.
+        const playerPayload = {
+          ...playerRegistration,
+          email: playerRegistration.email || email,
+          inscriptionStatus: 'pending_payment',
+          status: 'pending_validation',
+          estado: 'pendiente',
+          paymentStatus: 'pending',
+          inscriptionPaid: false,
+          pagado: false,
+          paidAt: null,
+          validatedDate: null,
+          validatedBy: null,
+          paymentMethod: 'gateway_pending',
+          pendingReason: 'pasarela_pendiente',
+          registrationSource: playerRegistration.registrationSource || 'web_inscription'
+        };
+        if (playerId && !String(playerId).startsWith('PENDING_') && !String(playerId).startsWith('PLAYER_')) {
+          playerPayload.id = playerId;
+        }
+        const upserted = await upsertPlayerInscriptionRecord(playerPayload);
+        const savedPlayer = upserted && upserted.player ? upserted.player : null;
+        if (savedPlayer && savedPlayer.id) {
+          playerId = savedPlayer.id;
+          playerRegistration = {
+            ...playerPayload,
+            ...savedPlayer,
+            id: savedPlayer.id,
+            inscriptionStatus: 'pending_payment',
+            status: 'pending_validation',
+            estado: 'pendiente',
+            paymentStatus: 'pending',
+            inscriptionPaid: false,
+            pagado: false,
+            paymentMethod: 'gateway_pending',
+            pendingReason: 'pasarela_pendiente'
+          };
+        }
+      } catch (playerErr) {
+        console.error('redsys-create-payment upsert jugador:', playerErr);
+        return {
+          statusCode: 503,
+          headers: CORS,
+          body: JSON.stringify({
+            ok: false,
+            error: 'No se pudo registrar la inscripción en la nube antes del pago. Reintenta o contacta con el club.'
+          })
+        };
+      }
+    }
+
     const paymentDoc = {
       type,
       payMethod,
@@ -69,14 +164,14 @@ exports.handler = async (event) => {
       amountCents: cents,
       customerEmail: email,
       description,
-      memberId: body.memberId || null,
+      memberId,
       eventId: body.eventId || null,
       participant: body.participant || null,
       guests: Array.isArray(body.guests) ? body.guests : [],
-      registrationBundle: body.registrationBundle || null,
+      registrationBundle,
       priceTier: body.priceTier || null,
-      playerId: body.playerId || null,
-      playerRegistration: body.playerRegistration || null,
+      playerId,
+      playerRegistration,
       playerKitOrder: body.playerKitOrder || null,
       torneoPreinscripcionId: body.torneoPreinscripcionId || body.preinscripcionId || null,
       teamName: body.teamName || null,
@@ -91,7 +186,7 @@ exports.handler = async (event) => {
       return {
         statusCode: 503,
         headers: CORS,
-        body: JSON.stringify({ ok: false, error: 'No se pudo registrar el pedido (Firebase Admin)' })
+        body: JSON.stringify({ ok: false, error: 'No se pudo registrar el pedido (nube)' })
       };
     }
 

@@ -622,6 +622,17 @@
                     <div id="payTransferBlock"><button type="button" class="btn btn-transfer" id="btnPayTransfer">🏦 Solicitar inscripción por transferencia, efectivo o TPV</button></div>
                 </section>
 
+                <section class="card" id="insChangePayMethodSection" style="display:none;">
+                    <h2>Completar o cambiar pago</h2>
+                    <p id="insChangePayMethodStatus" class="muted" style="margin-top:0;"></p>
+                    <p class="muted" style="font-size:0.9rem;">Si el pago quedó a medias con <strong>tarjeta</strong>, o elegiste <strong>efectivo</strong>/<strong>transferencia</strong> y aún no está pagado, puedes terminar el pago online ahora.</p>
+                    <div id="insChangePayMethodTotal" class="cart-total" style="margin:12px 0;"></div>
+                    <div id="payChangeToCardBlock" style="margin:8px 0;">
+                        <button type="button" class="btn btn-card" id="btnChangePayToCard">💳 Cambiar a tarjeta y pagar</button>
+                    </div>
+                    <p id="insChangePayMethodMsg" class="muted" style="margin:10px 0 0;"></p>
+                </section>
+
                 <section class="card insc-portal-pwd-block" id="insChangePortalPwdSection" style="display:none;">
                     <h3>🔒 Cambiar contraseña de acceso a tu ficha</h3>
                     <p class="muted">La misma que usas en «Buscar mi ficha». Mínimo 6 caracteres.</p>
@@ -725,6 +736,7 @@
     <script src="js/payment-method-picker.js"></script>
     <script src="js/club-password-hash.js"></script>
     <script src="js/player-portal-auth.js"></script>
+    <script src="js/club-player-kit-persist.js"></script>
     <script src="js/player-inscription.js"></script>
     <script src="js/player-export.js"></script>
     <script src="js/club-inscription-legal.js"></script>

@@ -136,8 +136,18 @@
 
   function getKitItems(player) {
     if (Array.isArray(player.kitOrder) && player.kitOrder.length) return player.kitOrder;
-    if (player.kit && Array.isArray(player.kit.items)) return player.kit.items;
-    return [];
+    if (player.kit && Array.isArray(player.kit.items) && player.kit.items.length) return player.kit.items;
+    const flat = [];
+    const flatIds = ['train_kit', 'tracksuit', 'train_jacket', 'cazadora', 'train_shirt', 'train_shorts'];
+    flatIds.forEach(function (id) {
+      const size =
+        (player.kit && player.kit[id]) ||
+        player['kit_' + id] ||
+        '';
+      if (!size || !String(size).trim()) return;
+      flat.push({ id: id, size: String(size).trim(), label: GARMENT_LABELS[id] || id });
+    });
+    return flat;
   }
 
   function garmentLabel(it) {
