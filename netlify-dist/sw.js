@@ -68,9 +68,9 @@ fcmMessaging.onBackgroundMessage(function (payload) {
   });
 });
 
-const CACHE_NAME = 'cdsanabriacf-v20260724-0037';
-const STATIC_CACHE = 'cdsanabriacf-v20260724-0037-static';
-const DYNAMIC_CACHE = 'cdsanabriacf-v20260724-0037-dynamic';
+const CACHE_NAME = 'cdsanabriacf-v20260724-0038';
+const STATIC_CACHE = 'cdsanabriacf-v20260724-0038-static';
+const DYNAMIC_CACHE = 'cdsanabriacf-v20260724-0038-dynamic';
 
 // Archivos críticos para cache (solo rutas que existen en el despliegue)
 const STATIC_ASSETS = [
