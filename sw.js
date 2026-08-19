@@ -68,7 +68,7 @@ fcmMessaging.onBackgroundMessage(function (payload) {
   });
 });
 
-const CACHE_NAME = 'cdsanabriacf-v2.2.0';
+const CACHE_NAME = 'cdsanabriacf-v2.2.1';
 const STATIC_CACHE = 'cdsanabriacf-static-v2.2.0';
 const DYNAMIC_CACHE = 'cdsanabriacf-dynamic-v2.2.0';
 
@@ -83,11 +83,13 @@ const STATIC_ASSETS = [
   '/js/club-torneo-config.js',
   '/js/torneo-equipo-manage-client.js',
   '/js/torneo-jugador-ficha-ui.js',
+  '/js/localstorage-quota.js',
   '/js/firebase-config.js',
   '/js/site-update-mode.js',
   '/js/admin-session.js',
   '/js/club-contact-defaults.js',
   '/js/torneo-preinscripcion.js',
+  '/js/torneo-f7-calendario-oficial.js',
   '/js/torneo-responsable-access.js',
   '/js/torneo-public-view.js',
   '/js/torneo-equipo-panel.js',
@@ -100,8 +102,19 @@ const STATIC_ASSETS = [
   '/manifest.json',
   '/assets/escudo-cdsanabriacf.png',
   '/assets/escudo-192.png',
-  '/assets/CAMPEONATO.jpg',
-  '/assets/torneo-inscripciones-2026.jpg'
+  '/assets/torneo-1.jpg',
+  '/assets/torneo-2.jpg',
+  '/assets/bases-torneo.jpg',
+  '/assets/escudos-senior/bar-mirador.png',
+  '/assets/escudos-senior/montelueno.png',
+  '/assets/escudos-senior/la-tosta-sanabresa.png',
+  '/assets/escudos-senior/caparrota.png',
+  '/assets/escudos-senior/jopos-de-sanabria.png',
+  '/assets/escudos-senior/sikariones-ecotera-a.png',
+  '/assets/escudos-senior/sikariones-ecotera-b.png',
+  '/assets/escudos-senior/car-rosinos.png',
+  '/assets/escudos-senior/olek-fc.png',
+  '/assets/escudos-senior/san-francisco-castellanos.png'
 ];
 
 // URLs dinámicas para cache
@@ -157,7 +170,13 @@ self.addEventListener('activate', (event) => {
       }),
       
       // Tomar control inmediato
-      self.clients.claim()
+      self.clients.claim().then(function () {
+        return self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then(function (clients) {
+          clients.forEach(function (client) {
+            client.postMessage({ type: 'SW_UPDATED' });
+          });
+        });
+      })
     ])
   );
 });
@@ -167,6 +186,14 @@ self.addEventListener('message', (event) => {
   if (!event.data) return;
   if (event.data.type === 'SKIP_WAITING') {
     self.skipWaiting();
+    return;
+  }
+  if (event.data.type === 'PURGE_CACHES') {
+    event.waitUntil(
+      caches.keys().then(function (keys) {
+        return Promise.all(keys.map(function (k) { return caches.delete(k); }));
+      })
+    );
     return;
   }
   const { type, payload } = event.data;
@@ -192,7 +219,7 @@ function shouldNetworkFirst(request) {
     if (request.mode === 'navigate') return true;
     if (path === '/' || path === '/index.html' || path === '/admin-panel.html') return true;
     if (path.endsWith('.js') || path.endsWith('.css') || path.endsWith('.html')) return true;
-    if (path === '/manifest.json' || path === '/sw.js') return true;
+    if (path === '/manifest.json' || path === '/sw.js' || path === '/deploy-version.json') return true;
     if (path === '/js/firebase-config.js' || path === '/js/notification-system.js') return true;
   } catch (_) {}
   return false;
@@ -242,36 +269,35 @@ self.addEventListener('fetch', (event) => {
 
 // 📱 Notificaciones Push (respaldo si no pasan por Firebase Messaging)
 self.addEventListener('push', (event) => {
-  if (!event.data) return;
-
-  let notificationData = {};
-
-  try {
-    const raw = event.data.json();
-    notificationData = {
-      title: raw.notification?.title || raw.title || raw.data?.title,
-      body: raw.notification?.body || raw.body || raw.data?.body,
-      icon: raw.notification?.icon || raw.icon || raw.data?.icon,
-      tag: raw.tag || raw.data?.tag,
-      urgent: raw.urgent || raw.data?.urgent === '1',
-      data: raw.data || raw
-    };
-  } catch (error) {
-    console.error('❌ Error parseando push data:', error);
-    notificationData = {
-      title: 'CDSANABRIACF',
-      body: 'Nueva notificación del club',
-      icon: '/assets/escudo-192.png'
-    };
-  }
-
-  const built = buildClubPushOptions({
-    notification: { title: notificationData.title, body: notificationData.body },
-    data: notificationData.data || notificationData
-  });
-
   event.waitUntil(
     (async function () {
+      let notificationData = {
+        title: 'CD Sanabria CF',
+        body: 'Nueva notificación del club',
+        icon: '/assets/escudo-192.png'
+      };
+
+      if (event.data) {
+        try {
+          const raw = event.data.json();
+          notificationData = {
+            title: raw.notification?.title || raw.title || raw.data?.title || notificationData.title,
+            body: raw.notification?.body || raw.body || raw.data?.body || notificationData.body,
+            icon: raw.notification?.icon || raw.icon || raw.data?.icon || notificationData.icon,
+            tag: raw.tag || raw.data?.tag,
+            urgent: raw.urgent || raw.data?.urgent === '1',
+            data: raw.data || raw
+          };
+        } catch (error) {
+          console.error('❌ Error parseando push data:', error);
+        }
+      }
+
+      const built = buildClubPushOptions({
+        notification: { title: notificationData.title, body: notificationData.body },
+        data: notificationData.data || notificationData
+      });
+
       await self.registration.showNotification(built.title, built.options);
       const clients = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
       clients.forEach(function (client) {
@@ -384,8 +410,13 @@ async function networkFirst(request) {
     
     // Cachear respuesta exitosa
     if (networkResponse.status === 200) {
-      const cache = await caches.open(DYNAMIC_CACHE);
-      cache.put(request, networkResponse.clone());
+      try {
+        const p = new URL(request.url).pathname;
+        if (p !== '/deploy-version.json' && p !== '/sw.js') {
+          const cache = await caches.open(DYNAMIC_CACHE);
+          cache.put(request, networkResponse.clone());
+        }
+      } catch (_) {}
     }
     
     return networkResponse;

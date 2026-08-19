@@ -2220,11 +2220,23 @@ function normalizeMemberRecordFields(raw) {
   delete m.plainPassword;
   delete m.portalPassword;
   const now = new Date().toISOString();
-  const status = String(m.status || m.estado || '').toLowerCase();
+  const statusRaw = String(m.status || m.estado || '').trim().toLowerCase();
   const pendingReason = String(m.pendingReason || '').toLowerCase();
   const reg = m.registrationDate || m.fechaRegistro || now;
+  const isActive = statusRaw === 'active' || statusRaw === 'activo';
+  const isExpired =
+    statusRaw === 'expired' || statusRaw === 'expirado' || statusRaw === 'caducado';
   const isPending =
-    status === 'pending_validation' || status === 'pendiente' || status === 'pending';
+    !isActive &&
+    !isExpired &&
+    (statusRaw === 'pending_validation' ||
+      statusRaw === 'pendiente' ||
+      statusRaw === 'pending' ||
+      statusRaw === 'pending_new' ||
+      statusRaw === 'nueva_alta' ||
+      !statusRaw);
+  const status = isActive ? 'active' : isExpired ? 'expired' : 'pending_validation';
+  const estado = isActive ? 'activo' : isExpired ? 'caducado' : 'pendiente';
   const isRenovacion = pendingReason === 'renovacion';
   let fechaLimitePago = m.fechaLimitePago || m.fechaVencimiento || null;
   if (isPending && !isRenovacion && !fechaLimitePago) {
@@ -2253,6 +2265,8 @@ function normalizeMemberRecordFields(raw) {
     email: String(m.email || '').trim().toLowerCase(),
     dni: normalizeDni(m.dni),
     guardianEmail: String(m.guardianEmail || '').trim().toLowerCase(),
+    status,
+    estado,
     pendingReason: isPending ? pr : m.pendingReason || null,
     fechaLimitePago: isPending ? fechaLimitePago : m.fechaLimitePago || null,
     fechaVencimiento: m.fechaVencimiento || fechaLimitePago || null,

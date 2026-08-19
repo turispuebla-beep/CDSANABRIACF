@@ -1,23 +1,38 @@
 /**
  * Carnet virtual de socio — CD Sanabria CF
  * Plantilla: assets/CARNET DE SOCIO.jpg
- * Datos reales del socio. Socio-jugador: «· JUGADOR» en Nº SOCIO.
- * Honor (n.º 1–50): «HONORÍFICO» en dorado debajo del nombre.
+ * Cara: datos + QR asistencia. Dorso: publicidad (p. ej. MAESTRE) 5 s en bucle.
+ * Socio-jugador: «· JUGADOR» en Nº SOCIO. Honor (1–50): «HONORÍFICO» dorado bajo el nombre.
  */
 (function (global) {
   'use strict';
 
   const CLUB_NAME = 'CD Sanabria CF';
   const CARNET_BG = 'assets/CARNET DE SOCIO.jpg';
-  let libsLoading = null;
+  const CARNET_AD = 'assets/anunciantes/MAESTRE.JPG';
+  const FLIP_BACK_MS = 5000;
+  const FLIP_FRONT_MS = 9000;
+  const QR_CDN = 'https://cdn.jsdelivr.net/npm/qrcode@1.5.4/build/qrcode.min.js';
 
-  function resolveCarnetBgSrc() {
+  let libsLoading = null;
+  let qrLibLoading = null;
+  const flipTimers = {};
+
+  function resolveAssetSrc(relPath) {
     try {
       if (typeof location !== 'undefined' && location.href) {
-        return new URL(CARNET_BG, location.href).href;
+        return new URL(relPath, location.href).href;
       }
     } catch (_) {}
-    return encodeURI(CARNET_BG);
+    return encodeURI(relPath);
+  }
+
+  function resolveCarnetBgSrc() {
+    return resolveAssetSrc(CARNET_BG);
+  }
+
+  function resolveAdSrc() {
+    return resolveAssetSrc(CARNET_AD);
   }
 
   function escapeHtml(s) {
@@ -47,7 +62,6 @@
       .trim();
   }
 
-  /** Nombre completo en carnet: D. / Dña. según sexo del socio. */
   function formatCardDisplayName(m) {
     const base =
       [m.nombre || m.name, m.apellidos || m.surname].filter(Boolean).join(' ').trim() ||
@@ -77,7 +91,6 @@
     }
   }
 
-  /** Datos del socio en sesión — nunca otro id/email. */
   function resolveMemberForCurrentSocio() {
     const session = getSessionSocio();
     if (!session || !session.id || !session.email) return null;
@@ -154,7 +167,6 @@
     return false;
   }
 
-  /** Honor: flag oficial o número 1–50. */
   function isHonorMember(m) {
     const CMN = global.ClubMemberNumbers;
     if (CMN) {
@@ -165,7 +177,9 @@
       if (n != null && n >= CMN.HONOR_MIN && n <= CMN.HONOR_MAX) return true;
     }
     if (m && (m.socioDeHonor === true || m.membershipTier === 'honor')) return true;
-    const raw = m && (m.numeroSocioHonor != null ? m.numeroSocioHonor : m.numeroSocio != null ? m.numeroSocio : m.memberNumber);
+    const raw =
+      m &&
+      (m.numeroSocioHonor != null ? m.numeroSocioHonor : m.numeroSocio != null ? m.numeroSocio : m.memberNumber);
     const n = parseInt(raw, 10);
     return Number.isFinite(n) && n >= 1 && n <= 50;
   }
@@ -182,7 +196,6 @@
     } catch (_) {}
     const y = new Date().getFullYear();
     const month = new Date().getMonth();
-    // Temporada futbolística aproximada: jul–jun
     if (month >= 6) return y + '-' + (y + 1);
     return y - 1 + '-' + y;
   }
@@ -197,10 +210,76 @@
       const r = CMN.getRegularNumber(m) || CMN.getDisplayNumber(m);
       if (r != null) return CMN.padSocNum(r);
     }
-    const raw = m.numeroSocioHonor != null && isHonorMember(m) ? m.numeroSocioHonor : m.numeroSocio != null ? m.numeroSocio : m.memberNumber;
+    const raw =
+      m.numeroSocioHonor != null && isHonorMember(m)
+        ? m.numeroSocioHonor
+        : m.numeroSocio != null
+          ? m.numeroSocio
+          : m.memberNumber;
     const n = parseInt(raw, 10);
     if (Number.isFinite(n) && n >= 1) return String(n).padStart(6, '0');
     return '—';
+  }
+
+  function resolveMemberTipo(m) {
+    if (isHonorMember(m)) return 'honorifico';
+    if (isSocioJugadorMember(m)) return 'jugador';
+    return 'socio';
+  }
+
+  function memberTipoLabel(tipo) {
+    if (tipo === 'honorifico') return 'Socio de honor';
+    if (tipo === 'jugador') return 'Socio-jugador';
+    return 'Socio/a';
+  }
+
+  function toBase64Url(str) {
+    try {
+      const b64 = btoa(unescape(encodeURIComponent(str)));
+      return b64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '');
+    } catch (_) {
+      return '';
+    }
+  }
+
+  function buildAttendancePayload(m, cardPayload) {
+    return {
+      v: 1,
+      id: m && m.id ? String(m.id) : '',
+      nombre: cardPayload.nombre,
+      dni: cardPayload.dni,
+      num: resolvePaddedSocNum(m || {}),
+      tipo: cardPayload.tipo,
+      tipoLabel: memberTipoLabel(cardPayload.tipo),
+      temp: cardPayload.temporada,
+      club: CLUB_NAME
+    };
+  }
+
+  function buildAttendanceUrl(m, cardPayload) {
+    const data = buildAttendancePayload(m, cardPayload);
+    let base = 'https://www.cdsanabriacf.com/carnet-asistencia.html';
+    try {
+      if (typeof location !== 'undefined' && location.protocol && location.protocol !== 'file:') {
+        const host = String(location.hostname || '').toLowerCase();
+        // En local/preview usamos el mismo origen para poder probar sin subir.
+        if (host === 'localhost' || host === '127.0.0.1' || host.endsWith('.local')) {
+          base = new URL('carnet-asistencia.html', location.origin + '/').href;
+        } else if (host) {
+          base = new URL('carnet-asistencia.html', location.origin + '/').href;
+        }
+      }
+    } catch (_) {}
+
+    // Query simple (más fiable al escanear que un base64 largo).
+    const q = new URLSearchParams();
+    q.set('nombre', data.nombre || '');
+    q.set('dni', data.dni || '');
+    q.set('num', data.num || '');
+    q.set('tipo', data.tipo || 'socio');
+    q.set('temp', data.temp || '');
+    if (data.id) q.set('id', data.id);
+    return base + '?' + q.toString();
   }
 
   function buildCardPayload(m) {
@@ -208,25 +287,28 @@
     const jugador = isSocioJugadorMember(m);
     const padded = resolvePaddedSocNum(m);
     let numLabel = padded;
-    // Socio-jugador: marca en la columna Nº SOCIO (resto: solo número).
     if (jugador && !honor) {
       numLabel = padded !== '—' ? padded + ' · JUGADOR' : 'JUGADOR';
     }
-    return {
+    const tipo = resolveMemberTipo(m);
+    const payload = {
       nombre: formatCardDisplayName(m),
       dni: String(m.dni || '—').trim() || '—',
       numLabel: numLabel,
       honor: !!honor,
       jugador: !!jugador && !honor,
-      temporada: resolveSeasonLabel(m)
+      temporada: resolveSeasonLabel(m),
+      tipo: tipo,
+      tipoLabel: memberTipoLabel(tipo),
+      memberId: m && m.id ? String(m.id) : ''
     };
+    payload.qrUrl = buildAttendanceUrl(m, payload);
+    return payload;
   }
 
   function cardMarkup(payload, cardId) {
     const id = cardId || 'cdsanMemberCardCanvas';
-    const honorLine = payload.honor
-      ? '<div class="cdsan-card-honor-tag">HONORÍFICO</div>'
-      : '';
+    const honorLine = payload.honor ? '<div class="cdsan-card-honor-tag">HONORÍFICO</div>' : '';
     const nameClass =
       'cdsan-card-field-value cdsan-card-field-name' +
       (payload.honor ? ' cdsan-card-field-name--honor' : '') +
@@ -234,14 +316,23 @@
     const numClass =
       'cdsan-card-field-value cdsan-card-field-num' +
       (payload.jugador ? ' cdsan-card-field-num--jugador' : '');
+    const qrUrl = escapeHtml(payload.qrUrl || '');
+
     return (
       '<div id="' +
       id +
-      '" class="cdsan-member-card" role="img" aria-label="Carnet de socio CD Sanabria CF">' +
+      '" class="cdsan-card-scene" data-flip-root="1" aria-label="Carnet de socio CD Sanabria CF">' +
+      '<div class="cdsan-card-flipper">' +
+      '<div class="cdsan-card-face cdsan-card-front cdsan-member-card">' +
       '<img class="cdsan-card-bg" src="' +
       escapeHtml(resolveCarnetBgSrc()) +
       '" alt="" draggable="false">' +
-      '<div class="cdsan-card-fields" aria-hidden="false">' +
+      '<div class="cdsan-card-qr-wrap" title="QR control de asistencia">' +
+      '<canvas class="cdsan-card-qr" width="72" height="72" data-qr-url="' +
+      qrUrl +
+      '"></canvas>' +
+      '</div>' +
+      '<div class="cdsan-card-fields">' +
       '<div class="cdsan-card-field cdsan-card-field--nombre">' +
       '<div class="' +
       nameClass +
@@ -268,6 +359,21 @@
       '</div>' +
       '</div>' +
       '</div>' +
+      '</div>' +
+      '<div class="cdsan-card-face cdsan-card-back" aria-hidden="true">' +
+      '<div class="cdsan-card-back-inner">' +
+      '<img class="cdsan-card-ad" src="' +
+      escapeHtml(resolveAdSrc()) +
+      '" alt="Patrocinador Talleres I. Maestre" draggable="false">' +
+      '<div class="cdsan-card-ad-meta">' +
+      '<span class="cdsan-card-ad-club">' +
+      escapeHtml(CLUB_NAME) +
+      '</span>' +
+      '<span class="cdsan-card-ad-tag">Patrocinador oficial</span>' +
+      '</div>' +
+      '</div>' +
+      '</div>' +
+      '</div>' +
       '</div>'
     );
   }
@@ -279,11 +385,29 @@
     const style = document.createElement('style');
     style.id = 'cdsan-member-card-styles';
     style.textContent =
-      '.cdsan-member-card{position:relative;width:560px;max-width:100%;aspect-ratio:16/10;' +
-      'border-radius:14px;overflow:hidden;box-shadow:0 12px 32px rgba(0,0,0,.28);' +
+      '.cdsan-card-scene{perspective:1200px;width:560px;max-width:100%;margin:0 auto}' +
+      '.cdsan-card-flipper{position:relative;width:100%;aspect-ratio:16/10;transform-style:preserve-3d;' +
+      'transition:transform .7s ease;border-radius:14px}' +
+      '.cdsan-card-scene.is-flipped .cdsan-card-flipper{transform:rotateY(180deg)}' +
+      '.cdsan-card-face{position:absolute;inset:0;width:100%;height:100%;backface-visibility:hidden;' +
+      '-webkit-backface-visibility:hidden;border-radius:14px;overflow:hidden}' +
+      '.cdsan-card-front.cdsan-member-card{position:absolute;box-shadow:0 12px 32px rgba(0,0,0,.28);' +
       'font-family:Montserrat,system-ui,-apple-system,Segoe UI,sans-serif;background:#8b0000}' +
+      '.cdsan-card-back{transform:rotateY(180deg);background:linear-gradient(160deg,#111827,#1f2937 55%,#7f1d1d);' +
+      'box-shadow:0 12px 32px rgba(0,0,0,.28);display:flex;align-items:center;justify-content:center}' +
+      '.cdsan-card-back-inner{width:100%;height:100%;padding:8% 7%;box-sizing:border-box;display:flex;' +
+      'flex-direction:column;align-items:center;justify-content:center;gap:10px}' +
+      '.cdsan-card-ad{max-width:88%;max-height:68%;width:auto;height:auto;object-fit:contain;' +
+      'background:#fff;border-radius:10px;padding:10px 14px;box-shadow:0 8px 24px rgba(0,0,0,.35)}' +
+      '.cdsan-card-ad-meta{display:flex;flex-direction:column;align-items:center;gap:2px}' +
+      '.cdsan-card-ad-club{color:#fecaca;font-size:.72rem;font-weight:800;letter-spacing:.04em;text-transform:uppercase}' +
+      '.cdsan-card-ad-tag{color:#fff;font-size:.8rem;font-weight:700;opacity:.92}' +
       '.cdsan-card-bg{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:center;' +
       'display:block;pointer-events:none;user-select:none;z-index:1}' +
+      '.cdsan-card-qr-wrap{position:absolute;top:2.4%;left:2.6%;z-index:3;display:flex;align-items:center;' +
+      'justify-content:center;background:rgba(255,255,255,.94);border-radius:7px;padding:3px;' +
+      'box-shadow:0 2px 8px rgba(0,0,0,.25)}' +
+      '.cdsan-card-qr{width:44px;height:44px;display:block;border-radius:3px}' +
       '.cdsan-card-fields{position:absolute;left:2.2%;right:2.2%;bottom:3.8%;height:16.5%;' +
       'display:grid;grid-template-columns:1.35fr 0.95fr 1.05fr 0.9fr;gap:0;z-index:2;' +
       'align-items:end;padding:0 1.2% 0.4%;box-sizing:border-box}' +
@@ -313,12 +437,19 @@
       '.cdsan-carnet-unavailable{background:#fef2f2;border:1px solid #fecaca;color:#991b1b;' +
       'padding:12px;border-radius:10px;font-size:.9rem;margin:12px 0}' +
       '@media (max-width:560px){.cdsan-card-fields{height:18%;bottom:3.2%}' +
-      '.cdsan-card-field-value{font-size:clamp(0.48rem,2.6vw,0.72rem)}}';
+      '.cdsan-card-qr{width:38px;height:38px}' +
+      '.cdsan-card-field-value{font-size:clamp(0.48rem,2.6vw,0.72rem)}}' +
+      '@media (prefers-reduced-motion:reduce){.cdsan-card-flipper{transition:none}}';
     document.head.appendChild(style);
   }
 
   function loadScript(url) {
     return new Promise(function (resolve, reject) {
+      const existing = document.querySelector('script[src="' + url + '"]');
+      if (existing && ((url.indexOf('qrcode') >= 0 && global.QRCode) || (url.indexOf('html2canvas') >= 0 && global.html2canvas))) {
+        resolve();
+        return;
+      }
       const s = document.createElement('script');
       s.src = url;
       s.async = true;
@@ -345,6 +476,103 @@
     return libsLoading;
   }
 
+  function loadQrLib() {
+    if (global.QRCode && typeof global.QRCode.toCanvas === 'function') {
+      return Promise.resolve(global.QRCode);
+    }
+    if (qrLibLoading) return qrLibLoading;
+    qrLibLoading = loadScript(QR_CDN).then(function () {
+      return global.QRCode;
+    });
+    return qrLibLoading;
+  }
+
+  function stopFlipCycle(rootId) {
+    const t = flipTimers[rootId];
+    if (t) {
+      if (t.timeout) clearTimeout(t.timeout);
+      delete flipTimers[rootId];
+    }
+    const el = document.getElementById(rootId);
+    if (el) el.classList.remove('is-flipped');
+  }
+
+  function startFlipCycle(rootId) {
+    stopFlipCycle(rootId);
+    const el = document.getElementById(rootId);
+    if (!el || !el.getAttribute('data-flip-root')) return;
+    try {
+      if (global.matchMedia && global.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    } catch (_) {}
+
+    const state = { showingBack: false, timeout: null };
+    flipTimers[rootId] = state;
+
+    function tick() {
+      const root = document.getElementById(rootId);
+      if (!root || !flipTimers[rootId]) return;
+      if (state.showingBack) {
+        root.classList.remove('is-flipped');
+        state.showingBack = false;
+        state.timeout = setTimeout(tick, FLIP_FRONT_MS);
+      } else {
+        root.classList.add('is-flipped');
+        state.showingBack = true;
+        state.timeout = setTimeout(tick, FLIP_BACK_MS);
+      }
+    }
+
+    // Primero cara frontal un momento, luego publicidad 5 s, y cicla.
+    state.timeout = setTimeout(tick, 2500);
+  }
+
+  function paintQrFallback(canvas, url) {
+    const api =
+      'https://api.qrserver.com/v1/create-qr-code/?size=176x176&margin=8&data=' + encodeURIComponent(url);
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.onload = function () {
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return;
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.fillStyle = '#fff';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+    };
+    img.src = api;
+  }
+
+  function fillQrOnRoot(rootEl) {
+    if (!rootEl) return Promise.resolve();
+    const canvas = rootEl.querySelector('.cdsan-card-qr');
+    if (!canvas) return Promise.resolve();
+    const url = canvas.getAttribute('data-qr-url') || '';
+    if (!url) return Promise.resolve();
+    return loadQrLib()
+      .then(function (QRCode) {
+        if (!QRCode || typeof QRCode.toCanvas !== 'function') {
+          paintQrFallback(canvas, url);
+          return;
+        }
+        return QRCode.toCanvas(canvas, url, {
+          width: canvas.width || 88,
+          margin: 1,
+          errorCorrectionLevel: 'M',
+          color: { dark: '#111827', light: '#ffffff' }
+        });
+      })
+      .catch(function () {
+        paintQrFallback(canvas, url);
+      });
+  }
+
+  function hydrateCard(rootId) {
+    const root = document.getElementById(rootId);
+    if (!root) return;
+    fillQrOnRoot(root);
+    startFlipCycle(rootId);
+  }
+
   function waitForCardBg(cardEl) {
     const img = cardEl && cardEl.querySelector('.cdsan-card-bg');
     if (!img) return Promise.resolve();
@@ -359,13 +587,26 @@
     });
   }
 
-  function captureCardCanvas(cardEl) {
+  function getExportTarget(cardRoot) {
+    if (!cardRoot) return null;
+    if (cardRoot.classList.contains('cdsan-card-scene')) {
+      return cardRoot.querySelector('.cdsan-card-front') || cardRoot;
+    }
+    return cardRoot;
+  }
+
+  function captureCardCanvas(cardRoot) {
+    const front = getExportTarget(cardRoot);
+    if (cardRoot && cardRoot.classList) cardRoot.classList.remove('is-flipped');
     return loadExportLibs()
       .then(function () {
-        return waitForCardBg(cardEl);
+        return fillQrOnRoot(cardRoot);
       })
       .then(function () {
-        return global.html2canvas(cardEl, {
+        return waitForCardBg(front);
+      })
+      .then(function () {
+        return global.html2canvas(front, {
           scale: 2,
           useCORS: true,
           allowTaint: true,
@@ -406,6 +647,8 @@
   }
 
   function closeModal() {
+    const card = document.getElementById('cdsanMemberCardExport');
+    if (card) stopFlipCycle('cdsanMemberCardExport');
     const el = document.getElementById('cdsanCardModalOverlay');
     if (el) el.remove();
   }
@@ -429,6 +672,7 @@
       '<div id="cdsanCardModalBox" role="dialog" aria-labelledby="cdsanCardModalTitle">' +
       '<h2 id="cdsanCardModalTitle" style="margin:0 0 12px;color:#1e3a8a;font-size:1.15rem">🎫 Carnet de socio/a</h2>' +
       adminNote +
+      '<p style="font-size:.8rem;color:#64748b;margin:0 0 10px">El carnet gira ~5 s para mostrar publicidad. El QR superior sirve para control de asistencia.</p>' +
       '<div class="cdsan-carnet-inline-wrap">' +
       cardMarkup(payload, cardId) +
       '</div>' +
@@ -439,6 +683,7 @@
       '</div>' +
       '</div>';
     document.body.appendChild(overlay);
+    hydrateCard(cardId);
     const cardEl = document.getElementById(cardId);
     const base = fileBaseFromPayload(payload);
     document.getElementById('cdsanBtnClose').onclick = closeModal;
@@ -494,15 +739,18 @@
       );
     }
     injectStyles();
-    return (
+    const html =
       '<div class="cdsan-carnet-inline-wrap" style="margin:16px auto">' +
       cardMarkup(buildCardPayload(m), 'cdsanMemberCardInline') +
       '<div class="cdsan-card-actions" style="margin-top:12px">' +
       '<button type="button" class="cdsan-card-btn cdsan-card-btn--jpg" onclick="memberCardGenerator.openForCurrentSession()">👁️ Ver carnet grande</button>' +
       '<button type="button" class="cdsan-card-btn cdsan-card-btn--jpg" onclick="memberCardGenerator.downloadJpgCurrent()">⬇️ JPG</button>' +
       '<button type="button" class="cdsan-card-btn cdsan-card-btn--pdf" onclick="memberCardGenerator.downloadPdfCurrent()">⬇️ PDF</button>' +
-      '</div></div>'
-    );
+      '</div></div>';
+    setTimeout(function () {
+      hydrateCard('cdsanMemberCardInline');
+    }, 30);
+    return html;
   }
 
   function ensureHiddenExportWrap() {
@@ -528,7 +776,9 @@
     const payload = buildCardPayload(m);
     wrap.innerHTML = cardMarkup(payload, 'cdsanMemberCardHidden');
     const cardEl = document.getElementById('cdsanMemberCardHidden');
-    downloadJpg(cardEl, fileBaseFromPayload(payload)).catch(function (e) {
+    fillQrOnRoot(cardEl).then(function () {
+      return downloadJpg(cardEl, fileBaseFromPayload(payload));
+    }).catch(function (e) {
       alert('No se pudo descargar: ' + (e.message || e));
     });
   }
@@ -545,19 +795,22 @@
     const payload = buildCardPayload(m);
     wrap.innerHTML = cardMarkup(payload, 'cdsanMemberCardHidden');
     const cardEl = document.getElementById('cdsanMemberCardHidden');
-    downloadPdf(cardEl, fileBaseFromPayload(payload)).catch(function (e) {
+    fillQrOnRoot(cardEl).then(function () {
+      return downloadPdf(cardEl, fileBaseFromPayload(payload));
+    }).catch(function (e) {
       alert('No se pudo descargar: ' + (e.message || e));
     });
   }
 
-  /** Vista previa local (preview-carnet-socio.html) */
   function renderPreviewCard(containerId, memberData, cardDomId) {
     injectStyles();
     const m = memberData || {};
     const payload = buildCardPayload(m);
     const host = document.getElementById(containerId);
     if (!host) return;
-    host.innerHTML = cardMarkup(payload, cardDomId || 'cdsanPreviewCard');
+    const id = cardDomId || 'cdsanPreviewCard';
+    host.innerHTML = cardMarkup(payload, id);
+    hydrateCard(id);
   }
 
   global.memberCardGenerator = {
@@ -569,6 +822,9 @@
     downloadJpgCurrent: downloadJpgCurrent,
     downloadPdfCurrent: downloadPdfCurrent,
     buildCardPayload: buildCardPayload,
+    buildAttendanceUrl: function (m) {
+      return buildAttendanceUrl(m, buildCardPayload(m || {}));
+    },
     getEligibility: function () {
       return getEligibility(resolveMemberForCurrentSocio());
     },

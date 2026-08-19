@@ -319,7 +319,8 @@ service cloud.firestore {
     match /sanabria_torneo_preinscripciones/{docId} {
       allow read: if hasScope() && canManageCompetitions();
       allow create: if publicRegistrationsOpen() && torneoPreinscripcionValid();
-      allow update, delete: if hasScope() && isAdmin() && hasRequestedScope();
+      allow update: if hasScope() && canManageCompetitions() && hasRequestedScope();
+      allow delete: if hasScope() && canManageCompetitions();
     }
     match /sanabria_coaches/{docId} {
       allow read: if hasScope();
@@ -346,7 +347,14 @@ service cloud.firestore {
     }
     match /sanabria_fcm_tokens/{docId} {
       allow read: if hasScope() && isAdmin();
-      allow create, update: if hasRequestedScope() && isSignedIn();
+      allow create, update: if hasRequestedScope()
+        && request.resource.data.fcmToken is string
+        && request.resource.data.fcmToken.size() > 20
+        && request.resource.data.fcmToken.size() < 4096
+        && (
+          (isSignedIn() && (docId == request.auth.uid || docId.matches('dev_[a-z0-9]+')))
+          || (!isSignedIn() && docId.matches('dev_[a-z0-9]+'))
+        );
       allow delete: if hasScope() && isAdmin();
     }
     match /sanabria_audit_logs/{docId} {

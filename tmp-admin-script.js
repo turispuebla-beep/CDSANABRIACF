@@ -1,4554 +1,4 @@
-<!DOCTYPE html>
-<html lang="es">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
-    <meta http-equiv="Pragma" content="no-cache">
-    <meta http-equiv="Expires" content="0">
-    <title>Panel de Administración - CDSANABRIACF</title>
-    <script>
-        (function () {
-            try {
-                var raw = localStorage.getItem('currentAdmin') || localStorage.getItem('adminUser') || '{}';
-                var s = JSON.parse(raw);
-                if (String(s.role || '').trim() === 'competition_organizer') {
-                    document.documentElement.classList.add('admin-organizer-pending');
-                }
-            } catch (_) {}
-        })();
-    </script>
-    
-    <!-- Google Analytics 4 - Invisible para usuarios -->
-    <script async src="https://www.googletagmanager.com/gtag/js?id=GA_MEASUREMENT_ID"></script>
-    <script>
-        window.dataLayer = window.dataLayer || [];
-        function gtag(){dataLayer.push(arguments);}
-        gtag('js', new Date());
-        gtag('config', 'GA_MEASUREMENT_ID', {
-            page_title: 'Admin Panel CDSANABRIACF',
-            page_location: window.location.href
-        });
-    </script>
-    
-    <script src="database.js"></script>
-    
-    <!-- 🔒 SEGURIDAD - Validación, Sanitización, Protección -->
-    <script src="js/password-validator.js"></script>
-    <script src="js/input-sanitizer.js"></script>
-    <script src="js/session-timeout.js"></script>
-    <script src="js/rate-limiter.js"></script>
-    <script src="js/permissionmanager.js"></script>
-    <!-- Misma capa la nube que la web: sincroniza socios (sanabria_members → localStorage) para el panel -->
-    <script src="js/localstorage-quota.js"></script>
-    <script src="js/club-password-hash.js"></script>
-    <script src="js/protocol-guard.js"></script>
-    <script src="js/admin-session.js"></script>
-    <script src="js/admin-organizer-access.js"></script>
-    <script src="js/club-member-numbers.js"></script>
-    <script src="js/club-friend-numbers.js"></script>
-    <script src="js/club-member-card.js"></script>
-    <script src="js/admin-event-attendance.js"></script>
-    <script src="js/club-role-links.js"></script>
-    <script src="js/club-inscription-config.js"></script>
-    <script src="js/club-season.js"></script>
-    <script src="js/club-contact-defaults.js"></script>
-    <script src="js/club-mailto.js"></script>
-    <script src="js/site-update-mode.js"></script>
-    <script src="js/admin-inscription-config.js"></script>
-    <script src="js/player-application.js"></script>
-    <script src="js/colaborador-solicitud.js"></script>
-    <script src="js/admin-torneo-preinscripciones.js"></script>
-    <script src="js/admin-torneo-competition-bridge.js"></script>
-    <script src="js/admin-torneo-f7-wizard.js"></script>
-    <script src="js/torneo-f7-calendario-oficial.js"></script>
-    <script src="js/admin-player-applications.js"></script>
-    <script src="js/club-player-kit-persist.js"></script>
-    <script src="js/player-inscription.js"></script>
-    <script src="js/club-player-member-sync.js"></script>
-    <script src="js/member-cloud-persist.js"></script>
-    <script src="js/admin-cloud-persist.js"></script>
-    <script src="js/club-player-export-config.js"></script>
-    <script src="js/player-export.js"></script>
-    <script src="js/admin-player-export-config.js"></script>
-    <script src="js/admin-notifications.js"></script>
-    <script src="js/club-players-public-sync.js"></script>
-    <script type="module" src="js/firebase-config.js"></script>
-    <script src="js/cdsan-membership-env.js"></script>
-    <script src="js/club-membership-season.js"></script>
-    <script src="js/club-accounting.js"></script>
-    <script src="js/admin-api-auth.js"></script>
-    <script src="js/club-notification-upload.js"></script>
-    <script src="js/admin-paygold.js"></script>
-    <script src="js/support-mode.js" defer></script>
-    
-    <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
 
-        :root {
-            --primary-color: #1e3a8a;
-            --secondary-color: #3b82f6;
-        }
-
-        body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: linear-gradient(135deg, var(--primary-color) 0%, var(--secondary-color) 100%);
-            min-height: 100vh;
-            padding: 20px;
-        }
-
-        .admin-container {
-            max-width: 1200px;
-            margin: 0 auto;
-            background: white;
-            border-radius: 15px;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
-            overflow: hidden;
-        }
-
-        .admin-header {
-            background: linear-gradient(135deg, var(--primary-color) 0%, var(--secondary-color) 100%);
-            color: white;
-            padding: 30px;
-            text-align: center;
-        }
-
-        .admin-header h1 {
-            font-size: 2.5rem;
-            margin-bottom: 10px;
-        }
-
-        .admin-info {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-top: 15px;
-        }
-
-        .current-admin {
-            background: rgba(255,255,255,0.2);
-            padding: 8px 16px;
-            border-radius: 20px;
-            font-size: 0.9rem;
-        }
-
-        .logout-btn {
-            background: rgba(220,53,69,0.8);
-            color: white;
-            border: none;
-            padding: 8px 16px;
-            border-radius: 20px;
-            cursor: pointer;
-            font-size: 0.9rem;
-            transition: background 0.3s ease;
-        }
-
-        .logout-btn:hover {
-            background: rgba(220,53,69,1);
-        }
-
-        .admin-header-actions {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-        }
-
-        .admin-notif-wrap {
-            position: relative;
-        }
-
-        .admin-notif-btn {
-            position: relative;
-            background: rgba(255,255,255,0.25);
-            color: white;
-            border: none;
-            width: 42px;
-            height: 42px;
-            border-radius: 50%;
-            cursor: pointer;
-            font-size: 1.2rem;
-            line-height: 1;
-            transition: background 0.2s ease;
-        }
-
-        .admin-notif-btn:hover {
-            background: rgba(255,255,255,0.4);
-        }
-
-        .admin-notif-badge {
-            position: absolute;
-            top: -4px;
-            right: -4px;
-            min-width: 18px;
-            height: 18px;
-            padding: 0 4px;
-            border-radius: 999px;
-            background: #dc2626;
-            color: white;
-            font-size: 0.65rem;
-            font-weight: 700;
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            border: 2px solid #1e3a8a;
-        }
-
-        .admin-notif-panel {
-            position: absolute;
-            top: calc(100% + 8px);
-            right: 0;
-            width: min(360px, calc(100vw - 24px));
-            max-height: 420px;
-            overflow: hidden;
-            background: white;
-            color: #1f2937;
-            border-radius: 10px;
-            box-shadow: 0 12px 32px rgba(0,0,0,0.2);
-            z-index: 2000;
-        }
-
-        .admin-notif-panel-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 10px 12px;
-            border-bottom: 1px solid #e5e7eb;
-            background: #f8fafc;
-        }
-
-        .admin-notif-panel-header button {
-            background: none;
-            border: none;
-            cursor: pointer;
-            font-size: 1rem;
-            color: #64748b;
-        }
-
-        .admin-notif-panel-list {
-            max-height: 360px;
-            overflow-y: auto;
-            padding: 8px;
-        }
-
-        .admin-notif-item {
-            display: flex;
-            gap: 8px;
-            align-items: flex-start;
-            padding: 10px;
-            margin-bottom: 8px;
-            background: #f8f9fa;
-            border-radius: 6px;
-            border-left: 4px solid #8b5cf6;
-        }
-
-        .admin-notif-item-body {
-            flex: 1;
-            min-width: 0;
-        }
-
-        .admin-notif-item-title {
-            font-weight: 700;
-            font-size: 0.9rem;
-        }
-
-        .admin-notif-item-msg {
-            font-size: 0.85rem;
-            color: #4b5563;
-            margin-top: 4px;
-        }
-
-        .admin-notif-item-time {
-            font-size: 0.75rem;
-            color: #9ca3af;
-            margin-top: 4px;
-        }
-
-        .admin-notif-item-action {
-            background: #6c757d;
-            color: white;
-            border: none;
-            padding: 4px 8px;
-            border-radius: 4px;
-            font-size: 0.8rem;
-            cursor: pointer;
-            flex-shrink: 0;
-        }
-
-        .admin-notif-empty {
-            text-align: center;
-            color: #6c757d;
-            padding: 20px 12px;
-            margin: 0;
-        }
-
-        .navigation {
-            background: #f8f9fa;
-            padding: 20px;
-            border-bottom: 1px solid #dee2e6;
-        }
-
-        .nav-tabs {
-            display: flex;
-            gap: 10px;
-            flex-wrap: wrap;
-        }
-
-        .nav-tab {
-            background: #e9ecef;
-            color: #495057;
-            padding: 10px 20px;
-            border: none;
-            border-radius: 5px;
-            cursor: pointer;
-            font-size: 0.9rem;
-            transition: all 0.3s ease;
-        }
-
-        .nav-tab:hover {
-            background: #6c757d;
-            color: white;
-        }
-
-        .nav-tab.active {
-            background: var(--primary-color);
-            color: white;
-        }
-
-        .admin-content {
-            padding: 30px;
-        }
-
-        .tab-content {
-            display: none;
-        }
-
-        .tab-content.active {
-            display: block;
-        }
-
-        .dashboard-cards {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-            gap: 20px;
-            margin-bottom: 30px;
-        }
-
-        .dashboard-card {
-            background: white;
-            padding: 20px;
-            border-radius: 10px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-            text-align: center;
-            border: 2px solid #f0f0f0;
-        }
-
-        .dashboard-card h3 {
-            color: #1e3a8a;
-            margin-bottom: 10px;
-        }
-
-        .dashboard-card .number {
-            font-size: 2rem;
-            font-weight: bold;
-            color: #333;
-            margin-bottom: 5px;
-        }
-
-        .dashboard-card--clickable {
-            cursor: pointer;
-            transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
-        }
-
-        .dashboard-card--clickable:hover {
-            transform: translateY(-3px);
-            box-shadow: 0 10px 28px rgba(30, 58, 138, 0.14);
-            border-color: #c7d2fe;
-        }
-
-        .dashboard-card--clickable:focus-visible {
-            outline: 3px solid #2563eb;
-            outline-offset: 2px;
-        }
-
-        .site-update-admin-wrap {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 10px;
-            align-items: center;
-        }
-
-        .site-update-admin-btn {
-            background: #475569;
-            color: #fff;
-            border: none;
-            padding: 10px 18px;
-            border-radius: 8px;
-            font-size: 0.9rem;
-            font-weight: 600;
-            cursor: pointer;
-        }
-
-        .site-update-admin-btn:hover {
-            opacity: 0.92;
-        }
-
-        .site-update-admin-btn.is-on {
-            background: #b45309;
-        }
-
-        .site-update-admin-btn--edit {
-            background: #1e3a8a;
-        }
-
-        .section {
-            margin-bottom: 40px;
-            padding: 25px;
-            border: 2px solid #f0f0f0;
-            border-radius: 10px;
-            background: #fafafa;
-        }
-
-        .section h2 {
-            color: #333;
-            margin-bottom: 20px;
-            font-size: 1.5rem;
-            border-bottom: 2px solid #1e3a8a;
-            padding-bottom: 10px;
-        }
-
-        .btn {
-            background: #1e3a8a;
-            color: white;
-            border: none;
-            padding: 12px 24px;
-            border-radius: 5px;
-            cursor: pointer;
-            font-size: 16px;
-            transition: background 0.3s ease;
-            margin-right: 10px;
-            margin-bottom: 10px;
-        }
-
-        .btn:hover {
-            background: #2563eb;
-        }
-
-        .success-message {
-            background: #d4edda;
-            color: #155724;
-            padding: 15px;
-            border-radius: 5px;
-            margin-bottom: 20px;
-            text-align: center;
-            font-weight: bold;
-        }
-
-        @media (max-width: 768px) {
-            .admin-info {
-                flex-direction: column;
-                gap: 10px;
-            }
-
-            .nav-tabs {
-                flex-direction: column;
-            }
-
-            .dashboard-cards {
-                grid-template-columns: 1fr;
-            }
-        }
-        /* Estilos para la sección de administradores */
-        .admin-section {
-            background: white;
-            padding: 20px;
-            border-radius: 10px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-        }
-
-        .admin-table {
-            width: 100%;
-            margin-top: 20px;
-            border-collapse: collapse;
-        }
-
-        .admin-row {
-            display: grid;
-            grid-template-columns: 2fr 1fr 1.5fr 1fr 1.5fr;
-            gap: 10px;
-            padding: 10px;
-            border-bottom: 1px solid #eee;
-            align-items: center;
-        }
-
-        .admin-row.header {
-            font-weight: bold;
-            background: #f8f9fa;
-            border-radius: 5px 5px 0 0;
-        }
-
-        .btn-small {
-            padding: 5px 10px;
-            font-size: 0.9rem;
-            border: none;
-            border-radius: 5px;
-            cursor: pointer;
-            background: #e2e8f0;
-            margin: 0 5px;
-        }
-
-        .btn-small:hover {
-            background: #cbd5e1;
-        }
-
-        .btn-small.delete {
-            background: #fee2e2;
-        }
-
-        .btn-small.delete:hover {
-            background: #fecaca;
-        }
-
-        .status-badge {
-            padding: 5px 10px;
-            border-radius: 15px;
-            font-size: 0.9rem;
-        }
-
-        .status-badge.active {
-            background: #dcfce7;
-            color: #166534;
-        }
-
-        .status-badge.inactive {
-            background: #fee2e2;
-            color: #991b1b;
-        }
-
-        .admin-session-gate {
-            display: none;
-            position: fixed;
-            inset: 0;
-            z-index: 99999;
-            align-items: center;
-            justify-content: center;
-            padding: 20px;
-            background: linear-gradient(135deg, #1e3a8a 0%, #3b82f6 100%);
-        }
-
-        .admin-session-gate.is-visible {
-            display: flex;
-        }
-
-        body.admin-access-denied .admin-container {
-            display: none !important;
-        }
-
-        .admin-session-gate-card {
-            max-width: 440px;
-            width: 100%;
-            background: #fff;
-            border-radius: 14px;
-            padding: 28px 24px;
-            box-shadow: 0 16px 40px rgba(0, 0, 0, 0.25);
-            text-align: center;
-        }
-
-        .admin-session-gate-card h2 {
-            margin: 0 0 12px;
-            color: #1e3a8a;
-            font-size: 1.25rem;
-        }
-
-        .admin-session-gate-card p {
-            margin: 0 0 20px;
-            color: #475569;
-            line-height: 1.5;
-            font-size: 0.95rem;
-        }
-
-        .admin-session-gate-actions {
-            display: flex;
-            flex-direction: column;
-            gap: 10px;
-        }
-
-        .admin-session-gate-actions button {
-            padding: 12px 16px;
-            border: none;
-            border-radius: 8px;
-            font-size: 1rem;
-            font-weight: 600;
-            cursor: pointer;
-        }
-
-        .admin-session-gate-primary {
-            background: #059669;
-            color: #fff;
-        }
-
-        .admin-session-gate-secondary {
-            background: #e2e8f0;
-            color: #334155;
-        }
-
-        body.admin-organizer-mode .navigation {
-            border-bottom-color: #93c5fd;
-        }
-
-        /* Organizador: solo Competiciones visible desde el primer pintado (sin flash de Dashboard) */
-        html.admin-organizer-pending #dashboard,
-        body.admin-organizer-mode #dashboard {
-            display: none !important;
-        }
-        html.admin-organizer-pending .tab-content:not(#competiciones),
-        body.admin-organizer-mode .tab-content:not(#competiciones) {
-            display: none !important;
-        }
-        html.admin-organizer-pending #competiciones,
-        body.admin-organizer-mode #competiciones {
-            display: block !important;
-        }
-        html.admin-organizer-pending .nav-tab,
-        body.admin-organizer-mode .nav-tab {
-            display: none !important;
-        }
-        html.admin-organizer-pending .nav-tab[onclick*="competiciones"],
-        body.admin-organizer-mode .nav-tab[onclick*="competiciones"] {
-            display: inline-flex !important;
-        }
-        html.admin-organizer-pending .admin-notif-wrap,
-        body.admin-organizer-mode .admin-notif-wrap {
-            display: none !important;
-        }
-        html.admin-organizer-pending #cuotaRenewalBanner,
-        body.admin-organizer-mode #cuotaRenewalBanner,
-        html.admin-organizer-pending #cuotaRenewalReminderBanner,
-        body.admin-organizer-mode #cuotaRenewalReminderBanner {
-            display: none !important;
-        }
-
-        .organizer-f7-banner {
-            background: linear-gradient(135deg, #eff6ff 0%, #f0fdf4 100%);
-            border: 2px solid #93c5fd;
-            border-radius: 12px;
-            padding: 18px 20px;
-            margin-bottom: 20px;
-            color: #1e3a8a;
-        }
-
-        .organizer-f7-banner h3 {
-            margin: 0 0 8px;
-            font-size: 1.1rem;
-        }
-
-        .organizer-f7-banner p {
-            margin: 0 0 10px;
-            color: #334155;
-            line-height: 1.5;
-        }
-
-        .organizer-f7-banner ul {
-            margin: 0;
-            padding-left: 1.2rem;
-            color: #475569;
-            font-size: 0.92rem;
-            line-height: 1.55;
-        }
-
-        .organizer-f7-banner code {
-            background: #e2e8f0;
-            padding: 1px 6px;
-            border-radius: 4px;
-            font-size: 0.85em;
-        }
-
-        .admin-copy-dialog {
-            position: fixed;
-            inset: 0;
-            z-index: 10050;
-            display: none;
-            align-items: center;
-            justify-content: center;
-            padding: 16px;
-            background: rgba(15, 23, 42, 0.55);
-        }
-        .admin-copy-dialog.is-open { display: flex; }
-        .admin-copy-dialog-card {
-            width: min(640px, 100%);
-            max-height: 90vh;
-            overflow: auto;
-            background: #fff;
-            border-radius: 12px;
-            padding: 18px;
-            box-shadow: 0 20px 50px rgba(0,0,0,0.25);
-        }
-        .admin-copy-dialog-card h3 { margin: 0 0 12px; font-size: 1.1rem; }
-        .admin-copy-dialog-hint {
-            margin: 0 0 10px;
-            font-size: 0.82rem;
-            color: #64748b;
-            line-height: 1.4;
-        }
-        .admin-copy-dialog-text {
-            width: 100%;
-            min-height: 220px;
-            resize: vertical;
-            font-family: Consolas, 'Courier New', monospace;
-            font-size: 0.85rem;
-            line-height: 1.45;
-            padding: 10px;
-            border: 1px solid #cbd5e1;
-            border-radius: 8px;
-            box-sizing: border-box;
-            user-select: all;
-        }
-        .admin-copy-dialog-actions {
-            display: flex;
-            gap: 10px;
-            justify-content: flex-end;
-            margin-top: 12px;
-            flex-wrap: wrap;
-        }
-    </style>
-</head>
-<body>
-    <div id="adminSessionGate" class="admin-session-gate" role="alertdialog" aria-modal="true" aria-labelledby="adminSessionGateTitle">
-        <div class="admin-session-gate-card">
-            <h2 id="adminSessionGateTitle">🔒 Acceso al panel</h2>
-            <p id="adminSessionGateMsg">Inicia sesión de administrador desde la página principal del club.</p>
-            <div class="admin-session-gate-actions">
-                <button type="button" class="admin-session-gate-primary" onclick="goToMainAdminLogin()">Iniciar sesión en la web principal</button>
-                <button type="button" class="admin-session-gate-secondary" onclick="closeAdminPanelWindow()">Cerrar panel</button>
-            </div>
-        </div>
-    </div>
-
-    <div id="adminCopyableDialog" class="admin-copy-dialog" role="dialog" aria-modal="true" aria-labelledby="adminCopyableDialogTitle" onclick="if(event.target===this)closeAdminCopyableDialog()">
-        <div class="admin-copy-dialog-card">
-            <h3 id="adminCopyableDialogTitle">Mensaje</h3>
-            <p id="adminCopyableDialogHint" class="admin-copy-dialog-hint">Selecciona el texto, edítalo si hace falta y cópialo (Ctrl+C) o pulsa «Copiar texto» para pegarlo en el chat de soporte.</p>
-            <textarea id="adminCopyableDialogText" class="admin-copy-dialog-text" aria-label="Texto del mensaje (editable, puedes copiarlo)"></textarea>
-            <div class="admin-copy-dialog-actions">
-                <button type="button" class="btn" onclick="adminCopyDialogToClipboard()">📋 Copiar texto</button>
-                <button type="button" class="btn btn-success" onclick="closeAdminCopyableDialog()">Cerrar</button>
-            </div>
-        </div>
-    </div>
-
-    <div class="admin-container">
-        <!-- Header -->
-        <div class="admin-header">
-            <h1>⚽ Panel de Administración</h1>
-            <p>CDSANABRIACF - Club Deportivo Sanabriacf</p>
-            <div class="admin-info">
-                <div class="current-admin" id="currentAdminInfo">
-                    👤 Cargando información del administrador...
-                </div>
-                <div class="admin-header-actions">
-                    <div class="admin-notif-wrap">
-                        <button type="button" class="admin-notif-btn" id="adminNotifBtn" onclick="toggleAdminNotificationsPanel()" aria-label="Notificaciones" aria-expanded="false" aria-controls="adminNotificationsPanel">
-                            🔔
-                            <span id="adminNotificationCounter" class="admin-notif-badge" hidden aria-hidden="true">0</span>
-                        </button>
-                        <div id="adminNotificationsPanel" class="admin-notif-panel" style="display:none;" role="region" aria-label="Notificaciones pendientes"></div>
-                    </div>
-                    <button class="logout-btn" onclick="logout()">🚪 Cerrar Sesión</button>
-                </div>
-            </div>
-        </div>
-
-        <!-- Navigation -->
-        <div class="navigation">
-            <div class="nav-tabs">
-                <button class="nav-tab active" onclick="showTab('dashboard')">📊 Dashboard</button>
-                <button class="nav-tab" onclick="showTab('equipos')">⚽ Equipos</button>
-                <button class="nav-tab" onclick="showTab('jugadores')">👥 Jugadores</button>
-                <button class="nav-tab" onclick="showTab('calendario')">📅 Calendario</button>
-                <button class="nav-tab" onclick="showTab('eventos')">🎉 Eventos</button>
-                <button class="nav-tab" onclick="showTab('encuentros')">⚽ Encuentros</button>
-                <button class="nav-tab" onclick="showTab('socios')">👨‍👩‍👧‍👦 Socios</button>
-                <button class="nav-tab" onclick="showTab('contabilidad')">💶 Contabilidad</button>
-                        <button class="nav-tab" onclick="showTab('amigos')">🤝 Amigos del Club</button>
-        <button class="nav-tab" onclick="showTab('entrenadores')">👨‍🏫 Entrenadores</button>
-        <button class="nav-tab" onclick="showTab('directiva')">🏛️ Directiva</button>
-                <button class="nav-tab" onclick="showTab('documentos')">📄 Documentos</button>
-                <button class="nav-tab" onclick="showTab('publicidad')">📢 Publicidad</button>
-                <button class="nav-tab" onclick="showTab('publicidad_colaboradores')">🤝 Publicidad Colaboradores</button>
-        <button class="nav-tab" onclick="showTab('mensajes')">📱 Mensajes Push</button>
-        <button class="nav-tab" onclick="showTab('exportar')">📊 Exportar Datos</button>
-                <button class="nav-tab" onclick="showTab('basedatos')">🗄️ Base de Datos</button>
-        <button class="nav-tab" onclick="showTab('importar')">📥 Importar Datos</button>
-        <button class="nav-tab" onclick="showTab('competiciones')">🏆 Competiciones</button>
-        <button class="nav-tab" onclick="showTab('multimedia')">📸 Multimedia</button>
-        <button class="nav-tab" onclick="showTab('tienda')">🏪 Tienda</button>
-        <button class="nav-tab" onclick="showTab('configuracion')">⚙️ Configuración</button>
-        <button class="nav-tab" onclick="showTab('estadisticas')">📈 Estadísticas</button>
-            </div>
-        </div>
-
-        <!-- Content -->
-        <div class="admin-content">
-            <div id="cuotaRenewalReminderBanner" style="display: none; margin: 0 0 16px 0; padding: 14px 18px; border-radius: 10px; border: 2px solid #ea580c; background: linear-gradient(135deg, #fff7ed 0%, #ffedd5 100%); box-shadow: 0 2px 8px rgba(234, 88, 12, 0.15);">
-                <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 12px; justify-content: space-between;">
-                    <div style="flex: 1; min-width: 220px;">
-                        <strong style="color: #9a3412;">📌 Recordatorio: nueva temporada de cuotas</strong>
-                        <p style="margin: 6px 0 0 0; font-size: 0.95rem; color: #7c2d12;">
-                            Tras el cierre del <span id="cuotaRenewalCierreLabel">31 de mayo</span>, los socios <strong>activos pasan automáticamente a pendiente de renovación</strong> (también en la nube). La <strong>validación</strong> del pago es siempre <strong>una a una</strong> cuando veas el ingreso en la cuenta. Tarjeta/Bizum activan al instante. Contacto: <a href="mailto:cdsanabriafc@gmail.com">cdsanabriafc@gmail.com</a>
-                        </p>
-                    </div>
-                    <div style="display: flex; flex-wrap: wrap; gap: 8px;">
-                        <button type="button" class="btn" onclick="iniciarNuevaTemporadaCuotas()" style="background: #ea580c; color: white; border: none; padding: 8px 14px; border-radius: 8px; cursor: pointer; font-weight: 600;">📆 Marcar temporada (pendientes de pago)</button>
-                        <button type="button" class="btn" onclick="showTab('socios')" style="background: #fff; color: #9a3412; border: 1px solid #ea580c; padding: 8px 14px; border-radius: 8px; cursor: pointer;">👨‍👩‍👧‍👦 Ir a Socios</button>
-                        <button type="button" class="btn" onclick="markCuotaRenovacionMasivaHechaManual()" style="background: #059669; color: white; border: none; padding: 8px 14px; border-radius: 8px; cursor: pointer;" title="Usa esto si ya renovasteis por otro medio">✓ Ya está hecho</button>
-                        <button type="button" class="btn" onclick="dismissCuotaRenewalBanner()" style="background: #64748b; color: white; border: none; padding: 8px 14px; border-radius: 8px; cursor: pointer;">Ocultar aviso</button>
-                    </div>
-                </div>
-            </div>
-            <!-- Dashboard Tab -->
-            <div id="dashboard" class="tab-content active">
-                <div class="success-message">
-                    ✅ Autenticación exitosa. Bienvenido al panel de administración de CDSANABRIACF
-                </div>
-                
-                <h2>📊 Panel de Control</h2>
-
-                <div class="section" style="background:#fffbeb;padding:20px;border-radius:12px;border:2px solid #fcd34d;margin-bottom:24px;">
-                    <h3 style="margin-top:0;">🛠️ Modo actualización (web pública)</h3>
-                    <p style="color:#64748b;font-size:0.92rem;margin:0 0 12px;line-height:1.5;">
-                        Activa o desactiva el bloqueo de registros e inscripciones en la página principal. Los visitantes siguen viendo la web, la tienda y el torneo. El estado se guarda en la nube y se aplica en todos los dispositivos.
-                    </p>
-                    <p id="siteUpdateAdminStatus" style="font-size:0.88rem;margin:0 0 14px;color:#92400e;display:none;"></p>
-                    <span id="siteUpdateAdminWrap" class="site-update-admin-wrap">
-                        <button type="button" id="siteUpdateToggleBtn" class="site-update-admin-btn" aria-pressed="false">Actualización: OFF</button>
-                        <button type="button" id="siteUpdateEditMsgBtn" class="site-update-admin-btn site-update-admin-btn--edit" hidden>Editar aviso visitantes</button>
-                    </span>
-                </div>
-                
-                <div class="dashboard-cards">
-                    <div class="dashboard-card dashboard-card--clickable" role="button" tabindex="0" onclick="showTab('equipos')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();showTab('equipos');}" title="Ir a gestión de equipos">
-                        <h3>⚽ Equipos</h3>
-                        <div class="number" id="teamsCount">0</div>
-                        <p id="teamsCountCaption">Equipos en el sistema</p>
-                    </div>
-                    <div class="dashboard-card dashboard-card--clickable" role="button" tabindex="0" onclick="showTab('jugadores')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();showTab('jugadores');}" title="Ir a jugadores">
-                        <h3>👥 Jugadores</h3>
-                        <div class="number" id="playersCount">0</div>
-                        <p>Jugadores/as activos</p>
-                    </div>
-                    <div class="dashboard-card dashboard-card--clickable" role="button" tabindex="0" onclick="showTab('socios')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();showTab('socios');}" title="Ir a socios (cuotas y validación de pagos)">
-                        <h3>👨‍👩‍👧‍👦 Socios</h3>
-                        <div class="number" id="membersCount">0</div>
-                        <p>Socios/as activos</p>
-                    </div>
-                    <div class="dashboard-card dashboard-card--clickable" role="button" tabindex="0" onclick="showTab('amigos')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();showTab('amigos');}" title="Ir a amigos del club">
-                        <h3>🤝 Amigos</h3>
-                        <div class="number" id="friendsCount">0</div>
-                        <p>Amigos/as activos</p>
-                    </div>
-                    <div class="dashboard-card dashboard-card--clickable" role="button" tabindex="0" onclick="showTab('eventos')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();showTab('eventos');}" title="Ir a eventos">
-                        <h3>🎉 Eventos</h3>
-                        <div class="number" id="eventsCount">0</div>
-                        <p>Eventos en calendario</p>
-                    </div>
-                    <div class="dashboard-card dashboard-card--clickable" role="button" tabindex="0" onclick="showTab('competiciones')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();showTab('competiciones');}" title="Ir a competiciones">
-                        <h3>🏆 Competiciones</h3>
-                        <div class="number" id="competitionsCount">0</div>
-                        <p>Competiciones registradas</p>
-                    </div>
-                </div>
-
-                            <div class="section" data-team="all">
-                <h2>📈 Resumen del Club</h2>
-                    <p><strong>🎯 Sistema completamente funcional</strong></p>
-                    <p>Desde este panel puedes gestionar todos los aspectos del club CDSANABRIACF:</p>
-                    <ul style="margin: 20px 0; padding-left: 30px;">
-                        <li><strong>⚽ Equipos:</strong> Categorías del club y equipos propios (escudos, estado)</li>
-                        <li><strong>👥 Jugadores:</strong> Administra fichas de jugadores con datos personales y de contacto</li>
-                        <li><strong>📅 Calendario:</strong> Programa entrenamientos y partidos</li>
-                        <li><strong>🎉 Eventos:</strong> Actividades y calendario; precios por perfil (incl. entrenadores/as) y exportación Excel/CSV/Word/PDF de inscritos para conciliar cobros.</li>
-                        <li><strong>🏆 Competiciones:</strong> Crea y gestiona ligas, torneos y campeonatos</li>
-                        <li><strong>👨‍👩‍👧‍👦 Socios:</strong> Administra la base de socios del club</li>
-                        <li><strong>💶 Cuotas y cobros (contabilidad operativa):</strong> pestaña Socios — altas, renovación de temporada, validación de ingresos <strong>una a una</strong> al comprobar el abono en cuenta. Los datos se guardan en el navegador y se sincronizan con la nube cuando está activa.</li>
-                        <li><strong>🏪 Tienda:</strong> pestaña Tienda — enlace al panel de ventas y URL externa si la usáis; pedidos y catálogo en los HTML dedicados de tienda.</li>
-                        <li><strong>📸 Multimedia:</strong> Gestiona fotos y videos del club</li>
-                    </ul>
-                    
-                    <div style="background: #e3f2fd; padding: 15px; border-radius: 8px; margin-top: 20px;">
-                        <h4>🔐 Sistema de Acceso Seguro:</h4>
-                        <p><strong>✅ Panel de administración configurado y funcional</strong></p>
-                        <p><strong>🔒 Acceso restringido a administradores autorizados</strong></p>
-                    </div>
-                </div>
-
-                <!-- Sección de Sincronización -->
-                <div class="section">
-                    <h2>🔄 Sincronización de datos en la nube</h2>
-                    <p><strong>✅ CD Sanabria CF</strong> — los datos del club se guardan en la nube y están disponibles en web y móvil.</p>
-                    
-                    <div style="background: #d1ecf1; padding: 15px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #17a2b8;">
-                        <h4>☁️ Nube del club:</h4>
-                        <p>Los datos se sincronizan automáticamente entre web y móvil:</p>
-                        <ol style="margin: 10px 0; padding-left: 20px;">
-                            <li><strong>Crear socios en la web</strong> (se guardan en la nube automáticamente)</li>
-                            <li><strong>Los datos están disponibles en móvil</strong> (sincronización en tiempo real)</li>
-                            <li><strong>Sincronización manual disponible</strong> usando los botones de abajo</li>
-                        </ol>
-                    </div>
-
-                    <div style="display: flex; gap: 15px; flex-wrap: wrap; margin-top: 20px;">
-                        <button class="btn" onclick="sincronizarSociosConBackend()" style="background: #28a745;">
-                            🔄 Subir socios a la nube
-                        </button>
-                        <button class="btn" onclick="obtenerSociosDelBackend()" style="background: #17a2b8;">
-                            📥 Descargar socios desde la nube
-                        </button>
-                        <button class="btn" onclick="verificarEstadoFirebase()" style="background: #6c757d;">
-                            🔍 Verificar estado de la nube
-                        </button>
-                        <button class="btn" onclick="auditarSincronizacionModulos()" style="background: #0ea5e9;">
-                            🧪 Auditoría de módulos (nube)
-                        </button>
-                        <button class="btn" onclick="reconciliarModulosConFirebase()" style="background: #2563eb;">
-                            🛠️ Reconciliar ahora
-                        </button>
-                        <button class="btn" onclick="eliminarDatosEjemplo()" style="background: #dc3545;">
-                            🗑️ Eliminar Datos de Ejemplo
-                        </button>
-                    </div>
-
-                    <div style="background: #d4edda; padding: 15px; border-radius: 8px; margin-top: 20px; border-left: 4px solid #28a745;">
-                        <h4>📋 Estado actual:</h4>
-                        <p><strong>✅ Web:</strong> Publicada en internet con copia en la nube</p>
-                        <p><strong>✅ PWA / móvil:</strong> Mismos datos en tiempo real</p>
-                        <p><strong>✅ Sincronización:</strong> Activa entre dispositivos</p>
-                        <p><strong>☁️ Respaldo:</strong> Datos del club en servidor en la nube</p>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Equipos Tab -->
-            <div id="equipos" class="tab-content">
-                <h2>⚽ Gestión de Equipos</h2>
-                
-                <div class="section">
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
-                        <h3>Categorías del Club CDSANABRIACF</h3>
-                        <button class="btn btn-success" onclick="showAddTeamForm()">➕ Crear Nuevo Equipo</button>
-                    </div>
-                    
-                    <!-- Formulario para crear nuevo equipo -->
-                    <div id="addTeamForm" style="display: none; margin-bottom: 30px; background: white; padding: 25px; border-radius: 10px; border: 2px solid #059669;">
-                        <h4>🏆 Crear Nuevo Equipo</h4>
-                        
-                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
-                            <div>
-                                <label style="display: block; margin-bottom: 5px; font-weight: bold;">Nombre del Equipo *</label>
-                                <input type="text" id="teamName" required placeholder="Ej: Prebenjamín A, Benjamín B" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
-                            </div>
-                            <div>
-                                <label style="display: block; margin-bottom: 5px; font-weight: bold;">Categoría *</label>
-                                <select id="teamCategory" required style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
-                                    <option value="">Seleccionar categoría</option>
-                                    <option value="prebenajmin">Prebenjamín (6-8 años)</option>
-                                    <option value="benjamin">Benjamín (8-10 años)</option>
-                                    <option value="alevin">Alevín (10-12 años)</option>
-                                    <option value="infantil">Infantil (12-14 años)</option>
-                                    <option value="cadete">Cadete (14-16 años)</option>
-                                    <option value="juvenil">Juvenil (16-18 años)</option>
-                                    <option value="aficionado">Aficionado (18+ años)</option>
-                                </select>
-                            </div>
-                            <div>
-                                <label style="display: block; margin-bottom: 5px; font-weight: bold;">Entrenador</label>
-                                <input type="text" id="teamCoach" placeholder="Nombre del entrenador" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
-                            </div>
-                            <div>
-                                <label style="display: block; margin-bottom: 5px; font-weight: bold;">Campo de Entrenamiento</label>
-                                <input type="text" id="teamField" placeholder="Ubicación del campo" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
-                            </div>
-                            <div>
-                                <label style="display: block; margin-bottom: 5px; font-weight: bold;">Horario de Entrenamiento</label>
-                                <input type="text" id="teamSchedule" placeholder="Ej: Lunes y Miércoles 17:00-18:30" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
-                            </div>
-                            <div>
-                                <label style="display: block; margin-bottom: 5px; font-weight: bold;">Estado</label>
-                                <select id="teamStatus" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
-                                    <option value="active">Activo</option>
-                                    <option value="inactive">Inactivo</option>
-                                </select>
-                            </div>
-                            <div>
-                                <label style="display: block; margin-bottom: 5px; font-weight: bold;">Escudo del Equipo</label>
-                                <input type="file" id="teamCrest" accept="image/*" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
-                                <small style="color: #666;">Opcional. JPG/PNG/WEBP, máximo 5MB.</small>
-                                <div id="teamCrestPreview" style="margin-top: 8px; min-height: 44px; display: flex; align-items: center;"></div>
-                            </div>
-                        </div>
-                        
-                        <div style="margin-top: 20px; text-align: center;">
-                            <button class="btn btn-success" onclick="saveTeam()" style="margin-right: 10px;">💾 Guardar Equipo</button>
-                            <button class="btn" onclick="cancelAddTeam()">❌ Cancelar</button>
-                        </div>
-                    </div>
-                    
-                    <div class="dashboard-cards" id="teamsCards">
-                        <!-- Las tarjetas se generarán dinámicamente -->
-                    </div>
-                </div>
-            </div>
-
-            <!-- Otras pestañas -->
-            <div id="jugadores" class="tab-content">
-                <h2>👥 Gestión de Jugadores</h2>
-
-                <div class="section" style="background:#f0fdf4;border:2px solid #059669;border-radius:12px;padding:20px;margin-bottom:24px;">
-                    <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;margin-bottom:16px;">
-                        <h3 style="margin:0;color:#059669;">📝 Configuración inscripciones (web pública)</h3>
-                        <span id="inscStatusBadge" style="color:#fff;padding:6px 14px;border-radius:20px;font-weight:700;font-size:0.85rem;">—</span>
-                    </div>
-                    <p style="color:#64748b;font-size:0.9rem;margin-top:0;">Temporadas 2026-2027 y sucesivas. Los datos quedan en la nube y en el panel (jugadores/socios).</p>
-                    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:12px;">
-                        <div>
-                            <label style="font-weight:bold;">Temporada</label>
-                            <input type="text" id="inscSeason" placeholder="2026-2027" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:4px;">
-                        </div>
-                        <div>
-                            <label style="font-weight:bold;">Abrir desde (opcional)</label>
-                            <input type="datetime-local" id="inscOpenFrom" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:4px;">
-                        </div>
-                        <div>
-                            <label style="font-weight:bold;">Cerrar el (opcional)</label>
-                            <input type="datetime-local" id="inscOpenUntil" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:4px;">
-                        </div>
-                    </div>
-                    <label style="display:flex;align-items:center;gap:8px;font-weight:bold;margin-bottom:12px;">
-                        <input type="checkbox" id="inscOpen"> Inscripciones abiertas para esta temporada
-                    </label>
-                    <div style="display:flex;flex-wrap:wrap;gap:20px;margin-bottom:16px;">
-                        <label style="display:flex;align-items:center;gap:8px;"><input type="checkbox" id="inscChargeFicha" checked> Ofrecer cuota ficha</label>
-                        <label style="display:flex;align-items:center;gap:8px;"><input type="checkbox" id="inscChargeSocio" checked> Ofrecer cuota socio/a</label>
-                    </div>
-                    <label style="font-weight:bold;">Modo equipación</label>
-                    <select id="inscKitMode" style="padding:8px;border:1px solid #ddd;border-radius:4px;margin-bottom:16px;">
-                        <option value="per_garment">Checkbox por prenda + talla</option>
-                        <option value="full_pack">Pack completo (todas las prendas activas)</option>
-                    </select>
-                    <h4 style="margin:12px 0 8px;">Importes por categoría (€)</h4>
-                    <table style="width:100%;border-collapse:collapse;margin-bottom:16px;">
-                        <thead><tr style="background:#e2e8f0;"><th style="padding:8px;text-align:left;">Categoría</th><th>Cuota ficha</th><th>Cuota socio</th></tr></thead>
-                        <tbody id="inscCategoryFeesBody"></tbody>
-                    </table>
-                    <h4 style="margin:12px 0 8px;">Prendas y precios</h4>
-                    <div id="inscGarmentsGrid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px;margin-bottom:16px;"></div>
-                    <h4 style="margin:12px 0 8px;">Formas de pago en la web</h4>
-                    <div style="display:flex;flex-wrap:wrap;gap:16px;margin-bottom:16px;">
-                        <label><input type="checkbox" id="inscPayCard" checked> Tarjeta</label>
-                        <label><input type="checkbox" id="inscPayBizum"> Bizum</label>
-                        <label><input type="checkbox" id="inscPayTransfer" checked> Transferencia</label>
-                    </div>
-                    <button class="btn btn-success" type="button" onclick="saveInscriptionAdminSettings()">💾 Guardar configuración inscripciones</button>
-                    <a href="inscripcion-jugador.html" target="_blank" rel="noopener" style="margin-left:12px;">Ver formulario público ↗</a>
-                </div>
-
-                <div class="section" style="background:#eff6ff;border:2px solid #2563eb;border-radius:12px;padding:20px;margin-bottom:24px;">
-                    <h3 style="margin:0 0 12px;color:#1e3a8a;">⚽ Solicitudes «Nuevo jugador» (sin ropa ni cuota)</h3>
-                    <p style="color:#64748b;font-size:0.9rem;margin-top:0;">Revisa las solicitudes enviadas desde la web. Al pulsar <strong>✅ Aceptar</strong>, se guarda en la nube y se envía un correo automático al jugador/a (con copia en cdsanabriafc@gmail.com) para completar ropa y pago en «Ya soy jugador/a».</p>
-                    <div id="playerApplicationsList"><p style="color:#64748b;">Cargando solicitudes…</p></div>
-                </div>
-                
-                <div class="section">
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
-                        <div>
-                            <h3>Filtrar por Categoría</h3>
-                            <select id="categoryFilter" onchange="filterPlayersByCategory()" style="padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
-                                <option value="all">Todas las Categorías</option>
-                                <option value="prebenjamin">Prebenjamín (6-8 años)</option>
-                                <option value="benjamin">Benjamín (8-10 años)</option>
-                                <option value="alevin">Alevín (10-12 años)</option>
-                                <option value="infantil">Infantil (12-14 años)</option>
-                                <option value="cadete">Cadete (14-16 años)</option>
-                                <option value="juvenil">Juvenil (16-18 años)</option>
-                                <option value="senior">Senior / Aficionado (18+ años)</option>
-                            </select>
-                        </div>
-                        <div style="display:flex; gap:10px; flex-wrap:wrap;">
-                            <button class="btn" onclick="aplicarPasoTemporadaJugadores()" style="background:#2563eb;">🔁 Paso de temporada</button>
-                            <button class="btn" onclick="undoLastCategoryChange()" style="background:#334155;">↩️ Deshacer categoría</button>
-                            <button class="btn btn-success" onclick="showAddPlayerForm()">➕ Registrar Nuevo Jugador</button>
-                        </div>
-                    </div>
-                    
-                    <!-- Formulario para añadir jugador -->
-                    <div id="addPlayerForm" style="display: none; margin-top: 20px; background: white; padding: 25px; border-radius: 10px; border: 2px solid #059669;">
-                        <h4>📝 Registrar Nuevo Jugador</h4>
-                        
-                        <!-- Datos del Jugador -->
-                        <div style="background: #f8f9fa; padding: 15px; border-radius: 8px; margin-bottom: 20px;">
-                            <h5>👤 Datos del Jugador</h5>
-                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px;">
-                                <div>
-                                    <label style="display: block; margin-bottom: 5px; font-weight: bold;">Nombre *</label>
-                                    <input type="text" id="playerName" required style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
-                                </div>
-                                <div>
-                                    <label style="display: block; margin-bottom: 5px; font-weight: bold;">Apellidos *</label>
-                                    <input type="text" id="playerSurname" required style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
-                                </div>
-                            </div>
-                            <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 15px; margin-bottom: 15px;">
-                                <div>
-                                    <label style="display: block; margin-bottom: 5px; font-weight: bold;">DNI *</label>
-                                    <input type="text" id="playerDNI" required style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
-                                </div>
-                                <div>
-                                    <label style="display: block; margin-bottom: 5px; font-weight: bold;">Teléfono *</label>
-                                    <input type="tel" id="playerPhone" required style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
-                                </div>
-                                <div>
-                                    <label style="display: block; margin-bottom: 5px; font-weight: bold;">Fecha de Nacimiento *</label>
-                                    <input type="date" id="playerBirthDate" required onchange="calculateAge()" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
-                                </div>
-                            </div>
-                            <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 15px; margin-bottom: 15px;">
-                                <div>
-                                    <label style="display: block; margin-bottom: 5px; font-weight: bold;">Edad</label>
-                                    <input type="number" id="playerAge" readonly style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px; background: #f8f9fa;">
-                                </div>
-                                <div>
-                                    <label style="display: block; margin-bottom: 5px; font-weight: bold;">Categoría</label>
-                                    <select id="playerCategory" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
-                                        <option value="">Seleccionar automáticamente</option>
-                                        <option value="prebenajmin">Prebenjamín (6-8 años)</option>
-                                        <option value="benjamin">Benjamín (8-10 años)</option>
-                                        <option value="alevin">Alevín (10-12 años)</option>
-                                        <option value="infantil">Infantil (12-14 años)</option>
-                                        <option value="cadete">Cadete (14-16 años)</option>
-                                        <option value="juvenil">Juvenil (16-18 años)</option>
-                                        <option value="aficionado">Aficionado (18+ años)</option>
-                                    </select>
-                                </div>
-                                <div>
-                                    <label style="display: block; margin-bottom: 5px; font-weight: bold;">Dorsal</label>
-                                    <input type="number" id="playerNumber" min="1" max="99" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;" title="Lo asigna el club">
-                                    <small style="color:#64748b;">Asignación del club (no inscripción web)</small>
-                                </div>
-                            </div>
-                            <div style="margin-bottom: 15px;">
-                                <label style="display: block; margin-bottom: 5px; font-weight: bold;">Dirección</label>
-                                <input type="text" id="playerAddress" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
-                            </div>
-                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px;">
-                                <div>
-                                    <label style="display: block; margin-bottom: 5px; font-weight: bold;">Posición</label>
-                                    <select id="playerPosition" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
-                                        <option value="">Seleccionar posición</option>
-                                        <option value="portero">Portero</option>
-                                        <option value="defensa">Defensa</option>
-                                        <option value="centrocampista">Centrocampista</option>
-                                        <option value="delantero">Delantero</option>
-                                        <option value="versatil">Versátil</option>
-                                    </select>
-                                </div>
-                                <div>
-                                    <label style="display: block; margin-bottom: 5px; font-weight: bold;">Licencia Federativa</label>
-                                    <input type="text" id="playerLicense" placeholder="Número cuando lo asigne la federación" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
-                                    <small style="color:#64748b;">La registra el club al recibirla de la federación</small>
-                                </div>
-                            </div>
-                            <div style="margin-bottom: 15px;">
-                                <label style="display: block; margin-bottom: 5px; font-weight: bold;">Foto del Jugador</label>
-                                <input type="file" id="playerPhoto" accept="image/*" onchange="previewPlayerPhoto()" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
-                                <small style="color: #666;">Formatos: JPG, PNG. Máximo 2MB</small>
-                                
-                                <!-- Recuadro para mostrar la foto -->
-                                <div id="photoPreview" style="margin-top: 10px; display: none;">
-                                    <div style="border: 2px dashed #ddd; border-radius: 8px; padding: 15px; text-align: center; background: #f8f9fa;">
-                                        <img id="playerPhotoPreview" style="max-width: 200px; max-height: 200px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);" alt="Vista previa de la foto">
-                                        <div style="margin-top: 10px;">
-                                            <button type="button" onclick="removePlayerPhoto()" style="background: #dc2626; color: white; border: none; padding: 5px 10px; border-radius: 4px; cursor: pointer; font-size: 0.8rem;">🗑️ Eliminar Foto</button>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- Datos del Tutor (aparece automáticamente para menores) -->
-                        <div id="guardianSection" style="background: #fff3cd; padding: 15px; border-radius: 8px; margin-bottom: 20px; display: none;">
-                            <h5>👨‍👩‍👧‍👦 Datos del Padre/Madre/Tutor (Obligatorio para menores de edad)</h5>
-                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px;">
-                                <div>
-                                    <label style="display: block; margin-bottom: 5px; font-weight: bold;">Nombre del Tutor *</label>
-                                    <input type="text" id="guardianName" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
-                                </div>
-                                <div>
-                                    <label style="display: block; margin-bottom: 5px; font-weight: bold;">DNI del Tutor *</label>
-                                    <input type="text" id="guardianDNI" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
-                                </div>
-                            </div>
-                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px;">
-                                <div>
-                                    <label style="display: block; margin-bottom: 5px; font-weight: bold;">Teléfono del Tutor *</label>
-                                    <input type="tel" id="guardianPhone" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
-                                </div>
-                                <div>
-                                    <label style="display: block; margin-bottom: 5px; font-weight: bold;">Email del Tutor *</label>
-                                    <input type="email" id="guardianEmail" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
-                                </div>
-                            </div>
-                            <div style="margin-bottom: 15px;">
-                                <label style="display: block; margin-bottom: 5px; font-weight: bold;">Dirección del Tutor</label>
-                                <input type="text" id="guardianAddress" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
-                            </div>
-                        </div>
-
-                        <!-- Estadísticas Deportivas -->
-                        <div style="background: #f0f8ff; padding: 15px; border-radius: 8px; margin-bottom: 20px;">
-                            <h5>⚽ Estadísticas Deportivas</h5>
-                            <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 15px; margin-bottom: 15px;">
-                                <div>
-                                    <label style="display: block; margin-bottom: 5px; font-weight: bold;">Partidos Jugados</label>
-                                    <input type="number" id="playerMatches" min="0" value="0" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
-                                </div>
-                                <div>
-                                    <label style="display: block; margin-bottom: 5px; font-weight: bold;">Goles Marcados</label>
-                                    <input type="number" id="playerGoals" min="0" value="0" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
-                                </div>
-                                <div>
-                                    <label style="display: block; margin-bottom: 5px; font-weight: bold;">Asistencias</label>
-                                    <input type="number" id="playerAssists" min="0" value="0" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
-                                </div>
-                            </div>
-                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px;">
-                                <div>
-                                    <label style="display: block; margin-bottom: 5px; font-weight: bold;">Tarjetas Amarillas</label>
-                                    <input type="number" id="playerYellowCards" min="0" value="0" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
-                                </div>
-                                <div>
-                                    <label style="display: block; margin-bottom: 5px; font-weight: bold;">Tarjetas Rojas</label>
-                                    <input type="number" id="playerRedCards" min="0" value="0" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- Consentimientos -->
-                        <div style="background: #e7f3ff; padding: 15px; border-radius: 8px; margin-bottom: 20px;">
-                            <h5>✅ Consentimientos Requeridos</h5>
-                            <div style="margin-bottom: 10px;">
-                                <label style="display: flex; align-items: center; font-weight: bold;">
-                                    <input type="checkbox" id="playerConsent" style="margin-right: 10px; transform: scale(1.2);"> 
-                                    Consentimiento para ser jugador del equipo CDSANABRIACF *
-                                </label>
-                            </div>
-                            <div style="margin-bottom: 10px;">
-                                <label style="display: flex; align-items: center; font-weight: bold;">
-                                    <input type="checkbox" id="photoConsent" style="margin-right: 10px; transform: scale(1.2);"> 
-                                    Consentimiento para aparecer en fotos y videos del club *
-                                </label>
-                            </div>
-                            <p style="font-size: 0.9em; color: #666; margin-top: 10px;">
-                                * Los consentimientos son obligatorios para completar el registro
-                            </p>
-                        </div>
-                        
-                        <div style="text-align: center;">
-                            <button class="btn btn-success" onclick="savePlayer()" style="margin-right: 10px;">💾 Guardar Jugador</button>
-                            <button class="btn" onclick="cancelAddPlayer()">❌ Cancelar</button>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Exportar jugadores (columnas configurables) -->
-                <div class="section" style="background:#eff6ff;border:2px solid #3b82f6;border-radius:12px;padding:18px;margin-bottom:20px;">
-                    <h3 style="margin-top:0;color:#1e3a8a;">📤 Exportar fichas de jugadores/as</h3>
-                    <p style="color:#64748b;font-size:0.9rem;margin:0 0 10px;"><strong>Siempre en la exportación:</strong> nombre, apellidos y DNI (en menores el DNI del jugador puede ir vacío; usa las columnas de tutor si las activas). El <strong>dorsal</strong> y la <strong>licencia federativa</strong> solo los asigna el club en el panel — no se piden en la inscripción web.</p>
-                    <div id="playerExportFieldsGrid" style="max-height:320px;overflow-y:auto;margin-bottom:12px;padding:4px;"></div>
-                    <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px;">
-                        <button type="button" class="btn" onclick="selectAllExportFields(true)" style="background:#64748b;color:#fff;">☑️ Marcar opcionales</button>
-                        <button type="button" class="btn" onclick="selectAllExportFields(false)" style="background:#94a3b8;color:#fff;">☐ Desmarcar opcionales</button>
-                        <button type="button" class="btn btn-success" onclick="savePlayerExportFieldSettings()">💾 Guardar columnas</button>
-                    </div>
-                    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;margin-bottom:14px;">
-                        <div>
-                            <label style="font-weight:bold;font-size:0.85rem;">Categoría</label>
-                            <select id="jugadoresExportCategory" style="width:100%;padding:8px;border:1px solid #cbd5e1;border-radius:6px;">
-                                <option value="all">Todas</option>
-                                <option value="prebenjamin">Prebenjamín</option>
-                                <option value="benjamin">Benjamín</option>
-                                <option value="alevin">Alevín</option>
-                                <option value="infantil">Infantil</option>
-                                <option value="cadete">Cadete</option>
-                                <option value="juvenil">Juvenil</option>
-                                <option value="senior">Senior / Aficionado</option>
-                            </select>
-                        </div>
-                        <div>
-                            <label style="font-weight:bold;font-size:0.85rem;">Temporada</label>
-                            <select id="jugadoresExportSeason" style="width:100%;padding:8px;border:1px solid #cbd5e1;border-radius:6px;">
-                                <option value="all">Todas las temporadas</option>
-                            </select>
-                        </div>
-                        <div>
-                            <label style="font-weight:bold;font-size:0.85rem;">Estado de pago</label>
-                            <select id="jugadoresExportPayment" style="width:100%;padding:8px;border:1px solid #cbd5e1;border-radius:6px;">
-                                <option value="all">Todos</option>
-                                <option value="paid">Pagados / activos</option>
-                                <option value="pending">Pendientes de pago</option>
-                            </select>
-                        </div>
-                    </div>
-                    <div style="display:flex;flex-wrap:wrap;gap:8px;">
-                        <button type="button" class="btn btn-success" onclick="exportPlayersFull('xlsx')">📊 Excel</button>
-                        <button type="button" class="btn" onclick="exportPlayersFull('word')" style="background:#2563eb;color:#fff;">📄 Word</button>
-                        <button type="button" class="btn" onclick="exportPlayersFull('pdf')" style="background:#475569;color:#fff;">🖨️ PDF</button>
-                    </div>
-                </div>
-
-                <!-- Lista de jugadores -->
-                <div class="section">
-                    <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:12px;">
-                        <h3 style="margin:0;">📋 Lista de Jugadores Registrados</h3>
-                        <button type="button" class="btn btn-success" onclick="regularizeAdminPlayers()" title="Quita duplicados, sincroniza socios↔jugadores y crea registros faltantes">🔄 Regularizar fichas</button>
-                    </div>
-                    <div id="playersListContainer">
-                        <div id="playersList">
-                            <!-- Los jugadores se cargarán aquí dinámicamente -->
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <div id="calendario" class="tab-content">
-                <h2>📅 Calendario</h2>
-                
-                <div class="section">
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
-                        <div>
-                            <h3>Filtrar Actividades</h3>
-                            <select id="calendarFilter" onchange="filterCalendarEvents()" style="padding: 8px; border: 1px solid #ddd; border-radius: 4px; margin-right: 10px;">
-                                <option value="all">Todas las Actividades</option>
-                                <option value="training">Entrenamientos</option>
-                                <option value="match">Partidos</option>
-                                <option value="meeting">Reuniones</option>
-                            </select>
-                            <select id="categoryCalendarFilter" onchange="filterCalendarEvents()" style="padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
-                                <option value="all">Todas las Categorías</option>
-                                <option value="prebenajmin">Prebenjamín</option>
-                                <option value="benjamin">Benjamín</option>
-                                <option value="alevin">Alevín</option>
-                                <option value="infantil">Infantil</option>
-                                <option value="cadete">Cadete</option>
-                                <option value="juvenil">Juvenil</option>
-                                <option value="aficionado">Aficionado</option>
-                            </select>
-                        </div>
-                        <button class="btn btn-success" onclick="showAddCalendarEventForm()">➕ Programar Actividad</button>
-                    </div>
-                    
-                    <!-- Formulario para añadir evento del calendario -->
-                    <div id="addCalendarEventForm" style="display: none; margin-top: 20px; background: white; padding: 25px; border-radius: 10px; border: 2px solid #059669;">
-                        <h4>📝 Programar Nueva Actividad</h4>
-                        
-                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px;">
-                            <div>
-                                <label style="display: block; margin-bottom: 5px; font-weight: bold;">Título *</label>
-                                <input type="text" id="calendarTitle" required style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
-                            </div>
-                            <div>
-                                <label style="display: block; margin-bottom: 5px; font-weight: bold;">Tipo de Actividad *</label>
-                                <select id="calendarType" required style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
-                                    <option value="">Seleccionar tipo</option>
-                                    <option value="training">🏃 Entrenamiento</option>
-                                    <option value="match">⚽ Partido</option>
-                                    <option value="meeting">💬 Reunión</option>
-                                    <option value="event">🎉 Evento Especial</option>
-                                </select>
-                            </div>
-                        </div>
-
-                        <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 15px; margin-bottom: 15px;">
-                            <div>
-                                <label style="display: block; margin-bottom: 5px; font-weight: bold;">Fecha *</label>
-                                <input type="date" id="calendarDate" required style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
-                            </div>
-                            <div>
-                                <label style="display: block; margin-bottom: 5px; font-weight: bold;">Hora de Inicio *</label>
-                                <input type="time" id="calendarStartTime" required style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
-                            </div>
-                            <div>
-                                <label style="display: block; margin-bottom: 5px; font-weight: bold;">Hora de Fin *</label>
-                                <input type="time" id="calendarEndTime" required style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
-                            </div>
-                        </div>
-
-                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px;">
-                            <div>
-                                <label style="display: block; margin-bottom: 5px; font-weight: bold;">Categoría *</label>
-                                <select id="calendarCategory" required style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
-                                    <option value="">Seleccionar categoría</option>
-                                    <option value="prebenajmin">Prebenjamín (6-8 años)</option>
-                                    <option value="benjamin">Benjamín (8-10 años)</option>
-                                    <option value="alevin">Alevín (10-12 años)</option>
-                                    <option value="infantil">Infantil (12-14 años)</option>
-                                    <option value="cadete">Cadete (14-16 años)</option>
-                                    <option value="juvenil">Juvenil (16-18 años)</option>
-                                    <option value="aficionado">Aficionado (18+ años)</option>
-                                    <option value="all">Todas las categorías</option>
-                                </select>
-                            </div>
-                            <div>
-                                <label style="display: block; margin-bottom: 5px; font-weight: bold;">Ubicación *</label>
-                                <input type="text" id="calendarLocation" required style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;" placeholder="Ej: Campo Municipal, Polideportivo...">
-                            </div>
-                        </div>
-
-                        <!-- Campos específicos para partidos -->
-                        <div id="matchFields" style="display: none; background: #f0f9ff; padding: 15px; border-radius: 8px; margin-bottom: 15px;">
-                            <h5>⚽ Información del Partido</h5>
-                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
-                                <div>
-                                    <label style="display: block; margin-bottom: 5px; font-weight: bold;">Equipo Rival</label>
-                                    <input type="text" id="rivalTeam" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
-                                </div>
-                                <div>
-                                    <label style="display: block; margin-bottom: 5px; font-weight: bold;">¿Local o Visitante?</label>
-                                    <select id="homeAway" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
-                                        <option value="home">🏠 Local</option>
-                                        <option value="away">✈️ Visitante</option>
-                                    </select>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div style="margin-bottom: 15px;">
-                            <label style="display: block; margin-bottom: 5px; font-weight: bold;">Descripción</label>
-                            <textarea id="calendarDescription" rows="3" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;" placeholder="Detalles adicionales sobre la actividad..."></textarea>
-                        </div>
-
-                        <div style="margin-bottom: 15px;">
-                            <label style="display: flex; align-items: center; font-weight: bold;">
-                                <input type="checkbox" id="calendarRecurring" onchange="toggleRecurringOptions()" style="margin-right: 10px; transform: scale(1.2);"> 
-                                Actividad recurrente (se repite semanalmente)
-                            </label>
-                        </div>
-
-                        <div id="recurringOptions" style="display: none; background: #fff3cd; padding: 15px; border-radius: 8px; margin-bottom: 15px;">
-                            <label style="display: block; margin-bottom: 5px; font-weight: bold;">Repetir hasta la fecha:</label>
-                            <input type="date" id="recurringEndDate" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
-                        </div>
-                        
-                        <div style="text-align: center;">
-                            <button class="btn btn-success" onclick="saveCalendarEvent()" style="margin-right: 10px;">💾 Programar Actividad</button>
-                            <button class="btn" onclick="cancelAddCalendarEvent()">❌ Cancelar</button>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Vista del calendario -->
-                <div class="section">
-                    <h3>📅 Vista de Calendario</h3>
-                    <div style="background: white; border-radius: 10px; padding: 20px;">
-                        <div style="display: flex; justify-content: between; align-items: center; margin-bottom: 20px;">
-                            <div style="display: flex; align-items: center; gap: 10px;">
-                                <button onclick="changeCalendarMonth(-1)" style="padding: 8px 12px; background: #6c757d; color: white; border: none; border-radius: 4px; cursor: pointer;">◀ Anterior</button>
-                                <h4 id="currentMonthYear" style="margin: 0; min-width: 200px; text-align: center;">Febrero 2026</h4>
-                                <button onclick="changeCalendarMonth(1)" style="padding: 8px 12px; background: #6c757d; color: white; border: none; border-radius: 4px; cursor: pointer;">Siguiente ▶</button>
-                            </div>
-                            <button onclick="goToToday()" style="padding: 8px 12px; background: #1e3a8a; color: white; border: none; border-radius: 4px; cursor: pointer;">📅 Hoy</button>
-                        </div>
-                        <div id="calendarGrid">
-                            <!-- El calendario se generará aquí -->
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Lista de próximas actividades -->
-                <div class="section">
-                    <h3>📋 Próximas Actividades</h3>
-                    <div id="upcomingActivities">
-                        <!-- Las actividades se cargarán aquí dinámicamente -->
-                    </div>
-                </div>
-            </div>
-
-            <div id="eventos" class="tab-content">
-                <h2>🎉 Eventos</h2>
-                
-                <div class="section">
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
-                        <div>
-                            <h3>Filtrar Eventos</h3>
-                            <select id="eventStatusFilter" onchange="filterEvents()" style="padding: 8px; border: 1px solid #ddd; border-radius: 4px; margin-right: 10px;">
-                                <option value="all">Todos los Estados</option>
-                                <option value="upcoming">Próximos</option>
-                                <option value="ongoing">En Curso</option>
-                                <option value="finished">Finalizados</option>
-                            </select>
-                            <select id="eventTypeFilter" onchange="filterEvents()" style="padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
-                                <option value="all">Todos los Tipos</option>
-                                <option value="free">Gratuitos</option>
-                                <option value="paid">De Pago</option>
-                            </select>
-                        </div>
-                        <div style="display:flex; gap:8px; flex-wrap:wrap;">
-                            <button class="btn" onclick="deleteOldEvents()" style="background:#b45309; color:white;">🧹 Eliminar antiguos</button>
-                            <button class="btn btn-success" onclick="showAddEventForm()">➕ Crear Nuevo Evento</button>
-                        </div>
-                    </div>
-                    
-                    <!-- Formulario para crear evento -->
-                    <div id="addEventForm" style="display: none; margin-top: 20px; background: white; padding: 25px; border-radius: 10px; border: 2px solid #059669;">
-                        <h4>📝 Crear Nuevo Evento</h4>
-                        
-                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px;">
-                            <div>
-                                <label style="display: block; margin-bottom: 5px; font-weight: bold;">Nombre del Evento *</label>
-                                <input type="text" id="eventName" required style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
-                            </div>
-                            <div>
-                                <label style="display: block; margin-bottom: 5px; font-weight: bold;">Fecha del Evento *</label>
-                                <input type="date" id="eventDate" required style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
-                            </div>
-                        </div>
-
-                        <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 15px; margin-bottom: 15px;">
-                            <div>
-                                <label style="display: block; margin-bottom: 5px; font-weight: bold;">Hora de Inicio *</label>
-                                <input type="time" id="eventStartTime" required style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
-                            </div>
-                            <div>
-                                <label style="display: block; margin-bottom: 5px; font-weight: bold;">Hora de Fin *</label>
-                                <input type="time" id="eventEndTime" required style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
-                            </div>
-                            <div>
-                                <label style="display: block; margin-bottom: 5px; font-weight: bold;">Ubicación *</label>
-                                <input type="text" id="eventLocation" required style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
-                            </div>
-                        </div>
-
-                        <div style="margin-bottom: 15px;">
-                            <label style="display: block; margin-bottom: 5px; font-weight: bold;">Descripción del Evento *</label>
-                            <textarea id="eventDescription" rows="3" required style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;" placeholder="Describe el evento, actividades, etc..."></textarea>
-                        </div>
-
-                        <!-- Configuración de Inscripciones -->
-                        <div style="background: #f0f9ff; padding: 15px; border-radius: 8px; margin-bottom: 15px;">
-                            <h5>👥 Configuración de Inscripciones</h5>
-                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px;">
-                                <div>
-                                    <label style="display: block; margin-bottom: 5px; font-weight: bold;">Precio socios/as (€) *</label>
-                                    <input type="number" id="eventPrice" min="0" step="0.01" required style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;" placeholder="0.00">
-                                    <small style="color: #666;">Se usa también como precio general de referencia</small>
-                                </div>
-                                <div>
-                                    <label style="display: block; margin-bottom: 5px; font-weight: bold;">Precio amigos/as (€)</label>
-                                    <input type="number" id="eventPriceAmigos" min="0" step="0.01" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;" placeholder="Si se deja vacío, usa precio de socios/as">
-                                </div>
-                            </div>
-                            <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 15px; margin-bottom: 15px;">
-                                <div>
-                                    <label style="display: block; margin-bottom: 5px; font-weight: bold;">Precio jugadores/as (€)</label>
-                                    <input type="number" id="eventPriceJugadores" min="0" step="0.01" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;" placeholder="Si se deja vacío, usa precio de socios/as">
-                                </div>
-                                <div>
-                                    <label style="display: block; margin-bottom: 5px; font-weight: bold;">Precio directiva (€)</label>
-                                    <input type="number" id="eventPriceDirectiva" min="0" step="0.01" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;" placeholder="Si se deja vacío, usa precio de socios/as">
-                                </div>
-                                <div>
-                                    <label style="display: block; margin-bottom: 5px; font-weight: bold;">Precio entrenadores/as (€)</label>
-                                    <input type="number" id="eventPriceEntrenadores" min="0" step="0.01" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;" placeholder="Si se deja vacío, usa precio de socios/as">
-                                </div>
-                            </div>
-                            <div style="margin-bottom: 15px;">
-                                <label style="display: block; margin-bottom: 5px; font-weight: bold;">💶 Ingresos del evento imputar a</label>
-                                <select id="eventRevenueDestination" style="width: 100%; max-width: 360px; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
-                                    <option value="A">A — Banco (ingreso bancario)</option>
-                                    <option value="B">B — Efectivo (caja)</option>
-                                </select>
-                                <small style="color: #666; display: block; margin-top: 4px;">Al inscribirse desde la web con precio &gt; 0, se registrará un asiento en la caja elegida (contabilidad).</small>
-                            </div>
-                            <div style="background: #ecfdf5; padding: 15px; border-radius: 8px; margin-bottom: 15px; border: 1px solid #a7f3d0;">
-                                <h5 style="margin: 0 0 10px;">💳 Formas de pago e invitados</h5>
-                                <label style="display: flex; align-items: center; gap: 8px; margin-bottom: 10px; font-weight: 700;">
-                                    <input type="checkbox" id="eventIsFree" onchange="toggleEventFreePaymentUI()"> Evento gratuito (sin cobro)
-                                </label>
-                                <div id="eventPaymentMethodsWrap" style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 12px;">
-                                    <label style="display:flex;align-items:center;gap:8px;"><input type="checkbox" id="eventPayCard" checked> Tarjeta (TPV)</label>
-                                    <label style="display:flex;align-items:center;gap:8px;"><input type="checkbox" id="eventPayBizum"> Bizum</label>
-                                    <label style="display:flex;align-items:center;gap:8px;"><input type="checkbox" id="eventPayTransfer" checked> Transferencia / efectivo</label>
-                                </div>
-                                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 12px;">
-                                    <div>
-                                        <label style="display: block; margin-bottom: 5px; font-weight: bold;">Precio invitado/a (€)</label>
-                                        <input type="number" id="eventPriceInvitados" min="0" step="0.01" value="0" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
-                                    </div>
-                                    <div>
-                                        <label style="display: block; margin-bottom: 5px; font-weight: bold;">Máx. invitados por inscripción</label>
-                                        <input type="number" id="eventMaxGuests" min="0" max="20" value="0" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
-                                    </div>
-                                </div>
-                                <label style="display: flex; align-items: center; gap: 8px;">
-                                    <input type="checkbox" id="eventAllowGuests" onchange="toggleEventGuestsMaxUI()"> Permitir invitados (sin cuenta; nombre y apellidos)
-                                </label>
-                                <small style="color: #666; display: block; margin-top: 6px;">Si el evento es gratuito no se muestran formas de pago. Puedes marcar varias formas de pago a la vez.</small>
-                            </div>
-                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px;">
-                                <div>
-                                    <label style="display: block; margin-bottom: 5px; font-weight: bold;">Mínimo de Inscritos *</label>
-                                    <input type="number" id="eventMinParticipants" min="1" required style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
-                                </div>
-                                <div>
-                                    <label style="display: block; margin-bottom: 5px; font-weight: bold;">Máximo de Inscritos *</label>
-                                    <input type="number" id="eventMaxParticipants" min="1" required style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
-                                </div>
-                            </div>
-                            <div style="margin-bottom: 15px;">
-                                <label style="display: block; margin-bottom: 5px; font-weight: bold;">Inicio de Inscripción</label>
-                                <input type="date" id="eventRegistrationStart" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
-                                <small style="color: #666;">Si no se especifica, comenzará hoy</small>
-                            </div>
-                            <div style="margin-bottom: 15px;">
-                                <label style="display: block; margin-bottom: 5px; font-weight: bold;">Quién puede apuntarse</label>
-                                <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; background:#fff; border:1px solid #dbeafe; border-radius:8px; padding:10px;">
-                                    <label style="display:flex; align-items:center; gap:8px;"><input type="checkbox" id="eventAllowSocios" checked> Socios/as</label>
-                                    <label style="display:flex; align-items:center; gap:8px;"><input type="checkbox" id="eventAllowAmigos" checked> Amigos/as</label>
-                                    <label style="display:flex; align-items:center; gap:8px;"><input type="checkbox" id="eventAllowJugadores"> Jugadores/as</label>
-                                    <label style="display:flex; align-items:center; gap:8px;"><input type="checkbox" id="eventAllowDirectiva"> Directiva</label>
-                                    <label style="display:flex; align-items:center; gap:8px;"><input type="checkbox" id="eventAllowEntrenadores"> Entrenadores/as</label>
-                                </div>
-                                <small style="color: #666;">Selecciona uno o varios grupos según el evento.</small>
-                            </div>
-                            <div style="margin-bottom: 15px;">
-                                <label style="display: block; margin-bottom: 5px; font-weight: bold;">Alcance para jugadores/as</label>
-                                <select id="eventPlayerScope" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
-                                    <option value="all" selected>Todos los jugadores/as</option>
-                                    <option value="categories">Solo categorías seleccionadas</option>
-                                </select>
-                            </div>
-                            <div style="margin-bottom: 15px;">
-                                <label style="display: block; margin-bottom: 5px; font-weight: bold;">Categorías de jugadores/as (si aplica)</label>
-                                <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; background:#fff; border:1px solid #dbeafe; border-radius:8px; padding:10px;">
-                                    <label style="display:flex; align-items:center; gap:8px;"><input type="checkbox" class="eventPlayerCategory" value="prebenjamin"> Prebenjamín</label>
-                                    <label style="display:flex; align-items:center; gap:8px;"><input type="checkbox" class="eventPlayerCategory" value="benjamin"> Benjamín</label>
-                                    <label style="display:flex; align-items:center; gap:8px;"><input type="checkbox" class="eventPlayerCategory" value="alevin"> Alevín</label>
-                                    <label style="display:flex; align-items:center; gap:8px;"><input type="checkbox" class="eventPlayerCategory" value="infantil"> Infantil</label>
-                                    <label style="display:flex; align-items:center; gap:8px;"><input type="checkbox" class="eventPlayerCategory" value="cadete"> Cadete</label>
-                                    <label style="display:flex; align-items:center; gap:8px;"><input type="checkbox" class="eventPlayerCategory" value="juvenil"> Juvenil</label>
-                                    <label style="display:flex; align-items:center; gap:8px;"><input type="checkbox" class="eventPlayerCategory" value="aficionado"> Aficionado</label>
-                                </div>
-                                <small style="color: #666;">Solo se usan si eliges “Solo categorías seleccionadas”.</small>
-                            </div>
-                            <div style="margin-bottom: 15px;">
-                                <label style="display: block; margin-bottom: 5px; font-weight: bold;">Fecha Límite de Inscripción</label>
-                                <input type="date" id="eventRegistrationDeadline" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
-                                <small style="color: #666;">Si no se especifica, será hasta el día del evento</small>
-                            </div>
-                        </div>
-
-                        <!-- Foto del Evento -->
-                        <div style="background: #fff3cd; padding: 15px; border-radius: 8px; margin-bottom: 15px;">
-                            <h5>📸 Foto del Evento</h5>
-                            <div style="margin-bottom: 15px;">
-                                <label style="display: block; margin-bottom: 5px; font-weight: bold;">Subir Imagen del Evento</label>
-                                <input type="file" id="eventImage" accept="image/*" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
-                                <small style="color: #666;">Formatos aceptados: JPG, PNG, GIF. Tamaño máximo: 5MB</small>
-                            </div>
-                            <div id="eventImagePreview" style="display: none; text-align: center; margin-top: 10px;">
-                                <img id="eventImagePreviewImg" style="max-width: 200px; max-height: 150px; border-radius: 8px;">
-                            </div>
-                        </div>
-
-                        <!-- Consentimientos -->
-                        <div style="background: #e7f3ff; padding: 15px; border-radius: 8px; margin-bottom: 20px;">
-                            <h5>✅ Configuración de Consentimientos</h5>
-                            <div style="margin-bottom: 10px;">
-                                <label style="display: flex; align-items: center; font-weight: bold;">
-                                    <input type="checkbox" id="eventPhotoConsent" style="margin-right: 10px; transform: scale(1.2);"> 
-                                    Los participantes deben autorizar aparecer en fotos y videos del evento
-                                </label>
-                            </div>
-                            <div style="margin-bottom: 10px;">
-                                <label style="display: flex; align-items: center; font-weight: bold;">
-                                    <input type="checkbox" id="eventDataConsent" style="margin-right: 10px; transform: scale(1.2);"> 
-                                    Los participantes deben aceptar el tratamiento de sus datos personales
-                                </label>
-                            </div>
-                        </div>
-                        
-                        <div style="text-align: center;">
-                            <button class="btn btn-success" onclick="saveEvent()" style="margin-right: 10px;">💾 Crear Evento</button>
-                            <button class="btn" onclick="cancelAddEvent()">❌ Cancelar</button>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Lista de eventos -->
-                <div class="section">
-                    <h3>📋 Lista de Eventos</h3>
-                    <div id="eventsList">
-                        <!-- Los eventos se cargarán aquí dinámicamente -->
-                    </div>
-                </div>
-            </div>
-
-            <!-- Encuentros Tab -->
-            <div id="encuentros" class="tab-content">
-                <h2>⚽ Gestión de Encuentros</h2>
-                
-                <div class="section">
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
-                        <div>
-                            <h3>Filtrar Encuentros</h3>
-                            <select id="encuentroStatusFilter" onchange="filterEncuentros()" style="padding: 8px; border: 1px solid #ddd; border-radius: 4px; margin-right: 10px;">
-                                <option value="all">Todos los estados</option>
-                                <option value="programado">Programados</option>
-                                <option value="en_curso">En Curso</option>
-                                <option value="finalizado">Finalizados</option>
-                                <option value="cancelado">Cancelados</option>
-                            </select>
-                            <select id="encuentroCategoriaFilter" onchange="filterEncuentros()" style="padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
-                                <option value="all">Todas las categorías</option>
-                                <option value="Prebenjamín">Prebenjamín</option>
-                                <option value="Benjamín">Benjamín</option>
-                                <option value="Alevín">Alevín</option>
-                                <option value="Infantil">Infantil</option>
-                                <option value="Aficionado">Aficionado</option>
-                            </select>
-                        </div>
-                        <button class="btn btn-success" onclick="showAddEncuentroForm()">➕ Crear Nuevo Encuentro</button>
-                    </div>
-                    
-                    <!-- Formulario para crear encuentro -->
-                    <div id="addEncuentroForm" style="display: none; margin-top: 20px; background: white; padding: 25px; border-radius: 10px; border: 2px solid #059669;">
-                        <h4>⚽ Nuevo Encuentro</h4>
-                        
-                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px;">
-                            <div>
-                                <label style="display: block; margin-bottom: 5px; font-weight: bold;">Equipo Local *</label>
-                                <input type="text" id="encuentroEquipoLocal" required style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;" placeholder="Ej: CDSANABRIACF Prebenjamín">
-                            </div>
-                            <div>
-                                <label style="display: block; margin-bottom: 5px; font-weight: bold;">Equipo Visitante *</label>
-                                <input type="text" id="encuentroEquipoVisitante" required style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;" placeholder="Ej: Club Rival">
-                            </div>
-                        </div>
-                        
-                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px;">
-                            <div>
-                                <label style="display: block; margin-bottom: 5px; font-weight: bold;">Categoría *</label>
-                                <select id="encuentroCategoria" required style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
-                                    <option value="">Seleccionar categoría</option>
-                                    <option value="Prebenjamín">Prebenjamín</option>
-                                    <option value="Benjamín">Benjamín</option>
-                                    <option value="Alevín">Alevín</option>
-                                    <option value="Infantil">Infantil</option>
-                                    <option value="Cadete">Cadete</option>
-                                    <option value="Juvenil">Juvenil</option>
-                                    <option value="Aficionado">Aficionado</option>
-                                </select>
-                            </div>
-                            <div>
-                                <label style="display: block; margin-bottom: 5px; font-weight: bold;">Tipo de Encuentro *</label>
-                                <select id="encuentroTipo" required style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
-                                    <option value="">Seleccionar tipo</option>
-                                    <option value="liga">Liga</option>
-                                    <option value="torneo">Torneo</option>
-                                    <option value="amistoso">Amistoso</option>
-                                    <option value="entrenamiento">Entrenamiento</option>
-                                </select>
-                            </div>
-                        </div>
-
-                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px;">
-                            <div>
-                                <label style="display: block; margin-bottom: 5px; font-weight: bold;">Fecha *</label>
-                                <input type="date" id="encuentroFecha" required style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
-                            </div>
-                            <div>
-                                <label style="display: block; margin-bottom: 5px; font-weight: bold;">Hora *</label>
-                                <input type="time" id="encuentroHora" required style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
-                            </div>
-                        </div>
-
-                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px;">
-                            <div>
-                                <label style="display: block; margin-bottom: 5px; font-weight: bold;">Campo de Juego *</label>
-                                <input type="text" id="encuentroCampo" required style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;" placeholder="Ej: Campo Municipal de Puebla de Sanabria">
-                            </div>
-                            <div>
-                                <label style="display: block; margin-bottom: 5px; font-weight: bold;">Estado *</label>
-                                <select id="encuentroEstado" required style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
-                                    <option value="programado">Programado</option>
-                                    <option value="en_curso">En Curso</option>
-                                    <option value="finalizado">Finalizado</option>
-                                    <option value="cancelado">Cancelado</option>
-                                </select>
-                            </div>
-                        </div>
-
-                        <div style="margin-bottom: 15px;">
-                            <label style="display: block; margin-bottom: 5px; font-weight: bold;">Descripción</label>
-                            <textarea id="encuentroDescripcion" rows="3" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;" placeholder="Información adicional sobre el encuentro..."></textarea>
-                        </div>
-
-                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px;">
-                            <div>
-                                <label style="display: block; margin-bottom: 5px; font-weight: bold;">Árbitro (opcional)</label>
-                                <input type="text" id="encuentroArbitro" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;" placeholder="Si lo conocéis">
-                            </div>
-                            <div>
-                                <label style="display: block; margin-bottom: 5px; font-weight: bold;">Convocatoria (opcional)</label>
-                                <input type="text" id="encuentroConvocatoria" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;" placeholder="Una línea breve">
-                            </div>
-                        </div>
-                        <div style="margin-bottom: 15px;">
-                            <label style="display: block; margin-bottom: 5px; font-weight: bold;">Alineación / quién juega (opcional)</label>
-                            <textarea id="encuentroAlineacion" rows="3" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;" placeholder="Lista de jugadores/as o notas de convocatoria"></textarea>
-                        </div>
-
-                        <!-- Resultado del Encuentro -->
-                        <div style="background: #f0f9ff; padding: 15px; border-radius: 8px; margin-bottom: 15px;">
-                            <h5>📊 Resultado del Encuentro (opcional)</h5>
-                            <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 15px; margin-bottom: 15px;">
-                                <div>
-                                    <label style="display: block; margin-bottom: 5px; font-weight: bold;">Goles Local</label>
-                                    <input type="number" id="encuentroGolesLocal" min="0" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
-                                </div>
-                                <div style="text-align: center; padding-top: 25px;">
-                                    <span style="font-size: 1.5rem; font-weight: bold;">VS</span>
-                                </div>
-                                <div>
-                                    <label style="display: block; margin-bottom: 5px; font-weight: bold;">Goles Visitante</label>
-                                    <input type="number" id="encuentroGolesVisitante" min="0" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
-                                </div>
-                            </div>
-                        </div>
-                        
-                        <div style="text-align: center;">
-                            <button class="btn btn-success" onclick="saveEncuentro()" style="margin-right: 10px;">💾 Guardar Encuentro</button>
-                            <button class="btn" onclick="cancelAddEncuentro()">❌ Cancelar</button>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Estadísticas de encuentros -->
-                <div class="section">
-                    <h3>📊 Estadísticas de Encuentros</h3>
-                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-bottom: 20px;">
-                        <div style="background: white; padding: 15px; border-radius: 8px; text-align: center; border: 2px solid #e9ecef;">
-                            <div style="font-size: 2rem; font-weight: bold; color: #059669;" id="totalEncuentrosCount">0</div>
-                            <div style="color: #666;">Total de Encuentros</div>
-                        </div>
-                        <div style="background: white; padding: 15px; border-radius: 8px; text-align: center; border: 2px solid #e9ecef;">
-                            <div style="font-size: 2rem; font-weight: bold; color: #3b82f6;" id="programadosEncuentrosCount">0</div>
-                            <div style="color: #666;">Programados</div>
-                        </div>
-                        <div style="background: white; padding: 15px; border-radius: 8px; text-align: center; border: 2px solid #e9ecef;">
-                            <div style="font-size: 2rem; font-weight: bold; color: #f59e0b;" id="finalizadosEncuentrosCount">0</div>
-                            <div style="color: #666;">Finalizados</div>
-                        </div>
-                        <div style="background: white; padding: 15px; border-radius: 8px; text-align: center; border: 2px solid #e9ecef;">
-                            <div style="font-size: 2rem; font-weight: bold; color: #dc2626;" id="canceladosEncuentrosCount">0</div>
-                            <div style="color: #666;">Cancelados</div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Lista de encuentros -->
-                <div class="section">
-                    <h3>📋 Lista de Encuentros</h3>
-                    <div id="encuentrosList" style="background: white; padding: 20px; border-radius: 10px; border: 1px solid #dee2e6;">
-                        <p style="text-align: center; color: #6c757d;">Cargando lista de encuentros...</p>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Módulo de Competiciones -->
-            <div id="competiciones" class="tab-content">
-                <h2>🏆 Gestión de Competiciones</h2>
-                
-                <div class="section">
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
-                        <div>
-                            <h3>Filtrar Competiciones</h3>
-                            <select id="competitionCategoryFilter" onchange="filterCompetitions()" style="padding: 8px; border: 1px solid #ddd; border-radius: 4px; margin-right: 10px;">
-                                <option value="">Todas las categorías</option>
-                                <option value="Prebenjamín">Prebenjamín</option>
-                                <option value="Benjamín">Benjamín</option>
-                                <option value="Alevín">Alevín</option>
-                                <option value="Infantil">Infantil</option>
-                                <option value="Cadete">Cadete</option>
-                                <option value="Juvenil">Juvenil</option>
-                                <option value="Aficionado">Aficionado</option>
-                            </select>
-                            <select id="competitionStatusFilter" onchange="filterCompetitions()" style="padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
-                                <option value="">Todos los estados</option>
-                                <option value="inscripcion">En Inscripción</option>
-                                <option value="activo">Activo</option>
-                                <option value="finalizado">Finalizado</option>
-                            </select>
-                        </div>
-                        <div style="display:flex; gap:8px; flex-wrap:wrap;">
-                            <button class="btn btn-success" onclick="showAddCompetitionForm()">➕ Crear Nueva Competición</button>
-                            <button class="btn" style="background:#2563eb; color:white;" onclick="showCompetitionSyncHealth()">🩺 Salud Sync</button>
-                            <button class="btn organizer-admin-only" data-admin-only="true" style="background:#0f766e; color:white;" onclick="backupClubData()">💾 Backup Club</button>
-                            <button class="btn organizer-admin-only" data-admin-only="true" style="background:#7c3aed; color:white;" onclick="restoreClubData()">♻️ Restaurar Backup</button>
-                            <button class="btn" style="background:#1d4ed8; color:white;" onclick="triggerCompetitionImport()">📥 Importar Competiciones (CSV/Excel/Word)</button>
-                            <button class="btn" style="background:#334155; color:white;" onclick="downloadCompetitionTemplateCSV()">📄 Plantilla CSV</button>
-                            <button class="btn" style="background:#1e40af; color:white;" onclick="downloadCompetitionTemplateExcel()">📗 Plantilla Excel</button>
-                            <button class="btn" style="background:#0ea5e9; color:white;" onclick="downloadCompetitionTemplateWord()">📝 Plantilla Word</button>
-                            <input type="file" id="competitionImportFile" accept=".csv,.xls,.xlsx,.doc,.docx,.txt" style="display:none;" onchange="importCompetitionsFromFile(event)">
-                        </div>
-                    </div>
-                    
-                    <!-- Formulario para crear competición -->
-                    <div id="addCompetitionForm" style="display: none; margin-top: 20px; background: white; padding: 25px; border-radius: 10px; border: 2px solid #059669;">
-                        <input type="hidden" id="competitionEditId" value="">
-                        <h4 id="competitionFormHeading">🏆 Nueva Competición</h4>
-                        
-                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px;">
-                            <div>
-                                <label style="display: block; margin-bottom: 5px; font-weight: bold;">Nombre de la Competición *</label>
-                                <input type="text" id="competitionName" required style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
-                            </div>
-                            <div>
-                                <label style="display: block; margin-bottom: 5px; font-weight: bold;">Categorías * (puedes elegir varias)</label>
-                                <select id="competitionCategories" multiple required style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px; min-height: 140px;">
-                                    <option value="">Seleccionar categoría</option>
-                                    <option value="Prebenjamín">Prebenjamín</option>
-                                    <option value="Benjamín">Benjamín</option>
-                                    <option value="Alevín">Alevín</option>
-                                    <option value="Infantil">Infantil</option>
-                                    <option value="Cadete">Cadete</option>
-                                    <option value="Juvenil">Juvenil</option>
-                                    <option value="Aficionado">Aficionado</option>
-                                </select>
-                                <small style="color:#666;">Ctrl/Cmd + clic para seleccionar múltiples categorías.</small>
-                            </div>
-                        </div>
-                        <div style="margin-bottom: 15px;">
-                            <label style="display: block; margin-bottom: 5px; font-weight: bold;">Programación por categoría (opcional)</label>
-                            <textarea id="competitionCategorySlots" rows="3" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;" placeholder="Formato por línea: Categoria | Campo | Hora&#10;Ej: Infantil | Campo 1 | 10:00"></textarea>
-                        </div>
-
-                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px;">
-                            <div>
-                                <label style="display: block; margin-bottom: 5px; font-weight: bold;">Configuración de campos</label>
-                                <select id="competitionFieldMode" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
-                                    <option value="single">Un solo campo</option>
-                                    <option value="multi">Varios campos (rotación)</option>
-                                    <option value="category">Por categorías</option>
-                                </select>
-                            </div>
-                            <div>
-                                <label style="display: block; margin-bottom: 5px; font-weight: bold;">Campo principal</label>
-                                <input type="text" id="competitionDefaultField" placeholder="Ej: Campo Municipal" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
-                            </div>
-                        </div>
-                        <div style="margin-bottom: 15px;">
-                            <label style="display: block; margin-bottom: 5px; font-weight: bold;">Listado de campos (opcional)</label>
-                            <textarea id="competitionFieldList" rows="2" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;" placeholder="Uno por línea o separados por coma&#10;Ej: Campo 1, Campo 2, Pabellón"></textarea>
-                            <small style="color:#666;">Si eliges "Por categorías", se prioriza el campo definido en "Programación por categoría".</small>
-                        </div>
-
-                        <div style="margin-bottom: 15px; padding: 12px; border-radius: 8px; border: 1px solid #bae6fd; background: #f0f9ff;">
-                            <label style="display: block; margin-bottom: 8px; font-weight: bold;">Sistema de calendario (torneos) — elige uno u otro</label>
-                            <select id="competitionCalendarMode" onchange="toggleParallelCalendarOptions()" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
-                                <option value="classic">Tradicional (mismo sistema de antes: calendario al crear; fechas de pendientes no se mueven solas al meter resultados)</option>
-                                <option value="parallel_occupancy">Nuevo: paralelo por campos y franjas (reorganiza partidos pendientes al guardar resultados)</option>
-                            </select>
-                            <div id="parallelCalendarOptions" style="display: none; margin-top: 12px;">
-                                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
-                                    <div>
-                                        <label style="display: block; margin-bottom: 5px; font-weight: bold;">Primera hora del día (orientativa, cuadrante)</label>
-                                        <input type="time" id="competitionScheduleDayStartTime" value="09:00" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
-                                    </div>
-                                    <div>
-                                        <label style="display: block; margin-bottom: 5px; font-weight: bold;">Intervalo total entre oleadas (min, respaldo)</label>
-                                        <input type="number" id="competitionScheduleSlotMinutes" min="30" max="300" value="90" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;" title="Se usa si no hay duración de encuentro ni líneas por categoría, o como respaldo cuando el partido no encaja en ninguna categoría. Fútbol y fútbol sala: misma lógica.">
-                                    </div>
-                                    <div>
-                                        <label style="display: block; margin-bottom: 5px; font-weight: bold;">Máx. partidos por día</label>
-                                        <input type="number" id="competitionScheduleMaxMatchesPerDay" min="0" max="99" value="0" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;" title="0 = sin límite">
-                                    </div>
-                                    <div>
-                                        <label style="display: block; margin-bottom: 5px; font-weight: bold;">Fin de jornada por defecto (orientativo)</label>
-                                        <input type="time" id="competitionScheduleWeekdayDefaultEnd" value="21:30" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
-                                    </div>
-                                </div>
-                                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 12px;">
-                                    <div>
-                                        <label style="display: block; margin-bottom: 5px; font-weight: bold;">Duración orientativa del encuentro (min)</label>
-                                        <input type="number" id="competitionScheduleMatchDurationMinutes" min="1" max="180" value="" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;" placeholder="Vacío = solo intervalo respaldo" title="Tiempo de juego aproximado por encuentro; con margen suma el hueco del cuadrante. El cuadrante (plan) se preserva en acta aunque el partido se retrase.">
-                                    </div>
-                                    <div>
-                                        <label style="display: block; margin-bottom: 5px; font-weight: bold;">Margen entre encuentros (min)</label>
-                                        <input type="number" id="competitionScheduleTurnoverMinutes" min="0" max="60" value="10" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;" title="Cambio de equipos, calentamiento, etc. Se suma a la duración del encuentro (o a la de la categoría).">
-                                    </div>
-                                </div>
-                                <div style="margin-top: 10px;">
-                                    <label style="display: block; margin-bottom: 5px; font-weight: bold;">Duración por categoría (opcional)</label>
-                                    <textarea id="competitionScheduleCategoryDurations" rows="3" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;" placeholder="Una línea: Categoría | minutos de juego | margen (opcional)&#10;Prebenjamín | 36 | 10&#10;Infantil | 40&#10;Cadete | 45 | 12"></textarea>
-                                    <small style="color:#64748b;display:block;margin-top:4px;">Si un cruce mezcla categorías, se usa el <strong>mayor</strong> total (juego+margen) entre local y visitante. Si falta margen en la línea, se usa el margen global. Campos/calendario paralelo siguen decidiendo <strong>dónde</strong> se juega; esto ajusta <strong>cuánto</strong> dura cada franja.</small>
-                                </div>
-                                <div style="margin-top: 12px;">
-                                    <label style="display: block; margin-bottom: 5px; font-weight: bold;">Ventanas por día de la semana (opcional)</label>
-                                    <textarea id="competitionScheduleWeekdayWindows" rows="4" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;" placeholder="Una línea: Día | Hora inicio | Hora fin&#10;Ej:&#10;Lunes | 09:00 | 14:00&#10;Sábado | 10:00 | 20:00&#10;&#10;Los días sin línea usan &quot;Primera hora&quot; y &quot;Fin de jornada por defecto&quot;."></textarea>
-                                </div>
-                                <div style="margin-top: 14px; padding-top: 12px; border-top: 1px solid #bae6fd;">
-                                    <label style="display: block; margin-bottom: 5px; font-weight: bold;">Orden de programación (cruces pendientes)</label>
-                                    <select id="competitionScheduleAgeSortMode" onchange="toggleParallelSortCustomOptions()" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px; margin-bottom: 8px;">
-                                        <option value="youngest_first">Primero categorías más jóvenes (por defecto)</option>
-                                        <option value="oldest_first">Primero categorías más mayores</option>
-                                        <option value="custom">Lista personalizada (orden de categorías)</option>
-                                    </select>
-                                    <div id="parallelSortCustomWrap" style="display: none; margin-bottom: 10px;">
-                                        <label style="display: block; margin-bottom: 4px; font-size: 0.9rem;">Una categoría por línea (las de arriba tienen prioridad antes en el día; cruces con equipos de esa categoría)</label>
-                                        <textarea id="competitionScheduleCategoryCustomOrder" rows="4" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;" placeholder="Prebenjamín&#10;Benjamín&#10;Alevín&#10;..."></textarea>
-                                        <label style="display: flex; align-items: center; gap: 8px; margin-top: 6px; font-size: 0.9rem;">
-                                            <input type="checkbox" id="competitionScheduleCustomOrderInverted">
-                                            Invertir lista (primero las últimas categorías de la lista)
-                                        </label>
-                                    </div>
-                                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 8px;">
-                                        <div>
-                                            <label style="display: block; margin-bottom: 4px; font-weight: bold;">Hora de corte (opcional)</label>
-                                            <input type="time" id="competitionScheduleSortCutoffTime" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;" title="A partir de esta hora del día se usa el orden de abajo">
-                                        </div>
-                                        <div>
-                                            <label style="display: block; margin-bottom: 4px; font-weight: bold;">Orden desde la hora de corte</label>
-                                            <select id="competitionScheduleAgeSortAfterCutoff" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
-                                                <option value="">Igual que el orden principal</option>
-                                                <option value="youngest_first">Forzar: más jóvenes primero</option>
-                                                <option value="oldest_first">Forzar: más mayores primero</option>
-                                                <option value="custom">Forzar: lista personalizada</option>
-                                            </select>
-                                        </div>
-                                    </div>
-                                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
-                                        <div>
-                                            <label style="display: block; margin-bottom: 4px; font-weight: bold;">Tope hora inicio global (opcional)</label>
-                                            <input type="time" id="competitionScheduleClampMinTime" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;" title="Ningún partido antes de esta hora (aplica a cada día)">
-                                        </div>
-                                        <div>
-                                            <label style="display: block; margin-bottom: 4px; font-weight: bold;">Tope hora fin global (opcional)</label>
-                                            <input type="time" id="competitionScheduleClampMaxTime" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;" title="Ningún partido termina la franja después de esta hora">
-                                        </div>
-                                    </div>
-                                    <small style="color:#0369a1; display:block; margin-top:6px;">Las fechas límite del torneo siguen siendo <strong>fecha inicio / fecha fin</strong> de la competición. Las horas de inicio/fin del día y la duración entre encuentros son <strong>orientativas</strong> para el cuadrante: un retraso al pitido inicial no debe cambiarse en el acta para desordenar el replan (en cada partido se guarda aparte el cuadrante y la hora del acta).</small>
-                                </div>
-                                <div style="margin-top: 14px; padding-top: 12px; border-top: 1px solid #bae6fd;">
-                                    <label style="display: block; margin-bottom: 5px; font-weight: bold;">Reglas avanzadas de calendario (opcional)</label>
-                                    <textarea id="competitionScheduleRuleOverrides" rows="5" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px; font-family: ui-monospace, monospace; font-size: 0.85rem;" placeholder="Una regla por línea. Las líneas posteriores refinan a las anteriores si coinciden.&#10;Semana|índice|horaIni|horaFin|[orden|horaCorte|ordenTrasCorte|clampIni|clampFin|minOleada]&#10;Fecha|YYYY-MM-DD|horaIni|horaFin|[mismo tail opcional]&#10;DiaSemana|sábado|horaIni|horaFin|[tail opcional] — solo ese día de la semana&#10;Final|[orden|horaCorte|ordenTrasCorte|clampIni|clampFin|minOleada] — partidos de la última ronda&#10;Orden: youngest_first | oldest_first | custom"></textarea>
-                                    <small style="color:#0369a1; display:block; margin-top:6px;"><strong>Semana</strong>: índice 0 = primera semana desde la fecha de inicio del torneo. <strong>Final</strong>: se detecta por la ronda máxima del cuadro. Valores vacíos en el tail no cambian ese campo.</small>
-                                </div>
-                                <div style="margin-top: 12px; padding: 10px; border-radius: 8px; background: #f8fafc; border: 1px solid #e2e8f0;">
-                                    <label style="display: block; margin-bottom: 6px; font-weight: bold;">Plantillas reutilizables (este navegador)</label>
-                                    <div style="display: flex; flex-wrap: wrap; gap: 8px; align-items: center;">
-                                        <select id="schedulePresetSelect" style="min-width: 200px; padding: 6px; border: 1px solid #ddd; border-radius: 4px;">
-                                            <option value="">— Elegir plantilla —</option>
-                                        </select>
-                                        <button type="button" class="btn" style="background:#0d9488;color:#fff;border:none;border-radius:6px;padding:6px 12px;cursor:pointer;" onclick="loadSchedulePresetIntoForm()">Cargar en formulario</button>
-                                        <button type="button" class="btn" style="background:#475569;color:#fff;border:none;border-radius:6px;padding:6px 12px;cursor:pointer;" onclick="saveSchedulePresetFromForm()">Guardar plantilla actual</button>
-                                        <button type="button" class="btn" style="background:#b91c1c;color:#fff;border:none;border-radius:6px;padding:6px 12px;cursor:pointer;" onclick="deleteSelectedSchedulePreset()">Eliminar seleccionada</button>
-                                    </div>
-                                    <small style="color:#64748b;display:block;margin-top:6px;">Guarda el bloque paralelo (campos, ventanas, orden, reglas avanzadas…) para reutilizarlo al crear otras competiciones.</small>
-                                </div>
-                            </div>
-                            <small style="color:#0369a1; display:block; margin-top:8px;">
-                                <strong>Tradicional</strong> = el organizador que ya usabais (cuadro, rondas que se generan al completar la anterior si aplica, etc.). <strong>Nuevo paralelo</strong> = otro sistema aparte: rellena <strong>campo principal</strong> + <strong>listado de campos</strong>; misma hora en campos distintos; un solo partido en franja → campo principal; orden por edades; al guardar resultados se actualizan cruces y se <em>replanifican</em> solo los partidos pendientes respetando lo ya jugado según el <strong>cuadrante orientativo</strong> (la hora/campo del acta pueden reflejar retrasos sin mover ese cuadrante). Fútbol y fútbol sala usan la misma lógica.
-                            </small>
-                        </div>
-                        
-                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px;">
-                            <div>
-                                <label style="display: block; margin-bottom: 5px; font-weight: bold;">Tipo de Competición *</label>
-                                <select id="competitionType" required onchange="toggleCompetitionFields()" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
-                                    <option value="">Seleccionar tipo</option>
-                                    <option value="liga">Liga</option>
-                                    <option value="torneo">Torneo (Eliminación)</option>
-                                    <option value="amistoso">Amistoso</option>
-                                </select>
-                            </div>
-                            <div>
-                                <label style="display: block; margin-bottom: 5px; font-weight: bold;">Máximo de Equipos</label>
-                                <input type="number" id="maxTeams" min="2" max="32" value="8" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
-                            </div>
-                        </div>
-
-                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px;">
-                            <div>
-                                <label style="display: block; margin-bottom: 5px; font-weight: bold;">Título visible de la competición</label>
-                                <input type="text" id="competitionTitle" placeholder="Ej: Torneo Primavera Sanabria 2026" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
-                            </div>
-                            <div>
-                                <label style="display: block; margin-bottom: 5px; font-weight: bold;">Tipo de competición *</label>
-                                <select id="competitionFormatType" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
-                                    <option value="futbol_7">Fútbol 7</option>
-                                    <option value="futbol_8">Fútbol 8</option>
-                                    <option value="futbol_9">Fútbol 9</option>
-                                    <option value="futbol_11">Fútbol 11</option>
-                                    <option value="futbol_sala">Fútbol sala</option>
-                                </select>
-                            </div>
-                        </div>
-
-                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px;">
-                            <div>
-                                <label style="display: block; margin-bottom: 5px; font-weight: bold;">Fecha de Inicio *</label>
-                                <input type="date" id="competitionStartDate" required style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
-                            </div>
-                            <div>
-                                <label style="display: block; margin-bottom: 5px; font-weight: bold;">Fecha de Fin *</label>
-                                <input type="date" id="competitionEndDate" required style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
-                            </div>
-                        </div>
-
-                        <div style="margin-bottom: 15px;">
-                            <label style="display: block; margin-bottom: 5px; font-weight: bold;">Descripción</label>
-                            <textarea id="competitionDescription" rows="3" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;" placeholder="Describe la competición, formato, premios..."></textarea>
-                        </div>
-
-                        <div style="margin-bottom: 15px;">
-                            <label style="display: block; margin-bottom: 5px; font-weight: bold;">Reglamento</label>
-                            <textarea id="competitionRules" rows="4" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;" placeholder="Reglas específicas de la competición..."></textarea>
-                        </div>
-
-                        <div style="margin-bottom: 15px; padding: 12px; border-radius: 8px; border: 1px solid #bbf7d0; background: #f0fdf4;">
-                            <label style="display: flex; align-items: flex-start; gap: 10px; cursor: pointer; font-weight: normal;">
-                                <input type="checkbox" id="competitionExcludeOfficialPlayerStats" checked style="margin-top: 4px;">
-                                <span><strong>Solo puntúa esta competición (recomendado):</strong> goles, tarjetas y faltas del acta <strong>no se suman</strong> a la ficha oficial del jugador del club ni al control anual de la liga / federación (Castilla y León). Todo queda guardado en el partido y en la clasificación de este torneo. Si participan equipos de fuera o jugadores externos, déjalo marcado.</span>
-                            </label>
-                        </div>
-                        
-                        <div style="text-align: center;">
-                            <button type="button" class="btn btn-success" onclick="saveCompetition()" style="margin-right: 10px;"><span id="competitionSaveButtonLabel">💾 Guardar competición</span></button>
-                            <button type="button" id="competitionRegenerateBracketBtn" class="btn" onclick="regenerateCompetitionBracketFromEditForm()" style="display:none; margin-right: 10px; background:#1d4ed8; color:#fff;">🧩 Regenerar cuadro</button>
-                            <button type="button" class="btn" onclick="cancelAddCompetition()">❌ Cancelar</button>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Preinscripciones torneo F7 (nube) -->
-                <div class="section" style="background:#eff6ff;padding:20px;border-radius:12px;border:2px solid #93c5fd;margin-bottom:24px;">
-                    <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;margin-bottom:12px;">
-                        <div>
-                            <h3 style="margin:0;">🏆 Preinscripciones torneo Fútbol 7</h3>
-                            <p style="color:#64748b;font-size:0.92rem;margin:6px 0 0;">Preinscripciones F7 · importar a competición · recordatorio plantilla/pago al responsable.</p>
-                        </div>
-                        <button type="button" class="btn btn-success" onclick="loadTorneoPreinscripcionesAdmin()">🔄 Actualizar listado</button>
-                        <button type="button" class="btn btn-primary" onclick="openTorneoF7Wizard()" style="margin-left:6px;">🧙 Asistente torneo F7</button>
-                        <button type="button" class="btn" onclick="loadTorneoF7CalendarioOficial()" style="margin-left:6px;background:#0f766e;color:#fff;">📅 Cargar calendario oficial</button>
-                    </div>
-                    <p style="margin:0 0 12px;font-size:0.9rem;"><strong>Total:</strong> <span id="torneoPreinscripcionesCompCount">0</span></p>
-                    <div id="torneoPreinscripcionesCompList">
-                        <p style="color:#64748b;margin:0;">Pulsa «Actualizar listado» para cargar desde la nube.</p>
-                    </div>
-                </div>
-
-                <!-- Lista de competiciones -->
-                <div class="section">
-                    <h3>📋 Lista de Competiciones</h3>
-                    <div id="competitionsList">
-                        <!-- Las competiciones se cargarán aquí dinámicamente -->
-                    </div>
-                </div>
-            </div>
-
-            <!-- Amigos del Club Tab -->
-            <div id="amigos" class="tab-content">
-                <h2>🤝 Amigos del Club</h2>
-                
-                <div class="section">
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
-                        <div>
-                            <h3>Filtrar Amigos</h3>
-                            <select id="friendStatusFilter" onchange="filterFriends()" style="padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
-                                <option value="all">Todos los Estados</option>
-                                <option value="active">Activos</option>
-                                <option value="inactive">Inactivos</option>
-                            </select>
-                        </div>
-                        <div style="display:flex; flex-wrap:wrap; gap:8px; align-items:center;">
-                            <button class="btn btn-success" onclick="showAddFriendForm()">➕ Registrar Nuevo Amigo</button>
-                            <button type="button" class="btn" onclick="exportClubListFromTab('amigos','xlsx')" style="background:#10b981;color:white;">📊 Excel</button>
-                            <button type="button" class="btn" onclick="exportClubListFromTab('amigos','word')" style="background:#059669;color:white;">📄 Word</button>
-                            <button type="button" class="btn" onclick="exportClubListFromTab('amigos','pdf')" style="background:#475569;color:white;">🖨️ PDF</button>
-                        </div>
-                    </div>
-                    
-                    <!-- Formulario para registrar amigo -->
-                    <div id="addFriendForm" style="display: none; margin-top: 20px; background: white; padding: 25px; border-radius: 10px; border: 2px solid #059669;">
-                        <h4>📝 Registrar Nuevo Amigo del Club</h4>
-                        
-                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px;">
-                            <div>
-                                <label style="display: block; margin-bottom: 5px; font-weight: bold;">Nombre *</label>
-                                <input type="text" id="friendName" required style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
-                            </div>
-                            <div>
-                                <label style="display: block; margin-bottom: 5px; font-weight: bold;">Apellidos *</label>
-                                <input type="text" id="friendSurname" required style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
-                            </div>
-                        </div>
-
-                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px;">
-                            <div>
-                                <label style="display: block; margin-bottom: 5px; font-weight: bold;">DNI *</label>
-                                <input type="text" id="friendDNI" required style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
-                            </div>
-                            <div>
-                                <label style="display: block; margin-bottom: 5px; font-weight: bold;">Teléfono *</label>
-                                <input type="tel" id="friendPhone" required style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
-                            </div>
-                        </div>
-
-                        <div style="display: grid; grid-template-columns: 1fr; gap: 15px; margin-bottom: 15px;">
-                            <div>
-                                <label style="display: block; margin-bottom: 5px; font-weight: bold;">Correo Electrónico *</label>
-                                <input type="email" id="friendEmail" required style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
-                            </div>
-                        </div>
-
-                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px;">
-                            <div>
-                                <label style="display: block; margin-bottom: 5px; font-weight: bold;">Contraseña de acceso (web) *</label>
-                                <input type="password" id="friendPassword" autocomplete="new-password" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
-                                <small style="color: #666;">La elige el club o la persona; sin reglas en la web. El acceso con correo puede rechazar contraseñas muy cortas (típico mínimo 6).</small>
-                            </div>
-                            <div>
-                                <label style="display: block; margin-bottom: 5px; font-weight: bold;">Confirmar contraseña *</label>
-                                <input type="password" id="friendPasswordConfirm" autocomplete="new-password" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
-                            </div>
-                        </div>
-
-                        <!-- Información de acceso limitado -->
-                        <div style="background: #e3f2fd; padding: 15px; border-radius: 8px; margin-bottom: 20px;">
-                            <h5>🔐 Acceso Limitado de Amigos del Club</h5>
-                            <p style="margin: 5px 0; font-size: 0.9em;">
-                                👁️ <strong>Los amigos del club solo pueden ver:</strong>
-                            </p>
-                            <ul style="margin: 5px 0; padding-left: 20px; font-size: 0.9em;">
-                                <li>📅 Calendario de actividades</li>
-                                <li>🏆 Competiciones y resultados</li>
-                            </ul>
-                            <p style="margin: 5px 0; font-size: 0.9em;">
-                                🔑 <strong>Acceso en la web:</strong> correo y contraseña (el administrador puede asignar o cambiar la clave desde esta pestaña; en la lista solo se muestran puntos).
-                            </p>
-                        </div>
-                        
-                        <div style="text-align: center;">
-                            <button class="btn btn-success" onclick="saveFriend()" style="margin-right: 10px;">💾 Registrar Amigo</button>
-                            <button class="btn" onclick="cancelAddFriend()">❌ Cancelar</button>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Estadísticas de amigos -->
-                <div class="section">
-                    <h3>📊 Estadísticas de Amigos del Club</h3>
-                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-bottom: 20px;">
-                        <div style="background: white; padding: 15px; border-radius: 8px; text-align: center; border: 2px solid #e9ecef;">
-                            <div style="font-size: 2rem; font-weight: bold; color: #059669;" id="activeFriendsCount">0</div>
-                            <div style="color: #666;">Amigos Activos</div>
-                        </div>
-                        <div style="background: white; padding: 15px; border-radius: 8px; text-align: center; border: 2px solid #e9ecef;">
-                            <div style="font-size: 2rem; font-weight: bold; color: #6c757d;" id="inactiveFriendsCount">0</div>
-                            <div style="color: #666;">Amigos Inactivos</div>
-                        </div>
-                        <div style="background: white; padding: 15px; border-radius: 8px; text-align: center; border: 2px solid #e9ecef;">
-                            <div style="font-size: 2rem; font-weight: bold; color: #1e3a8a;" id="totalFriendsCount">0</div>
-                            <div style="color: #666;">Total de Amigos</div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Lista de amigos -->
-                <div class="section">
-                    <h3>👥 Lista de Amigos del Club</h3>
-                    <div id="friendsList" style="background: white; padding: 20px; border-radius: 10px; border: 1px solid #dee2e6;">
-                        <p style="text-align: center; color: #6c757d;">Cargando lista de amigos...</p>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Documentos Tab -->
-            <div id="documentos" class="tab-content">
-                <h2>📄 Gestión de Documentos del Club</h2>
-                
-                <div class="section">
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
-                        <div>
-                            <h3>Filtrar Documentos</h3>
-                            <select id="documentStatusFilter" onchange="filterDocuments()" style="padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
-                                <option value="all">Todos los Estados</option>
-                                <option value="active">Activos</option>
-                                <option value="inactive">Inactivos</option>
-                            </select>
-                        </div>
-                        <button class="btn btn-success" onclick="showAddDocumentForm()">➕ Subir Nuevo Documento</button>
-                    </div>
-                    
-                    <!-- Formulario para subir documento -->
-                    <div id="addDocumentForm" style="display: none; margin-top: 20px; background: white; padding: 25px; border-radius: 10px; border: 2px solid #059669;">
-                        <h4>📝 Subir Nuevo Documento</h4>
-                        
-                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px;">
-                            <div>
-                                <label style="display: block; margin-bottom: 5px; font-weight: bold;">Nombre del Documento *</label>
-                                <input type="text" id="documentName" required style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
-                            </div>
-                            <div>
-                                <label style="display: block; margin-bottom: 5px; font-weight: bold;">Categoría *</label>
-                                <select id="documentCategory" required style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
-                                    <option value="">Seleccionar categoría</option>
-                                    <option value="reglamento">Reglamento</option>
-                                    <option value="normativa">Normativa</option>
-                                    <option value="formulario">Formulario</option>
-                                    <option value="informacion">Información General</option>
-                                    <option value="competicion">Competición</option>
-                                    <option value="entrenamiento">Entrenamiento</option>
-                                    <option value="otros">Otros</option>
-                                </select>
-                            </div>
-                        </div>
-
-                        <div style="margin-bottom: 15px;">
-                            <label style="display: block; margin-bottom: 5px; font-weight: bold;">Descripción</label>
-                            <textarea id="documentDescription" rows="3" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;" placeholder="Describe el contenido del documento..."></textarea>
-                        </div>
-
-                        <div style="margin-bottom: 15px;">
-                            <label style="display: block; margin-bottom: 5px; font-weight: bold;">Archivo PDF *</label>
-                            <input type="file" id="documentFile" accept=".pdf" required style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
-                            <small style="color: #666;">Solo archivos PDF. Tamaño máximo: 10MB</small>
-                        </div>
-
-                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px;">
-                            <div>
-                                <label style="display: block; margin-bottom: 5px; font-weight: bold;">Estado</label>
-                                <select id="documentStatus" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
-                                    <option value="active">Activo</option>
-                                    <option value="inactive">Inactivo</option>
-                                </select>
-                            </div>
-                            <div>
-                                <label style="display: block; margin-bottom: 5px; font-weight: bold;">Visibilidad</label>
-                                <select id="documentVisibility" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
-                                    <option value="public">Público (Todos)</option>
-                                    <option value="socios">Solo Socios</option>
-                                    <option value="admin">Solo Administradores</option>
-                                </select>
-                            </div>
-                        </div>
-
-                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px;">
-                            <div>
-                                <label style="display: block; margin-bottom: 5px; font-weight: bold;">Libro: tipo de página</label>
-                                <select id="adBookLayout" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
-                                    <option value="single">Página simple</option>
-                                    <option value="double">Doble página</option>
-                                </select>
-                            </div>
-                            <div>
-                                <label style="display: block; margin-bottom: 5px; font-weight: bold;">Libro: velocidad auto-paso</label>
-                                <select id="adBookSpeed" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
-                                    <option value="3000">Rápida (3s)</option>
-                                    <option value="5000" selected>Normal (5s)</option>
-                                    <option value="8000">Lenta (8s)</option>
-                                    <option value="12000">Muy lenta (12s)</option>
-                                </select>
-                            </div>
-                        </div>
-
-                        <!-- Información de documentos -->
-                        <div style="background: #e3f2fd; padding: 15px; border-radius: 8px; margin-bottom: 20px;">
-                            <h5>📄 Información de Documentos</h5>
-                            <p style="margin: 5px 0; font-size: 0.9em;">
-                                📋 <strong>Los documentos estarán disponibles en:</strong>
-                            </p>
-                            <ul style="margin: 5px 0; padding-left: 20px; font-size: 0.9em;">
-                                <li>🏠 Página principal del club (cuadro de documentos)</li>
-                                <li>📱 Panel de administración</li>
-                                <li>👥 Según la visibilidad configurada</li>
-                                <li>📊 Con estadísticas de descargas</li>
-                            </ul>
-                        </div>
-                        
-                        <div style="text-align: center;">
-                            <button class="btn btn-success" onclick="saveDocument()" style="margin-right: 10px;">💾 Subir Documento</button>
-                            <button class="btn" onclick="cancelAddDocument()">❌ Cancelar</button>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Estadísticas de documentos -->
-                <div class="section">
-                    <h3>📊 Estadísticas de Documentos</h3>
-                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-bottom: 20px;">
-                        <div style="background: white; padding: 15px; border-radius: 8px; text-align: center; border: 2px solid #e9ecef;">
-                            <div style="font-size: 2rem; font-weight: bold; color: #059669;" id="activeDocumentsCount">0</div>
-                            <div style="color: #666;">Documentos Activos</div>
-                        </div>
-                        <div style="background: white; padding: 15px; border-radius: 8px; text-align: center; border: 2px solid #e9ecef;">
-                            <div style="font-size: 2rem; font-weight: bold; color: #3b82f6;" id="totalDocumentsCount">0</div>
-                            <div style="color: #666;">Total de Documentos</div>
-                        </div>
-                        <div style="background: white; padding: 15px; border-radius: 8px; text-align: center; border: 2px solid #e9ecef;">
-                            <div style="font-size: 2rem; font-weight: bold; color: #f59e0b;" id="totalDownloadsCount">0</div>
-                            <div style="color: #666;">Total de Descargas</div>
-                        </div>
-                        <div style="background: white; padding: 15px; border-radius: 8px; text-align: center; border: 2px solid #e9ecef;">
-                            <div style="font-size: 2rem; font-weight: bold; color: #8b5cf6;" id="publicDocumentsCount">0</div>
-                            <div style="color: #666;">Documentos Públicos</div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Lista de documentos -->
-                <div class="section">
-                    <h3>📋 Lista de Documentos</h3>
-                    <div id="documentsList" style="background: white; padding: 20px; border-radius: 10px; border: 1px solid #dee2e6;">
-                        <p style="text-align: center; color: #6c757d;">Cargando lista de documentos...</p>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Publicidad Tab -->
-            <div id="publicidad" class="tab-content">
-                <h2>📢 Gestión de Publicidad del Club</h2>
-                
-                <div class="section">
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
-                        <div>
-                            <h3>Filtrar Publicidad</h3>
-                            <select id="publicidadStatusFilter" onchange="filterPublicidad()" style="padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
-                                <option value="all">Todos los Estados</option>
-                                <option value="active">Activa</option>
-                                <option value="inactive">Inactiva</option>
-                            </select>
-                        </div>
-                        <button class="btn btn-success" onclick="showAddPublicidadForm()">➕ Crear Nueva Publicidad</button>
-                    </div>
-                    
-                    <!-- Formulario para crear publicidad -->
-                    <div id="addPublicidadForm" style="display: none; margin-top: 20px; background: white; padding: 25px; border-radius: 10px; border: 2px solid #059669;">
-                        <h4>📝 Crear Nueva Publicidad</h4>
-                        
-                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px;">
-                            <div>
-                                <label style="display: block; margin-bottom: 5px; font-weight: bold;">Título de la Publicidad *</label>
-                                <input type="text" id="publicidadTitulo" required style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;" placeholder="Ej: Nuevo Equipamiento">
-                            </div>
-                            <div>
-                                <label style="display: block; margin-bottom: 5px; font-weight: bold;">Tipo de Publicidad *</label>
-                                <select id="publicidadTipo" required style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
-                                    <option value="">Seleccionar tipo</option>
-                                    <option value="evento">Evento</option>
-                                    <option value="equipamiento">Equipamiento</option>
-                                    <option value="patrocinador">Patrocinador</option>
-                                    <option value="noticia">Noticia</option>
-                                    <option value="promocion">Promoción</option>
-                                    <option value="otros">Otros</option>
-                                </select>
-                            </div>
-                        </div>
-
-                        <div style="margin-bottom: 15px;">
-                            <label style="display: block; margin-bottom: 5px; font-weight: bold;">Descripción *</label>
-                            <textarea id="publicidadDescripcion" rows="3" required style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;" placeholder="Describe la publicidad..."></textarea>
-                        </div>
-
-                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px;">
-                            <div>
-                                <label style="display: block; margin-bottom: 5px; font-weight: bold;">Archivo de Publicidad</label>
-                                <input type="file" id="publicidadImagen" accept="image/*,application/pdf" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
-                                <small style="color: #666;">Formatos: JPG, PNG, GIF, PDF. Tamaño máximo: 5MB</small>
-                            </div>
-                            <div>
-                                <label style="display: block; margin-bottom: 5px; font-weight: bold;">Enlace (Opcional)</label>
-                                <input type="url" id="publicidadEnlace" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;" placeholder="https://ejemplo.com">
-                            </div>
-                        </div>
-
-                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px;">
-                            <div>
-                                <label style="display: block; margin-bottom: 5px; font-weight: bold;">Estado</label>
-                                <select id="publicidadEstado" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
-                                    <option value="active">Activa</option>
-                                    <option value="inactive">Inactiva</option>
-                                </select>
-                            </div>
-                            <div>
-                                <label style="display: block; margin-bottom: 5px; font-weight: bold;">Prioridad</label>
-                                <select id="publicidadPrioridad" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
-                                    <option value="1">Baja</option>
-                                    <option value="2">Media</option>
-                                    <option value="3" selected>Alta</option>
-                                </select>
-                            </div>
-                            <div>
-                                <label style="display: block; margin-bottom: 5px; font-weight: bold;">Tipo de Visualización</label>
-                                <select id="publicidadVisualizacion" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
-                                    <option value="carrusel">Carrusel Automático</option>
-                                    <option value="fija">Foto Fija</option>
-                                    <option value="tarjeta">Tarjeta Individual</option>
-                                    <option value="banner">Banner Horizontal</option>
-                                    <option value="libro">Libro / folleto</option>
-                                </select>
-                            </div>
-                        </div>
-
-                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px;">
-                            <div>
-                                <label style="display: block; margin-bottom: 5px; font-weight: bold;">Fecha de Inicio</label>
-                                <input type="date" id="publicidadFechaInicio" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
-                            </div>
-                            <div>
-                                <label style="display: block; margin-bottom: 5px; font-weight: bold;">Fecha de Fin</label>
-                                <input type="date" id="publicidadFechaFin" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
-                            </div>
-                        </div>
-
-                        <!-- Información de publicidad -->
-                        <div style="background: #e3f2fd; padding: 15px; border-radius: 8px; margin-bottom: 20px;">
-                            <h5>📢 Información de Publicidad</h5>
-                            <p style="margin: 5px 0; font-size: 0.9em;">
-                                📋 <strong>La publicidad se mostrará en:</strong>
-                            </p>
-                            <ul style="margin: 5px 0; padding-left: 20px; font-size: 0.9em;">
-                                <li>🏠 Página principal del club (Galería de Multimedia)</li>
-                                <li>📱 Panel de administración</li>
-                                <li>🎯 Según la prioridad y estado configurados</li>
-                                <li>📊 Con estadísticas de visualizaciones</li>
-                            </ul>
-                        </div>
-                        
-                        <div style="text-align: center;">
-                            <button class="btn btn-success" onclick="savePublicidad()" style="margin-right: 10px;">💾 Crear Publicidad</button>
-                            <button class="btn" onclick="cancelAddPublicidad()">❌ Cancelar</button>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Formulario público colaboradores -->
-                <div class="section" style="background: #f0fdf4; padding: 20px; border-radius: 12px; border: 2px solid #86efac; margin-bottom: 24px;">
-                    <h3>🤝 Formulario público de colaboradores</h3>
-                    <p style="color:#64748b;font-size:0.92rem;margin:0 0 16px;">
-                        Configura las opciones del modal «Colabora» (cuadro «No hay publicidad activa»). Los visitantes envían la solicitud por correo al club.
-                    </p>
-                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px;">
-                        <div>
-                            <label style="display:block;font-weight:bold;margin-bottom:4px;">Título del modal</label>
-                            <input type="text" id="colabCfgModalTitle" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:4px;">
-                        </div>
-                        <div>
-                            <label style="display:block;font-weight:bold;margin-bottom:4px;">Texto introductorio</label>
-                            <input type="text" id="colabCfgModalIntro" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:4px;">
-                        </div>
-                    </div>
-                    <h4 style="margin:16px 0 8px;">Opciones de publicidad (checkbox + precio)</h4>
-                    <p style="color:#64748b;font-size:0.88rem;margin:0 0 10px;">La opción «Renovación» es configurable. Siempre se muestra además «Estoy interesado en ser colaborador/anunciante» (sin precio).</p>
-                    <div id="colabCfgServicesList" style="display:flex;flex-direction:column;gap:8px;margin-bottom:12px;"></div>
-                    <button type="button" class="btn" onclick="addColaboradorFormConfigRow()" style="margin-right:8px;">➕ Añadir opción</button>
-                    <button type="button" class="btn btn-success" onclick="saveColaboradorFormConfigAdmin()">💾 Guardar formulario colaboradores</button>
-
-                    <div style="margin-top:20px;padding-top:16px;border-top:1px solid #86efac;">
-                        <h4 style="margin:0 0 8px;">Vista previa y diagnóstico local</h4>
-                        <p style="color:#64748b;font-size:0.88rem;margin:0 0 12px;">El listado de solicitudes solo existe en el navegador donde se envió (localStorage). La vista previa muestra el cuerpo del correo mailto con datos de ejemplo.</p>
-                        <button type="button" class="btn" onclick="previewColaboradorMailAdmin()" style="margin-right:8px;">👁 Vista previa del correo</button>
-                        <button type="button" class="btn" onclick="renderColaboradorSubmissionsAdmin()">📋 Actualizar solicitudes locales</button>
-                        <pre id="colabCfgMailPreview" style="display:none;margin-top:12px;padding:12px;background:#fff;border:1px solid #d1fae5;border-radius:8px;white-space:pre-wrap;font-size:0.82rem;max-height:320px;overflow:auto;"></pre>
-                        <div id="colabCfgSubmissionsList" style="margin-top:12px;"></div>
-                    </div>
-                </div>
-
-                <!-- Estadísticas de publicidad -->
-                <div class="section">
-                    <h3>📊 Estadísticas de Publicidad</h3>
-                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-bottom: 20px;">
-                        <div style="background: white; padding: 15px; border-radius: 8px; text-align: center; border: 2px solid #e9ecef;">
-                            <div style="font-size: 2rem; font-weight: bold; color: #059669;" id="activePublicidadCount">0</div>
-                            <div style="color: #666;">Publicidades Activas</div>
-                        </div>
-                        <div style="background: white; padding: 15px; border-radius: 8px; text-align: center; border: 2px solid #e9ecef;">
-                            <div style="font-size: 2rem; font-weight: bold; color: #3b82f6;" id="totalPublicidadCount">0</div>
-                            <div style="color: #666;">Total de Publicidades</div>
-                        </div>
-                        <div style="background: white; padding: 15px; border-radius: 8px; text-align: center; border: 2px solid #e9ecef;">
-                            <div style="font-size: 2rem; font-weight: bold; color: #f59e0b;" id="totalViewsCount">0</div>
-                            <div style="color: #666;">Total de Visualizaciones</div>
-                        </div>
-                        <div style="background: white; padding: 15px; border-radius: 8px; text-align: center; border: 2px solid #e9ecef;">
-                            <div style="font-size: 2rem; font-weight: bold; color: #8b5cf6;" id="totalClicksCount">0</div>
-                            <div style="color: #666;">Total de Clics</div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Lista de publicidades -->
-                <div class="section">
-                    <h3>📋 Lista de Publicidades</h3>
-                    <div id="publicidadList" style="background: white; padding: 20px; border-radius: 10px; border: 1px solid #dee2e6;">
-                        <p style="text-align: center; color: #6c757d;">Cargando lista de publicidades...</p>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Entrenadores Tab -->
-            <div id="entrenadores" class="tab-content">
-                <h2>👨‍🏫 Gestión de Entrenadores</h2>
-                
-                <div class="section">
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
-                        <div>
-                            <h3>Filtrar Entrenadores</h3>
-                            <select id="coachStatusFilter" onchange="filterCoaches()" style="padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
-                                <option value="all">Todos los Estados</option>
-                                <option value="active">Activos</option>
-                                <option value="inactive">Inactivos</option>
-                            </select>
-                        </div>
-                        <div style="display:flex; flex-wrap:wrap; gap:8px; align-items:center;">
-                            <button class="btn btn-success" onclick="showAddCoachForm()">➕ Registrar Nuevo Entrenador</button>
-                            <button type="button" class="btn" onclick="exportClubListFromTab('entrenadores','xlsx')" style="background:#f59e0b;color:white;">📊 Excel</button>
-                            <button type="button" class="btn" onclick="exportClubListFromTab('entrenadores','word')" style="background:#d97706;color:white;">📄 Word</button>
-                            <button type="button" class="btn" onclick="exportClubListFromTab('entrenadores','pdf')" style="background:#475569;color:white;">🖨️ PDF</button>
-                        </div>
-                    </div>
-                    
-                    <!-- Formulario para registrar entrenador -->
-                    <div id="addCoachForm" style="display: none; margin-top: 20px; background: white; padding: 25px; border-radius: 10px; border: 2px solid #059669;">
-                        <h4>📝 Registrar Nuevo Entrenador</h4>
-                        
-                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px;">
-                            <div>
-                                <label style="display: block; margin-bottom: 5px; font-weight: bold;">Nombre *</label>
-                                <input type="text" id="coachName" required style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
-                            </div>
-                            <div>
-                                <label style="display: block; margin-bottom: 5px; font-weight: bold;">Apellidos *</label>
-                                <input type="text" id="coachSurname" required style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
-                            </div>
-                        </div>
-
-                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px;">
-                            <div>
-                                <label style="display: block; margin-bottom: 5px; font-weight: bold;">DNI *</label>
-                                <input type="text" id="coachDNI" required style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
-                            </div>
-                            <div>
-                                <label style="display: block; margin-bottom: 5px; font-weight: bold;">Teléfono *</label>
-                                <input type="tel" id="coachPhone" required style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
-                            </div>
-                        </div>
-
-                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px;">
-                            <div>
-                                <label style="display: block; margin-bottom: 5px; font-weight: bold;">Correo Electrónico *</label>
-                                <input type="email" id="coachEmail" required style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
-                            </div>
-                            <div>
-                                <label style="display: block; margin-bottom: 5px; font-weight: bold;">Clave de acceso (asignada por admin) *</label>
-                                <input type="password" id="coachPassword" required style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
-                                <button type="button" onclick="generateCoachAccessKey()" style="margin-top:6px; background:#1d4ed8; color:white; border:none; padding:6px 10px; border-radius:6px; cursor:pointer;">⚙️ Generar clave</button>
-                                <small style="color: #666;">La define el administrador; puede ser la que prefieras (corta o larga).</small>
-                            </div>
-                        </div>
-
-                        <div style="display: grid; grid-template-columns: 1fr; gap: 15px; margin-bottom: 15px;">
-                            <div>
-                                <label style="display: block; margin-bottom: 5px; font-weight: bold;">Equipo Asignado *</label>
-                                <select id="coachTeam" required style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
-                                    <option value="">Seleccionar equipo...</option>
-                                    <option value="prebenjamin">Prebenjamín</option>
-                                    <option value="benjamin">Benjamín</option>
-                                    <option value="alevin">Alevín</option>
-                                    <option value="infantil">Infantil</option>
-                                    <option value="cadete">Cadete</option>
-                                    <option value="juvenil">Juvenil</option>
-                                    <option value="aficionado">Aficionado</option>
-                                </select>
-                            </div>
-                        </div>
-
-                        <div style="display: grid; grid-template-columns: 1fr; gap: 15px; margin-bottom: 15px;">
-                            <div>
-                                <label style="display: block; margin-bottom: 5px; font-weight: bold;">Permisos del entrenador</label>
-                                <label style="display:block; margin:4px 0;"><input type="checkbox" id="coachPermLineups" checked> Gestionar convocatorias/alineaciones</label>
-                                <label style="display:block; margin:4px 0;"><input type="checkbox" id="coachPermTraining" checked> Gestionar entrenamientos de equipo</label>
-                                <label style="display:block; margin:4px 0;"><input type="checkbox" id="coachPermIndividual" checked> Gestionar entrenamientos individuales</label>
-                                <label style="display:block; margin:4px 0;"><input type="checkbox" id="coachPermExport" checked> Exportar planes</label>
-                            </div>
-                        </div>
-
-                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px;">
-                            <div>
-                                <label style="display: block; margin-bottom: 5px; font-weight: bold;">Licencia de Entrenador</label>
-                                <input type="text" id="coachLicense" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
-                            </div>
-                            <div>
-                                <label style="display: block; margin-bottom: 5px; font-weight: bold;">Años de Experiencia</label>
-                                <input type="number" id="coachExperience" min="0" max="50" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
-                            </div>
-                        </div>
-
-                        <!-- Información de acceso del entrenador -->
-                        <div style="background: #e3f2fd; padding: 15px; border-radius: 8px; margin-bottom: 20px;">
-                            <h5>🔐 Acceso del Entrenador</h5>
-                            <p style="margin: 5px 0; font-size: 0.9em;">
-                                👨‍🏫 <strong>El entrenador podrá:</strong>
-                            </p>
-                            <ul style="margin: 5px 0; padding-left: 20px; font-size: 0.9em;">
-                                <li>📝 Gestionar jugadores de su equipo</li>
-                                <li>📅 Ver calendario de su equipo</li>
-                                <li>📱 Enviar mensajes push a sus jugadores/padres</li>
-                                <li>📊 Ver estadísticas de su equipo</li>
-                                <li>📋 Registrar asistencia y notas</li>
-                            </ul>
-                            <p style="margin: 5px 0; font-size: 0.9em;">
-                                🔑 <strong>Acceso:</strong> Login con email + clave asignada por administrador.
-                            </p>
-                            <p style="margin: 5px 0; font-size: 0.9em; color: #dc2626;">
-                                ⚠️ <strong>Validación:</strong> El entrenador debe ser validado por un administrador para poder acceder.
-                            </p>
-                        </div>
-                        
-                        <div style="text-align: center;">
-                            <button class="btn btn-success" onclick="saveCoach()" style="margin-right: 10px;">💾 Registrar Entrenador</button>
-                            <button class="btn" onclick="cancelAddCoach()">❌ Cancelar</button>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Estadísticas de entrenadores -->
-                <div class="section">
-                    <h3>📊 Estadísticas de Entrenadores</h3>
-                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-bottom: 20px;">
-                        <div style="background: white; padding: 15px; border-radius: 8px; text-align: center; border: 2px solid #e9ecef;">
-                            <div style="font-size: 2rem; font-weight: bold; color: #059669;" id="activeCoachesCount">0</div>
-                            <div style="color: #666;">Entrenadores Activos</div>
-                        </div>
-                        <div style="background: white; padding: 15px; border-radius: 8px; text-align: center; border: 2px solid #e9ecef;">
-                            <div style="font-size: 2rem; font-weight: bold; color: #6c757d;" id="inactiveCoachesCount">0</div>
-                            <div style="color: #666;">Entrenadores Inactivos</div>
-                        </div>
-                        <div style="background: white; padding: 15px; border-radius: 8px; text-align: center; border: 2px solid #e9ecef;">
-                            <div style="font-size: 2rem; font-weight: bold; color: #1e3a8a;" id="totalCoachesCount">0</div>
-                            <div style="color: #666;">Total de Entrenadores</div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Lista de entrenadores -->
-                <div class="section">
-                    <h3>👥 Lista de Entrenadores</h3>
-                    <div id="coachesList" style="background: white; padding: 20px; border-radius: 10px; border: 1px solid #dee2e6;">
-                        <p style="text-align: center; color: #6c757d;">Cargando lista de entrenadores...</p>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Directiva Tab -->
-            <div id="directiva" class="tab-content">
-                <h2>🏛️ Gestión de Directiva</h2>
-
-                <div class="section">
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
-                        <div>
-                            <h3>Composición de la directiva</h3>
-                            <p style="margin: 4px 0 0 0; color: #666;">Configura presidencia, vicepresidencia, secretaría, tesorería y vocalías.</p>
-                        </div>
-                        <div style="display:flex; flex-wrap:wrap; gap:8px; align-items:center;">
-                            <button class="btn btn-success" onclick="showAddBoardMemberForm()">➕ Añadir cargo</button>
-                            <button type="button" class="btn" onclick="exportClubList('directiva','xlsx')" style="background:#1e3a8a;color:white;">📊 Excel</button>
-                            <button type="button" class="btn" onclick="exportClubList('directiva','word')" style="background:#2563eb;color:white;">📄 Word</button>
-                            <button type="button" class="btn" onclick="exportClubList('directiva','pdf')" style="background:#475569;color:white;">🖨️ PDF</button>
-                        </div>
-                    </div>
-
-                    <div id="addBoardMemberForm" style="display: none; margin-top: 20px; background: white; padding: 25px; border-radius: 10px; border: 2px solid #1e3a8a;">
-                        <h4>📝 Añadir integrante de la directiva</h4>
-
-                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px;">
-                            <div>
-                                <label style="display:block; margin-bottom:5px; font-weight:bold;">Nombre *</label>
-                                <input type="text" id="boardMemberName" style="width:100%; padding:8px; border:1px solid #ddd; border-radius:4px;">
-                            </div>
-                            <div>
-                                <label style="display:block; margin-bottom:5px; font-weight:bold;">Apellidos</label>
-                                <input type="text" id="boardMemberSurname" style="width:100%; padding:8px; border:1px solid #ddd; border-radius:4px;">
-                            </div>
-                        </div>
-
-                        <div style="display: grid; grid-template-columns: 1fr; gap: 15px; margin-bottom: 15px;">
-                            <div>
-                                <label style="display:block; margin-bottom:5px; font-weight:bold;">DNI (para vincular con socios/as) *</label>
-                                <input type="text" id="boardMemberDNI" style="width:100%; padding:8px; border:1px solid #ddd; border-radius:4px;" placeholder="Ej: 12345678A">
-                            </div>
-                        </div>
-
-                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px;">
-                            <div>
-                                <label style="display:block; margin-bottom:5px; font-weight:bold;">Cargo *</label>
-                                <select id="boardMemberRole" style="width:100%; padding:8px; border:1px solid #ddd; border-radius:4px;">
-                                    <option value="">Seleccionar cargo...</option>
-                                    <option value="presidencia">Presidencia</option>
-                                    <option value="vicepresidencia">Vicepresidencia</option>
-                                    <option value="secretaria">Secretaría</option>
-                                    <option value="tesoreria">Tesorería</option>
-                                    <option value="vocalia">Vocalía</option>
-                                </select>
-                            </div>
-                            <div>
-                                <label style="display:block; margin-bottom:5px; font-weight:bold;">Área o nota</label>
-                                <input type="text" id="boardMemberArea" placeholder="Ej: Vocalía de eventos" style="width:100%; padding:8px; border:1px solid #ddd; border-radius:4px;">
-                            </div>
-                        </div>
-
-                        <div style="display: grid; grid-template-columns: 1fr; gap: 15px; margin-bottom: 20px;">
-                            <div>
-                                <label style="display:block; margin-bottom:5px; font-weight:bold;">Visible en web pública</label>
-                                <label style="display:block; margin:4px 0;">
-                                    <input type="checkbox" id="boardMemberVisible" checked> Mostrar en "Nuestro equipo"
-                                </label>
-                            </div>
-                        </div>
-
-                        <div style="text-align: center;">
-                            <button class="btn btn-success" onclick="saveBoardMember()" style="margin-right:10px;">💾 Guardar cargo</button>
-                            <button class="btn" onclick="cancelAddBoardMember()">❌ Cancelar</button>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="section">
-                    <h3>👥 Lista de directiva</h3>
-                    <div id="boardMembersList" style="background:white; padding:20px; border-radius:10px; border:1px solid #dee2e6;">
-                        <p style="text-align:center; color:#6c757d;">No hay integrantes de directiva registrados.</p>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Mensajes Push Tab -->
-            <div id="mensajes" class="tab-content">
-                <h2>📱 Gestión de Mensajes Push</h2>
-                
-                <div class="section">
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
-                        <div>
-                            <h3>Enviar Mensaje Push</h3>
-                        </div>
-                        <button class="btn btn-success" onclick="showAddMessageForm()">📤 Enviar Nuevo Mensaje</button>
-                    </div>
-                    
-                    <!-- Formulario para enviar mensaje push -->
-                    <div id="addMessageForm" style="display: none; margin-top: 20px; background: white; padding: 25px; border-radius: 10px; border: 2px solid #059669;">
-                        <h4 id="addMessageFormTitle">📝 Nuevo Mensaje Push</h4>
-                        
-                        <div style="display: grid; grid-template-columns: 1fr; gap: 15px; margin-bottom: 15px;">
-                            <div>
-                                <label style="display: block; margin-bottom: 5px; font-weight: bold;">Título del Mensaje *</label>
-                                <input type="text" id="messageTitle" required style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
-                            </div>
-                        </div>
-
-                        <div style="display: grid; grid-template-columns: 1fr; gap: 15px; margin-bottom: 15px;">
-                            <div>
-                                <label style="display: block; margin-bottom: 5px; font-weight: bold;">Contenido del Mensaje *</label>
-                                <textarea id="messageContent" required style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px; min-height: 100px; resize: vertical;"></textarea>
-                            </div>
-                        </div>
-
-                        <div style="display: grid; grid-template-columns: 1fr; gap: 15px; margin-bottom: 15px;">
-                            <div>
-                                <label style="display: block; margin-bottom: 8px; font-weight: bold;">Envío</label>
-                                <div style="display:flex; flex-wrap:wrap; gap:16px; margin-bottom:10px;">
-                                    <label><input type="radio" name="messageSendMode" value="manual" checked onchange="toggleMessageSendMode()"> Enviar ahora (manual)</label>
-                                    <label><input type="radio" name="messageSendMode" value="scheduled" onchange="toggleMessageSendMode()"> Programar recordatorio</label>
-                                </div>
-                                <div id="messageScheduledWrap" style="display:none;">
-                                    <label style="display:block; margin-bottom:5px; font-weight:600;">Fecha y hora del recordatorio</label>
-                                    <input type="datetime-local" id="messageScheduledAt" style="width:100%; max-width:320px; padding:8px; border:1px solid #ddd; border-radius:4px;">
-                                </div>
-                            </div>
-                        </div>
-
-                        <div style="display: grid; grid-template-columns: 1fr; gap: 15px; margin-bottom: 15px;">
-                            <div>
-                                <label style="display: block; margin-bottom: 5px; font-weight: bold;">Adjunto JPG o PDF (opcional)</label>
-                                <input type="file" id="messageAttachmentFile" accept=".jpg,.jpeg,.png,.pdf,image/jpeg,image/png,application/pdf" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
-                                <div id="messageAttachmentPreview" style="display:none; margin-top:8px; padding:10px; background:#f8fafc; border-radius:8px; font-size:0.9em; color:#475569;"></div>
-                                <p style="margin: 6px 0 0; font-size: 0.85em; color: #64748b;">El aviso push siempre mostrará el <strong>escudo del club</strong>. La imagen o PDF se verá al pulsar la notificación.</p>
-                            </div>
-                        </div>
-
-                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px;">
-                            <div>
-                                <label style="display: block; margin-bottom: 5px; font-weight: bold;">Tipo de Mensaje</label>
-                                <select id="messageType" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
-                                    <option value="general">General</option>
-                                    <option value="urgent">Urgente</option>
-                                    <option value="reminder">Recordatorio</option>
-                                    <option value="announcement">Anuncio</option>
-                                </select>
-                            </div>
-                            <div>
-                                <label style="display: block; margin-bottom: 8px; font-weight: bold;">Destinatarios</label>
-                                <div id="messageRecipientsBox" class="push-filter-box" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 8px; padding: 10px; border: 1px solid #ddd; border-radius: 8px; background: #f8fafc;">
-                                    <label><input type="checkbox" name="messageRecipient" value="all" checked onchange="onMessageRecipientToggle(this)"> Todos los usuarios</label>
-                                    <label><input type="checkbox" name="messageRecipient" value="socios" onchange="onMessageRecipientToggle(this)"> Socios</label>
-                                    <label><input type="checkbox" name="messageRecipient" value="amigos" onchange="onMessageRecipientToggle(this)"> Amigos del club</label>
-                                    <label><input type="checkbox" name="messageRecipient" value="entrenadores" onchange="onMessageRecipientToggle(this)"> Entrenadores</label>
-                                    <label><input type="checkbox" name="messageRecipient" value="jugadores" onchange="onMessageRecipientToggle(this)"> Jugadores</label>
-                                    <label><input type="checkbox" name="messageRecipient" value="padres" onchange="onMessageRecipientToggle(this)"> Padres/tutores</label>
-                                </div>
-                                <p style="margin: 6px 0 0; font-size: 0.85em; color: #64748b;">Puedes marcar varios grupos a la vez. «Todos los usuarios» incluye visitantes sin login.</p>
-                            </div>
-                        </div>
-
-                        <div style="display: grid; grid-template-columns: 1fr; gap: 15px; margin-bottom: 15px;">
-                            <div>
-                                <label style="display: block; margin-bottom: 8px; font-weight: bold;">Equipo específico (opcional)</label>
-                                <div id="messageTeamsBox" class="push-filter-box" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 8px; padding: 10px; border: 1px solid #ddd; border-radius: 8px; background: #f8fafc;">
-                                    <label><input type="checkbox" name="messageTeam" value="all" checked onchange="onMessageTeamToggle(this)"> Todos los equipos</label>
-                                    <label><input type="checkbox" name="messageTeam" value="prebenjamin" onchange="onMessageTeamToggle(this)"> Prebenjamín</label>
-                                    <label><input type="checkbox" name="messageTeam" value="benjamin" onchange="onMessageTeamToggle(this)"> Benjamín</label>
-                                    <label><input type="checkbox" name="messageTeam" value="alevin" onchange="onMessageTeamToggle(this)"> Alevín</label>
-                                    <label><input type="checkbox" name="messageTeam" value="infantil" onchange="onMessageTeamToggle(this)"> Infantil</label>
-                                    <label><input type="checkbox" name="messageTeam" value="cadete" onchange="onMessageTeamToggle(this)"> Cadete</label>
-                                    <label><input type="checkbox" name="messageTeam" value="juvenil" onchange="onMessageTeamToggle(this)"> Juvenil</label>
-                                    <label><input type="checkbox" name="messageTeam" value="aficionado" onchange="onMessageTeamToggle(this)"> Aficionado</label>
-                                </div>
-                                <p style="margin: 6px 0 0; font-size: 0.85em; color: #64748b;">Puedes marcar varios equipos. Si no marcas ninguno concreto, llega a todos los equipos.</p>
-                            </div>
-                        </div>
-
-                        <!-- Información de envío -->
-                        <div style="background: #e3f2fd; padding: 15px; border-radius: 8px; margin-bottom: 20px;">
-                            <h5>📤 Información de Envío</h5>
-                            <p style="margin: 5px 0; font-size: 0.9em;">
-                                📱 <strong>Los mensajes push se enviarán a:</strong>
-                            </p>
-                            <ul style="margin: 5px 0; padding-left: 20px; font-size: 0.9em;">
-                                <li>👥 Usuarios registrados según el filtro seleccionado</li>
-                                <li>🔔 Campana de notificaciones en la web y la PWA</li>
-                                <li>📱 Push al móvil con escudo del club (si tienen avisos activados)</li>
-                                <li>⏰ Recordatorios programados (fecha y hora)</li>
-                                <li>📎 Adjunto JPG/PDF visible al pulsar el aviso</li>
-                                <li>📊 Se registrará en el historial y en la nube</li>
-                            </ul>
-                        </div>
-                        
-                        <div style="text-align: center;">
-                            <button type="button" class="btn btn-success" id="messageFormSubmitBtn" onclick="sendAdminPushMessage()" style="margin-right: 10px;">📤 Enviar Mensaje</button>
-                            <button type="button" class="btn btn-warning" onclick="previewAdminMessage()" style="margin-right: 10px;">👁️ Vista Previa</button>
-                            <button type="button" class="btn" onclick="cancelAddMessage()">❌ Cancelar</button>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Estadísticas de mensajes -->
-                <div class="section">
-                    <h3>📊 Estadísticas de Mensajes</h3>
-                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-bottom: 20px;">
-                        <div style="background: white; padding: 15px; border-radius: 8px; text-align: center; border: 2px solid #e9ecef;">
-                            <div style="font-size: 2rem; font-weight: bold; color: #059669;" id="totalMessagesCount">0</div>
-                            <div style="color: #666;">Total de Mensajes</div>
-                        </div>
-                        <div style="background: white; padding: 15px; border-radius: 8px; text-align: center; border: 2px solid #e9ecef;">
-                            <div style="font-size: 2rem; font-weight: bold; color: #3b82f6;" id="todayMessagesCount">0</div>
-                            <div style="color: #666;">Mensajes Hoy</div>
-                        </div>
-                        <div style="background: white; padding: 15px; border-radius: 8px; text-align: center; border: 2px solid #e9ecef;">
-                            <div style="font-size: 2rem; font-weight: bold; color: #f59e0b;" id="urgentMessagesCount">0</div>
-                            <div style="color: #666;">Mensajes Urgentes</div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Historial de mensajes -->
-                <div class="section">
-                    <h3>📋 Historial de Mensajes</h3>
-                    <div id="adminMessagesHistory" style="background: white; padding: 20px; border-radius: 10px; border: 1px solid #dee2e6;">
-                        <p style="text-align: center; color: #6c757d;">Cargando historial de mensajes...</p>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Exportar Datos Tab -->
-            <div id="exportar" class="tab-content">
-                <h2>📊 Exportar listados del club</h2>
-                
-                <div class="section">
-                    <div style="background: #e3f2fd; padding: 20px; border-radius: 10px; margin-bottom: 30px;">
-                        <h3>📋 Información de Exportación</h3>
-                        <p style="margin: 10px 0; color: #1e3a8a;">
-                            💡 <strong>Formatos disponibles:</strong> Excel (.xlsx) en tabla horizontal; Word (.doc) y PDF en ficha vertical con escudo del club.
-                        </p>
-                        <p style="margin: 10px 0; color: #1e3a8a;">
-                            📁 Cada listado incluye los datos de contacto, estado y fechas registradas en el panel.
-                        </p>
-                    </div>
-                    
-                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px;">
-                        
-                        <!-- Exportar Jugadores -->
-                        <div style="background: white; padding: 25px; border-radius: 10px; border: 2px solid #059669; box-shadow: 0 4px 15px rgba(0,0,0,0.1);">
-                            <h3 style="color: #059669; margin-bottom: 15px;">⚽ Jugadores / inscripciones</h3>
-                            <p style="margin-bottom: 12px; color: #666;">Elige columnas en <strong>Jugadores → Exportar fichas</strong> (nombre, apellidos y DNI fijos). Dorsal y licencia: datos que asigna el club.</p>
-                            
-                            <div style="margin-bottom: 15px;">
-                                <label style="display: block; margin-bottom: 5px; font-weight: bold;">Categoría:</label>
-                                <select id="exportPlayerCategory" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
-                                    <option value="all">Todas las categorías</option>
-                                    <option value="prebenjamin">Prebenjamín</option>
-                                    <option value="benjamin">Benjamín</option>
-                                    <option value="alevin">Alevín</option>
-                                    <option value="infantil">Infantil</option>
-                                    <option value="cadete">Cadete</option>
-                                    <option value="juvenil">Juvenil</option>
-                                    <option value="senior">Senior / Aficionado</option>
-                                </select>
-                            </div>
-                            <div style="margin-bottom: 15px;">
-                                <label style="display: block; margin-bottom: 5px; font-weight: bold;">Temporada:</label>
-                                <select id="exportPlayerSeason" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
-                                    <option value="all">Todas las temporadas</option>
-                                </select>
-                            </div>
-                            <div style="margin-bottom: 15px;">
-                                <label style="display: block; margin-bottom: 5px; font-weight: bold;">Estado de pago:</label>
-                                <select id="exportPlayerPayment" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
-                                    <option value="all">Todos</option>
-                                    <option value="paid">Pagados / activos</option>
-                                    <option value="pending">Pendientes de pago</option>
-                                </select>
-                            </div>
-                            
-                            <div style="display:flex; flex-wrap:wrap; gap:8px;">
-                                <button type="button" class="btn btn-success" onclick="exportClubList('jugadores','xlsx')" style="flex:1; min-width:90px;">📊 Excel</button>
-                                <button type="button" class="btn btn-success" onclick="exportClubList('jugadores','word')" style="flex:1; min-width:90px;">📄 Word</button>
-                                <button type="button" class="btn btn-success" onclick="exportClubList('jugadores','pdf')" style="flex:1; min-width:90px;">🖨️ PDF</button>
-                            </div>
-                        </div>
-
-                        <!-- Exportar Socios -->
-                        <div style="background: white; padding: 25px; border-radius: 10px; border: 2px solid #3b82f6; box-shadow: 0 4px 15px rgba(0,0,0,0.1);">
-                            <h3 style="color: #3b82f6; margin-bottom: 15px;">👨‍👩‍👧‍👦 Socios del Club</h3>
-                            <p style="margin-bottom: 20px; color: #666;">Exporta la lista completa de socios con sus datos y estados.</p>
-                            
-                            <div style="margin-bottom: 15px;">
-                                <label style="display: block; margin-bottom: 5px; font-weight: bold;">Estado:</label>
-                                <select id="exportMemberStatus" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
-                                    <option value="all">Todos los estados</option>
-                                    <option value="active">Solo activos (pagados)</option>
-                                    <option value="paid">Solo con cuota pagada</option>
-                                    <option value="pending">Pendientes (todos)</option>
-                                    <option value="pending_renewal">Pendientes renovación</option>
-                                    <option value="pending_new">Pendientes alta nueva</option>
-                                    <option value="expired">Solo caducados</option>
-                                </select>
-                            </div>
-                            
-                            <div style="display:flex; flex-wrap:wrap; gap:8px;">
-                                <button type="button" class="btn btn-primary" onclick="exportClubList('socios','xlsx')" style="flex:1; min-width:90px;">📊 Excel</button>
-                                <button type="button" class="btn btn-primary" onclick="exportClubList('socios','word')" style="flex:1; min-width:90px;">📄 Word</button>
-                                <button type="button" class="btn btn-primary" onclick="exportClubList('socios','pdf')" style="flex:1; min-width:90px;">🖨️ PDF</button>
-                            </div>
-                        </div>
-
-                        <!-- Exportar Amigos -->
-                        <div style="background: white; padding: 25px; border-radius: 10px; border: 2px solid #10b981; box-shadow: 0 4px 15px rgba(0,0,0,0.1);">
-                            <h3 style="color: #10b981; margin-bottom: 15px;">🤝 Amigos del Club</h3>
-                            <p style="margin-bottom: 20px; color: #666;">Exporta la lista de amigos del club con sus datos de contacto.</p>
-                            
-                            <div style="display:flex; flex-wrap:wrap; gap:8px;">
-                                <button type="button" class="btn" onclick="exportClubList('amigos','xlsx')" style="flex:1; min-width:90px; background:#10b981; color:white;">📊 Excel</button>
-                                <button type="button" class="btn" onclick="exportClubList('amigos','word')" style="flex:1; min-width:90px; background:#10b981; color:white;">📄 Word</button>
-                                <button type="button" class="btn" onclick="exportClubList('amigos','pdf')" style="flex:1; min-width:90px; background:#10b981; color:white;">🖨️ PDF</button>
-                            </div>
-                        </div>
-
-                        <!-- Exportar Directiva -->
-                        <div style="background: white; padding: 25px; border-radius: 10px; border: 2px solid #1e3a8a; box-shadow: 0 4px 15px rgba(0,0,0,0.1);">
-                            <h3 style="color: #1e3a8a; margin-bottom: 15px;">🏛️ Directiva</h3>
-                            <p style="margin-bottom: 20px; color: #666;">Exporta la composición de la directiva (cargos, DNI, visibilidad web).</p>
-                            <div style="display:flex; flex-wrap:wrap; gap:8px;">
-                                <button type="button" class="btn" onclick="exportClubList('directiva','xlsx')" style="flex:1; min-width:90px; background:#1e3a8a; color:white;">📊 Excel</button>
-                                <button type="button" class="btn" onclick="exportClubList('directiva','word')" style="flex:1; min-width:90px; background:#1e3a8a; color:white;">📄 Word</button>
-                                <button type="button" class="btn" onclick="exportClubList('directiva','pdf')" style="flex:1; min-width:90px; background:#1e3a8a; color:white;">🖨️ PDF</button>
-                            </div>
-                        </div>
-
-                        <!-- Exportar Entrenadores -->
-                        <div style="background: white; padding: 25px; border-radius: 10px; border: 2px solid #f59e0b; box-shadow: 0 4px 15px rgba(0,0,0,0.1);">
-                            <h3 style="color: #f59e0b; margin-bottom: 15px;">👨‍🏫 Entrenadores</h3>
-                            <p style="margin-bottom: 20px; color: #666;">Exporta la lista de entrenadores con sus equipos asignados.</p>
-                            
-                            <div style="margin-bottom: 15px;">
-                                <label style="display: block; margin-bottom: 5px; font-weight: bold;">Estado:</label>
-                                <select id="exportCoachStatus" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
-                                    <option value="all">Todos los estados</option>
-                                    <option value="active">Solo activos</option>
-                                    <option value="pending">Solo pendientes</option>
-                                    <option value="inactive">Solo inactivos</option>
-                                </select>
-                            </div>
-                            
-                            <div style="display:flex; flex-wrap:wrap; gap:8px;">
-                                <button type="button" class="btn" onclick="exportClubList('entrenadores','xlsx')" style="flex:1; min-width:90px; background:#f59e0b; color:white;">📊 Excel</button>
-                                <button type="button" class="btn" onclick="exportClubList('entrenadores','word')" style="flex:1; min-width:90px; background:#f59e0b; color:white;">📄 Word</button>
-                                <button type="button" class="btn" onclick="exportClubList('entrenadores','pdf')" style="flex:1; min-width:90px; background:#f59e0b; color:white;">🖨️ PDF</button>
-                            </div>
-                        </div>
-
-                        <!-- Exportar Eventos -->
-                        <div style="background: white; padding: 25px; border-radius: 10px; border: 2px solid #8b5cf6; box-shadow: 0 4px 15px rgba(0,0,0,0.1);">
-                            <h3 style="color: #8b5cf6; margin-bottom: 15px;">🎉 Eventos del Club</h3>
-                            <p style="margin-bottom: 20px; color: #666;">Exporta la lista de eventos con participantes y detalles.</p>
-                            
-                            <button class="btn" onclick="exportEvents()" style="width: 100%; background: #8b5cf6; color: white;">
-                                📊 Exportar Eventos
-                            </button>
-                        </div>
-
-                        <!-- Exportar Competiciones -->
-                        <div style="background: white; padding: 25px; border-radius: 10px; border: 2px solid #dc2626; box-shadow: 0 4px 15px rgba(0,0,0,0.1);">
-                            <h3 style="color: #dc2626; margin-bottom: 15px;">🏆 Competiciones</h3>
-                            <p style="margin-bottom: 20px; color: #666;">Exporta las competiciones con equipos participantes y resultados.</p>
-                            
-                            <button class="btn" onclick="exportCompetitions()" style="width: 100%; background: #dc2626; color: white;">
-                                📊 Exportar Competiciones
-                            </button>
-                        </div>
-
-                        <!-- Exportar Todo -->
-                        <div style="background: white; padding: 25px; border-radius: 10px; border: 2px solid #1e3a8a; box-shadow: 0 4px 15px rgba(0,0,0,0.1);">
-                            <h3 style="color: #1e3a8a; margin-bottom: 15px;">📋 Exportar Todo</h3>
-                            <p style="margin-bottom: 20px; color: #666;">Exporta todos los datos del club en archivos separados.</p>
-                            
-                            <button class="btn" onclick="exportAllData()" style="width: 100%; background: #1e3a8a; color: white;">
-                                📊 Exportar Todo
-                            </button>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Historial de Exportaciones -->
-                <div class="section">
-                    <h3>📋 Historial de Exportaciones</h3>
-                    <div id="exportHistory" style="background: white; padding: 20px; border-radius: 10px; border: 1px solid #dee2e6;">
-                        <p style="text-align: center; color: #6c757d;">No hay exportaciones recientes</p>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Base de Datos Tab -->
-            <div id="basedatos" class="tab-content">
-                <h2>🗄️ Gestión de Base de Datos</h2>
-                
-                <div class="section">
-                    <h3>📊 Estado de la Base de Datos</h3>
-                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-bottom: 20px;">
-                        <div style="background: white; padding: 15px; border-radius: 8px; text-align: center; border: 2px solid #e9ecef;">
-                            <div style="font-size: 2rem; font-weight: bold; color: #059669;" id="dbSociosCount">-</div>
-                            <div style="color: #666;">Socios</div>
-                        </div>
-                        <div style="background: white; padding: 15px; border-radius: 8px; text-align: center; border: 2px solid #e9ecef;">
-                            <div style="font-size: 2rem; font-weight: bold; color: #3b82f6;" id="dbAmigosCount">-</div>
-                            <div style="color: #666;">Amigos</div>
-                        </div>
-                        <div style="background: white; padding: 15px; border-radius: 8px; text-align: center; border: 2px solid #e9ecef;">
-                            <div style="font-size: 2rem; font-weight: bold; color: #f59e0b;" id="dbJugadoresCount">-</div>
-                            <div style="color: #666;">Jugadores</div>
-                        </div>
-                        <div style="background: white; padding: 15px; border-radius: 8px; text-align: center; border: 2px solid #e9ecef;">
-                            <div style="font-size: 2rem; font-weight: bold; color: #8b5cf6;" id="dbEquiposCount">-</div>
-                            <div style="color: #666;">Equipos</div>
-                        </div>
-                        <div style="background: white; padding: 15px; border-radius: 8px; text-align: center; border: 2px solid #e9ecef;">
-                            <div style="font-size: 2rem; font-weight: bold; color: #dc2626;" id="dbEventosCount">-</div>
-                            <div style="color: #666;">Eventos</div>
-                        </div>
-                        <div style="background: white; padding: 15px; border-radius: 8px; text-align: center; border: 2px solid #e9ecef;">
-                            <div style="font-size: 2rem; font-weight: bold; color: #10b981;" id="dbDocumentosCount">-</div>
-                            <div style="color: #666;">Documentos</div>
-                        </div>
-                        <div style="background: white; padding: 15px; border-radius: 8px; text-align: center; border: 2px solid #e9ecef;">
-                            <div style="font-size: 2rem; font-weight: bold; color: #0d9488;" id="dbEntrenadoresCount">-</div>
-                            <div style="color: #666;">Entrenadores</div>
-                        </div>
-                        <div style="background: white; padding: 15px; border-radius: 8px; text-align: center; border: 2px solid #e9ecef;">
-                            <div style="font-size: 2rem; font-weight: bold; color: #6366f1;" id="dbDirectivaCount">-</div>
-                            <div style="color: #666;">Directiva</div>
-                        </div>
-                        <div style="background: white; padding: 15px; border-radius: 8px; text-align: center; border: 2px solid #e9ecef;">
-                            <div style="font-size: 2rem; font-weight: bold; color: #b45309;" id="dbEncuentrosCount">-</div>
-                            <div style="color: #666;">Encuentros</div>
-                        </div>
-                    </div>
-                    
-                    <div id="dbFirebaseStatus" style="text-align: center; margin: 20px 0; padding: 15px; background: #dbeafe; border-radius: 8px; color: #1e3a8a;">
-                        <span style="display: inline-block; width: 12px; height: 12px; background: #2563eb; border-radius: 50%; margin-right: 8px;"></span>
-                        <strong>Sincronizado con la nube (misma fuente que Socios, Amigos y el resto de pestañas)</strong>
-                    </div>
-                    <p style="text-align:center;color:#64748b;font-size:0.9rem;margin:-8px 0 16px 0;">
-                        Una misma persona puede contar en varias casillas (p. ej. socio + jugador + entrenador + directiva). Los totales no son excluyentes entre sí.
-                    </p>
-                </div>
-
-                <div class="section">
-                    <h3>🛠️ Funciones de Base de Datos</h3>
-                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px;">
-                        
-                        <div style="background: white; padding: 20px; border-radius: 10px; border-left: 4px solid #059669; box-shadow: 0 4px 12px rgba(0,0,0,0.1);">
-                            <h4 style="color: #059669; margin-bottom: 15px;">👥 Gestión de Socios</h4>
-                            <p style="margin-bottom: 15px;">Gestión completa de socios con validación de datos y numeración automática.</p>
-                            <button class="btn" onclick="dbAddSocio()" style="margin-right: 10px;">➕ Añadir Socio</button>
-                            <button class="btn btn-secondary" onclick="dbViewSocios()">👁️ Ver Socios</button>
-                            <div id="dbSociosPreview" style="background: #f8f9fa; border: 1px solid #dee2e6; border-radius: 5px; padding: 15px; margin-top: 15px; max-height: 200px; overflow-y: auto; display: none;"></div>
-                        </div>
-
-                        <div style="background: white; padding: 20px; border-radius: 10px; border-left: 4px solid #3b82f6; box-shadow: 0 4px 12px rgba(0,0,0,0.1);">
-                            <h4 style="color: #3b82f6; margin-bottom: 15px;">🤝 Gestión de Amigos</h4>
-                            <p style="margin-bottom: 15px;">Registro de amigos del club con acceso limitado a información.</p>
-                            <button class="btn" onclick="dbAddAmigo()" style="margin-right: 10px;">➕ Añadir Amigo</button>
-                            <button class="btn btn-secondary" onclick="dbViewAmigos()">👁️ Ver Amigos</button>
-                            <div id="dbAmigosPreview" style="background: #f8f9fa; border: 1px solid #dee2e6; border-radius: 5px; padding: 15px; margin-top: 15px; max-height: 200px; overflow-y: auto; display: none;"></div>
-                        </div>
-
-                        <div style="background: white; padding: 20px; border-radius: 10px; border-left: 4px solid #f59e0b; box-shadow: 0 4px 12px rgba(0,0,0,0.1);">
-                            <h4 style="color: #f59e0b; margin-bottom: 15px;">⚽ Gestión de Jugadores</h4>
-                            <p style="margin-bottom: 15px;">Registro completo de jugadores con categorías y datos de padres.</p>
-                            <button class="btn" onclick="dbAddJugador()" style="margin-right: 10px;">➕ Añadir Jugador</button>
-                            <button class="btn btn-secondary" onclick="dbViewJugadores()">👁️ Ver Jugadores</button>
-                            <div id="dbJugadoresPreview" style="background: #f8f9fa; border: 1px solid #dee2e6; border-radius: 5px; padding: 15px; margin-top: 15px; max-height: 200px; overflow-y: auto; display: none;"></div>
-                        </div>
-
-                        <div style="background: white; padding: 20px; border-radius: 10px; border-left: 4px solid #8b5cf6; box-shadow: 0 4px 12px rgba(0,0,0,0.1);">
-                            <h4 style="color: #8b5cf6; margin-bottom: 15px;">📊 Exportación de Datos</h4>
-                            <p style="margin-bottom: 15px;">Exportación en formato CSV y JSON para respaldos y análisis.</p>
-                            <button class="btn btn-success" onclick="dbExportSocios()" style="margin-right: 10px;">📤 Exportar Socios</button>
-                            <button class="btn btn-success" onclick="dbExportAll()">📤 Exportar Todo</button>
-                            <div id="dbExportStatus"></div>
-                        </div>
-
-                        <div style="background: white; padding: 20px; border-radius: 10px; border-left: 4px solid #dc2626; box-shadow: 0 4px 12px rgba(0,0,0,0.1);">
-                            <h4 style="color: #dc2626; margin-bottom: 15px;">💾 Respaldo y Restauración</h4>
-                            <p style="margin-bottom: 15px;">Sistema de respaldo completo y restauración de datos.</p>
-                            <button class="btn btn-success" onclick="dbBackup()" style="margin-right: 10px;">💾 Crear Respaldo</button>
-                            <button class="btn btn-secondary" onclick="dbRestore()">🔄 Restaurar</button>
-                            <div id="dbBackupStatus"></div>
-                        </div>
-
-                        <div style="background: white; padding: 20px; border-radius: 10px; border-left: 4px solid #10b981; box-shadow: 0 4px 12px rgba(0,0,0,0.1);">
-                            <h4 style="color: #10b981; margin-bottom: 15px;">🔍 Búsqueda y Filtros</h4>
-                            <p style="margin-bottom: 15px;">Búsqueda avanzada y filtros por categorías y estados.</p>
-                            <button class="btn" onclick="dbSearch()" style="margin-right: 10px;">🔍 Buscar Socios</button>
-                            <button class="btn btn-secondary" onclick="dbFilterJugadores()">⚽ Filtrar Jugadores</button>
-                            <div id="dbSearchResults" style="background: #f8f9fa; border: 1px solid #dee2e6; border-radius: 5px; padding: 15px; margin-top: 15px; max-height: 200px; overflow-y: auto; display: none;"></div>
-                        </div>
-
-                        <div style="background: white; padding: 20px; border-radius: 10px; border-left: 4px solid #dc2626; box-shadow: 0 4px 12px rgba(0,0,0,0.1);">
-                            <h4 style="color: #dc2626; margin-bottom: 15px;">🗑️ Limpiar Base de Datos</h4>
-                            <p style="margin-bottom: 15px;">⚠️ <strong>PELIGROSO:</strong> Deja a cero socios, jugadores y solicitudes en la nube y en este dispositivo.</p>
-                            <button class="btn" style="background: #dc2626; margin-right: 10px;" onclick="limpiarBaseDeDatos()">🗑️ Reset socios y jugadores</button>
-                            <button class="btn" style="background: #f59e0b; margin-right: 10px;" onclick="limpiarSocios()">👥 Limpiar Solo Socios</button>
-                            <button class="btn btn-secondary" onclick="mostrarEstadisticasDuplicados()">📊 Ver Duplicados</button>
-                            <div id="dbCleanStatus"></div>
-                        </div>
-
-                        <div style="background: white; padding: 20px; border-radius: 10px; border-left: 4px solid #8b5cf6; box-shadow: 0 4px 12px rgba(0,0,0,0.1);">
-                            <h4 style="color: #8b5cf6; margin-bottom: 15px;">📱 Notificaciones</h4>
-                            <p style="margin-bottom: 15px;">Sistema de notificaciones para nuevos socios y eventos.</p>
-                            <button class="btn" onclick="mostrarNotificaciones()" style="margin-right: 10px;">🔔 Ver Notificaciones</button>
-                            <button class="btn btn-secondary" onclick="limpiarNotificaciones()">🗑️ Limpiar</button>
-                            <div id="dbNotificationsPreview" style="background: #f8f9fa; border: 1px solid #dee2e6; border-radius: 5px; padding: 15px; margin-top: 15px; max-height: 200px; overflow-y: auto; display: none;"></div>
-                        </div>
-
-                        <div style="background: white; padding: 20px; border-radius: 10px; border-left: 4px solid #f59e0b; box-shadow: 0 4px 12px rgba(0,0,0,0.1);">
-                            <h4 style="color: #f59e0b; margin-bottom: 15px;">👥 Gestión Avanzada de Socios</h4>
-                            <p style="margin-bottom: 15px;">Añadir y eliminar socios con verificación de duplicados.</p>
-                            <button class="btn" onclick="mostrarFormularioSocioAvanzado()" style="margin-right: 10px;">➕ Añadir Socio</button>
-                            <button class="btn btn-secondary" onclick="mostrarListaSociosEliminar()">🗑️ Eliminar Socio</button>
-                            <div id="dbSociosAvanzadoPreview" style="background: #f8f9fa; border: 1px solid #dee2e6; border-radius: 5px; padding: 15px; margin-top: 15px; max-height: 200px; overflow-y: auto; display: none;"></div>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="section">
-                    <h3>📈 Características de la Base de Datos</h3>
-                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 20px;">
-                        
-                        <div style="background: white; padding: 20px; border-radius: 10px; border-left: 4px solid #059669; box-shadow: 0 4px 12px rgba(0,0,0,0.1);">
-                            <h4 style="color: #059669; margin-bottom: 15px;">✅ Persistencia Estable</h4>
-                            <ul style="margin: 0; padding-left: 20px;">
-                                <li>IndexedDB para almacenamiento robusto</li>
-                                <li>Fallback a localStorage si es necesario</li>
-                                <li>Datos persistentes entre sesiones</li>
-                                <li>Integridad de datos garantizada</li>
-                            </ul>
-                        </div>
-
-                        <div style="background: white; padding: 20px; border-radius: 10px; border-left: 4px solid #3b82f6; box-shadow: 0 4px 12px rgba(0,0,0,0.1);">
-                            <h4 style="color: #3b82f6; margin-bottom: 15px;">🔐 Seguridad</h4>
-                            <ul style="margin: 0; padding-left: 20px;">
-                                <li>Validación de datos en tiempo real</li>
-                                <li>DNI único por persona</li>
-                                <li>Contraseñas encriptadas</li>
-                                <li>Acceso controlado por roles</li>
-                            </ul>
-                        </div>
-
-                        <div style="background: white; padding: 20px; border-radius: 10px; border-left: 4px solid #f59e0b; box-shadow: 0 4px 12px rgba(0,0,0,0.1);">
-                            <h4 style="color: #f59e0b; margin-bottom: 15px;">📊 Exportación Completa</h4>
-                            <ul style="margin: 0; padding-left: 20px;">
-                                <li>Exportación en formato CSV</li>
-                                <li>Exportación en formato JSON</li>
-                                <li>Respaldo completo de datos</li>
-                                <li>Restauración de respaldos</li>
-                            </ul>
-                        </div>
-
-                        <div style="background: white; padding: 20px; border-radius: 10px; border-left: 4px solid #8b5cf6; box-shadow: 0 4px 12px rgba(0,0,0,0.1);">
-                            <h4 style="color: #8b5cf6; margin-bottom: 15px;">⚡ Rendimiento</h4>
-                            <ul style="margin: 0; padding-left: 20px;">
-                                <li>Búsquedas indexadas</li>
-                                <li>Consultas optimizadas</li>
-                                <li>Interfaz asíncrona</li>
-                                <li>Respuesta instantánea</li>
-                            </ul>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Publicidad Tab -->
-            <div id="publicidad_colaboradores" class="tab-content">
-                <h2>📢 Gestión de Publicidad y Colaboradores</h2>
-                
-                <div class="section">
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
-                        <div>
-                            <h3>Gestionar Anuncios Publicitarios</h3>
-                        </div>
-                        <button class="btn btn-success" onclick="showAddAdvertisementForm()">➕ Agregar Nuevo Anuncio</button>
-                    </div>
-                    
-                    <!-- Formulario para agregar anuncio -->
-                    <div id="addAdvertisementForm" style="display: none; margin-top: 20px; background: white; padding: 25px; border-radius: 10px; border: 2px solid #059669;">
-                        <h4>📝 Nuevo Anuncio Publicitario</h4>
-                        
-                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px;">
-                            <div>
-                                <label style="display: block; margin-bottom: 5px; font-weight: bold;">Título del Anuncio *</label>
-                                <input type="text" id="adTitle" required style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
-                            </div>
-                            <div>
-                                <label style="display: block; margin-bottom: 5px; font-weight: bold;">Colaborador/Empresa *</label>
-                                <input type="text" id="adCompany" required style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
-                            </div>
-                        </div>
-
-                        <div style="display: grid; grid-template-columns: 1fr; gap: 15px; margin-bottom: 15px;">
-                            <div>
-                                <label style="display: block; margin-bottom: 5px; font-weight: bold;">Descripción</label>
-                                <textarea id="adDescription" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px; min-height: 80px; resize: vertical;"></textarea>
-                            </div>
-                        </div>
-
-                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px;">
-                            <div>
-                                <label style="display: block; margin-bottom: 5px; font-weight: bold;">Página web del colaborador</label>
-                                <input type="url" id="adUrl" placeholder="https://www.ejemplo.com" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
-                                <small style="color:#666;">Si la indicas, al pinchar la foto o el PDF en la web se abrirá esta página.</small>
-                            </div>
-                            <div>
-                                <label style="display: block; margin-bottom: 5px; font-weight: bold;">Categoría</label>
-                                <select id="adCategory" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
-                                    <option value="general">General</option>
-                                    <option value="deportes">Deportes</option>
-                                    <option value="alimentacion">Alimentación</option>
-                                    <option value="tecnologia">Tecnología</option>
-                                    <option value="servicios">Servicios</option>
-                                    <option value="comercio">Comercio</option>
-                                </select>
-                            </div>
-                        </div>
-
-                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px;">
-                            <div>
-                                <label style="display: block; margin-bottom: 5px; font-weight: bold;">Archivo del Anuncio (Foto o PDF)</label>
-                                <input type="file" id="adMediaFile" accept="image/*,.pdf,application/pdf" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
-                                <small style="color: #666;">Formatos: JPG, PNG, WEBP, PDF. Tamaño máximo: 10MB</small>
-                                <div id="adMediaPreview" style="margin-top: 10px; max-width: 220px;"></div>
-                            </div>
-                            <div>
-                                <label style="display: block; margin-bottom: 5px; font-weight: bold;">Posición en Carrusel</label>
-                                <select id="adPosition" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
-                                    <option value="1">1 - Primera posición</option>
-                                    <option value="2">2 - Segunda posición</option>
-                                    <option value="3">3 - Tercera posición</option>
-                                    <option value="4">4 - Cuarta posición</option>
-                                    <option value="5">5 - Quinta posición</option>
-                                </select>
-                            </div>
-                        </div>
-
-                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px;">
-                            <div>
-                                <label style="display: block; margin-bottom: 5px; font-weight: bold;">Fecha de Inicio</label>
-                                <input type="date" id="adStartDate" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
-                            </div>
-                            <div>
-                                <label style="display: block; margin-bottom: 5px; font-weight: bold;">Fecha de Fin</label>
-                                <input type="date" id="adEndDate" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
-                            </div>
-                        </div>
-
-                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px;">
-                            <div>
-                                <label style="display: block; margin-bottom: 5px; font-weight: bold;">Estado</label>
-                                <select id="adStatus" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
-                                    <option value="active">Activo</option>
-                                    <option value="inactive">Inactivo</option>
-                                    <option value="pending">Pendiente</option>
-                                </select>
-                            </div>
-                            <div>
-                                <label style="display: block; margin-bottom: 5px; font-weight: bold;">Modo de Visualización</label>
-                                <select id="adType" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
-                                    <option value="carrusel">Carrusel</option>
-                                    <option value="estatico">Estático</option>
-                                    <option value="libro">Libro</option>
-                                </select>
-                            </div>
-                        </div>
-
-                        <!-- Información de configuración -->
-                        <div style="background: #e3f2fd; padding: 15px; border-radius: 8px; margin-bottom: 20px;">
-                            <h5>📋 Configuración del Anuncio</h5>
-                            <p style="margin: 5px 0; font-size: 0.9em;">
-                                🎯 <strong>El anuncio aparecerá en:</strong>
-                            </p>
-                            <ul style="margin: 5px 0; padding-left: 20px; font-size: 0.9em;">
-                                <li>🏠 Página principal del club</li>
-                                <li>📱 Carrusel de colaboradores</li>
-                                <li>⏰ Según las fechas configuradas</li>
-                                <li>📊 Con estadísticas de visualizaciones</li>
-                            </ul>
-                        </div>
-                        
-                        <div style="text-align: center;">
-                            <button class="btn btn-success" onclick="saveAdvertisement()" style="margin-right: 10px;">💾 Guardar Anuncio</button>
-                            <button class="btn" onclick="cancelAddAdvertisement()">❌ Cancelar</button>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Estadísticas de publicidad -->
-                <div class="section">
-                    <h3>📊 Estadísticas de Publicidad</h3>
-                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-bottom: 20px;">
-                        <div style="background: white; padding: 15px; border-radius: 8px; text-align: center; border: 2px solid #e9ecef;">
-                            <div style="font-size: 2rem; font-weight: bold; color: #059669;" id="activeAdsCount">0</div>
-                            <div style="color: #666;">Anuncios Activos</div>
-                        </div>
-                        <div style="background: white; padding: 15px; border-radius: 8px; text-align: center; border: 2px solid #e9ecef;">
-                            <div style="font-size: 2rem; font-weight: bold; color: #3b82f6;" id="totalAdsCount">0</div>
-                            <div style="color: #666;">Total de Anuncios</div>
-                        </div>
-                        <div style="background: white; padding: 15px; border-radius: 8px; text-align: center; border: 2px solid #e9ecef;">
-                            <div style="font-size: 2rem; font-weight: bold; color: #f59e0b;" id="carouselAdsCount">0</div>
-                            <div style="color: #666;">En Carrusel</div>
-                        </div>
-                        <div style="background: white; padding: 15px; border-radius: 8px; text-align: center; border: 2px solid #e9ecef;">
-                            <div style="font-size: 2rem; font-weight: bold; color: #dc2626;" id="expiredAdsCount">0</div>
-                            <div style="color: #666;">Expirados</div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Configuración de Redes Sociales -->
-                <div class="section">
-                    <h3>📱 Configuración de Redes Sociales</h3>
-                    <p style="margin-bottom: 20px; color: #666;">
-                        Configura los enlaces de las redes sociales del club que aparecerán en la página principal.
-                    </p>
-                    
-                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 20px;">
-                        <div>
-                            <label style="display: block; margin-bottom: 5px; font-weight: bold;">📘 URL de Facebook</label>
-                            <input type="url" id="facebookUrl" placeholder="https://www.facebook.com/p/CD-Sanabria-CF-100094003011055/" style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 8px;">
-                            <small style="color: #666;">URL completa del perfil de Facebook del club</small>
-                        </div>
-                        <div>
-                            <label style="display: block; margin-bottom: 5px; font-weight: bold;">📷 URL de Instagram</label>
-                            <input type="url" id="instagramUrl" placeholder="https://www.instagram.com/cdsanabriafc/" style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 8px;">
-                            <small style="color: #666;">URL completa del perfil de Instagram del club</small>
-                        </div>
-                    </div>
-                    
-                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 20px;">
-                        <div>
-                            <label style="display: block; margin-bottom: 5px; font-weight: bold;">📘 Usuario de Facebook</label>
-                            <input type="text" id="facebookUsername" placeholder="@CDSANABRIACF" style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 8px;">
-                            <small style="color: #666;">Nombre de usuario que se mostrará en la página</small>
-                        </div>
-                        <div>
-                            <label style="display: block; margin-bottom: 5px; font-weight: bold;">📷 Usuario de Instagram</label>
-                            <input type="text" id="instagramUsername" placeholder="@cdsanabriacf" style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 8px;">
-                            <small style="color: #666;">Nombre de usuario que se mostrará en la página</small>
-                        </div>
-                    </div>
-                    
-                    <div style="text-align: center; margin-top: 20px;">
-                        <button class="btn btn-success" onclick="saveSocialMediaConfig()" style="margin-right: 10px;">💾 Guardar Configuración</button>
-                        <button class="btn" onclick="loadSocialMediaConfig()" style="margin-right: 10px;">📋 Cargar Configuración</button>
-                        <button class="btn" onclick="testSocialMediaLinks()" style="background: #17a2b8;">🧪 Probar Enlaces</button>
-                    </div>
-                    
-                    <div id="socialMediaStatus" style="margin-top: 15px; padding: 10px; border-radius: 5px; display: none;"></div>
-                </div>
-
-                <!-- Lista de anuncios -->
-                <div class="section">
-                    <h3>📋 Lista de Anuncios</h3>
-                    <div style="margin-bottom: 15px;">
-                        <select id="adFilter" onchange="filterAdvertisements()" style="padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
-                            <option value="all">Todos los Anuncios</option>
-                            <option value="active">Solo Activos</option>
-                            <option value="carrusel">Solo Carrusel</option>
-                            <option value="static">Solo Estáticos</option>
-                            <option value="book">Solo Libro</option>
-                            <option value="expired">Expirados</option>
-                        </select>
-                    </div>
-                    <div id="advertisementsList" style="background: white; padding: 20px; border-radius: 10px; border: 1px solid #dee2e6;">
-                        <p style="text-align: center; color: #6c757d;">Cargando anuncios...</p>
-                    </div>
-                </div>
-            </div>
-
-            <div id="socios" class="tab-content">
-                <h2>👨‍👩‍👧‍👦 Socios</h2>
-                
-                <div class="section">
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
-                        <div>
-                            <h3>Filtrar Socios</h3>
-                            <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;">
-                            <select id="memberStatusFilter" onchange="filterMembers()" style="padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
-                                <option value="all">Todos los Estados</option>
-                                <option value="active">Activos (pagados)</option>
-                                <option value="pending">Pendientes (todos)</option>
-                                <option value="pending_renewal">Pendientes renovación</option>
-                                <option value="pending_new">Pendientes alta nueva</option>
-                                <option value="expired">Caducados (7 días offline)</option>
-                            </select>
-                            <select id="memberKindFilter" onchange="filterMembers()" style="padding: 8px; border: 1px solid #ddd; border-radius: 4px;" title="Tipo de socio">
-                                <option value="all">Todos (normales + jugadores)</option>
-                                <option value="normal">Solo socios normales</option>
-                                <option value="jugador">Solo socios-jugadores</option>
-                            </select>
-                            </div>
-                        </div>
-                        <div style="display:flex; flex-wrap:wrap; gap:8px; align-items:center;">
-                            <button class="btn btn-success" onclick="showAddMemberForm()">➕ Registrar Nuevo Socio</button>
-                            <button type="button" class="btn" onclick="assignPendingMemberNumbersFromPanel()" style="background:#0f766e;color:white;" title="Socios activos sin N.º SOC. real (≥ 51)">🔢 Asignar números pendientes</button>
-                            <button type="button" class="btn" onclick="repairPlayerInscriptionsFromPanel()" style="background:#b45309;color:white;" title="Recrear jugador/a y socio desde pedido Redsys pagado">🔧 Reparar inscripción pasarela</button>
-                            <button type="button" class="btn" onclick="repairMembershipRegistrationsFromPanel()" style="background:#0e7490;color:white;" title="Recuperar socio/a desde pedido Redsys (cuota)">🔧 Reparar alta socio</button>
-                            <button type="button" class="btn" onclick="recoverMemberFromEmailPanel()" style="background:#7c3aed;color:white;" title="Pegar correo de alta (transferencia/efectivo/tarjeta) y crear ficha">📧 Recuperar socio desde correo</button>
-                            <button type="button" class="btn" onclick="exportClubListFromTab('socios','xlsx')" style="background:#2563eb;color:white;">📊 Excel</button>
-                            <button type="button" class="btn" onclick="exportClubListFromTab('socios','word')" style="background:#1d4ed8;color:white;">📄 Word</button>
-                            <button type="button" class="btn" onclick="exportClubListFromTab('socios','pdf')" style="background:#475569;color:white;">🖨️ PDF</button>
-                        </div>
-                    </div>
-                    
-                    <!-- Formulario para registrar socio -->
-                    <div id="addMemberForm" style="display: none; margin-top: 20px; background: white; padding: 25px; border-radius: 10px; border: 2px solid #059669;">
-                        <h4>📝 Registrar Nuevo Socio</h4>
-                        
-                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px;">
-                            <div>
-                                <label style="display: block; margin-bottom: 5px; font-weight: bold;">Nombre *</label>
-                                <input type="text" id="memberName" required style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
-                            </div>
-                            <div>
-                                <label style="display: block; margin-bottom: 5px; font-weight: bold;">Apellidos *</label>
-                                <input type="text" id="memberSurname" required style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
-                            </div>
-                        </div>
-
-                        <div style="margin-bottom: 15px;">
-                            <label style="display: block; margin-bottom: 5px; font-weight: bold;">Sexo *</label>
-                            <select id="memberSexo" required style="width: 100%; max-width: 280px; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
-                                <option value="">Seleccionar…</option>
-                                <option value="hombre">Hombre (D.)</option>
-                                <option value="mujer">Mujer (Dña.)</option>
-                            </select>
-                        </div>
-
-                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px;">
-                            <div>
-                                <label style="display: block; margin-bottom: 5px; font-weight: bold;">DNI</label>
-                                <input type="text" id="memberDNI" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
-                            </div>
-                            <div>
-                                <label style="display: block; margin-bottom: 5px; font-weight: bold;">Teléfono *</label>
-                                <input type="tel" id="memberPhone" required style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
-                            </div>
-                        </div>
-
-                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px;">
-                            <div>
-                                <label style="display: block; margin-bottom: 5px; font-weight: bold;">Dirección</label>
-                                <input type="text" id="memberAddress" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
-                            </div>
-                            <div>
-                                <label style="display: block; margin-bottom: 5px; font-weight: bold;">Correo Electrónico *</label>
-                                <input type="email" id="memberEmail" required style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
-                                <small style="color: #666;">Obligatorio: sin correo el socio no se guarda en la nube y desaparece de la lista.</small>
-                            </div>
-                        </div>
-
-                        <div style="margin-bottom: 15px;">
-                            <label style="display: block; margin-bottom: 5px; font-weight: bold;">Contraseña *</label>
-                            <input type="password" id="memberPassword" required style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
-                            <small style="color: #666;">Solo para alta inicial; no se guarda en el panel. El socio accede con su cuenta del club (correo + esta clave).</small>
-                        </div>
-
-                        <!-- Flujo de validación (pago en cuenta) -->
-                        <div style="background: #fff3cd; padding: 15px; border-radius: 8px; margin-bottom: 20px;">
-                            <h5>⏰ Altas nuevas: 7 días para ingresar la cuota</h5>
-                            <p style="margin: 5px 0; font-size: 0.9em;">
-                                ⚠️ <strong>El socio tiene 7 días para realizar el ingreso</strong> tras registrarse. Tú <strong>no valides en bloque</strong>: usa <strong>«Validar pago»</strong> en cada uno cuando veas el abono en la cuenta del club.
-                            </p>
-                            <p style="margin: 5px 0; font-size: 0.9em;">
-                                📧 Contacto del club: <strong>cdsanabriafc@gmail.com</strong> · Podéis coordinar avisos también por <strong>notificaciones</strong> si el socio las activa en la web.
-                            </p>
-                            <p style="margin: 5px 0; font-size: 0.9em;">
-                                🗑️ Si no se paga en plazo, el alta caduca y puede eliminarse al limpiar pendientes caducados.
-                            </p>
-                            <p style="margin: 5px 0; font-size: 0.9em;">
-                                🔢 El número de socio se asigna al validar el pago.
-                            </p>
-                        </div>
-                        <div style="background: #e0f2fe; padding: 15px; border-radius: 8px; margin-bottom: 20px; border-left: 4px solid #0284c7;">
-                            <h5>📅 Cuota anual (31 de mayo)</h5>
-                            <p style="margin: 5px 0; font-size: 0.9em;">
-                                Tras el <strong>31 de mayo</strong>, los socios <strong>activos</strong> pasan a <strong>pendiente de renovación</strong> de forma automática (nube + panel). Transferencia, efectivo y TPV manual: <strong>7 días</strong> para pagar en altas nuevas. Tarjeta/Bizum: activación al instante.
-                            </p>
-                            <p style="margin: 5px 0; font-size: 0.9em;">
-                                Cuota <strong>menor (10 €)</strong> / <strong>mayor (25 €)</strong> según edad al <strong>31/05</strong> del año de referencia.
-                            </p>
-                            <p style="margin: 5px 0; text-align: center;">
-                                <button type="button" class="btn" onclick="iniciarNuevaTemporadaCuotas()" style="background: #0284c7; color: white;">📆 Nueva temporada (marcar pendientes de pago)</button>
-                            </p>
-                        </div>
-                        
-                        <div style="text-align: center;">
-                            <button class="btn btn-success" onclick="saveMember()" style="margin-right: 10px;">💾 Registrar Socio</button>
-                            <button class="btn" onclick="cancelAddMember()">❌ Cancelar</button>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Estadísticas de socios -->
-                <div class="section">
-                    <h3>📊 Estadísticas de Socios</h3>
-                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-bottom: 20px;">
-                        <div style="background: white; padding: 15px; border-radius: 8px; text-align: center; border: 2px solid #e9ecef;">
-                            <div style="font-size: 2rem; font-weight: bold; color: #059669;" id="activeMembersCount">0</div>
-                            <div style="color: #666;">Socios Activos</div>
-                        </div>
-                        <div style="background: white; padding: 15px; border-radius: 8px; text-align: center; border: 2px solid #e9ecef;">
-                            <div style="font-size: 2rem; font-weight: bold; color: #f59e0b;" id="pendingMembersCount">0</div>
-                            <div style="color: #666;">Pendientes de Validación</div>
-                        </div>
-                        <div style="background: white; padding: 15px; border-radius: 8px; text-align: center; border: 2px solid #e9ecef;">
-                            <div style="font-size: 2rem; font-weight: bold; color: #dc2626;" id="expiredMembersCount">0</div>
-                            <div style="color: #666;">Caducados (7 días)</div>
-                        </div>
-                        <div style="background: white; padding: 15px; border-radius: 8px; text-align: center; border: 2px solid #e9ecef;">
-                            <div style="font-size: 2rem; font-weight: bold; color: #1e3a8a;" id="nextMemberNumber">1</div>
-                            <div style="color: #666;">Próximo Número de Socio</div>
-                        </div>
-                        <div style="background: white; padding: 15px; border-radius: 8px; text-align: center; border: 2px solid #e9ecef;">
-                            <div style="font-size: 2rem; font-weight: bold; color: #3730a3;" id="normalMembersCount">0</div>
-                            <div style="color: #666;">Socios normales</div>
-                        </div>
-                        <div style="background: white; padding: 15px; border-radius: 8px; text-align: center; border: 2px solid #e9ecef;">
-                            <div style="font-size: 2rem; font-weight: bold; color: #b45309;" id="playerMembersCount">0</div>
-                            <div style="color: #666;">Socios-jugadores</div>
-                        </div>
-                    </div>
-                    
-                    <div style="text-align: center; margin-bottom: 20px;">
-                        <button class="btn" onclick="cleanExpiredMembers()" style="background: #dc2626;">🗑️ Limpiar Socios Caducados</button>
-                    </div>
-                    <p style="text-align: center; color: #475569; font-size: 0.9rem; max-width: 760px; margin: 0 auto 18px auto; line-height: 1.45;">
-                        <strong>Validación de pagos:</strong> siempre individual. Pulsa <strong>«Validar pago»</strong> en cada socio cuando compruebes el ingreso en la cuenta. No se usa validación masiva. Contacto interno: <a href="mailto:cdsanabriafc@gmail.com">cdsanabriafc@gmail.com</a> · Los socios pueden activar <strong>notificaciones</strong> en la web para avisos del club.
-                    </p>
-                </div>
-
-                <!-- Lista de socios -->
-                <div class="section">
-                    <h3>📋 Lista de Socios</h3>
-                    <div id="membersList">
-                        <!-- Los socios se cargarán aquí dinámicamente -->
-                    </div>
-                </div>
-            </div>
-
-            <div id="multimedia" class="tab-content">
-                <h2>📸 Multimedia</h2>
-                <div class="section">
-                    <p><strong>Galería del club</strong> (sincronizada con la nube). Usa enlaces públicos (YouTube, Vimeo, o URL de imagen) para no sobrecargar el almacenamiento.</p>
-                    <div style="background:#f8f9fa;padding:20px;border-radius:10px;border:2px solid #e9ecef;margin-bottom:20px;">
-                        <div style="display:grid;grid-template-columns:1fr 1fr;gap:15px;margin-bottom:12px;">
-                            <div>
-                                <label style="display:block;font-weight:bold;margin-bottom:5px;">Título</label>
-                                <input type="text" id="mediaTitle" placeholder="Ej: Torneo benjamín 2026" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:4px;">
-                            </div>
-                            <div>
-                                <label style="display:block;font-weight:bold;margin-bottom:5px;">Tipo</label>
-                                <select id="mediaType" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:4px;">
-                                    <option value="image">Imagen / enlace</option>
-                                    <option value="video">Vídeo (YouTube, etc.)</option>
-                                </select>
-                            </div>
-                        </div>
-                        <div style="margin-bottom:12px;">
-                            <label style="display:block;font-weight:bold;margin-bottom:5px;">URL *</label>
-                            <input type="url" id="mediaUrl" placeholder="https://..." style="width:100%;padding:8px;border:1px solid #ddd;border-radius:4px;">
-                        </div>
-                        <button type="button" class="btn btn-success" onclick="addClubMediaFromForm()">➕ Añadir a la galería</button>
-                    </div>
-                    <h3>Elementos actuales</h3>
-                    <div id="multimediaListContainer"><p style="text-align:center;color:#666;">Abre esta pestaña para cargar la lista.</p></div>
-                </div>
-            </div>
-
-            <!-- Sección de Tienda -->
-            <div id="tienda" class="tab-content">
-                <h2>🏪 Administración de Tienda</h2>
-
-                <div class="section" style="margin-bottom: 28px;">
-                    <h3>📱 PayGold — Cobro por SMS (Caja Rural)</h3>
-                    <p style="color:#64748b;margin-bottom:12px;line-height:1.5;">
-                        Genera un enlace de pago y Redsys lo envía por <strong>SMS</strong> al móvil del socio.
-                        Úsalo para cuota, ropa u otros conceptos. Tras la prueba del TPV normal y con la URL del comercio corregida en Caja Rural.
-                    </p>
-                    <div id="paygoldDisabledWarn" style="display:none;background:#fff7ed;border:1px solid #fdba74;border-radius:8px;padding:12px;margin-bottom:12px;color:#9a3412;font-size:0.9rem;">
-                        ⚠️ PayGold requiere TPV Redsys activo en Netlify. Completa primero la prueba del TPV y el deploy con funciones.
-                    </div>
-                    <div id="paygoldForm" style="background:#f8fafc;border:2px solid #e2e8f0;border-radius:10px;padding:20px;">
-                        <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px;">
-                            <div>
-                                <label for="paygoldMemberSelect" style="font-weight:600;display:block;margin-bottom:6px;">Socio (opcional)</label>
-                                <select id="paygoldMemberSelect" onchange="onPaygoldMemberChange()" style="width:100%;padding:10px;border:1px solid #cbd5e1;border-radius:6px;">
-                                    <option value="">— Sin vincular / manual —</option>
-                                </select>
-                            </div>
-                            <div>
-                                <label for="paygoldCategory" style="font-weight:600;display:block;margin-bottom:6px;">Tipo de cobro</label>
-                                <select id="paygoldCategory" onchange="onPaygoldCategoryChange()" style="width:100%;padding:10px;border:1px solid #cbd5e1;border-radius:6px;">
-                                    <option value="membership">Cuota de socio/a</option>
-                                    <option value="kit">Ropa / equipación</option>
-                                    <option value="other">Otro</option>
-                                </select>
-                            </div>
-                        </div>
-                        <div style="margin-bottom:14px;">
-                            <label for="paygoldConcept" style="font-weight:600;display:block;margin-bottom:6px;">Concepto *</label>
-                            <input type="text" id="paygoldConcept" maxlength="125" placeholder="Ej. Cuota socio temporada 2026" style="width:100%;padding:10px;border:1px solid #cbd5e1;border-radius:6px;">
-                        </div>
-                        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;margin-bottom:14px;">
-                            <div>
-                                <label for="paygoldAmount" style="font-weight:600;display:block;margin-bottom:6px;">Importe (€) *</label>
-                                <input type="number" id="paygoldAmount" min="0.01" step="0.01" placeholder="25.00" style="width:100%;padding:10px;border:1px solid #cbd5e1;border-radius:6px;">
-                            </div>
-                            <div>
-                                <label for="paygoldMobile" style="font-weight:600;display:block;margin-bottom:6px;">Móvil SMS *</label>
-                                <input type="tel" id="paygoldMobile" placeholder="666123456" autocomplete="tel" style="width:100%;padding:10px;border:1px solid #cbd5e1;border-radius:6px;">
-                                <small style="color:#64748b;">9 dígitos, sin +34</small>
-                            </div>
-                            <div>
-                                <label for="paygoldEmail" style="font-weight:600;display:block;margin-bottom:6px;">Email (opcional)</label>
-                                <input type="email" id="paygoldEmail" placeholder="socio@email.com" style="width:100%;padding:10px;border:1px solid #cbd5e1;border-radius:6px;">
-                            </div>
-                        </div>
-                        <div style="margin-bottom:14px;">
-                            <label for="paygoldBuyerName" style="font-weight:600;display:block;margin-bottom:6px;">Nombre del pagador</label>
-                            <input type="text" id="paygoldBuyerName" placeholder="Nombre y apellidos" style="width:100%;padding:10px;border:1px solid #cbd5e1;border-radius:6px;">
-                        </div>
-                        <div style="display:flex;flex-wrap:wrap;gap:16px;margin-bottom:16px;align-items:center;">
-                            <label style="display:flex;align-items:center;gap:8px;"><input type="checkbox" id="paygoldSendSms" checked> Enviar SMS (Redsys PayGold)</label>
-                            <label style="display:flex;align-items:center;gap:8px;"><input type="checkbox" id="paygoldSendEmail"> Enviar también por email (Redsys)</label>
-                        </div>
-                        <div style="display:flex;flex-wrap:wrap;gap:10px;">
-                            <button type="button" id="paygoldSendBtn" onclick="sendPaygoldLink()" style="background:#059669;color:#fff;border:none;padding:12px 20px;border-radius:8px;font-weight:700;cursor:pointer;">📱 Enviar enlace PayGold</button>
-                            <button type="button" onclick="copyPaygoldLinkFromStatus()" style="background:#3b82f6;color:#fff;border:none;padding:12px 16px;border-radius:8px;cursor:pointer;">📋 Copiar último enlace</button>
-                            <button type="button" id="paygoldRefreshHistory" onclick="loadPaygoldHistory()" style="background:#64748b;color:#fff;border:none;padding:12px 16px;border-radius:8px;cursor:pointer;">🔄 Actualizar historial</button>
-                        </div>
-                        <div id="paygoldStatus" style="display:none;margin-top:14px;padding:12px;border-radius:8px;font-size:0.9rem;line-height:1.45;"></div>
-                    </div>
-                    <div style="margin-top:20px;">
-                        <h4 style="margin-bottom:10px;">Historial PayGold (últimos 30)</h4>
-                        <div style="overflow-x:auto;">
-                            <table style="width:100%;border-collapse:collapse;background:#fff;border:1px solid #e2e8f0;border-radius:8px;">
-                                <thead>
-                                    <tr style="background:#f1f5f9;">
-                                        <th style="padding:8px;text-align:left;font-size:0.8rem;">Fecha</th>
-                                        <th style="padding:8px;text-align:left;font-size:0.8rem;">Pagador</th>
-                                        <th style="padding:8px;text-align:left;font-size:0.8rem;">Concepto</th>
-                                        <th style="padding:8px;text-align:left;font-size:0.8rem;">Importe</th>
-                                        <th style="padding:8px;text-align:left;font-size:0.8rem;">Estado</th>
-                                        <th style="padding:8px;text-align:left;font-size:0.8rem;">Enlace</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="paygoldHistoryBody">
-                                    <tr><td colspan="6" style="padding:12px;color:#64748b;">Abre esta pestaña para cargar el historial.</td></tr>
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-                </div>
-                
-                <div class="section">
-                    <h3>🛒 Gestión de Productos</h3>
-                    <p><strong>Administra la tienda oficial de CDSANABRIACF</strong></p>
-                    
-                    <div style="background: #e3f2fd; padding: 20px; border-radius: 10px; margin: 20px 0;">
-                        <h4>🏪 Tienda CDSANABRIACF</h4>
-                        <p><strong>Funcionalidades disponibles:</strong></p>
-                        <ul style="margin: 10px 0; padding-left: 20px;">
-                            <li>➕ Agregar nuevos productos</li>
-                            <li>📝 Editar productos existentes</li>
-                            <li>🗑️ Eliminar productos</li>
-                            <li>📊 Gestionar stock por tallas</li>
-                            <li>💰 Configurar precios</li>
-                            <li>📸 Subir fotos de productos</li>
-                            <li>📈 Ver estadísticas de ventas</li>
-                        </ul>
-                    </div>
-                    
-                    <div style="text-align: center; margin: 30px 0;">
-                        <a href="admin-tienda-completa.html" style="
-                            display: inline-block;
-                            background: linear-gradient(135deg, #dc2626, #3b82f6);
-                            color: white;
-                            padding: 15px 30px;
-                            border-radius: 25px;
-                            text-decoration: none;
-                            font-weight: 600;
-                            font-size: 1.1rem;
-                            transition: transform 0.3s, box-shadow 0.3s;
-                            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-                        " onmouseover="this.style.transform='translateY(-2px)'; this.style.boxShadow='0 8px 15px rgba(220, 38, 38, 0.3)'" 
-                           onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='0 4px 6px rgba(0, 0, 0, 0.1)'">
-                            🏪 Abrir Panel de Tienda
-                        </a>
-                    </div>
-                    
-                    <div style="background: #fff3cd; padding: 15px; border-radius: 8px; margin-top: 20px;">
-                        <h4>ℹ️ Información Importante:</h4>
-                        <p><strong>• Solo socios y amigos pueden comprar productos</strong></p>
-                        <p><strong>• Entrega en mano disponible</strong></p>
-                        <p><strong>• Stock controlado por tallas</strong></p>
-                        <p><strong>• Enlace a tienda oficial externa disponible</strong></p>
-                    </div>
-
-                    <!-- Configuración de Tienda Online -->
-                    <div class="section" style="margin-top: 30px;">
-                        <h3>🌐 Configuración de Tienda Online</h3>
-                        <p><strong>Configura la URL de la tienda online que se abrirá desde el botón TIENDA</strong></p>
-                        
-                        <div style="background: #f8f9fa; padding: 20px; border-radius: 10px; border: 2px solid #e9ecef;">
-                            <div style="margin-bottom: 15px;">
-                                <label for="tiendaUrl" style="display: block; margin-bottom: 5px; font-weight: bold;">URL de Tienda Online *</label>
-                                <input type="url" id="tiendaUrl" placeholder="https://tu-tienda-online.com" style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 5px; font-size: 14px;">
-                                <small style="color: #666; margin-top: 5px; display: block;">🔗 Esta URL se abrirá cuando los usuarios hagan clic en el botón TIENDA de la página principal</small>
-                            </div>
-                            
-                            <div style="margin-bottom: 15px;">
-                                <label for="tiendaNombre" style="display: block; margin-bottom: 5px; font-weight: bold;">Nombre de la Tienda</label>
-                                <input type="text" id="tiendaNombre" placeholder="Tienda Oficial CDSANABRIACF" style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 5px; font-size: 14px;">
-                                <small style="color: #666; margin-top: 5px; display: block;">📝 Nombre descriptivo de la tienda (opcional)</small>
-                            </div>
-                            
-                            <div style="display: flex; gap: 10px; flex-wrap: wrap;">
-                                <button onclick="guardarConfiguracionTienda()" class="btn" style="background: #059669; color: white; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer;">
-                                    💾 Guardar Configuración
-                                </button>
-                                <button onclick="probarTiendaOnline()" class="btn" style="background: #3b82f6; color: white; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer;">
-                                    🧪 Probar Enlace
-                                </button>
-                                <button onclick="restaurarTiendaPorDefecto()" class="btn" style="background: #dc2626; color: white; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer;">
-                                    🔄 Restaurar por Defecto
-                                </button>
-                            </div>
-                        </div>
-                        
-                        <div id="tiendaConfigStatus" style="margin-top: 15px; padding: 10px; border-radius: 5px; display: none;">
-                            <!-- Aquí se mostrarán mensajes de estado -->
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Importar Datos Tab -->
-            <div id="importar" class="tab-content">
-                <h2>📥 Importar Datos desde Excel</h2>
-                
-                <div class="section">
-                    <h3>📋 Información de Importación</h3>
-                    <div style="background: #e3f2fd; padding: 15px; border-radius: 8px; margin-bottom: 20px;">
-                        <p><strong>⚠️ Importante:</strong> Antes de importar, asegúrate de que el archivo Excel tenga el formato correcto.</p>
-                        <p><strong>📊 Formatos soportados:</strong> .xlsx, .xls, .csv</p>
-                        <p><strong>🔒 Seguridad:</strong> Los datos existentes no se sobrescribirán automáticamente.</p>
-                    </div>
-
-                    <!-- Importar Jugadores -->
-                    <div style="background: white; padding: 20px; border-radius: 10px; border: 1px solid #dee2e6; margin-bottom: 20px;">
-                        <h4>⚽ Importar Jugadores</h4>
-                        <p style="margin-bottom: 20px; color: #666;">Importa jugadores desde un archivo Excel. Las columnas deben ser: Nombre, Apellidos, DNI, Teléfono, Dirección, Edad, Fecha de Nacimiento, Categoría, Dorsal, Nombre del Padre/Madre, DNI del Padre/Madre, Teléfono del Padre/Madre, Email del Padre/Madre.</p>
-                        
-                        <div style="margin-bottom: 15px;">
-                            <label style="display: block; margin-bottom: 5px; font-weight: bold;">Categoría de Destino:</label>
-                            <select id="importPlayerCategory" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
-                                <option value="">Seleccionar categoría</option>
-                                <option value="Prebenjamín">Prebenjamín</option>
-                                <option value="Benjamín">Benjamín</option>
-                                <option value="Alevín">Alevín</option>
-                                <option value="Infantil">Infantil</option>
-                                <option value="Cadete">Cadete</option>
-                                <option value="Juvenil">Juvenil</option>
-                                <option value="Aficionado">Aficionado</option>
-                            </select>
-                        </div>
-                        
-                        <input type="file" id="importPlayersFile" accept=".xlsx,.xls,.csv" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px; margin-bottom: 15px;">
-                        
-                        <button class="btn btn-success" onclick="importPlayers()" style="width: 100%;">
-                            📥 Importar Jugadores
-                        </button>
-                    </div>
-
-                    <!-- Importar Socios -->
-                    <div style="background: white; padding: 20px; border-radius: 10px; border: 1px solid #dee2e6; margin-bottom: 20px;">
-                        <h4>👨‍👩‍👧‍👦 Importar Socios</h4>
-                        <p style="margin-bottom: 20px; color: #666;">Importa socios desde un archivo Excel. Las columnas deben ser: Nombre, Apellidos, DNI, Dirección, Teléfono, Email, Fecha de Nacimiento, Cuota.</p>
-                        
-                        <input type="file" id="importMembersFile" accept=".xlsx,.xls,.csv" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px; margin-bottom: 15px;">
-                        
-                        <button class="btn btn-primary" onclick="importMembers()" style="width: 100%;">
-                            📥 Importar Socios
-                        </button>
-                    </div>
-
-                    <!-- Importar Amigos -->
-                    <div style="background: white; padding: 20px; border-radius: 10px; border: 1px solid #dee2e6; margin-bottom: 20px;">
-                        <h4>🤝 Importar Amigos del Club</h4>
-                        <p style="margin-bottom: 20px; color: #666;">Importa amigos del club desde un archivo Excel. Las columnas deben ser: Nombre, Apellidos, DNI, Teléfono, Email.</p>
-                        
-                        <input type="file" id="importFriendsFile" accept=".xlsx,.xls,.csv" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px; margin-bottom: 15px;">
-                        
-                        <button class="btn" onclick="importFriends()" style="width: 100%; background: #10b981; color: white;">
-                            📥 Importar Amigos
-                        </button>
-                    </div>
-
-                    <!-- Importar Entrenadores -->
-                    <div style="background: white; padding: 20px; border-radius: 10px; border: 1px solid #dee2e6; margin-bottom: 20px;">
-                        <h4>👨‍🏫 Importar Entrenadores</h4>
-                        <p style="margin-bottom: 20px; color: #666;">Importa entrenadores desde un archivo Excel. Las columnas deben ser: Nombre, Apellidos, DNI, Teléfono, Email, Equipo Asignado, Licencia.</p>
-                        
-                        <input type="file" id="importCoachesFile" accept=".xlsx,.xls,.csv" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px; margin-bottom: 15px;">
-                        
-                        <button class="btn" onclick="importCoaches()" style="width: 100%; background: #f59e0b; color: white;">
-                            📥 Importar Entrenadores
-                        </button>
-                    </div>
-
-                    <!-- Plantillas de Excel -->
-                    <div style="background: white; padding: 20px; border-radius: 10px; border: 1px solid #dee2e6; margin-bottom: 20px;">
-                        <h4>📋 Descargar Plantillas</h4>
-                        <p style="margin-bottom: 20px; color: #666;">Descarga las plantillas de Excel con el formato correcto para cada tipo de datos.</p>
-                        
-                        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px;">
-                            <button class="btn" onclick="downloadTemplate('jugadores')" style="background: #059669; color: white;">
-                                📥 Plantilla Jugadores
-                            </button>
-                            <button class="btn" onclick="downloadTemplate('socios')" style="background: #3b82f6; color: white;">
-                                📥 Plantilla Socios
-                            </button>
-                            <button class="btn" onclick="downloadTemplate('amigos')" style="background: #10b981; color: white;">
-                                📥 Plantilla Amigos
-                            </button>
-                            <button class="btn" onclick="downloadTemplate('entrenadores')" style="background: #f59e0b; color: white;">
-                                📥 Plantilla Entrenadores
-                            </button>
-                        </div>
-                    </div>
-
-                    <!-- Progreso de Importación -->
-                    <div id="importProgress" style="display: none;"></div>
-
-                    <!-- Historial de Importaciones -->
-                    <div style="background: white; padding: 20px; border-radius: 10px; border: 1px solid #dee2e6;">
-                        <h4>📋 Historial de Importaciones</h4>
-                        <div id="importHistory" style="background: #f8f9fa; padding: 15px; border-radius: 8px; border: 1px solid #dee2e6;">
-                            <p style="text-align: center; color: #6c757d;">No hay importaciones recientes</p>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <div id="contabilidad" class="tab-content" style="display: none;">
-                <h2>💶 Contabilidad (banco A · efectivo B)</h2>
-                <p style="color:#475569; margin-bottom:20px;">Los saldos se calculan sumando todos los asientos del libro. Los administradores pueden <strong>editar, borrar</strong> un asiento o <strong>cambiarlo de caja A a B</strong> (y viceversa). Las cuotas de socios validadas se registran por defecto en <strong>A (banco)</strong>. Usa el rango de fechas para el listado y para generar <strong>Word, PDF o Excel</strong> para los socios.</p>
-
-                <div class="dashboard-cards" style="margin-bottom: 24px;">
-                    <div class="dashboard-card" style="border-color:#1d4ed8;">
-                        <h3>🏦 Saldo A — Banco</h3>
-                        <div class="number" id="contabSaldoA" style="color:#1d4ed8;">0,00 €</div>
-                        <p>Ingresos bancarios (cuotas socios, eventos si A, manual en A…)</p>
-                    </div>
-                    <div class="dashboard-card" style="border-color:#059669;">
-                        <h3>💵 Saldo B — Efectivo</h3>
-                        <div class="number" id="contabSaldoB" style="color:#059669;">0,00 €</div>
-                        <p>Caja (eventos si B, manual en B, traspasos…)</p>
-                    </div>
-                </div>
-
-                <div class="section">
-                    <h3>📋 Cuotas de socio (menor / mayor)</h3>
-                    <p style="color:#64748b; margin-bottom:12px;">Valores persistentes hasta que los cambies. Se usan en el panel y en el formulario web de alta (edad según fecha de nacimiento).</p>
-                    <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap:12px; align-items:end;">
-                        <div>
-                            <label style="font-weight:600;">Cuota menor (€)</label>
-                            <input type="number" id="contabCuotaMenor" min="0" step="0.01" style="width:100%; padding:8px; border:1px solid #ddd; border-radius:6px;">
-                        </div>
-                        <div>
-                            <label style="font-weight:600;">Cuota mayor (€)</label>
-                            <input type="number" id="contabCuotaMayor" min="0" step="0.01" style="width:100%; padding:8px; border:1px solid #ddd; border-radius:6px;">
-                        </div>
-                        <div>
-                            <label style="font-weight:600;">Hasta edad (menor)</label>
-                            <input type="number" id="contabEdadMenor" min="0" max="25" step="1" style="width:100%; padding:8px; border:1px solid #ddd; border-radius:6px;" title="Menor o igual a esta edad paga cuota menor">
-                        </div>
-                        <div>
-                            <button type="button" class="btn" onclick="guardarContabilidadCuotas()" style="background:#1e3a8a;">💾 Guardar cuotas</button>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="section">
-                    <h3>➕ Ingreso o gasto manual</h3>
-                    <p style="color:#64748b; margin-bottom:12px;">Elige si afecta a caja bancaria (A) o efectivo (B). Gasto = salida de dinero.</p>
-                    <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap:12px; align-items:end;">
-                        <div>
-                            <label style="font-weight:600;">Tipo</label>
-                            <select id="contabMovTipo" style="width:100%; padding:8px; border-radius:6px;">
-                                <option value="ingreso">Ingreso</option>
-                                <option value="gasto">Gasto</option>
-                            </select>
-                        </div>
-                        <div>
-                            <label style="font-weight:600;">Destino</label>
-                            <select id="contabMovBucket" style="width:100%; padding:8px; border-radius:6px;">
-                                <option value="A">A — Banco</option>
-                                <option value="B">B — Efectivo</option>
-                            </select>
-                        </div>
-                        <div>
-                            <label style="font-weight:600;">Importe (€)</label>
-                            <input type="number" id="contabMovMonto" min="0.01" step="0.01" style="width:100%; padding:8px; border-radius:6px;">
-                        </div>
-                        <div style="grid-column: 1 / -1;">
-                            <label style="font-weight:600;">Concepto</label>
-                            <input type="text" id="contabMovConcepto" placeholder="Ej: Material deportivo" style="width:100%; padding:8px; border-radius:6px;">
-                        </div>
-                        <div>
-                            <button type="button" class="btn" onclick="contabilidadMovimientoManual()" style="background:#059669;">Registrar movimiento</button>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="section">
-                    <h3>↔️ Traspaso entre A y B</h3>
-                    <p style="color:#64748b; margin-bottom:12px;">Genera dos asientos enlazados (salida de uno, entrada en el otro).</p>
-                    <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap:12px; align-items:end;">
-                        <div>
-                            <label style="font-weight:600;">Desde</label>
-                            <select id="contabXferFrom" style="width:100%; padding:8px; border-radius:6px;">
-                                <option value="A">A — Banco</option>
-                                <option value="B">B — Efectivo</option>
-                            </select>
-                        </div>
-                        <div>
-                            <label style="font-weight:600;">Hacia</label>
-                            <select id="contabXferTo" style="width:100%; padding:8px; border-radius:6px;">
-                                <option value="B">B — Efectivo</option>
-                                <option value="A">A — Banco</option>
-                            </select>
-                        </div>
-                        <div>
-                            <label style="font-weight:600;">Importe (€)</label>
-                            <input type="number" id="contabXferMonto" min="0.01" step="0.01" style="width:100%; padding:8px; border-radius:6px;">
-                        </div>
-                        <div style="grid-column: 1 / -1;">
-                            <label style="font-weight:600;">Nota (opcional)</label>
-                            <input type="text" id="contabXferNota" style="width:100%; padding:8px; border-radius:6px;">
-                        </div>
-                        <div>
-                            <button type="button" class="btn" onclick="contabilidadTraspaso()" style="background:#7c3aed;">Ejecutar traspaso</button>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="section">
-                    <h3>📅 Rango de fechas (listado e informes para socios)</h3>
-                    <p style="color:#64748b; margin-bottom:12px;">Filtra la tabla del libro y los informes. Si dejas las fechas vacías, se incluye <strong>todo</strong> el historial.</p>
-                    <div style="display:flex; flex-wrap:wrap; gap:12px; align-items:flex-end; margin-bottom:12px;">
-                        <div>
-                            <label style="font-weight:600; display:block; margin-bottom:4px;">Desde</label>
-                            <input type="date" id="contabRangoDesde" style="padding:8px; border:1px solid #ddd; border-radius:6px;">
-                        </div>
-                        <div>
-                            <label style="font-weight:600; display:block; margin-bottom:4px;">Hasta</label>
-                            <input type="date" id="contabRangoHasta" style="padding:8px; border:1px solid #ddd; border-radius:6px;">
-                        </div>
-                        <button type="button" class="btn" onclick="loadContabilidadPanel()" style="background:#0f766e;">🔍 Aplicar al listado</button>
-                        <button type="button" class="btn" onclick="contabilidadLimpiarRango()" style="background:#64748b;">Limpiar fechas</button>
-                        <button type="button" class="btn" onclick="exportContabilidadWord()" style="background:#1d4ed8;">📄 Word</button>
-                        <button type="button" class="btn" onclick="exportContabilidadPdf()" style="background:#b45309;">🖨️ PDF (imprimir / guardar como PDF)</button>
-                        <button type="button" class="btn" onclick="exportContabilidadExcel()" style="background:#166534;">📊 Excel (.xlsx)</button>
-                    </div>
-                </div>
-
-                <div class="section">
-                    <h3>📒 Libro de asientos</h3>
-                    <p style="color:#64748b; margin-bottom:12px;">Ordenados del más reciente al más antiguo (máx. 500 en pantalla). Los cambios se guardan en este equipo y, si la nube está activa, se sincronizan automáticamente.</p>
-                    <div style="overflow-x:auto; max-height:480px; border:1px solid #e2e8f0; border-radius:8px;">
-                        <table style="width:100%; border-collapse:collapse; font-size:0.9rem;">
-                            <thead style="background:#f1f5f9; position:sticky; top:0;">
-                                <tr>
-                                    <th style="padding:8px; text-align:left;">Fecha</th>
-                                    <th style="padding:8px;">Caja</th>
-                                    <th style="padding:8px;">Importe</th>
-                                    <th style="padding:8px;">Categoría</th>
-                                    <th style="padding:8px; text-align:left;">Concepto</th>
-                                    <th style="padding:8px; text-align:center; white-space:nowrap;">Acciones</th>
-                                </tr>
-                            </thead>
-                            <tbody id="contabLedgerBody"></tbody>
-                        </table>
-                    </div>
-                </div>
-
-                <div id="contabEditBackdrop" style="display:none; position:fixed; inset:0; background:rgba(15,23,42,0.45); z-index:10050; align-items:center; justify-content:center; padding:16px;" onclick="if (event.target === this) contabilidadCerrarEditarModal()">
-                    <div style="background:#fff; border-radius:12px; max-width:520px; width:100%; padding:24px; box-shadow:0 10px 40px rgba(0,0,0,0.2);" onclick="event.stopPropagation()">
-                        <h3 style="margin-top:0;">Editar asiento</h3>
-                        <input type="hidden" id="contabEditId">
-                        <div style="display:grid; gap:12px;">
-                            <div>
-                                <label style="font-weight:600; display:block; margin-bottom:4px;">Fecha y hora</label>
-                                <input type="datetime-local" id="contabEditCreatedAt" style="width:100%; padding:8px; border:1px solid #ddd; border-radius:6px;">
-                            </div>
-                            <div>
-                                <label style="font-weight:600; display:block; margin-bottom:4px;">Caja</label>
-                                <select id="contabEditBucket" style="width:100%; padding:8px; border-radius:6px;">
-                                    <option value="A">A — Banco</option>
-                                    <option value="B">B — Efectivo</option>
-                                </select>
-                            </div>
-                            <div>
-                                <label style="font-weight:600; display:block; margin-bottom:4px;">Importe con signo (€)</label>
-                                <small style="color:#64748b;">Positivo = ingreso · Negativo = gasto</small>
-                                <input type="number" step="0.01" id="contabEditSigned" style="width:100%; padding:8px; border:1px solid #ddd; border-radius:6px;">
-                            </div>
-                            <div>
-                                <label style="font-weight:600; display:block; margin-bottom:4px;">Categoría</label>
-                                <input type="text" id="contabEditCategory" style="width:100%; padding:8px; border:1px solid #ddd; border-radius:6px;">
-                            </div>
-                            <div>
-                                <label style="font-weight:600; display:block; margin-bottom:4px;">Concepto</label>
-                                <input type="text" id="contabEditConcept" style="width:100%; padding:8px; border:1px solid #ddd; border-radius:6px;">
-                            </div>
-                        </div>
-                        <div style="margin-top:20px; display:flex; gap:10px; flex-wrap:wrap;">
-                            <button type="button" class="btn" onclick="contabilidadGuardarEditar()" style="background:#1e3a8a;">Guardar</button>
-                            <button type="button" class="btn" onclick="contabilidadCerrarEditarModal()" style="background:#64748b;">Cancelar</button>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <div id="configuracion" class="tab-content">
-                <h2>⚙️ Configuración</h2>
-                
-                <!-- Gestión de Administradores -->
-                <div class="section">
-                    <h3>👨‍💼 Gestión de Administradores</h3>
-                    <p><strong>Administradores del equipo CDSANABRIACF</strong></p>
-                    <p style="font-size:0.9rem;color:#334155;margin:8px 0 14px;">Los organizadores del campeonato entran con <strong>email + contraseña</strong> en 🔧 Admin. Al guardar, la clave se crea de verdad en la nube (si solo se guardaba en este navegador, no podían entrar).</p>
-                    
-                    <button class="btn" onclick="showAddAdminForm()" style="background: #059669;">➕ Añadir Administrador</button>
-                    
-                    <!-- Formulario para añadir administrador -->
-                    <div id="addAdminForm" style="display: none; margin-top: 20px; background: white; padding: 20px; border-radius: 10px; border: 2px solid #059669;">
-                        <h4>📝 Registrar Nuevo Administrador</h4>
-                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px;">
-                            <div>
-                                <label style="display: block; margin-bottom: 5px; font-weight: bold;">Nombre *</label>
-                                <input type="text" id="adminName" required style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
-                            </div>
-                            <div>
-                                <label style="display: block; margin-bottom: 5px; font-weight: bold;">Email *</label>
-                                <input type="text" id="adminEmail" inputmode="email" autocomplete="username" required style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;" placeholder="admite alias con +">
-                            </div>
-                        </div>
-                        <div style="margin-bottom: 15px;">
-                            <label style="display: block; margin-bottom: 5px; font-weight: bold;">Contraseña *</label>
-                            <input type="password" id="adminPassword" required style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
-                        </div>
-                        <div style="margin-bottom: 15px;">
-                            <label style="display: block; margin-bottom: 5px; font-weight: bold;">Rol</label>
-                            <select id="adminRole" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
-                                <option value="competition_organizer">Organizador/a de competiciones (solo pestaña Competiciones)</option>
-                                <option value="team_admin">Administrador de Equipo</option>
-                                <option value="assistant_admin">Administrador Asistente</option>
-                            </select>
-                        </div>
-                        
-                        <button class="btn" onclick="saveNewAdmin()" style="background: #059669;">💾 Guardar Administrador</button>
-                        <button class="btn" onclick="cancelAddAdmin()">❌ Cancelar</button>
-                    </div>
-                    
-                    <!-- Lista de administradores -->
-                    <div id="adminsList" style="margin-top: 20px;">
-                        <!-- Se carga dinámicamente -->
-                    </div>
-                </div>
-                
-                <!-- Logo del Club -->
-                <div class="section">
-                    <h3>🏆 Logo del Club</h3>
-                    <p><strong>Subir y gestionar el logo oficial del club</strong></p>
-                    
-                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin: 20px 0;">
-                        <div>
-                            <label style="display: block; margin-bottom: 10px; font-weight: bold;">📁 Seleccionar Logo</label>
-                            <input type="file" id="logoFile" accept="image/*" style="width: 100%; padding: 10px; border: 2px dashed #ddd; border-radius: 8px;">
-                            <p style="font-size: 0.8rem; color: #666; margin-top: 5px;">Formatos: JPG, PNG, GIF. Tamaño máximo: 2MB</p>
-                        </div>
-                        <div>
-                            <label style="display: block; margin-bottom: 10px; font-weight: bold;">👁️ Vista Previa</label>
-                            <div id="logoPreview" style="width: 150px; height: 150px; border: 2px dashed #ddd; border-radius: 8px; display: flex; align-items: center; justify-content: center; background: #f8f9fa;">
-                                <span style="color: #666;">Sin logo</span>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <button class="btn" onclick="uploadLogo()" style="background: #059669;">💾 Guardar Logo</button>
-                    <button class="btn" onclick="removeLogo()" style="background: #dc3545;">🗑️ Eliminar Logo</button>
-                </div>
-
-                <!-- Privacidad web pública -->
-                <div class="section">
-                    <h3>🔒 Privacidad en la web</h3>
-                    <p><strong>Lista de jugadores/as en la página pública</strong></p>
-                    <p style="font-size: 0.9rem; color: #64748b; margin-bottom: 12px;">
-                        Por defecto los nombres y categorías de jugadores/as <strong>no</strong> se muestran a socios, amigos ni visitantes.
-                        Solo los administradores ven la lista completa en el panel. Activa la casilla cuando quieras publicarla.
-                    </p>
-                    <label style="display: flex; align-items: flex-start; gap: 10px; cursor: pointer; margin-bottom: 16px;">
-                        <input type="checkbox" id="publicPlayersListVisible" style="margin-top: 4px; width: 18px; height: 18px;">
-                        <span>Publicar jugadores/as y sus categorías en la web (sección Equipos)</span>
-                    </label>
-                    <button class="btn" onclick="savePublicPlayersPrivacySettings()" style="background: #059669;">💾 Guardar privacidad</button>
-                </div>
-
-                <!-- Mensaje del Logo -->
-                <div class="section">
-                    <h3>💬 Mensaje del Logo</h3>
-                    <p><strong>Personalizar el mensaje que aparece debajo del logo</strong></p>
-                    
-                    <div style="margin: 20px 0;">
-                        <label style="display: block; margin-bottom: 10px; font-weight: bold;">📝 Mensaje Personalizado</label>
-                        <textarea id="logoMessage" rows="3" placeholder="Escribe aquí el mensaje que aparecerá debajo del logo..." style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 8px; font-family: inherit; resize: vertical;"></textarea>
-                        <p style="font-size: 0.8rem; color: #666; margin-top: 5px;">Este mensaje se mostrará debajo del logo en la página principal</p>
-                    </div>
-                    
-                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin: 20px 0;">
-                        <div>
-                            <label style="display: block; margin-bottom: 10px; font-weight: bold;">🎨 Color del Texto</label>
-                            <input type="color" id="logoMessageColor" value="#333333" style="width: 100%; height: 40px; border: none; border-radius: 8px; cursor: pointer;">
-                            <p style="font-size: 0.8rem; color: #666; margin-top: 5px;">Selecciona el color para el texto del mensaje</p>
-                        </div>
-                        <div>
-                            <label style="display: block; margin-bottom: 10px; font-weight: bold;">👁️ Vista Previa</label>
-                            <div id="logoMessagePreview" style="padding: 15px; border: 2px dashed #ddd; border-radius: 8px; background: #f8f9fa; min-height: 60px; display: flex; align-items: center; justify-content: center; color: #333333; font-weight: bold; text-align: center;">
-                                Vista previa del mensaje
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <button class="btn" onclick="saveLogoMessage()" style="background: #059669;">💾 Guardar Mensaje</button>
-                    <button class="btn" onclick="resetLogoMessage()" style="background: #6c757d;">🔄 Restablecer</button>
-                </div>
-
-                <!-- Colores y Tema -->
-                <div class="section">
-                    <h3>🎨 Colores y Tema</h3>
-                    <p><strong>Personalizar la apariencia del club</strong></p>
-                    
-                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin: 20px 0;">
-                        <div>
-                            <label style="display: block; margin-bottom: 10px; font-weight: bold;">🎨 Color Principal</label>
-                            <input type="color" id="primaryColor" value="#dc2626" style="width: 100%; height: 40px; border: none; border-radius: 8px;">
-                        </div>
-                        <div>
-                            <label style="display: block; margin-bottom: 10px; font-weight: bold;">🎨 Color Secundario</label>
-                            <input type="color" id="secondaryColor" value="#3b82f6" style="width: 100%; height: 40px; border: none; border-radius: 8px;">
-                        </div>
-                    </div>
-                    
-                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin: 20px 0;">
-                        <div>
-                            <label style="display: block; margin-bottom: 10px; font-weight: bold;">📝 Fuente</label>
-                            <select id="fontFamily" style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 8px;">
-                                <option value="'Segoe UI', Tahoma, Geneva, Verdana, sans-serif">Segoe UI</option>
-                                <option value="Arial, sans-serif">Arial</option>
-                                <option value="'Times New Roman', serif">Times New Roman</option>
-                                <option value="'Courier New', monospace">Courier New</option>
-                                <option value="Georgia, serif">Georgia</option>
-                            </select>
-                        </div>
-                        <div>
-                            <label style="display: block; margin-bottom: 10px; font-weight: bold;">📏 Tamaño de Fuente</label>
-                            <select id="fontSize" style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 8px;">
-                                <option value="14px">Pequeño (14px)</option>
-                                <option value="16px" selected>Mediano (16px)</option>
-                                <option value="18px">Grande (18px)</option>
-                                <option value="20px">Muy Grande (20px)</option>
-                            </select>
-                        </div>
-                    </div>
-                    
-                    <button class="btn" onclick="saveThemeSettings()" style="background: #059669;">💾 Guardar Tema</button>
-                    <button class="btn" onclick="resetThemeSettings()" style="background: #6c757d;">🔄 Restablecer</button>
-                </div>
-
-                <!-- Datos de Contacto -->
-                <div class="section">
-                    <h3>📞 Datos de Contacto</h3>
-                    <p><strong>Información de contacto del club</strong> (se muestra en la web y en los avisos por correo de solicitudes de jugador).</p>
-                    <p style="font-size:0.9rem;color:#64748b;margin:0 0 12px;">Email del club: <strong>cdsanabriafc@gmail.com</strong> (web, formularios y SMTP en Netlify). Pulsa <strong>Guardar contacto</strong> para fijarlo en la nube.</p>
-                    
-                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin: 20px 0;">
-                        <div>
-                            <label style="display: block; margin-bottom: 5px; font-weight: bold;">📧 Email del Club</label>
-                            <input type="email" id="clubEmail" placeholder="cdsanabriafc@gmail.com" value="cdsanabriafc@gmail.com" style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 8px;">
-                        </div>
-                        <div>
-                            <label style="display: block; margin-bottom: 5px; font-weight: bold;">📱 Teléfono</label>
-                            <input type="tel" id="clubPhone" placeholder="+34 600 000 000" style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 8px;">
-                        </div>
-                    </div>
-                    
-                    <div style="margin: 20px 0;">
-                        <label style="display: block; margin-bottom: 5px; font-weight: bold;">📍 Dirección</label>
-                        <input type="text" id="clubAddress" placeholder="Calle del Club, 123, Ciudad" style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 8px;">
-                    </div>
-                    
-                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin: 20px 0;">
-                        <div>
-                            <label style="display: block; margin-bottom: 5px; font-weight: bold;">🌐 Sitio Web</label>
-                            <input type="url" id="clubWebsite" placeholder="https://www.cdsanabriacf.com" style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 8px;">
-                        </div>
-                        <div>
-                            <label style="display: block; margin-bottom: 5px; font-weight: bold;">📱 WhatsApp</label>
-                            <input type="tel" id="clubWhatsApp" placeholder="+34 600 000 000" style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 8px;">
-                        </div>
-                    </div>
-                    
-                    <div style="margin: 20px 0;">
-                        <label style="display: block; margin-bottom: 5px; font-weight: bold;">📝 Horarios de Atención</label>
-                        <textarea id="clubHours" placeholder="Lunes a Viernes: 9:00 - 18:00&#10;Sábados: 9:00 - 14:00&#10;Domingos: Cerrado" style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 8px; height: 80px; resize: vertical;"></textarea>
-                    </div>
-                    
-                    <button class="btn" onclick="saveContactInfo()" style="background: #059669;">💾 Guardar Contacto</button>
-                    <button class="btn" onclick="loadContactInfo()" style="background: #17a2b8;">📋 Cargar Datos</button>
-                </div>
-            </div>
-
-            <div id="estadisticas" class="tab-content">
-                <h2>📈 Estadísticas y Monitoreo del Sistema</h2>
-                
-                <!-- Estadísticas Generales -->
-                <div class="section">
-                    <h3>📊 Estadísticas del Sistema</h3>
-                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-bottom: 20px;">
-                        <div style="background: white; padding: 15px; border-radius: 8px; text-align: center; border: 2px solid #e9ecef;">
-                            <div style="font-size: 2rem; font-weight: bold; color: #059669;" id="totalSocios">0</div>
-                            <div style="color: #666;">👥 Total Socios</div>
-                        </div>
-                        <div style="background: white; padding: 15px; border-radius: 8px; text-align: center; border: 2px solid #e9ecef;">
-                            <div style="font-size: 2rem; font-weight: bold; color: #3b82f6;" id="totalAmigos">0</div>
-                            <div style="color: #666;">🤝 Total Amigos</div>
-                        </div>
-                        <div style="background: white; padding: 15px; border-radius: 8px; text-align: center; border: 2px solid #e9ecef;">
-                            <div style="font-size: 2rem; font-weight: bold; color: #f59e0b;" id="totalJugadores">0</div>
-                            <div style="color: #666;">⚽ Total Jugadores</div>
-                        </div>
-                        <div style="background: white; padding: 15px; border-radius: 8px; text-align: center; border: 2px solid #e9ecef;">
-                            <div style="font-size: 2rem; font-weight: bold; color: #8b5cf6;" id="totalEntrenadores">0</div>
-                            <div style="color: #666;">👨‍🏫 Total Entrenadores</div>
-                        </div>
-                        <div style="background: white; padding: 15px; border-radius: 8px; text-align: center; border: 2px solid #e9ecef;">
-                            <div style="font-size: 2rem; font-weight: bold; color: #dc2626;" id="totalEventos">0</div>
-                            <div style="color: #666;">🎉 Total Eventos</div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Estados de Usuarios -->
-                <div class="section">
-                    <h3>👥 Estado de Usuarios</h3>
-                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-bottom: 20px;">
-                        <div style="background: white; padding: 15px; border-radius: 8px; text-align: center; border-left: 4px solid #059669;">
-                            <div style="font-size: 1.5rem; font-weight: bold; color: #059669;" id="sociosActivos">0</div>
-                            <div style="color: #666;">✅ Socios Activos</div>
-                        </div>
-                        <div style="background: white; padding: 15px; border-radius: 8px; text-align: center; border-left: 4px solid #f59e0b;">
-                            <div style="font-size: 1.5rem; font-weight: bold; color: #f59e0b;" id="sociosPendientes">0</div>
-                            <div style="color: #666;">⏳ Socios Pendientes</div>
-                        </div>
-                        <div style="background: white; padding: 15px; border-radius: 8px; text-align: center; border-left: 4px solid #3b82f6;">
-                            <div style="font-size: 1.5rem; font-weight: bold; color: #3b82f6;" id="amigosActivos">0</div>
-                            <div style="color: #666;">🤝 Amigos Activos</div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Estado del Sistema -->
-                <div class="section">
-                    <h3>🛠️ Estado del Sistema</h3>
-                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 20px;">
-                        <div style="background: white; padding: 20px; border-radius: 10px; border-left: 4px solid #059669;">
-                            <h4 style="color: #059669; margin-bottom: 15px;">🔄 Sincronización</h4>
-                            <p><strong>Estado:</strong> <span id="estadoSincronizacion">⏳ Verificando...</span></p>
-                            <p><strong>Nube (conexión):</strong> <span id="estadoFirebaseSync">⏳ Verificando...</span></p>
-                            <p><strong>Última actualización:</strong> <span id="ultimaActualizacion">--</span></p>
-                        </div>
-                        
-                        <div style="background: white; padding: 20px; border-radius: 10px; border-left: 4px solid #3b82f6;">
-                            <h4 style="color: #3b82f6; margin-bottom: 15px;">💾 Almacenamiento</h4>
-                            <p><strong>localStorage:</strong> <span id="estadoLocalStorage">⏳ Verificando...</span></p>
-                            <p><strong>IndexedDB:</strong> <span id="estadoPersistence">⏳ Verificando...</span></p>
-                            <p><strong>Servicio en la nube:</strong> <span id="estadoFirebaseHealth">⏳ Verificando...</span></p>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Herramientas de Administración -->
-                <div class="section">
-                    <h3>🔧 Herramientas de Administración</h3>
-                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px;">
-                        
-                        <div style="background: white; padding: 20px; border-radius: 10px; border-left: 4px solid #059669;">
-                            <h4 style="color: #059669; margin-bottom: 15px;">📊 Exportar Estadísticas</h4>
-                            <p style="margin-bottom: 15px;">Exporta un resumen completo de las estadísticas del sistema.</p>
-                            <button onclick="exportStatistics()" class="btn" style="background: #059669; color: white; width: 100%;">
-                                📊 Exportar Estadísticas
-                            </button>
-                        </div>
-
-                        <div style="background: white; padding: 20px; border-radius: 10px; border-left: 4px solid #f59e0b;">
-                            <h4 style="color: #f59e0b; margin-bottom: 15px;">🔄 Actualizar Datos</h4>
-                            <p style="margin-bottom: 15px;">Actualiza manualmente las estadísticas del sistema.</p>
-                            <button onclick="loadSystemStatistics()" class="btn" style="background: #f59e0b; color: white; width: 100%;">
-                                🔄 Actualizar Ahora
-                            </button>
-                        </div>
-
-                        <div style="background: white; padding: 20px; border-radius: 10px; border-left: 4px solid #8b5cf6;">
-                            <h4 style="color: #8b5cf6; margin-bottom: 15px;">🔍 Verificar Sistema</h4>
-                            <p style="margin-bottom: 15px;">Verifica el estado de salud del sistema completo.</p>
-                            <button onclick="monitorSystemHealth()" class="btn" style="background: #8b5cf6; color: white; width: 100%;">
-                                🔍 Verificar Sistema
-                            </button>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Información del Sistema -->
-                <div class="section">
-                    <h3>ℹ️ Información del Sistema</h3>
-                    <div style="background: #f8f9fa; padding: 20px; border-radius: 10px; border: 1px solid #dee2e6;">
-                        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px;">
-                            <div>
-                                <h5 style="color: #1e3a8a; margin-bottom: 10px;">📊 Google Analytics</h5>
-                                <p style="color: #666; font-size: 0.9rem;">Sistema de analíticas activado para monitorear el uso del panel de administración.</p>
-                            </div>
-                            <div>
-                                <h5 style="color: #1e3a8a; margin-bottom: 10px;">💾 Backup Automático</h5>
-                                <p style="color: #666; font-size: 0.9rem;">Respaldo automático cada 5 minutos de todos los datos críticos.</p>
-                            </div>
-                            <div>
-                                <h5 style="color: #1e3a8a; margin-bottom: 10px;">🔄 Sincronización</h5>
-                                <p style="color: #666; font-size: 0.9rem;">Actualización automática cada 30 segundos cuando la pestaña está activa.</p>
-                            </div>
-                            <div>
-                                <h5 style="color: #1e3a8a; margin-bottom: 10px;">🔍 Monitoreo</h5>
-                                <p style="color: #666; font-size: 0.9rem;">Supervisión continua del estado del sistema y alertas automáticas.</p>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Estado Profesional -->
-                <div class="section">
-                    <h3>🏆 Estado Profesional del Sistema</h3>
-                    <div style="background: linear-gradient(135deg, #059669, #10b981); padding: 25px; border-radius: 15px; color: white; text-align: center;">
-                        <h4 style="margin-bottom: 15px; color: white;">✅ Sistema de Nivel Profesional</h4>
-                        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 15px; margin-bottom: 20px;">
-                            <div>
-                                <div style="font-size: 2rem; font-weight: bold;">100%</div>
-                                <div style="font-size: 0.9rem; opacity: 0.9;">Funcionalidad</div>
-                            </div>
-                            <div>
-                                <div style="font-size: 2rem; font-weight: bold;">✅</div>
-                                <div style="font-size: 0.9rem; opacity: 0.9;">Seguridad</div>
-                            </div>
-                            <div>
-                                <div style="font-size: 2rem; font-weight: bold;">💾</div>
-                                <div style="font-size: 0.9rem; opacity: 0.9;">Persistencia</div>
-                            </div>
-                            <div>
-                                <div style="font-size: 2rem; font-weight: bold;">🚀</div>
-                                <div style="font-size: 0.9rem; opacity: 0.9;">Rendimiento</div>
-                            </div>
-                        </div>
-                        <p style="margin: 0; opacity: 0.9; font-size: 0.9rem;">
-                            Sistema completamente optimizado para uso profesional con todas las funcionalidades implementadas
-                        </p>
-                    </div>
-                </div>
-            </div>
-
-        </div>
-    </div>
-
-        <script>
         function showAdminSessionGate(message) {
             document.body.classList.add('admin-access-denied');
             const gate = document.getElementById('adminSessionGate');
@@ -4576,61 +26,22 @@
             }, 400);
         }
 
-        function sanitizeCloudBrandText(text) {
-            return String(text == null ? '' : text)
-                .replace(/\bFirebase\b/gi, 'nube')
-                .replace(/\bFirestore\b/gi, 'nube');
-        }
-
         function showAdminCopyableDialog(title, text) {
             const dlg = document.getElementById('adminCopyableDialog');
             const titleEl = document.getElementById('adminCopyableDialogTitle');
             const textEl = document.getElementById('adminCopyableDialogText');
-            const safeTitle = sanitizeCloudBrandText(title);
-            const safeText = sanitizeCloudBrandText(text);
             if (!dlg || !textEl) {
-                window.__adminNativeAlert(String(safeTitle || '') + '\n\n' + String(safeText || ''));
+                alert(String(title || '') + '\n\n' + String(text || ''));
                 return;
             }
-            if (titleEl) titleEl.textContent = safeTitle || 'Mensaje';
-            textEl.value = String(safeText || '');
-            textEl.readOnly = false;
+            if (titleEl) titleEl.textContent = title || 'Mensaje';
+            textEl.value = String(text || '');
             dlg.classList.add('is-open');
             try {
                 textEl.focus();
                 textEl.select();
             } catch (_) {}
         }
-
-        function showAdminErrorDialog(title, message, err) {
-            let text = String(message || '');
-            if (err) {
-                const detail = err && err.message ? err.message : String(err);
-                if (detail && text.indexOf(detail) < 0) {
-                    text += '\n\nDetalle:\n' + detail;
-                }
-                if (err.stack && text.indexOf(err.stack) < 0) {
-                    text += '\n\nTraza técnica:\n' + err.stack;
-                }
-            }
-            showAdminCopyableDialog(title || '❌ Error', text);
-        }
-
-        (function installAdminCopyableAlerts() {
-            window.__adminNativeAlert = window.__adminNativeAlert || window.alert.bind(window);
-            window.__adminNativeConfirm = window.__adminNativeConfirm || window.confirm.bind(window);
-            window.alert = function adminPanelAlert(msg) {
-                const text = sanitizeCloudBrandText(msg);
-                if (text.indexOf('❌') >= 0) {
-                    showAdminErrorDialog('Error en el panel', text);
-                    return;
-                }
-                window.__adminNativeAlert(text);
-            };
-            window.confirm = function adminPanelConfirm(msg) {
-                return window.__adminNativeConfirm(sanitizeCloudBrandText(msg));
-            };
-        })();
 
         function closeAdminCopyableDialog() {
             const dlg = document.getElementById('adminCopyableDialog');
@@ -4643,7 +54,7 @@
             try {
                 if (navigator.clipboard && navigator.clipboard.writeText) {
                     await navigator.clipboard.writeText(text);
-                    window.__adminNativeAlert('✅ Texto copiado al portapapeles.');
+                    alert('✅ Texto copiado al portapapeles.');
                     return;
                 }
             } catch (_) {}
@@ -4651,14 +62,13 @@
                 textEl.focus();
                 textEl.select();
                 document.execCommand('copy');
-                window.__adminNativeAlert('✅ Texto copiado (selección manual).');
+                alert('✅ Texto copiado (selección manual).');
             } catch (e) {
-                window.__adminNativeAlert('Selecciona el texto con el ratón y pulsa Ctrl+C.');
+                alert('Selecciona el texto con el ratón y pulsa Ctrl+C.');
             }
         }
 
         window.showAdminCopyableDialog = showAdminCopyableDialog;
-        window.showAdminErrorDialog = showAdminErrorDialog;
         window.closeAdminCopyableDialog = closeAdminCopyableDialog;
         window.adminCopyDialogToClipboard = adminCopyDialogToClipboard;
 
@@ -4675,8 +85,7 @@
                 }
             }
             if (!window.firebaseAuth || window.firebaseAuth.isSimulation) {
-                showAdminSessionGate('No se pudo conectar con la nube. Abre la web del club e inicia sesión como administrador u organizador.');
-                return false;
+                return true;
             }
 
             const waitAuth =
@@ -4700,6 +109,16 @@
                 return false;
             }
 
+            if (
+                !window.AdminSession
+                || typeof window.AdminSession.isAdminAuthenticated !== 'function'
+                || !window.AdminSession.isAdminAuthenticated()
+            ) {
+                showAdminSessionGate(
+                    'Acceso al panel solo tras iniciar sesión con contraseña en la web principal (botón Admin).'
+                );
+                return false;
+            }
             try {
                 const { doc, getDoc } = await import('https://www.gstatic.com/firebasejs/10.12.3/firebase-firestore.js');
                 const col = (window.DB_COLLECTIONS && window.DB_COLLECTIONS.ADMINS) || 'sanabria_admins';
@@ -4709,49 +128,27 @@
                     return false;
                 }
                 const d = snap.data() || {};
-                const isOrganizer = String(d.role || '').trim() === 'competition_organizer'
+                const isOrganizer = d.role === 'competition_organizer'
                     || (window.AdminOrganizerAccess && window.AdminOrganizerAccess.isOrganizerFirestoreDoc(d));
                 const isFullAdmin =
                     d.isAdmin === true
                     || d.isSuperAdmin === true
                     || d.role === 'admin'
-                    || d.role === 'super_admin'
-                    || d.role === 'team_admin'
-                    || d.role === 'assistant_admin';
+                    || d.role === 'super_admin';
                 const ok = d.appScope === 'cdsanabriacf' && (isFullAdmin || isOrganizer);
                 if (!ok) {
                     showAdminSessionGate('Sin permisos de administrador u organizador en la nube del club.');
                     return false;
                 }
-                try {
-                    let cur = {};
-                    if (window.AdminSession && typeof window.AdminSession.getStoredAdminSession === 'function') {
-                        cur = window.AdminSession.getStoredAdminSession() || {};
-                    }
-                    if (!cur.email) {
-                        try {
-                            cur = JSON.parse(localStorage.getItem('currentAdmin') || localStorage.getItem('adminUser') || '{}');
-                        } catch (_) {
-                            cur = {};
-                        }
-                    }
-                    cur.id = user.uid;
-                    cur.email = String(user.email || cur.email || '').toLowerCase();
-                    cur.name = cur.name || d.name || d.nombre || (isOrganizer ? 'Organizador/a' : 'Administrador/a');
-                    cur.role = isOrganizer ? 'competition_organizer' : (d.role || cur.role || 'admin');
-                    cur.isAdmin = !isOrganizer && (isFullAdmin || cur.isAdmin === true);
-                    cur.isSuperAdmin = d.isSuperAdmin === true;
-                    cur.loginTime = cur.loginTime || new Date().toISOString();
-                    if (window.AdminSession && typeof window.AdminSession.setStoredAdminSession === 'function') {
-                        window.AdminSession.setStoredAdminSession(cur);
-                    } else {
+                if (isOrganizer) {
+                    try {
+                        const cur = JSON.parse(localStorage.getItem('currentAdmin') || '{}');
+                        cur.role = 'competition_organizer';
+                        cur.isAdmin = false;
                         localStorage.setItem('currentAdmin', JSON.stringify(cur));
                         localStorage.setItem('adminUser', JSON.stringify(cur));
-                    }
-                    if (window.AdminSession && typeof window.AdminSession.markAdminAuthenticated === 'function') {
-                        window.AdminSession.markAdminAuthenticated();
-                    }
-                } catch (_) {}
+                    } catch (_) {}
+                }
                 return true;
             } catch (e) {
                 console.warn('verifyFirebaseAdminSession:', e);
@@ -4764,16 +161,15 @@
             console.log('🔍 Cargando panel de administración CDSANABRIACF...');
             const firebaseOk = await verifyFirebaseAdminSession();
             if (!firebaseOk) return;
-            if (!checkAdminSession()) return;
+            checkAdminSession();
             checkAdminPermissions();
             if (window.AdminOrganizerAccess && window.AdminOrganizerAccess.isCompetitionOrganizer()) {
                 window.AdminOrganizerAccess.applyNavRestrictions();
                 window.AdminOrganizerAccess.applyCompetitionTabChrome();
-            } else {
-                checkExpiredMembers();
-                checkAutomaticSeasonRenewal();
-                cargarConfiguracionTienda();
             }
+            checkExpiredMembers(); // Verificar socios expirados al cargar
+            checkAutomaticSeasonRenewal(); // Renovación automática tras 31/05 (Firebase)
+            cargarConfiguracionTienda(); // Cargar configuración de tienda
             
             // Abrir pestaña si viene desde enlace de la web principal
             const savedTab = localStorage.getItem('adminActiveTab');
@@ -4786,9 +182,6 @@
                     showTab('competiciones');
                 }
                 if (typeof loadCompetitionsList === 'function') loadCompetitionsList();
-                if (typeof loadTorneoPreinscripcionesAdmin === 'function') {
-                    loadTorneoPreinscripcionesAdmin();
-                }
             } else if (savedTab) {
                 console.log('📂 Abriendo pestaña desde enlace:', savedTab);
                 setTimeout(() => {
@@ -4806,14 +199,12 @@
                 }, 500);
             }
 
-            // Reconciliación al abrir: solo administradores del club (el organizador no puede escribir socios/jugadores).
-            if (!(window.AdminOrganizerAccess && window.AdminOrganizerAccess.isCompetitionOrganizer())) {
-                setTimeout(() => {
-                    intentarReconciliacionAutomaticaAlAbrir().catch((err) => {
-                        console.warn('No se pudo ejecutar reconciliación automática al abrir:', err);
-                    });
-                }, 1200);
-            }
+            // Reconciliación al abrir: solo el resumen final (sin otros avisos previos).
+            setTimeout(() => {
+                intentarReconciliacionAutomaticaAlAbrir().catch((err) => {
+                    console.warn('No se pudo ejecutar reconciliación automática al abrir:', err);
+                });
+            }, 1200);
 
             window.addEventListener('clubMediaUpdated', function () {
                 try { if (typeof renderMultimediaAdminList === 'function') renderMultimediaAdminList(); } catch (_) {}
@@ -4826,35 +217,9 @@
         // Función para verificar sesión de administrador
         function checkAdminSession() {
             try {
-                let currentAdmin = {};
-                if (window.AdminSession && typeof window.AdminSession.getStoredAdminSession === 'function') {
-                    currentAdmin = window.AdminSession.getStoredAdminSession() || {};
-                }
-                if (!currentAdmin.email) {
-                    currentAdmin = JSON.parse(
-                        localStorage.getItem('currentAdmin') ||
-                        localStorage.getItem('adminUser') ||
-                        sessionStorage.getItem('currentAdmin') ||
-                        '{}'
-                    );
-                }
-                const user = window.firebaseAuth && window.firebaseAuth.currentUser;
-                if ((!currentAdmin || !currentAdmin.email) && user && user.email) {
-                    currentAdmin = {
-                        id: user.uid,
-                        email: String(user.email).toLowerCase(),
-                        name: user.displayName || 'Administrador/a',
-                        role: 'admin',
-                        loginTime: new Date().toISOString()
-                    };
-                    if (window.AdminSession && typeof window.AdminSession.setStoredAdminSession === 'function') {
-                        window.AdminSession.setStoredAdminSession(currentAdmin);
-                    } else {
-                        localStorage.setItem('currentAdmin', JSON.stringify(currentAdmin));
-                    }
-                }
+                const currentAdmin = JSON.parse(localStorage.getItem('currentAdmin') || '{}');
                 
-                if (!currentAdmin || !currentAdmin.email) {
+                if (!currentAdmin.email) {
                     showAdminSessionGate('Sesión de administrador no válida. Inicia sesión desde la web principal.');
                     return false;
                 }
@@ -4987,7 +352,7 @@
             return password;
         }
 
-        /** Por seguridad no se revelan contraseñas guardadas (solo la nube / hash local). */
+        /** Por seguridad no se revelan contraseñas guardadas (solo Firebase Auth / hash local). */
         function togglePassword(elementId) {
             const element = document.getElementById(elementId);
             if (!element) return;
@@ -5019,95 +384,67 @@
             document.getElementById('adminRole').value = 'competition_organizer';
         }
 
-        async function upsertClubAdminInCloud(payload) {
-            if (!window.CdsanAdminApiAuth || !window.CdsanAdminApiAuth.adminFetch) {
-                throw new Error('Sesión de administrador no disponible para escribir en la nube.');
-            }
-            const res = await window.CdsanAdminApiAuth.adminFetch('/.netlify/functions/manage-club-admin', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload)
-            });
-            const data = await res.json().catch(function () { return {}; });
-            if (!res.ok || !data.ok) {
-                throw new Error(data.error || 'No se pudo guardar la cuenta en la nube.');
-            }
-            return data;
-        }
-
-        async function saveNewAdmin() {
+        function saveNewAdmin() {
+            // Verificar permisos
             const currentAdmin = JSON.parse(localStorage.getItem('currentAdmin') || '{}');
             if (currentAdmin.email !== 'amco@gmx.es') {
                 alert('❌ Solo el administrador principal puede añadir otros administradores');
                 return;
             }
-
+            
             try {
                 const adminPasswordField = document.getElementById('adminPassword').value;
                 const adminData = {
                     id: 'ADMIN_' + Date.now(),
-                    name: String(document.getElementById('adminName').value || '').trim(),
-                    email: String(document.getElementById('adminEmail').value || '').trim().toLowerCase(),
-                    role: document.getElementById('adminRole').value || 'competition_organizer',
+                    name: document.getElementById('adminName').value,
+                    email: document.getElementById('adminEmail').value,
+                    role: document.getElementById('adminRole').value,
                     teamId: 'CDSANABRIACF',
                     createdAt: new Date().toISOString(),
                     createdBy: 'amco@gmx.es',
                     status: 'active'
                 };
 
+                // Validar campos obligatorios
                 if (!adminData.name || !adminData.email) {
-                    alert('❌ Completa nombre y email.');
+                    alert('❌ Por favor, completa todos los campos obligatorios marcados con *');
                     return;
                 }
-                if (!adminData.email.includes('@')) {
-                    alert('❌ El email no es válido.');
-                    return;
-                }
-                if (adminData.email === 'amco@gmx.es') {
+
+                // Validar que no sea el email principal
+                if (adminData.email.toLowerCase() === 'amco@gmx.es') {
                     alert('❌ No puedes crear otro administrador con el email principal');
                     return;
                 }
-                if (!adminPasswordField || String(adminPasswordField).length < 8) {
-                    alert('❌ La contraseña de acceso es obligatoria (mínimo 8 caracteres). Se crea en la nube para que pueda entrar.');
+
+                // Validar email único
+                const existingAdmins = JSON.parse(localStorage.getItem('cdsanabriacfTeamAdmins') || '[]');
+                if (existingAdmins.find(admin => admin.email.toLowerCase() === adminData.email.toLowerCase())) {
+                    alert('❌ Ya existe un administrador con este email');
                     return;
                 }
 
-                const cloud = await upsertClubAdminInCloud({
-                    email: adminData.email,
-                    name: adminData.name,
-                    password: adminPasswordField,
-                    role: adminData.role
-                });
-                adminData.uid = cloud.uid || '';
-                adminData.cloudRole = cloud.role || adminData.role;
-
-                const existingAdmins = JSON.parse(localStorage.getItem('cdsanabriacfTeamAdmins') || '[]');
-                const already = existingAdmins.find(function (admin) {
-                    return String(admin.email || '').toLowerCase() === adminData.email;
-                });
-                if (already) {
-                    already.name = adminData.name;
-                    already.role = adminData.role;
-                    already.uid = adminData.uid;
-                    already.status = 'active';
-                    already.updatedAt = new Date().toISOString();
-                } else {
-                    existingAdmins.push(adminData);
-                }
+                // Guardar en localStorage
+                existingAdmins.push(adminData);
                 localStorage.setItem('cdsanabriacfTeamAdmins', JSON.stringify(existingAdmins));
 
                 alert(
-                    '✅ Cuenta creada en la nube. Ya puede entrar.\n\n' +
-                    '📧 ' + adminData.email + '\n' +
-                    '🔑 Usa la contraseña que acabas de indicar (no se guarda en este navegador).\n\n' +
-                    'Entrada: web del club → 🔧 Admin → email y contraseña.'
+                    '✅ Datos del administrador guardados (sin contraseña en este navegador).\n\n' +
+                    '📧 ' + adminData.email + '\n\n' +
+                    '🔐 Crea la cuenta de administrador en la nube del club (contacto con soporte técnico si hace falta).\n' +
+                    (adminPasswordField
+                        ? '\n⚠️ La contraseña escrita aquí no se almacena: configúrala con «Restablecer contraseña» o desde soporte técnico.'
+                        : '')
                 );
                 document.getElementById('adminPassword').value = '';
+                
                 cancelAddAdmin();
                 loadAdminsList();
+
+                console.log('👨‍💼 Nuevo administrador añadido:', adminData.name, adminData.email);
             } catch (error) {
                 console.error('❌ Error añadiendo administrador:', error);
-                alert('❌ No se pudo crear el acceso en la nube: ' + (error.message || error));
+                alert('❌ Error al añadir el administrador. Inténtalo de nuevo.');
             }
         }
 
@@ -5122,14 +459,6 @@
                     name: 'Administrador Secundario',
                     email: 'cdsanabriafc@gmail.com',
                     role: 'super_admin',
-                    status: 'active'
-                };
-
-                const defaultOrganizer = {
-                    id: 'ADMIN_ORGANIZER_F7',
-                    name: 'Organizador Torneo F7',
-                    email: 'cdsanabriafc+torneo@gmail.com',
-                    role: 'competition_organizer',
                     status: 'active'
                 };
 
@@ -5149,25 +478,12 @@
                         </div>
                     </div>
                 `;
-                html += `
-                    <div style="display: flex; justify-content: space-between; align-items: center; padding: 15px; border-bottom: 1px solid #eee; background: #ecfdf5;">
-                        <div>
-                            <strong>🏆 ${defaultOrganizer.name}</strong><br>
-                            <small>📧 ${defaultOrganizer.email} | 🎯 Organizador/a competiciones</small><br>
-                            <small style="color: #0f766e; font-weight: bold;">🔐 Pulsa «Clave en la nube» para crear o restablecer su acceso</small>
-                        </div>
-                        <div>
-                            <button class="btn btn-small" onclick="resetAdminCloudPassword('${defaultOrganizer.id}')" style="padding: 5px 10px; font-size: 0.8rem; background:#0f766e; color:white;">🔑 Clave en la nube</button>
-                        </div>
-                    </div>
-                `;
 
                 // Mostrar administradores adicionales
                 if (admins.length === 0) {
                     html += '<div style="padding: 15px; text-align: center; color: #666;">No hay administradores adicionales registrados</div>';
                 } else {
                     admins.forEach(admin => {
-                        if (String(admin.email || '').toLowerCase() === 'cdsanabriafc+torneo@gmail.com') return;
                         const roleText =
                             admin.role === 'competition_organizer'
                                 ? 'Organizador/a competiciones'
@@ -5183,7 +499,7 @@
                                     <small style="color: #059669; font-weight: bold;">🔐 Credenciales gestionadas en la cuenta del club (nube)</small>
                                 </div>
                                 <div>
-                                    <button class="btn btn-small" onclick="resetAdminCloudPassword('${admin.id}')" style="padding: 5px 10px; font-size: 0.8rem; margin-right: 5px; background:#0f766e; color:white;">🔑 Clave en la nube</button>
+                                    <button class="btn btn-small" onclick="editAdmin('${admin.id}')" style="padding: 5px 10px; font-size: 0.8rem; margin-right: 5px;">✏️ Editar</button>
                                     <button class="btn btn-small" onclick="deleteAdmin('${admin.id}')" style="padding: 5px 10px; font-size: 0.8rem; background: #dc2626;">🗑️ Eliminar</button>
                                 </div>
                             </div>
@@ -5200,47 +516,14 @@
             }
         }
 
-        async function resetAdminCloudPassword(adminId) {
+        function editAdmin(adminId) {
+            // Verificar permisos
             const currentAdmin = JSON.parse(localStorage.getItem('currentAdmin') || '{}');
             if (currentAdmin.email !== 'amco@gmx.es') {
-                alert('❌ Solo el administrador principal puede cambiar claves de otros administradores');
+                alert('❌ Solo el administrador principal puede editar otros administradores');
                 return;
             }
-            const admins = JSON.parse(localStorage.getItem('cdsanabriacfTeamAdmins') || '[]');
-            const builtIn = {
-                ADMIN_ORGANIZER_F7: {
-                    id: 'ADMIN_ORGANIZER_F7',
-                    name: 'Organizador Torneo F7',
-                    email: 'cdsanabriafc+torneo@gmail.com',
-                    role: 'competition_organizer'
-                }
-            };
-            const admin = builtIn[adminId] || admins.find(function (row) { return row.id === adminId; });
-            if (!admin || !admin.email) {
-                alert('❌ No se encontró ese administrador.');
-                return;
-            }
-            const password = prompt(
-                'Nueva contraseña de acceso para ' + admin.email + ' (mínimo 8 caracteres).\nSe guarda en la nube para que pueda entrar con 🔧 Admin.',
-                ''
-            );
-            if (password == null) return;
-            if (String(password).length < 8) {
-                alert('❌ La contraseña debe tener al menos 8 caracteres.');
-                return;
-            }
-            try {
-                await upsertClubAdminInCloud({
-                    email: String(admin.email).trim().toLowerCase(),
-                    name: admin.name || '',
-                    password: String(password),
-                    role: admin.role || 'competition_organizer'
-                });
-                alert('✅ Clave actualizada en la nube.\n\n📧 ' + admin.email + '\nEntrada: web del club → 🔧 Admin.');
-            } catch (error) {
-                console.error('❌ Error actualizando clave admin:', error);
-                alert('❌ No se pudo actualizar la clave en la nube: ' + (error.message || error));
-            }
+            alert('🔧 Función de edición en desarrollo. ID: ' + adminId);
         }
 
         function deleteAdmin(adminId) {
@@ -5302,609 +585,6 @@
 
         function jsPlayerIdArg(playerId) {
             return JSON.stringify(String(playerId || ''));
-        }
-
-        function playerActionDataId(playerId) {
-            return encodeURIComponent(String(playerId == null ? '' : playerId));
-        }
-
-        function buildPlayerActionButton(action, playerId, label, style, title) {
-            const idAttr = playerActionDataId(playerId);
-            const titleAttr = title ? ' title="' + escapeHtml(title) + '"' : '';
-            return (
-                '<button type="button" data-player-action="' + action + '" data-player-id="' + idAttr + '"' +
-                ' style="' + style + '"' + titleAttr + '>' + label + '</button>'
-            );
-        }
-
-        const PLAYER_ADMIN_BTN_STYLE =
-            'padding:4px 8px;font-size:0.72rem;line-height:1.25;color:#fff;border:none;border-radius:4px;cursor:pointer;white-space:nowrap;';
-
-        function getPlayerKitItems(player) {
-            if (window.PlayerExport && typeof window.PlayerExport.getKitItems === 'function') {
-                return window.PlayerExport.getKitItems(player) || [];
-            }
-            if (Array.isArray(player.kitOrder) && player.kitOrder.length) return player.kitOrder;
-            if (player.kit && Array.isArray(player.kit.items)) return player.kit.items;
-            return [];
-        }
-
-        function getPlayerKitItemsEnriched(player) {
-            let items = getPlayerKitItems(player);
-            if (items.length) return items;
-            if (player.kit && typeof player.kit === 'object' && !Array.isArray(player.kit)) {
-                const cfg =
-                    window.ClubInscriptionConfig && window.ClubInscriptionConfig.read
-                        ? window.ClubInscriptionConfig.read()
-                        : null;
-                const garments =
-                    cfg && window.ClubInscriptionConfig.getEnabledGarments
-                        ? window.ClubInscriptionConfig.getEnabledGarments(cfg)
-                        : [];
-                Object.keys(player.kit).forEach(function (gid) {
-                    if (gid === 'mode' || gid === 'items') return;
-                    const size = player.kit[gid];
-                    if (!size || !String(size).trim()) return;
-                    const gDef = garments.find(function (g) {
-                        return g.id === gid;
-                    }) || {};
-                    items.push({
-                        id: gid,
-                        label: gDef.label || gid,
-                        size: String(size).trim(),
-                        price: Number(gDef.price || 0)
-                    });
-                });
-                if (items.length) return items;
-            }
-            if (Array.isArray(player.kitPurchases) && player.kitPurchases.length) {
-                const last = player.kitPurchases[player.kitPurchases.length - 1];
-                if (last && Array.isArray(last.items) && last.items.length) return last.items;
-            }
-            if (!window.ClubInscriptionConfig || !window.ClubInscriptionConfig.read) return [];
-            const cfg = window.ClubInscriptionConfig.read();
-            const garments =
-                window.ClubInscriptionConfig.getEnabledGarments
-                    ? window.ClubInscriptionConfig.getEnabledGarments(cfg)
-                    : [];
-            const flatKeys = [
-                ['train_kit', 'kit_train_kit'],
-                ['tracksuit', 'kit_tracksuit'],
-                ['train_jacket', 'kit_train_jacket'],
-                ['cazadora', 'kit_cazadora'],
-                ['train_shirt', 'kit_train_shirt'],
-                ['train_shorts', 'kit_train_shorts'],
-                ['match_shirt', 'kit_match_shirt'],
-                ['match_shorts', 'kit_match_shorts']
-            ];
-            items = [];
-            flatKeys.forEach(function (pair) {
-                const gid = pair[0];
-                const field = pair[1];
-                const size =
-                    player[field] ||
-                    (player.kit && typeof player.kit === 'object' ? player.kit[gid] : '') ||
-                    '';
-                if (!size || !String(size).trim()) return;
-                const gDef = garments.find(function (g) {
-                    return g.id === gid;
-                }) || {};
-                items.push({
-                    id: gid,
-                    label: gDef.label || gid,
-                    size: String(size).trim(),
-                    price: Number(gDef.price || 0)
-                });
-            });
-            return items;
-        }
-
-        function resolvePlayerCategoryIdForFees(player) {
-            if (window.ClubPlayerMemberSync && window.ClubPlayerMemberSync.resolvePlayerCategoryId) {
-                return window.ClubPlayerMemberSync.resolvePlayerCategoryId(player) || '';
-            }
-            let cat = String(player.category || player.categoria || player.playerCategory || '').toLowerCase();
-            if (cat === 'aficionado') cat = 'senior';
-            if (cat === 'prebenajmin') cat = 'prebenjamin';
-            return cat;
-        }
-
-        function formatAdminPaymentMethod(raw) {
-            const m = String(raw || '').trim().toLowerCase();
-            if (!m) return '';
-            if (m === 'transferencia' || m.indexOf('transfer') >= 0) return 'Transferencia';
-            if (m === 'efectivo' || m.indexOf('cash') >= 0) return 'Efectivo';
-            if (m === 'tarjeta' || m === 'tpv' || m.indexOf('card') >= 0 || m.indexOf('redsys') >= 0) return 'Tarjeta';
-            if (m === 'bizum') return 'Bizum';
-            if (m === 'otro') return 'Otro';
-            if (m.indexOf('admin') >= 0) return 'Administración';
-            return String(raw || '');
-        }
-
-        function formatAdminEur(amount) {
-            return Number(amount || 0).toFixed(2).replace('.', ',') + ' €';
-        }
-
-        function resolvePlayerPaymentBreakdown(player) {
-            const b = player.chargeBreakdown || {};
-            const catId = resolvePlayerCategoryIdForFees(player);
-            let socio = Number(b.socio || 0);
-            let ficha = Number(b.ficha || 0);
-            let kit = Number(b.kit || 0);
-            const kitItems = getPlayerKitItemsEnriched(player);
-            if (kit <= 0 && kitItems.length) {
-                kitItems.forEach(function (it) {
-                    kit += Number(it.price || 0);
-                });
-                kit = Math.round(kit * 100) / 100;
-            }
-            let cfgSocio = 0;
-            let cfgFicha = 0;
-            const cfg =
-                window.ClubInscriptionConfig && window.ClubInscriptionConfig.read
-                    ? window.ClubInscriptionConfig.read()
-                    : null;
-            if (cfg && catId && window.ClubInscriptionConfig.getCategoryFee) {
-                cfgSocio = Number(window.ClubInscriptionConfig.getCategoryFee(cfg, catId, 'socio') || 0);
-                cfgFicha = Number(window.ClubInscriptionConfig.getCategoryFee(cfg, catId, 'ficha') || 0);
-            }
-            const recordedSocio = Number(b.socio || 0);
-            const recordedFicha = Number(b.ficha || 0);
-            const recordedKit = Number(b.kit || 0);
-            const recordedTotal = Number(b.total || player.totalCharge || 0);
-            const sumRecordedLines = Math.round((recordedSocio + recordedFicha + recordedKit) * 100) / 100;
-
-            if (sumRecordedLines > 0) {
-                if (socio <= 0) socio = recordedSocio;
-                if (ficha <= 0) ficha = recordedFicha;
-                if (kit <= 0 && recordedKit > 0) kit = recordedKit;
-            } else if (recordedTotal > 0) {
-                const cuotaPart = Math.max(0, recordedTotal - kit);
-                if (cfgSocio > 0 && cfgFicha > 0 && Math.abs(cuotaPart - cfgSocio - cfgFicha) < 0.02) {
-                    socio = cfgSocio;
-                    ficha = cfgFicha;
-                } else if (cfgSocio > 0 && Math.abs(cuotaPart - cfgSocio) < 0.02) {
-                    socio = cfgSocio;
-                    ficha = 0;
-                } else if (cuotaPart > 0) {
-                    socio = cuotaPart;
-                    ficha = 0;
-                }
-            }
-
-            if (player.paySocioSelected !== false && socio <= 0 && cfgSocio > 0) socio = cfgSocio;
-            if (player.payFichaSelected !== false && ficha <= 0 && cfgFicha > 0) ficha = cfgFicha;
-
-            let cuotaFichaTotal = Math.round((socio + ficha) * 100) / 100;
-            if (cuotaFichaTotal <= 0 && cfgSocio + cfgFicha > 0) {
-                let s = player.paySocioSelected !== false ? cfgSocio : 0;
-                let f = player.payFichaSelected !== false ? cfgFicha : 0;
-                socio = socio > 0 ? socio : s;
-                ficha = ficha > 0 ? ficha : f;
-                cuotaFichaTotal = Math.round((socio + ficha) * 100) / 100;
-            }
-
-            const computedInscriptionTotal = Math.round((cuotaFichaTotal + kit) * 100) / 100;
-            let inscriptionTotal = computedInscriptionTotal;
-            if (recordedTotal > 0 && Math.abs(recordedTotal - computedInscriptionTotal) < 0.02) {
-                inscriptionTotal = recordedTotal;
-            } else if (recordedTotal > sumRecordedLines + 0.01 && sumRecordedLines > 0) {
-                inscriptionTotal = Math.max(computedInscriptionTotal, recordedTotal);
-            }
-
-            return {
-                catId: catId,
-                socio: socio,
-                ficha: ficha,
-                kit: kit,
-                cuotaFichaTotal: cuotaFichaTotal,
-                kitItems: kitItems,
-                cfgSocio: cfgSocio,
-                cfgFicha: cfgFicha,
-                recordedTotal: recordedTotal,
-                inscriptionTotal: inscriptionTotal
-            };
-        }
-
-        /** Cuota socio + ficha = pack único: todo pagado o todo pendiente (sin parciales). */
-        function isCuotaFichaPackPaid(player, pb) {
-            if (!player) return false;
-            const total = pb && pb.cuotaFichaTotal > 0 ? pb.cuotaFichaTotal : 0;
-            if (total <= 0) return true;
-
-            if (player.cuotaFichaValidatedAt) return true;
-            if (player.inscriptionPaid === true) return true;
-
-            const ins = String(player.inscriptionStatus || '').toLowerCase();
-            if (ins === 'paid') return true;
-
-            const paySt = String(player.paymentStatus || '').toLowerCase();
-            if (paySt === 'paid' && (player.status === 'active' || player.validatedDate)) return true;
-
-            if (player.status === 'active' && player.validatedDate && paySt !== 'pending') return true;
-
-            return false;
-        }
-
-        function getCuotaFichaPaidAmount(player, pb) {
-            const total = pb && pb.cuotaFichaTotal > 0 ? pb.cuotaFichaTotal : 0;
-            if (total <= 0) return 0;
-            return isCuotaFichaPackPaid(player, pb) ? total : 0;
-        }
-
-        function buildPaymentStatusBadge(label, total, paid, method) {
-            const t = Number(total || 0);
-            const p = Math.max(0, Number(paid || 0));
-            const methodLabel = formatAdminPaymentMethod(method);
-            const methodSuffix = methodLabel ? ' · ' + escapeHtml(methodLabel) : '';
-            if (t <= 0) {
-                return (
-                    '<span style="display:inline-block;background:#e2e8f0;color:#334155;padding:2px 8px;border-radius:999px;font-size:0.75rem;margin-right:6px;margin-bottom:4px;">' +
-                    escapeHtml(label) +
-                    ': —' +
-                    methodSuffix +
-                    '</span>'
-                );
-            }
-            const ok = p >= t - 0.001;
-            const pending = Math.max(0, t - p);
-            const bg = ok ? '#059669' : p > 0 ? '#f59e0b' : '#dc2626';
-            const txt = ok ? 'Pagado' : p > 0 ? 'Parcial' : 'Pendiente';
-            const extra = ok ? '' : p > 0 ? ' · falta ' + pending.toFixed(2) + '€' : '';
-            return (
-                '<span style="display:inline-block;background:' +
-                bg +
-                ';color:#fff;padding:2px 8px;border-radius:999px;font-size:0.75rem;margin-right:6px;margin-bottom:4px;">' +
-                escapeHtml(label) +
-                ': ' +
-                txt +
-                ' (' +
-                p.toFixed(2) +
-                '/' +
-                t.toFixed(2) +
-                '€' +
-                extra +
-                ')' +
-                methodSuffix +
-                '</span>'
-            );
-        }
-
-        function buildCuotaFichaPaymentBadge(player, pb) {
-            const total = pb.cuotaFichaTotal;
-            const packPaid = isCuotaFichaPackPaid(player, pb);
-            const method =
-                player.cuotaFichaPaymentMethod ||
-                player.offlinePaymentChannel ||
-                (packPaid ? player.paymentMethod : '') ||
-                '';
-            const refSocio = pb.socio > 0 ? pb.socio : pb.cfgSocio;
-            const refFicha = pb.ficha > 0 ? pb.ficha : pb.cfgFicha;
-            const methodLabel = formatAdminPaymentMethod(method);
-            const methodSuffix = methodLabel ? ' · ' + escapeHtml(methodLabel) : '';
-            let label = 'Cuota+ficha';
-            if (refSocio > 0 || refFicha > 0) {
-                label += ' (socio ' + refSocio.toFixed(2).replace('.', ',') + '€ + ficha ' + refFicha.toFixed(2).replace('.', ',') + '€)';
-            }
-            if (total <= 0) {
-                return (
-                    '<span style="display:inline-block;background:#e2e8f0;color:#334155;padding:2px 8px;border-radius:999px;font-size:0.75rem;margin-right:6px;margin-bottom:4px;">' +
-                    escapeHtml(label) +
-                    ': —' +
-                    methodSuffix +
-                    '</span>'
-                );
-            }
-            const bg = packPaid ? '#059669' : '#dc2626';
-            const txt = packPaid ? 'Pagado ' + formatAdminEur(total) : 'Pendiente ' + formatAdminEur(total);
-            return (
-                '<span style="display:inline-block;background:' +
-                bg +
-                ';color:#fff;padding:2px 8px;border-radius:999px;font-size:0.75rem;margin-right:6px;margin-bottom:4px;">' +
-                escapeHtml(label) +
-                ': ' +
-                txt +
-                methodSuffix +
-                '</span>'
-            );
-        }
-
-        function buildKitPaymentBadgeHtml(player, pb, kitPaid, method) {
-            const total = pb.kit;
-            const paid = typeof kitPaid === 'number' ? kitPaid : getPlayerKitPaidEur(player);
-            const methodLabel = formatAdminPaymentMethod(method);
-            const methodSuffix = methodLabel ? ' · ' + escapeHtml(methodLabel) : '';
-            if (total <= 0) {
-                return (
-                    '<span style="display:inline-block;background:#e2e8f0;color:#334155;padding:2px 8px;border-radius:999px;font-size:0.75rem;margin-right:6px;margin-bottom:4px;">Ropa: —' +
-                    methodSuffix +
-                    '</span>'
-                );
-            }
-            const ok = paid >= total - 0.001 || kitPaymentIsComplete(player);
-            const pending = Math.max(0, total - paid);
-            const bg = ok ? '#059669' : paid > 0 ? '#f59e0b' : '#dc2626';
-            let txt;
-            if (ok) {
-                txt = 'Pagado ' + formatAdminEur(paid > 0 ? paid : total);
-            } else if (paid > 0) {
-                txt = 'Parcial ' + formatAdminEur(paid) + ' / ' + formatAdminEur(total) + ' · falta ' + formatAdminEur(pending);
-            } else {
-                txt = 'Pendiente ' + formatAdminEur(total);
-            }
-            return (
-                '<span style="display:inline-block;background:' +
-                bg +
-                ';color:#fff;padding:2px 8px;border-radius:999px;font-size:0.75rem;margin-right:6px;margin-bottom:4px;">Ropa: ' +
-                txt +
-                methodSuffix +
-                '</span>'
-            );
-        }
-
-        function buildKitOrderDisplayHtml(player, pb) {
-            const items = pb.kitItems || getPlayerKitItemsEnriched(player);
-            const itemsPaidState = buildKitItemsPaidState(player);
-            let html = '';
-            const kitSummaryTxt =
-                window.PlayerExport && window.PlayerExport.formatKitSummary
-                    ? window.PlayerExport.formatKitSummary(player)
-                    : '';
-
-            if (items.length) {
-                let kitTotal = 0;
-                let kitPaidItems = 0;
-                let kitPendingItems = 0;
-                html +=
-                    '<div style="font-size:0.8em;color:#1e3a8a;margin-top:4px;line-height:1.55;"><strong>👕 Ropa encargada:</strong><br>';
-                items.forEach(function (it, idx) {
-                    const key = kitItemKey(it, idx);
-                    const paidRow = itemsPaidState.find(function (x) {
-                        return x.key === key;
-                    });
-                    const price = Number(it.price || 0);
-                    kitTotal += price;
-                    const isPaid = !!(paidRow && paidRow.paid);
-                    if (isPaid) kitPaidItems += price;
-                    else kitPendingItems += price;
-                    const badgeBg = isPaid ? '#059669' : '#dc2626';
-                    const badgeTxt = isPaid ? 'Pagada' : 'Pendiente';
-                    const methodLabel = isPaid && paidRow && paidRow.method ? formatAdminPaymentMethod(paidRow.method) : '';
-                    html +=
-                        '• ' +
-                        escapeHtml(kitGarmentLabel(it)) +
-                        ' · talla ' +
-                        escapeHtml(kitGarmentSize(it));
-                    if (price > 0) html += ' · ' + formatAdminEur(price);
-                    html +=
-                        ' <span style="display:inline-block;background:' +
-                        badgeBg +
-                        ';color:#fff;padding:1px 7px;border-radius:999px;font-size:0.72rem;font-weight:600;margin-left:4px;">' +
-                        badgeTxt +
-                        '</span>';
-                    if (methodLabel) {
-                        html +=
-                            ' <span style="color:#64748b;font-size:0.72rem;">(' +
-                            escapeHtml(methodLabel) +
-                            ')</span>';
-                    }
-                    html += '<br>';
-                });
-                kitTotal = Math.round(kitTotal * 100) / 100;
-                kitPaidItems = Math.round(kitPaidItems * 100) / 100;
-                kitPendingItems = Math.round(kitPendingItems * 100) / 100;
-                const kitPaidEur = getPlayerKitPaidEur(player);
-                const paidDisplay = kitPaidEur > 0 ? kitPaidEur : kitPaidItems;
-                const pendingDisplay = Math.max(0, kitTotal - paidDisplay);
-                html +=
-                    '<span style="color:#475569;font-size:0.78rem;">Total ropa: ' +
-                    formatAdminEur(kitTotal) +
-                    ' · Pagado: <strong style="color:#059669;">' +
-                    formatAdminEur(paidDisplay) +
-                    '</strong>';
-                if (pendingDisplay > 0.001) {
-                    html += ' · Pendiente: <strong style="color:#dc2626;">' + formatAdminEur(pendingDisplay) + '</strong>';
-                }
-                html += '</span></div>';
-            } else if (kitSummaryTxt) {
-                html +=
-                    '<div style="font-size:0.8em;color:#1e3a8a;margin-top:4px;font-weight:600;line-height:1.5;"><strong>👕 Tallas:</strong> ' +
-                    escapeHtml(kitSummaryTxt) +
-                    '</div>';
-            } else if (pb.kit > 0) {
-                const kitPaid = getPlayerKitPaidEur(player);
-                const kitOk = kitPaymentIsComplete(player);
-                html +=
-                    '<div style="font-size:0.8em;color:#1e3a8a;margin-top:4px;"><strong>👕 Ropa:</strong> Total ' +
-                    formatAdminEur(pb.kit) +
-                    ' · ' +
-                    (kitOk
-                        ? '<span style="color:#059669;font-weight:600;">Pagado ' + formatAdminEur(kitPaid) + '</span>'
-                        : '<span style="color:#dc2626;font-weight:600;">Pagado ' +
-                          formatAdminEur(kitPaid) +
-                          ' · Pendiente ' +
-                          formatAdminEur(Math.max(0, pb.kit - kitPaid)) +
-                          '</span>') +
-                    ' (detalle de tallas no guardado en ficha)</div>';
-            }
-            return html;
-        }
-
-        function getPlayerKitTotal(player) {
-            const pb = resolvePlayerPaymentBreakdown(player);
-            return pb.kit;
-        }
-
-        function getPlayerKitPaidEur(player) {
-            if (typeof player.kitPaidEur === 'number') return Math.max(0, Number(player.kitPaidEur || 0));
-            return 0;
-        }
-
-        function kitGarmentLabel(it) {
-            if (window.PlayerExport && window.PlayerExport.garmentLabel) {
-                return window.PlayerExport.garmentLabel(it);
-            }
-            return String((it && (it.label || it.garment || it.id)) || 'Prenda');
-        }
-
-        function kitGarmentSize(it) {
-            return String((it && (it.size || it.talla)) || '—');
-        }
-
-        function kitItemKey(it, idx) {
-            return String((it && (it.id || it.garment || it.prenda)) || 'item_' + idx);
-        }
-
-        function buildKitItemsPaidState(player) {
-            const items = getPlayerKitItemsEnriched(player);
-            const existing = Array.isArray(player.kitItemsPaid) ? player.kitItemsPaid : [];
-            const kitTotal = getPlayerKitTotal(player);
-            const kitPaidEur = getPlayerKitPaidEur(player);
-            const kitComplete =
-                kitTotal > 0 &&
-                (kitPaymentIsComplete(player) ||
-                    String(player.kitPaymentStatus || '').toLowerCase() === 'paid' ||
-                    kitPaidEur >= kitTotal - 0.001);
-            let budgetLeft = kitPaidEur;
-
-            return items.map(function (it, idx) {
-                const key = kitItemKey(it, idx);
-                const prev = existing.find(function (x) {
-                    return String(x.key || x.id || '') === key;
-                });
-                const price = Number(it.price || 0);
-                let paid = !!(prev && prev.paid);
-                if (!paid && kitComplete) {
-                    paid = true;
-                } else if (!paid && !existing.length && kitPaidEur > 0 && price > 0) {
-                    if (budgetLeft >= price - 0.001) {
-                        paid = true;
-                        budgetLeft = Math.round((budgetLeft - price) * 100) / 100;
-                    }
-                } else if (!paid && !existing.length && kitPaidEur > 0 && price <= 0 && kitComplete) {
-                    paid = true;
-                }
-                return {
-                    key: key,
-                    id: it.id || key,
-                    label: kitGarmentLabel(it),
-                    size: kitGarmentSize(it),
-                    price: price,
-                    paid: paid,
-                    paidAt: (prev && prev.paidAt) || null,
-                    method: (prev && prev.method) || player.kitPaymentMethod || null
-                };
-            });
-        }
-
-        function sumKitItemsPaidEur(itemsPaid) {
-            return Math.round(
-                (itemsPaid || []).reduce(function (acc, it) {
-                    return acc + (it.paid ? Number(it.price || 0) : 0);
-                }, 0) * 100
-            ) / 100;
-        }
-
-        function kitPaymentIsComplete(player) {
-            const kitTotal = getPlayerKitTotal(player);
-            if (kitTotal <= 0) return true;
-            return getPlayerKitPaidEur(player) >= kitTotal - 0.001;
-        }
-
-        function needsKitPaymentValidation(player) {
-            if (!player) return false;
-            const pb = resolvePlayerPaymentBreakdown(player);
-            const kitTotal = pb.kit;
-            if (kitTotal <= 0 && pb.kitItems.length === 0) return false;
-            if (kitPaymentIsComplete(player)) return false;
-            const st = String(player.kitPaymentStatus || '').toLowerCase();
-            if (st.indexOf('pending') >= 0) return true;
-            return getPlayerKitPaidEur(player) < kitTotal - 0.001;
-        }
-
-        function needsCuotaFichaPaymentValidation(player) {
-            if (!player) return false;
-            const pb = resolvePlayerPaymentBreakdown(player);
-            if (pb.cuotaFichaTotal <= 0) {
-                if (typeof window.PlayerInscription !== 'undefined' && window.PlayerInscription.needsPaymentValidation) {
-                    return window.PlayerInscription.needsPaymentValidation(player);
-                }
-                return false;
-            }
-            if (isCuotaFichaPackPaid(player, pb)) return false;
-            const ins = String(player.inscriptionStatus || '').toLowerCase();
-            if (ins === 'pending_payment' || ins === 'pending_transfer' || ins === 'pending_cash' || ins === 'pending_tpv') {
-                return true;
-            }
-            if (player.registrationSource === 'web_inscription') return true;
-            return true;
-        }
-
-        function adminPaymentMethodFromChoice(choice) {
-            const c = String(choice || '').trim();
-            if (c === '1') return { key: 'transferencia', label: 'Transferencia bancaria' };
-            if (c === '2') return { key: 'efectivo', label: 'Efectivo' };
-            if (c === '3') return { key: 'tarjeta', label: 'Tarjeta' };
-            if (c === '4') return { key: 'bizum', label: 'Bizum' };
-            if (c === '5') return { key: 'otro', label: 'Otro' };
-            return null;
-        }
-
-        function adminPaymentMethodPrompt(prefix) {
-            return prompt(
-                (prefix || '') +
-                    '\n\n1 = Transferencia bancaria\n2 = Efectivo\n3 = Tarjeta\n4 = Bizum\n5 = Otro\n\nEscribe 1, 2, 3, 4 o 5:',
-                '1'
-            );
-        }
-
-        let playersListClickDelegationBound = false;
-
-        function initPlayersListClickDelegation() {
-            const root = document.getElementById('playersListContainer') || document.getElementById('playersList');
-            if (!root || playersListClickDelegationBound) return;
-            playersListClickDelegationBound = true;
-            root.addEventListener('click', function (ev) {
-                const btn = ev.target.closest('[data-player-action]');
-                if (!btn || !root.contains(btn)) return;
-                ev.preventDefault();
-                ev.stopPropagation();
-                const action = btn.getAttribute('data-player-action') || '';
-                let playerId = btn.getAttribute('data-player-id') || '';
-                try {
-                    playerId = decodeURIComponent(playerId);
-                } catch (_) {}
-                const handlers = {
-                    view: viewPlayerDetails,
-                    stats: updatePlayerStats,
-                    edit: editPlayer,
-                    category: changePlayerCategoryManual,
-                    password: setPlayerPortalPasswordAdmin,
-                    payments: editPlayerPayments,
-                    kitOrder: editPlayerKitOrder,
-                    validatePay: validatePlayerPayment,
-                    validateKit: validatePlayerKitPayment,
-                    validate: validatePlayer,
-                    delete: deletePlayer
-                };
-                const fn = handlers[action];
-                if (typeof fn !== 'function') {
-                    showAdminErrorDialog('Acción no disponible', '❌ Acción no disponible («' + action + '»). Recarga el panel de administración.');
-                    return;
-                }
-                try {
-                    const result = fn(playerId);
-                    if (result && typeof result.then === 'function') {
-                        result.catch(function (err) {
-                            console.error('playersList action ' + action + ':', err);
-                            showAdminErrorDialog('Error en jugadores', '❌ Error en «' + action + '».', err);
-                        });
-                    }
-                } catch (err) {
-                    console.error('playersList action ' + action + ':', err);
-                    showAdminErrorDialog('Error en jugadores', '❌ Error en «' + action + '».', err);
-                }
-            });
         }
 
         function setPlayerFormMode(mode) {
@@ -6398,21 +1078,6 @@
         function loadPlayersList() {
             try {
                 let players = JSON.parse(localStorage.getItem('clubPlayers') || '[]');
-                if (window.ClubPlayerKitPersist) {
-                    if (
-                        Array.isArray(window.__lastRawClubPlayers) &&
-                        window.__lastRawClubPlayers.length &&
-                        typeof window.ClubPlayerKitPersist.mergePlayersListPreserveKit === 'function'
-                    ) {
-                        players = window.ClubPlayerKitPersist.mergePlayersListPreserveKit(
-                            players,
-                            window.__lastRawClubPlayers
-                        );
-                    }
-                    if (typeof window.ClubPlayerKitPersist.applyKitSnapshotsToList === 'function') {
-                        players = window.ClubPlayerKitPersist.applyKitSnapshotsToList(players);
-                    }
-                }
                 let members = JSON.parse(localStorage.getItem('clubMembers') || '[]');
                 let testPurgeRemovedIds = [];
                 let testPurgeRemovedMemberIds = [];
@@ -6559,6 +1224,7 @@
                         `;
 
                         categoryPlayers.forEach(player => {
+                            const pid = jsPlayerIdArg(player.id);
                             const disp = (typeof window.PlayerInscription !== 'undefined' && window.PlayerInscription.getDisplayStatus)
                                 ? window.PlayerInscription.getDisplayStatus(player)
                                 : {
@@ -6567,8 +1233,7 @@
                                 };
                             const statusColor = disp.color;
                             const statusText = disp.text;
-                            const needsCuotaFichaPay = needsCuotaFichaPaymentValidation(player);
-                            const needsKitPay = needsKitPaymentValidation(player);
+                            const needsPay = typeof window.PlayerInscription !== 'undefined' && window.PlayerInscription.needsPaymentValidation(player);
                             const isMinorIcon = player.age < 18 ? '👶' : '👤';
                             const seasonTag = player.inscriptionSeason ? ` · 🗓️ ${player.inscriptionSeason}` : '';
                             const portalPwdSet = !!(player.portalPasswordHash && String(player.portalPasswordHash).trim());
@@ -6576,30 +1241,54 @@
                                 ? new Date(player.playerUpdatedBySelfAt).toLocaleString('es-ES')
                                 : '';
 
-                            const pb = resolvePlayerPaymentBreakdown(player);
-                            const kitPaid = typeof player.kitPaidEur === 'number' ? Number(player.kitPaidEur || 0) : 0;
-                            const kitPayMethod =
-                                player.kitPaymentMethod ||
-                                (player.kitPaymentStatus && String(player.kitPaymentStatus).indexOf('pending') >= 0
-                                    ? player.kitPendingGateway || player.kitPaymentStatus
-                                    : '');
+                            // Desglose pagos (no destructivo: se calcula y solo se guarda si faltan campos).
+                            const breakdown = player.chargeBreakdown || {};
+                            const socioTotal = Number(breakdown.socio || 0);
+                            const fichaTotal = Number(breakdown.ficha || 0);
+                            const kitTotal = Number(breakdown.kit || 0);
 
-                            const cuotaFichaBadgeHtml = buildCuotaFichaPaymentBadge(player, pb);
-                            const ropaBadgeHtml = buildKitPaymentBadgeHtml(player, pb, kitPaid, kitPayMethod);
-                            const kitOrderHtml = buildKitOrderDisplayHtml(player, pb);
-                            const globalPayMethod = formatAdminPaymentMethod(
-                                player.cuotaFichaPaymentMethod ||
-                                    player.paymentMethod ||
-                                    player.offlinePaymentChannel ||
-                                    ''
-                            );
-                            const totalInscripcion = pb.inscriptionTotal > 0 ? pb.inscriptionTotal : 0;
+                            // Ficha pagada (parcial posible). Si el jugador ya figura pagado, asumimos ficha completa (solo si no había campos nuevos).
+                            const fichaPaid =
+                                typeof player.feePaidEur === 'number'
+                                    ? Number(player.feePaidEur || 0)
+                                    : player.inscriptionPaid
+                                      ? fichaTotal
+                                      : 0;
+                            const kitPaid = typeof player.kitPaidEur === 'number' ? Number(player.kitPaidEur || 0) : 0;
+
+                            function paymentBadge(label, total, paid) {
+                                const t = Number(total || 0);
+                                const p = Math.max(0, Math.min(Number(paid || 0), t || Number(paid || 0)));
+                                if (!t || t <= 0) {
+                                    return `<span style="display:inline-block;background:#e2e8f0;color:#334155;padding:2px 8px;border-radius:999px;font-size:0.75rem;margin-right:6px;">${label}: —</span>`;
+                                }
+                                const ok = p >= t - 0.001;
+                                const pending = Math.max(0, t - p);
+                                const bg = ok ? '#059669' : p > 0 ? '#f59e0b' : '#dc2626';
+                                const txt = ok ? 'Pagado' : p > 0 ? 'Parcial' : 'Pendiente';
+                                const extra = ok ? '' : p > 0 ? ` · falta ${pending.toFixed(2)}€` : '';
+                                return `<span style="display:inline-block;background:${bg};color:#fff;padding:2px 8px;border-radius:999px;font-size:0.75rem;margin-right:6px;">${label}: ${txt} (${p.toFixed(2)}/${t.toFixed(2)}€${extra})</span>`;
+                            }
+
+                            // Cuota socio: se muestra por el total de breakdown (si existe), pero el pago real se cruza con Socios por DNI cuando se pueda.
+                            // No cambiamos estados: solo mostramos indicador.
+                            let socioPaid = null;
+                            try {
+                                const members = JSON.parse(localStorage.getItem('clubMembers') || '[]');
+                                const dni = String(player.dni || '').trim().toLowerCase();
+                                const hit = dni
+                                    ? members.find((m) => String(m.dni || '').trim().toLowerCase() === dni)
+                                    : null;
+                                if (hit) {
+                                    socioPaid = !!(hit.pagado || String(hit.paymentStatus || '').toLowerCase() === 'paid' || String(hit.status || '').toLowerCase() === 'active' || String(hit.estado || '').toLowerCase() === 'activo');
+                                }
+                            } catch (_) {}
                             
                             html += `
-                                <div style="padding: 15px; border-bottom: 1px solid #eee; background: #f8f9fa; margin-bottom: 10px; border-radius: 8px;">
-                                    <div>
-                                        <div style="display: flex; align-items: center; margin-bottom: 5px; flex-wrap: wrap; gap: 6px;">
-                                            <strong style="font-size: 1.1em;">${isMinorIcon} ${escapeHtml(player.name)} ${escapeHtml(player.surname)}</strong>
+                                <div style="display: flex; justify-content: space-between; align-items: center; padding: 15px; border-bottom: 1px solid #eee; background: #f8f9fa; margin-bottom: 10px; border-radius: 8px;">
+                                    <div style="flex: 1;">
+                                        <div style="display: flex; align-items: center; margin-bottom: 5px;">
+                                            <strong style="font-size: 1.1em;">${isMinorIcon} ${player.name} ${player.surname}</strong>
                                             <span style="background: ${statusColor}; color: white; padding: 2px 8px; border-radius: 10px; font-size: 0.8rem; margin-left: 10px;">
                                                 ${statusText}
                                             </span>
@@ -6610,30 +1299,33 @@
                                         <div style="font-size: 0.9em; color: #666;">
                                             📞 ${player.phone} | 🆔 ${player.dni} | 🎂 ${player.age} años | 🏃 Dorsal: ${player.number || 'Sin asignar'} | ⚽ ${player.position || 'Sin posición'}${seasonTag}
                                         </div>
-                                        ${totalInscripcion > 0 ? `<div style="font-size:0.8em;color:#475569;margin-top:3px;">💶 Importe inscripción: ${formatAdminEur(totalInscripcion)}${globalPayMethod ? ' · ' + escapeHtml(globalPayMethod) : ''} <span style="color:#64748b;">(cuota+ficha ${formatAdminEur(pb.cuotaFichaTotal)}${pb.kit > 0 ? ' + ropa ' + formatAdminEur(pb.kit) : ''})</span></div>` : ''}
-                                        <div style="font-size:0.8em;color:#0f172a;margin-top:6px;line-height:1.45;">
-                                            ${cuotaFichaBadgeHtml}
-                                            ${ropaBadgeHtml}
+                                        ${player.chargeBreakdown && player.chargeBreakdown.total > 0 ? `<div style="font-size:0.8em;color:#475569;margin-top:3px;">💶 Importe inscripción: ${Number(player.chargeBreakdown.total).toFixed(2)} € · ${player.paymentMethod || 'sin método'}</div>` : ''}
+                                        <div style="font-size:0.8em;color:#0f172a;margin-top:6px;line-height:1.35;">
+                                            ${socioTotal > 0 ? (socioPaid === true ? `<span style="display:inline-block;background:#059669;color:#fff;padding:2px 8px;border-radius:999px;font-size:0.75rem;margin-right:6px;">Socio: Pagado</span>` : socioPaid === false ? `<span style="display:inline-block;background:#dc2626;color:#fff;padding:2px 8px;border-radius:999px;font-size:0.75rem;margin-right:6px;">Socio: Pendiente</span>` : `<span style="display:inline-block;background:#f59e0b;color:#fff;padding:2px 8px;border-radius:999px;font-size:0.75rem;margin-right:6px;">Socio: revisar</span>`) : ''}
+                                            ${paymentBadge('Ficha', fichaTotal, fichaPaid)}
+                                            ${paymentBadge('Ropa', kitTotal, kitPaid)}
                                         </div>
-                                        ${kitOrderHtml}
+                                        ${(function () {
+                                            if (!window.PlayerExport || !window.PlayerExport.formatKitSummary) return '';
+                                            const kitTxt = window.PlayerExport.formatKitSummary(player);
+                                            return kitTxt ? `<div style="font-size:0.8em;color:#1e3a8a;margin-top:3px;font-weight:600;">👕 Tallas: ${kitTxt}</div>` : '';
+                                        })()}
                                         <div style="font-size: 0.8em; color: #1e3a8a; margin-top: 3px;">
                                             📊 PJ: ${player.matches || 0} | ⚽ Goles: ${player.goals || 0} | 🎯 Asist: ${player.assists || 0} | 🟨 ${player.yellowCards || 0} | 🟥 ${player.redCards || 0}
                                         </div>
-                                        ${player.age < 18 ? `<div style="font-size: 0.8em; color: #f59e0b; margin-top: 3px;">👨‍👩‍👧‍👦 Tutor: ${escapeHtml(player.guardianName || '')} (${escapeHtml(player.guardianPhone || '')})</div>` : ''}
+                                        ${player.age < 18 ? `<div style="font-size: 0.8em; color: #f59e0b; margin-top: 3px;">👨‍👩‍👧‍👦 Tutor: ${player.guardianName} (${player.guardianPhone})</div>` : ''}
                                         ${selfUpdateAt ? `<div style="font-size: 0.8em; color: #7c3aed; margin-top: 4px; font-weight: 600;">📝 Ficha actualizada por el jugador el ${selfUpdateAt}</div>` : ''}
                                     </div>
-                                    <div style="display: flex; flex-wrap: wrap; gap: 4px; margin-top: 10px; padding-top: 8px; border-top: 1px solid #e2e8f0; width: 100%;">
-                                        ${buildPlayerActionButton('view', player.id, '👁️ Ver', PLAYER_ADMIN_BTN_STYLE + ' background:#6c757d;')}
-                                        ${buildPlayerActionButton('stats', player.id, '📊 Stats', PLAYER_ADMIN_BTN_STYLE + ' background:#f59e0b;')}
-                                        ${buildPlayerActionButton('edit', player.id, '✏️ Editar', PLAYER_ADMIN_BTN_STYLE + ' background:#1e3a8a;')}
-                                        ${buildPlayerActionButton('category', player.id, '🏷️ Cat.', PLAYER_ADMIN_BTN_STYLE + ' background:#2563eb;', 'Cambiar categoría')}
-                                        ${buildPlayerActionButton('password', player.id, '🔑 Ficha', PLAYER_ADMIN_BTN_STYLE + ' background:#7c3aed;', 'Contraseña acceso ficha (Buscar mi ficha)')}
-                                        ${buildPlayerActionButton('payments', player.id, '💶 Pagos', PLAYER_ADMIN_BTN_STYLE + ' background:#0ea5e9;', 'Registrar pagos parciales manualmente')}
-                                        ${buildPlayerActionButton('kitOrder', player.id, '👕 Pedido', PLAYER_ADMIN_BTN_STYLE + ' background:#6366f1;', 'Pedido de ropa: tallas y pagada/pendiente por prenda')}
-                                        ${needsCuotaFichaPay ? buildPlayerActionButton('validatePay', player.id, '✅ Cuota/ficha', PLAYER_ADMIN_BTN_STYLE + ' background:#059669;', 'Validar pago de cuota de socio y ficha (no incluye ropa)') : ''}
-                                        ${needsKitPay ? buildPlayerActionButton('validateKit', player.id, '✅ Ropa', PLAYER_ADMIN_BTN_STYLE + ' background:#0d9488;', 'Validar pago de ropa/equipación (prenda a prenda)') : ''}
-                                        ${!needsCuotaFichaPay && player.status === 'pending_validation' ? buildPlayerActionButton('validate', player.id, '✅ Alta', PLAYER_ADMIN_BTN_STYLE + ' background:#059669;', 'Validar alta administrativa') : ''}
-                                        ${buildPlayerActionButton('delete', player.id, '🗑️', PLAYER_ADMIN_BTN_STYLE + ' background:#dc2626;', 'Eliminar jugador/a')}
+                                    <div style="display: flex; gap: 5px;">
+                                        <button onclick="viewPlayerDetails(${pid})" style="padding: 5px 10px; font-size: 0.8rem; background: #6c757d; color: white; border: none; border-radius: 4px; cursor: pointer;">👁️ Ver</button>
+                                        <button onclick="updatePlayerStats(${pid})" style="padding: 5px 10px; font-size: 0.8rem; background: #f59e0b; color: white; border: none; border-radius: 4px; cursor: pointer;">📊 Stats</button>
+                                        <button onclick="editPlayer(${pid})" style="padding: 5px 10px; font-size: 0.8rem; background: #1e3a8a; color: white; border: none; border-radius: 4px; cursor: pointer;">✏️ Editar</button>
+                                        <button onclick="changePlayerCategoryManual(${pid})" style="padding: 5px 10px; font-size: 0.8rem; background: #2563eb; color: white; border: none; border-radius: 4px; cursor: pointer;">🏷️ Categoría</button>
+                                        <button onclick="setPlayerPortalPasswordAdmin(${pid})" style="padding: 5px 10px; font-size: 0.8rem; background: #7c3aed; color: white; border: none; border-radius: 4px; cursor: pointer;" title="Contraseña para Buscar mi ficha (inscripción web)">🔑 Contraseña ficha</button>
+                                        <button onclick="editPlayerPayments(${pid})" style="padding: 5px 10px; font-size: 0.8rem; background: #0ea5e9; color: white; border: none; border-radius: 4px; cursor: pointer;" title="Registrar pagos parciales (ficha/ropa) — no cambia el estado automáticamente">💶 Pagos</button>
+                                        ${needsPay ? `<button onclick="validatePlayerPayment(${pid})" style="padding: 5px 10px; font-size: 0.8rem; background: #059669; color: white; border: none; border-radius: 4px; cursor: pointer;" title="Confirmar pago por transferencia o efectivo">✅ Validar pago</button>` : ''}
+                                        ${!needsPay && player.status === 'pending_validation' ? `<button onclick="validatePlayer(${pid})" style="padding: 5px 10px; font-size: 0.8rem; background: #059669; color: white; border: none; border-radius: 4px; cursor: pointer;">✅ Validar alta</button>` : ''}
+                                        <button onclick="deletePlayer(${pid})" style="padding: 5px 10px; font-size: 0.8rem; background: #dc2626; color: white; border: none; border-radius: 4px; cursor: pointer;">🗑️ Eliminar</button>
                                     </div>
                                 </div>
                             `;
@@ -6668,7 +1360,8 @@
                                 ? window.ClubPlayerMemberSync.globalPlayerIdentityKey(player)
                                 : String(player.id);
                         renderedIdentityKeys.add(identityKey);
-                        html += `<div style="padding:10px;border-bottom:1px solid #eee;">${escapeHtml(player.name)} ${escapeHtml(player.surname)} — ${buildPlayerActionButton('category', player.id, '🏷️ Asignar categoría', 'padding:4px 8px;font-size:0.8rem;background:#2563eb;color:#fff;border:none;border-radius:4px;cursor:pointer;')}</div>`;
+                        const pid = jsPlayerIdArg(player.id);
+                        html += `<div style="padding:10px;border-bottom:1px solid #eee;">${player.name} ${player.surname} — <button type="button" onclick="changePlayerCategoryManual(${pid})" style="padding:4px 8px;font-size:0.8rem;">🏷️ Asignar categoría</button></div>`;
                     });
                     html += `</div>`;
                 }
@@ -6678,19 +1371,59 @@
                 }
 
                 playersList.innerHTML = html;
-                initPlayersListClickDelegation();
                 console.log('👥 Lista de jugadores cargada:', players.length, 'jugadores');
             } catch (error) {
                 console.error('❌ Error cargando lista de jugadores:', error);
             }
         }
 
+        window.viewPlayerDetails = viewPlayerDetails;
+        window.updatePlayerStats = updatePlayerStats;
+        window.savePlayerStats = savePlayerStats;
+        window.closeStatsModal = closeStatsModal;
+        window.editPlayer = editPlayer;
+        window.changePlayerCategoryManual = changePlayerCategoryManual;
+        window.setPlayerPortalPasswordAdmin = setPlayerPortalPasswordAdmin;
+        window.validatePlayerPayment = validatePlayerPayment;
+        window.editPlayerPayments = editPlayerPayments;
+        window.validatePlayer = validatePlayer;
+        window.deletePlayer = deletePlayer;
+        window.filterPlayersByCategory = filterPlayersByCategory;
+        window.regularizeAdminPlayers = regularizeAdminPlayers;
+
+        // Wrappers defensivos: si hay un error, mostrarlo al hacer clic.
+        (function () {
+            function wrap(name) {
+                const fn = window[name];
+                if (typeof fn !== 'function') return;
+                window[name] = function () {
+                    try {
+                        return fn.apply(this, arguments);
+                    } catch (e) {
+                        console.error(name + ':', e);
+                        alert('❌ Error ejecutando "' + name + '": ' + (e && e.message ? e.message : e));
+                    }
+                };
+            }
+            [
+                'viewPlayerDetails',
+                'updatePlayerStats',
+                'editPlayer',
+                'changePlayerCategoryManual',
+                'setPlayerPortalPasswordAdmin',
+                'editPlayerPayments',
+                'validatePlayerPayment',
+                'validatePlayer',
+                'deletePlayer'
+            ].forEach(wrap);
+        })();
+
         async function regularizeAdminPlayers() {
             if (!window.ClubPlayerMemberSync) {
                 alert('❌ Módulo de sincronización no cargado.');
                 return;
             }
-            if (!confirm('¿Regularizar fichas y socios?\n\n• Elimina duplicados (misma persona en varias temporadas)\n• Quita intentos abortados de pasarela (sin pago)\n• Crea socios faltantes desde jugadores (p. ej. menores sin socio)\n• Crea fichas jugador/a desde socios pendientes\n• Sincroniza con la nube')) {
+            if (!confirm('¿Regularizar fichas y socios?\n\n• Elimina duplicados (misma persona en varias temporadas)\n• Quita intentos abortados de pasarela (sin pago)\n• Crea socios faltantes desde jugadores (p. ej. menores sin socio)\n• Crea fichas jugador/a desde socios pendientes\n• Sincroniza con Firebase')) {
                 return;
             }
             try {
@@ -6763,7 +1496,7 @@
                 if (typeof persistRecordToFirebase === 'function') {
                     await persistRecordToFirebase('clubPlayers', 'players', players[ix]);
                 }
-                alert('✅ Contraseña de ficha guardada en la nube.\n\nComunícala al jugador/a o tutor/a de forma privada.');
+                alert('✅ Contraseña de ficha guardada en Firebase.\n\nComunícala al jugador/a o tutor/a de forma privada.');
                 loadPlayersList();
             } catch (e) {
                 console.error(e);
@@ -6812,24 +1545,7 @@
                     if (player.chargeBreakdown.socio != null) details += `  · Cuota socio: ${player.chargeBreakdown.socio} €\n`;
                     if (player.chargeBreakdown.kit != null) details += `  · Ropa: ${player.chargeBreakdown.kit} €\n`;
                 }
-                details += `Pago cuota+ficha: ${player.inscriptionPaid ? 'Pagado' : 'Pendiente'} (${player.inscriptionStatus || player.paymentStatus || '—'})\n`;
-                const kitTotalDetail = getPlayerKitTotal(player);
-                const kitPaidDetail = getPlayerKitPaidEur(player);
-                if (kitTotalDetail > 0 || getPlayerKitItems(player).length) {
-                    details += `Pago ropa: ${kitPaidDetail.toFixed(2)} / ${kitTotalDetail.toFixed(2)} €`;
-                    if (player.kitPaymentStatus) details += ` (${player.kitPaymentStatus})`;
-                    details += '\n';
-                    if (player.kitPaymentMethod) details += `Método ropa: ${player.kitPaymentMethod}\n`;
-                    const itemsPaid = buildKitItemsPaidState(player);
-                    if (itemsPaid.length) {
-                        details += '\n👕 DETALLE ROPA (pedido / pagado):\n';
-                        itemsPaid.forEach(function (it) {
-                            details += '• ' + it.label + ' talla ' + it.size + ' — ' + Number(it.price || 0).toFixed(2) + ' € — ';
-                            details += it.paid ? 'PAGADA' + (it.method ? ' (' + it.method + ')' : '') : 'PENDIENTE';
-                            details += '\n';
-                        });
-                    }
-                }
+                details += `Pago: ${player.inscriptionPaid ? 'Pagado' : 'Pendiente'} (${player.inscriptionStatus || player.paymentStatus || '—'})\n`;
                 if (window.PlayerExport && window.PlayerExport.formatKitDetailLines) {
                     const kitLines = window.PlayerExport.formatKitDetailLines(player);
                     details += `\n👕 PEDIDO DE ROPA (tallas elegidas):\n${kitLines}\n`;
@@ -6859,7 +1575,7 @@
                 alert(details);
         }
 
-        // Validar pago de cuota socio + ficha (NO incluye ropa)
+        // Validar pago de inscripción (transferencia, efectivo, etc.)
         async function validatePlayerPayment(playerId) {
             try {
                 const players = JSON.parse(localStorage.getItem('clubPlayers') || '[]');
@@ -6869,74 +1585,42 @@
                     alert('❌ Jugador/a no encontrado/a');
                     return;
                 }
-                const pb = resolvePlayerPaymentBreakdown(player);
-                const socioTotal = pb.socio;
-                const fichaTotal = pb.ficha;
-                const cuotaFichaTotal = pb.cuotaFichaTotal;
-                const summary =
-                    '👤 ' + (player.name || '') + ' ' + (player.surname || '') +
-                    '\n\n💶 CUOTA + FICHA (sin ropa):' +
-                    '\n  · Cuota socio: ' + socioTotal.toFixed(2) + ' €' +
-                    '\n  · Cuota ficha: ' + fichaTotal.toFixed(2) + ' €' +
-                    '\n  · Total a validar: ' + cuotaFichaTotal.toFixed(2) + ' €';
-
-                const choice = adminPaymentMethodPrompt(
-                    '¿Confirmas que has recibido el pago de CUOTA + FICHA?\n\n' + summary
+                const total = player.chargeBreakdown && player.chargeBreakdown.total != null
+                    ? Number(player.chargeBreakdown.total).toFixed(2) + ' €'
+                    : '—';
+                const choice = prompt(
+                    '¿Confirmas que has recibido el pago de la inscripción?\n\n' +
+                    player.name + ' ' + player.surname + '\nImporte: ' + total + '\n\n' +
+                    '1 = Transferencia bancaria\n2 = Efectivo\n3 = Otro\n\nEscribe 1, 2 o 3:',
+                    '1'
                 );
                 if (choice === null) return;
-                const method = adminPaymentMethodFromChoice(choice);
-                if (!method) {
+                if (!['1', '2', '3'].includes(String(choice).trim())) {
                     alert('Operación cancelada.');
                     return;
                 }
-                if (!confirm('¿Validar cuota + ficha y activar la ficha del jugador/a?\n\n(La ropa se valida por separado con el botón ✅ Ropa)')) return;
+                if (!confirm('¿Validar el pago y activar la ficha del jugador/a?')) return;
 
                 const currentAdmin = JSON.parse(localStorage.getItem('currentAdmin') || '{}');
                 const adminName = currentAdmin.name || currentAdmin.email || 'Administrador';
-                const preservedKitFields = window.ClubPlayerKitPersist
-                    ? window.ClubPlayerKitPersist.snapshotKitFields(player)
-                    : {
-                          kitPaidEur: player.kitPaidEur,
-                          kitPaymentStatus: player.kitPaymentStatus,
-                          kitPaymentMethod: player.kitPaymentMethod,
-                          kitItemsPaid: player.kitItemsPaid,
-                          kitPaymentValidatedAt: player.kitPaymentValidatedAt,
-                          kitPaymentValidatedBy: player.kitPaymentValidatedBy
-                      };
-                const preservedKitPaid = getPlayerKitPaidEur(player);
 
                 if (typeof window.PlayerInscription !== 'undefined' && window.PlayerInscription.markInscriptionPaidByAdmin) {
-                    try {
-                        await window.PlayerInscription.markInscriptionPaidByAdmin(playerId, {
-                            methodChoice: String(choice).trim(),
-                            method: method.key + '_manual',
-                            validatedBy: adminName
-                        });
-                    } catch (inscErr) {
-                        console.warn('markInscriptionPaidByAdmin:', inscErr);
-                        alert(
-                            '❌ No se pudo validar cuota/ficha en la nube.\n\n' +
-                                (inscErr && inscErr.message ? inscErr.message : String(inscErr)) +
-                                '\n\nEl jugador/a NO se ha marcado como activo. Revisa la conexión o sesión de administrador y vuelve a intentarlo.'
-                        );
-                        return;
-                    }
+                    await window.PlayerInscription.markInscriptionPaidByAdmin(playerId, {
+                        methodChoice: String(choice).trim(),
+                        validatedBy: adminName
+                    });
+                    // Reflejo local: marcar ficha pagada al 100% (no toca ropa).
                     try {
                         const refreshed = JSON.parse(localStorage.getItem('clubPlayers') || '[]');
                         const ix2 = findPlayerIndexById(refreshed, playerId);
                         if (ix2 >= 0) {
+                            const b = refreshed[ix2].chargeBreakdown || {};
+                            const fichaTotal = Number(b.ficha || 0);
                             if (fichaTotal > 0) refreshed[ix2].feePaidEur = fichaTotal;
-                            refreshed[ix2].cuotaFichaPaymentMethod = method.key;
-                            refreshed[ix2].cuotaFichaValidatedAt = new Date().toISOString();
-                            refreshed[ix2].cuotaFichaValidatedBy = adminName;
-                            Object.assign(refreshed[ix2], preservedKitFields);
-                            refreshed[ix2].kitPaidEur = preservedKitPaid;
                             localStorage.setItem('clubPlayers', JSON.stringify(refreshed));
                             await persistRecordToFirebase('clubPlayers', 'players', refreshed[ix2]);
                         }
-                    } catch (persistErr) {
-                        console.warn('Persist cuota/ficha extra fields:', persistErr);
-                    }
+                    } catch (_) {}
                 } else {
                     if (ix < 0) {
                         alert('❌ Jugador/a no encontrado/a');
@@ -6946,14 +1630,14 @@
                     players[ix].status = 'active';
                     players[ix].paymentStatus = 'paid';
                     players[ix].inscriptionPaid = true;
-                    if (fichaTotal > 0) players[ix].feePaidEur = fichaTotal;
-                    players[ix].cuotaFichaPaymentMethod = method.key;
-                    players[ix].cuotaFichaValidatedAt = new Date().toISOString();
-                    players[ix].cuotaFichaValidatedBy = adminName;
+                    // Nuevo esquema: ficha pagada completa (no toca ropa).
+                    try {
+                        const b = players[ix].chargeBreakdown || {};
+                        const fichaTotal = Number(b.ficha || 0);
+                        if (fichaTotal > 0) players[ix].feePaidEur = fichaTotal;
+                    } catch (_) {}
                     players[ix].validatedDate = new Date().toISOString();
                     players[ix].validatedBy = adminName;
-                    players[ix].kitPaidEur = preservedKitPaid;
-                    Object.assign(players[ix], preservedKitFields);
                     localStorage.setItem('clubPlayers', JSON.stringify(players));
                     await persistRecordToFirebase('clubPlayers', 'players', players[ix]);
                 }
@@ -6961,609 +1645,10 @@
                 loadPlayersList();
                 loadMembersList();
                 updateDashboardCounts();
-                alert(
-                    '✅ Cuota + ficha validadas. El jugador/a queda ACTIVO.\n\n👕 La ropa se gestiona con el botón «✅ Ropa».\n\n📧 Se ha enviado correo de confirmación si estaba configurado.'
-                );
+                alert('✅ Pago validado. El jugador/a queda ACTIVO y pagado en el sistema.\n\n📧 Se ha enviado un correo de confirmación al jugador/a.\n\nSi la inscripción incluía cuota de socio/a, comprueba también en Socios que el alta esté activa.');
             } catch (error) {
-                console.error('❌ Error validando pago cuota+ficha:', error);
-                showAdminErrorDialog('Error al validar cuota+ficha', '❌ Error al validar cuota+ficha.', error);
-            }
-        }
-
-        /** Validar pago de ropa/equipación (prenda a prenda, transferencia/efectivo/tarjeta/bizum). */
-        async function validatePlayerKitPayment(playerId) {
-            try {
-                const players = JSON.parse(localStorage.getItem('clubPlayers') || '[]');
-                const ix = findPlayerIndexById(players, playerId);
-                if (ix < 0) {
-                    alert('❌ Jugador/a no encontrado/a');
-                    return;
-                }
-                const p = players[ix];
-                const kitTotal = getPlayerKitTotal(p);
-                const itemsPaid = buildKitItemsPaidState(p);
-                if (kitTotal <= 0 && !itemsPaid.length) {
-                    alert('ℹ️ Este jugador/a no tiene pedido de ropa registrado.');
-                    return;
-                }
-
-                let lines = '👕 VALIDAR PAGO DE ROPA\n\n' + (p.name || '') + ' ' + (p.surname || '') + '\n\n';
-                if (itemsPaid.length) {
-                    lines += 'Pedido (prenda a prenda):\n';
-                    itemsPaid.forEach(function (it, n) {
-                        lines +=
-                            (n + 1) + ') ' + it.label + ' · talla ' + it.size + ' · ' +
-                            Number(it.price || 0).toFixed(2) + ' € · ' +
-                            (it.paid ? 'PAGADA' : 'PENDIENTE') + '\n';
-                    });
-                } else {
-                    lines += 'Sin detalle de prendas (solo importe total).\n';
-                }
-                lines +=
-                    '\nTotal ropa: ' + kitTotal.toFixed(2) + ' €' +
-                    '\nPagado ropa: ' + getPlayerKitPaidEur(p).toFixed(2) + ' €' +
-                    '\nPendiente: ' + Math.max(0, kitTotal - getPlayerKitPaidEur(p)).toFixed(2) + ' €';
-
-                alert(lines);
-
-                const choice = adminPaymentMethodPrompt('Método de pago de la ropa:');
-                if (choice === null) return;
-                const method = adminPaymentMethodFromChoice(choice);
-                if (!method) {
-                    alert('Operación cancelada.');
-                    return;
-                }
-
-                const isGateway = method.key === 'tarjeta' || method.key === 'bizum';
-                let received = true;
-                if (isGateway) {
-                    received = confirm(
-                        '¿Ya has recibido el cobro de ropa por ' + method.label + '?\n\n' +
-                            'Sí = marcar como cobrado\nNo = dejar pendiente de ' + method.label
-                    );
-                }
-
-                const now = new Date().toISOString();
-                const currentAdmin = JSON.parse(localStorage.getItem('currentAdmin') || '{}');
-                const adminName = currentAdmin.name || currentAdmin.email || 'Administrador';
-
-                if (!received) {
-                    p.kitPaymentStatus = method.key === 'bizum' ? 'pending_bizum' : 'pending_tpv';
-                    p.kitPaymentMethod = method.key;
-                    p.kitPendingGateway = method.key;
-                    p.kitPaymentValidatedAt = now;
-                    p.kitPaymentValidatedBy = adminName;
-                    const savedPending = await persistRecordToFirebase('clubPlayers', 'players', p);
-                    adminUpsertPlayerInLocalAndRaw(
-                        window.ClubPlayerKitPersist && savedPending
-                            ? window.ClubPlayerKitPersist.mergePlayerKitFields(savedPending, p)
-                            : p
-                    );
-                    loadPlayersList();
-                    alert('📝 Ropa dejada como PENDIENTE de cobro por ' + method.label + '.\n\nCuando recibas el pago, vuelve a pulsar «✅ Ropa».');
-                    return;
-                }
-
-                const mode = prompt(
-                    '¿Cómo registrar el pago de ropa?\n\n' +
-                        '1 = Marcar TODAS las prendas pendientes como pagadas\n' +
-                        '2 = Marcar prenda a prenda (te preguntará una a una)\n' +
-                        '3 = Introducir importe manual (€)\n\nEscribe 1, 2 o 3:',
-                    itemsPaid.some(function (it) { return !it.paid; }) ? '2' : '1'
-                );
-                if (mode === null) return;
-
-                let updatedItems = itemsPaid.slice();
-                let kitPaidEur = getPlayerKitPaidEur(p);
-
-                if (String(mode).trim() === '1') {
-                    updatedItems = updatedItems.map(function (it) {
-                        if (it.paid) return it;
-                        return Object.assign({}, it, {
-                            paid: true,
-                            paidAt: now,
-                            method: method.key
-                        });
-                    });
-                    kitPaidEur = sumKitItemsPaidEur(updatedItems);
-                } else if (String(mode).trim() === '2') {
-                    updatedItems = updatedItems.map(function (it) {
-                        if (it.paid) return it;
-                        const mark = confirm(
-                            '¿Marcar como PAGADA?\n\n' +
-                                it.label + ' · talla ' + it.size + ' · ' + Number(it.price || 0).toFixed(2) + ' €'
-                        );
-                        if (!mark) return it;
-                        return Object.assign({}, it, {
-                            paid: true,
-                            paidAt: now,
-                            method: method.key
-                        });
-                    });
-                    kitPaidEur = sumKitItemsPaidEur(updatedItems);
-                } else if (String(mode).trim() === '3') {
-                    const pending = Math.max(0, kitTotal - getPlayerKitPaidEur(p));
-                    const amountInput = prompt(
-                        'Importe pagado de ROPA (€)\n\nTotal ropa: ' + kitTotal.toFixed(2) +
-                            ' €\nPagado actual: ' + getPlayerKitPaidEur(p).toFixed(2) +
-                            ' €\nPendiente: ' + pending.toFixed(2) + ' €',
-                        pending.toFixed(2)
-                    );
-                    if (amountInput === null) return;
-                    kitPaidEur = Number(String(amountInput).replace(',', '.'));
-                    if (!isFinite(kitPaidEur) || kitPaidEur < 0) {
-                        alert('❌ Importe no válido');
-                        return;
-                    }
-                } else {
-                    alert('Operación cancelada.');
-                    return;
-                }
-
-                kitPaidEur = Math.round(Math.max(0, kitPaidEur) * 100) / 100;
-                const kitComplete = kitTotal > 0 ? kitPaidEur >= kitTotal - 0.001 : kitPaidEur > 0;
-                p.kitPaidEur = kitPaidEur;
-                p.kitItemsPaid = updatedItems;
-                p.kitPaymentMethod = method.key;
-                p.kitPaymentValidatedAt = now;
-                p.kitPaymentValidatedBy = adminName;
-                p.kitPendingGateway = null;
-                p.kitPaymentStatus = kitComplete ? 'paid' : kitPaidEur > 0 ? 'partial' : 'pending';
-                p.paymentsUpdatedAt = now;
-                const savedKit = await persistRecordToFirebase('clubPlayers', 'players', p);
-                adminUpsertPlayerInLocalAndRaw(
-                    window.ClubPlayerKitPersist && savedKit
-                        ? window.ClubPlayerKitPersist.mergePlayerKitFields(savedKit, p)
-                        : p
-                );
-                loadPlayersList();
-                alert(
-                    '✅ Pago de ropa registrado en la nube.\n\n' +
-                        'Pagado: ' + kitPaidEur.toFixed(2) + ' / ' + kitTotal.toFixed(2) + ' €' +
-                        '\nEstado: ' + p.kitPaymentStatus +
-                        '\nMétodo: ' + method.label
-                );
-            } catch (e) {
-                console.error('validatePlayerKitPayment:', e);
-                showAdminErrorDialog('Error validando pago de ropa', '❌ Error validando pago de ropa.', e);
-            }
-        }
-
-        /**
-         * Editor manual pedido de ropa (tallas + pagada/pendiente por prenda) — persiste en la nube.
-         */
-        const PLAYER_KIT_ORDER_MODAL_ID = 'playerKitOrderEditorModal';
-        const ADMIN_KIT_SIZE_OPTIONS = ['6/8', '10/12', 'S', 'M', 'L', 'XL'];
-        let __adminKitOrderPlayerId = null;
-
-        function getAdminKitGarmentCatalog() {
-            if (window.ClubInscriptionConfig && window.ClubInscriptionConfig.getEnabledGarments) {
-                const list = window.ClubInscriptionConfig.getEnabledGarments(
-                    window.ClubInscriptionConfig.read ? window.ClubInscriptionConfig.read() : null
-                );
-                if (list && list.length) return list;
-            }
-            return [
-                { id: 'train_kit', label: 'Ropa de entreno', price: 16 },
-                { id: 'tracksuit', label: 'Sudadera', price: 16 },
-                { id: 'train_jacket', label: 'Chubasquero', price: 18 },
-                { id: 'cazadora', label: 'Cazadora', price: 40 }
-            ];
-        }
-
-        function getAdminKitSizeOptions() {
-            const cfg = window.ClubInscriptionConfig;
-            const fromCfg = cfg && cfg.INSCRIPTION_KIT_SIZES;
-            if (Array.isArray(fromCfg) && fromCfg.length) {
-                return fromCfg.filter(function (s) {
-                    return String(s || '').trim();
-                });
-            }
-            return ADMIN_KIT_SIZE_OPTIONS.slice();
-        }
-
-        function fillAdminKitSizeSelect(selectEl, selectedSize) {
-            if (!selectEl) return;
-            const sizes = getAdminKitSizeOptions();
-            selectEl.innerHTML = '';
-            const placeholder = document.createElement('option');
-            placeholder.value = '';
-            placeholder.textContent = '— Talla —';
-            selectEl.appendChild(placeholder);
-            sizes.forEach(function (s) {
-                const opt = document.createElement('option');
-                opt.value = String(s);
-                opt.textContent = String(s);
-                if (selectedSize && String(selectedSize) === String(s)) opt.selected = true;
-                selectEl.appendChild(opt);
-            });
-        }
-
-        function ensurePlayerKitOrderEditorModal() {
-            if (document.getElementById(PLAYER_KIT_ORDER_MODAL_ID)) return;
-            const modal = document.createElement('div');
-            modal.id = PLAYER_KIT_ORDER_MODAL_ID;
-            modal.style.cssText =
-                'display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:13200;align-items:center;justify-content:center;padding:16px;';
-            modal.innerHTML =
-                '<div style="background:#fff;width:min(640px,96vw);max-height:92vh;overflow:visible;border-radius:12px;padding:20px;position:relative;box-shadow:0 20px 50px rgba(0,0,0,0.2);">' +
-                '<button type="button" id="pkoBtnCloseX" style="position:absolute;top:12px;right:12px;border:none;background:#e5e7eb;width:32px;height:32px;border-radius:50%;cursor:pointer;font-size:18px;">×</button>' +
-                '<h3 id="pkoTitle" style="margin:0 0 6px;color:#1e3a8a;">👕 Pedido de ropa</h3>' +
-                '<p id="pkoSubtitle" style="margin:0 0 14px;color:#64748b;font-size:14px;"></p>' +
-                '<p style="font-size:12px;color:#475569;margin:0 0 12px;">Marca las prendas solicitadas, elige talla e indica si cada una está <strong>pagada</strong> o <strong>pendiente</strong>.</p>' +
-                '<div id="pkoRows" style="display:flex;flex-direction:column;gap:10px;margin-bottom:14px;max-height:55vh;overflow-y:auto;overflow-x:visible;padding-right:4px;"></div>' +
-                '<div id="pkoTotals" style="font-size:13px;color:#334155;background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:10px 12px;margin-bottom:14px;"></div>' +
-                '<div style="display:flex;gap:10px;flex-wrap:wrap;justify-content:flex-end;">' +
-                '<button type="button" id="pkoBtnCancel" style="padding:10px 18px;border:1px solid #cbd5e1;background:#fff;border-radius:8px;cursor:pointer;">Cancelar</button>' +
-                '<button type="button" id="pkoBtnSave" style="padding:10px 18px;border:none;background:#6366f1;color:#fff;border-radius:8px;cursor:pointer;font-weight:600;">💾 Guardar pedido</button>' +
-                '</div></div>';
-            document.body.appendChild(modal);
-            modal.querySelector('#pkoBtnCloseX').addEventListener('click', closePlayerKitOrderEditor);
-            modal.querySelector('#pkoBtnCancel').addEventListener('click', closePlayerKitOrderEditor);
-            modal.querySelector('#pkoBtnSave').addEventListener('click', savePlayerKitOrderEditor);
-            modal.addEventListener('click', function (e) {
-                if (e.target === modal) closePlayerKitOrderEditor();
-            });
-            modal.addEventListener('change', function (e) {
-                if (!e.target || !e.target.classList) return;
-                if (e.target.classList.contains('pko-size') && e.target.value) {
-                    const row = e.target.closest('.pko-row');
-                    const activeCb = row ? row.querySelector('.pko-row-active') : null;
-                    if (activeCb && !activeCb.checked) activeCb.checked = true;
-                }
-                if (
-                    e.target.classList.contains('pko-row-active') ||
-                    e.target.classList.contains('pko-size') ||
-                    e.target.classList.contains('pko-paid')
-                ) {
-                    updatePlayerKitOrderModalTotals();
-                }
-            });
-        }
-
-        function closePlayerKitOrderEditor() {
-            const modal = document.getElementById(PLAYER_KIT_ORDER_MODAL_ID);
-            if (modal) modal.style.display = 'none';
-            __adminKitOrderPlayerId = null;
-        }
-
-        function renderPlayerKitOrderEditorRows(player) {
-            const rowsEl = document.getElementById('pkoRows');
-            if (!rowsEl) return;
-            const garments = getAdminKitGarmentCatalog();
-            const existing = getPlayerKitItemsEnriched(player);
-            const paidState = buildKitItemsPaidState(player);
-            rowsEl.innerHTML = '';
-            garments.forEach(function (g) {
-                const prev = existing.find(function (it) {
-                    return String(it.id || '') === String(g.id);
-                });
-                const paidRow = prev
-                    ? paidState.find(function (x) {
-                          return x.id === g.id || x.key === g.id;
-                      })
-                    : null;
-                const active = !!prev;
-                const sizeVal = prev ? kitGarmentSize(prev) : '';
-                const isPaid = !!(paidRow && paidRow.paid);
-
-                const row = document.createElement('div');
-                row.className = 'pko-row';
-                row.setAttribute('data-garment-id', String(g.id || ''));
-                row.style.cssText =
-                    'display:grid;grid-template-columns:auto 1fr auto auto;gap:8px;align-items:center;padding:10px;border:1px solid #e2e8f0;border-radius:8px;background:#fafafa;';
-
-                const label = document.createElement('label');
-                label.style.cssText =
-                    'display:flex;align-items:center;gap:6px;font-weight:600;font-size:13px;cursor:pointer;';
-                const activeCb = document.createElement('input');
-                activeCb.type = 'checkbox';
-                activeCb.className = 'pko-row-active';
-                activeCb.setAttribute('data-gid', String(g.id || ''));
-                activeCb.checked = active;
-                label.appendChild(activeCb);
-                label.appendChild(document.createTextNode(' ' + String(g.label || g.id || '')));
-                const priceSpan = document.createElement('span');
-                priceSpan.style.cssText = 'color:#64748b;font-weight:400;';
-                priceSpan.textContent = ' (' + Number(g.price || 0).toFixed(2) + ' €)';
-                label.appendChild(priceSpan);
-
-                const sizeSel = document.createElement('select');
-                sizeSel.className = 'pko-size';
-                sizeSel.setAttribute('data-gid', String(g.id || ''));
-                sizeSel.style.cssText =
-                    'padding:6px 8px;border:1px solid #cbd5e1;border-radius:6px;font-size:13px;min-width:110px;background:#fff;';
-                fillAdminKitSizeSelect(sizeSel, sizeVal);
-
-                const paidLabel = document.createElement('label');
-                paidLabel.style.cssText =
-                    'display:flex;align-items:center;gap:4px;font-size:12px;white-space:nowrap;cursor:pointer;';
-                paidLabel.title = 'Pagada';
-                const paidCb = document.createElement('input');
-                paidCb.type = 'checkbox';
-                paidCb.className = 'pko-paid';
-                paidCb.setAttribute('data-gid', String(g.id || ''));
-                paidCb.checked = isPaid;
-                paidLabel.appendChild(paidCb);
-                paidLabel.appendChild(document.createTextNode(' Pagada'));
-
-                row.appendChild(label);
-                row.appendChild(sizeSel);
-                row.appendChild(paidLabel);
-                rowsEl.appendChild(row);
-            });
-            updatePlayerKitOrderModalTotals();
-        }
-
-        function collectPlayerKitOrderFromModal() {
-            const garments = getAdminKitGarmentCatalog();
-            const byId = {};
-            garments.forEach(function (g) {
-                byId[g.id] = g;
-            });
-            const kitItems = [];
-            const paidRows = [];
-            document.querySelectorAll('#pkoRows .pko-row').forEach(function (row, idx) {
-                const gid = row.getAttribute('data-garment-id') || '';
-                const active = row.querySelector('.pko-row-active');
-                if (!active || !active.checked) return;
-                const sizeSel = row.querySelector('.pko-size');
-                const size = sizeSel ? String(sizeSel.value || '').trim() : '';
-                if (!size) return;
-                const g = byId[gid] || { id: gid, label: gid, price: 0 };
-                const paidCb = row.querySelector('.pko-paid');
-                const paid = !!(paidCb && paidCb.checked);
-                kitItems.push({
-                    id: gid,
-                    label: g.label,
-                    size: size,
-                    price: Number(g.price || 0)
-                });
-                paidRows.push({
-                    key: gid,
-                    id: gid,
-                    label: g.label,
-                    size: size,
-                    price: Number(g.price || 0),
-                    paid: paid,
-                    paidAt: paid ? new Date().toISOString() : null,
-                    method: paid ? 'admin_manual' : null
-                });
-            });
-            return { kitItems: kitItems, paidRows: paidRows };
-        }
-
-        function updatePlayerKitOrderModalTotals() {
-            const totalsEl = document.getElementById('pkoTotals');
-            if (!totalsEl) return;
-            const data = collectPlayerKitOrderFromModal();
-            const total = data.kitItems.reduce(function (a, it) {
-                return a + Number(it.price || 0);
-            }, 0);
-            const paid = data.paidRows.reduce(function (a, it) {
-                return a + (it.paid ? Number(it.price || 0) : 0);
-            }, 0);
-            const pending = Math.max(0, total - paid);
-            totalsEl.innerHTML =
-                '<strong>Resumen:</strong> ' +
-                data.kitItems.length +
-                ' prenda(s) · Total ' +
-                formatAdminEur(Math.round(total * 100) / 100) +
-                ' · Pagado <span style="color:#059669;">' +
-                formatAdminEur(Math.round(paid * 100) / 100) +
-                '</span>' +
-                (pending > 0.001
-                    ? ' · Pendiente <span style="color:#dc2626;">' + formatAdminEur(Math.round(pending * 100) / 100) + '</span>'
-                    : '');
-        }
-
-        function adminUpsertPlayerInLocalAndRaw(player) {
-            if (!player || player.id == null) return player;
-            const players = JSON.parse(localStorage.getItem('clubPlayers') || '[]');
-            const ix =
-                window.ClubPlayerKitPersist && window.ClubPlayerKitPersist.findPlayerIndexInList
-                    ? window.ClubPlayerKitPersist.findPlayerIndexInList(players, player)
-                    : findPlayerIndexById(players, player.id);
-            const merged =
-                ix >= 0 && window.ClubPlayerKitPersist
-                    ? window.ClubPlayerKitPersist.mergePlayerKitFields(player, players[ix])
-                    : player;
-            if (merged.id == null && player.id != null) merged.id = player.id;
-            if (ix >= 0) players[ix] = merged;
-            else players.push(merged);
-            if (window.ClubPlayerKitPersist && window.ClubPlayerKitPersist.saveKitSnapshot) {
-                window.ClubPlayerKitPersist.saveKitSnapshot(merged);
-            }
-            if (typeof window.syncClubPlayersLocal === 'function') {
-                window.syncClubPlayersLocal(players);
-            } else {
-                localStorage.setItem('clubPlayers', JSON.stringify(players));
-            }
-            if (Array.isArray(window.__lastRawClubPlayers)) {
-                const rix = window.__lastRawClubPlayers.findIndex(function (p) {
-                    return String(p.id) === String(merged.id);
-                });
-                if (rix >= 0) {
-                    window.__lastRawClubPlayers[rix] = window.ClubPlayerKitPersist
-                        ? window.ClubPlayerKitPersist.mergePlayerKitFields(merged, window.__lastRawClubPlayers[rix])
-                        : Object.assign({}, window.__lastRawClubPlayers[rix], merged);
-                } else {
-                    window.__lastRawClubPlayers.push(merged);
-                }
-            }
-            return merged;
-        }
-
-        function applyKitOrderFieldsToPlayer(player, kitItems, paidRows) {
-            const kitTotal = Math.round(
-                kitItems.reduce(function (a, it) {
-                    return a + Number(it.price || 0);
-                }, 0) * 100
-            ) / 100;
-            const kitPaidEur = Math.round(
-                paidRows.reduce(function (a, it) {
-                    return a + (it.paid ? Number(it.price || 0) : 0);
-                }, 0) * 100
-            ) / 100;
-            const flatIds = ['train_kit', 'tracksuit', 'train_jacket', 'cazadora', 'train_shirt', 'train_shorts', 'match_shirt', 'match_shorts'];
-            flatIds.forEach(function (id) {
-                delete player['kit_' + id];
-            });
-            kitItems.forEach(function (it) {
-                if (it.id) player['kit_' + it.id] = it.size;
-            });
-            player.kitOrder = kitItems.slice();
-            player.kit = { mode: 'per_garment', items: kitItems.slice() };
-            kitItems.forEach(function (it) {
-                if (it.id) player.kit[it.id] = it.size;
-            });
-            player.kitItemsPaid = paidRows.slice();
-            player.kitPaidEur = kitPaidEur;
-            player.kitPaymentStatus =
-                kitTotal <= 0 ? null : kitPaidEur >= kitTotal - 0.001 ? 'paid' : kitPaidEur > 0 ? 'partial' : 'pending';
-            if (kitPaidEur > 0 && !player.kitPaymentMethod) player.kitPaymentMethod = 'admin_manual';
-            const cb = Object.assign({}, player.chargeBreakdown || {});
-            cb.kit = kitTotal;
-            const pb = resolvePlayerPaymentBreakdown(Object.assign({}, player, { chargeBreakdown: cb }));
-            if (Number(cb.socio || 0) <= 0 && pb.socio > 0) cb.socio = pb.socio;
-            if (Number(cb.ficha || 0) <= 0 && pb.ficha > 0) cb.ficha = pb.ficha;
-            cb.total = Math.round((Number(cb.socio || 0) + Number(cb.ficha || 0) + kitTotal) * 100) / 100;
-            player.chargeBreakdown = cb;
-            player.kitOrderUpdatedAt = new Date().toISOString();
-            player.kitOrderUpdatedBy =
-                (JSON.parse(localStorage.getItem('currentAdmin') || '{}').name ||
-                    JSON.parse(localStorage.getItem('currentAdmin') || '{}').email ||
-                    'admin');
-            if (window.PlayerExport && typeof window.PlayerExport.formatKitSummary === 'function') {
-                player.kitSummary = window.PlayerExport.formatKitSummary(player);
-            } else if (kitItems.length) {
-                player.kitSummary = kitItems
-                    .map(function (it) {
-                        return (it.label || it.id || 'Prenda') + ' ' + (it.size || '');
-                    })
-                    .join(' · ');
-            } else {
-                player.kitSummary = '';
-            }
-            if (window.ClubPlayerKitPersist && window.ClubPlayerKitPersist.saveKitSnapshot) {
-                window.ClubPlayerKitPersist.saveKitSnapshot(player);
-            }
-            return player;
-        }
-
-        function buildKitOrderSaveSummaryLines(kitItems, paidRows) {
-            const paidById = {};
-            (paidRows || []).forEach(function (row) {
-                if (row && row.id) paidById[row.id] = !!row.paid;
-            });
-            return (kitItems || []).map(function (it) {
-                const paid = paidById[it.id];
-                return (
-                    '• ' +
-                    (it.label || it.id || 'Prenda') +
-                    ' · talla ' +
-                    (it.size || '—') +
-                    (Number(it.price || 0) > 0 ? ' · ' + formatAdminEur(Number(it.price || 0)) : '') +
-                    ' · ' +
-                    (paid ? 'Pagada' : 'Pendiente')
-                );
-            });
-        }
-
-        function editPlayerKitOrder(playerId) {
-            ensurePlayerKitOrderEditorModal();
-            const players = JSON.parse(localStorage.getItem('clubPlayers') || '[]');
-            const ix = findPlayerIndexById(players, playerId);
-            if (ix < 0) {
-                alert('❌ Jugador/a no encontrado/a');
-                return;
-            }
-            __adminKitOrderPlayerId = playerId;
-            const p = players[ix];
-            const modal = document.getElementById(PLAYER_KIT_ORDER_MODAL_ID);
-            document.getElementById('pkoTitle').textContent = '👕 Pedido de ropa';
-            document.getElementById('pkoSubtitle').textContent =
-                (p.name || '') + ' ' + (p.surname || '') + (p.dni ? ' · DNI ' + p.dni : '');
-            renderPlayerKitOrderEditorRows(p);
-            modal.style.display = 'flex';
-        }
-
-        async function savePlayerKitOrderEditor() {
-            if (!__adminKitOrderPlayerId) return;
-            try {
-                const data = collectPlayerKitOrderFromModal();
-                const anyGarmentTouched =
-                    document.querySelectorAll('#pkoRows .pko-row-active:checked').length > 0 ||
-                    Array.prototype.some.call(document.querySelectorAll('#pkoRows .pko-size'), function (sel) {
-                        return !!String(sel.value || '').trim();
-                    });
-                if (!data.kitItems.length) {
-                    if (anyGarmentTouched) {
-                        alert(
-                            '❌ Para guardar el pedido, marca cada prenda y elige su talla.\n\n' +
-                                '«Pagada» solo indica si esa prenda ya está pagada; no sustituye a la talla.'
-                        );
-                        return;
-                    }
-                    if (!confirm('No hay ninguna prenda con talla. ¿Guardar pedido vacío (sin ropa)?')) return;
-                }
-                const players = JSON.parse(localStorage.getItem('clubPlayers') || '[]');
-                const ix = findPlayerIndexById(players, __adminKitOrderPlayerId);
-                if (ix < 0) {
-                    alert('❌ Jugador/a no encontrado/a');
-                    return;
-                }
-                const base = players[ix];
-                const season =
-                    String(
-                        base.inscriptionSeason || base.temporada || base.season || base.inscription_season || ''
-                    ).trim() || '2025-2026';
-                const updated = applyKitOrderFieldsToPlayer(Object.assign({}, base), data.kitItems, data.paidRows);
-                updated.inscriptionSeason = String(updated.inscriptionSeason || updated.temporada || season).trim() || season;
-                updated.temporada = updated.inscriptionSeason;
-                updated.registrationSource = updated.registrationSource || 'admin_panel';
-
-                adminUpsertPlayerInLocalAndRaw(updated);
-
-                let saved = updated;
-                if (typeof persistRecordToFirebase === 'function') {
-                    saved = (await persistRecordToFirebase('clubPlayers', 'players', updated)) || updated;
-                } else if (typeof window.updateDocument === 'function') {
-                    await window.updateDocument('players', updated.id, updated);
-                    saved = updated;
-                } else {
-                    throw new Error('No hay conexión con la nube para guardar el pedido');
-                }
-                const finalPlayer = adminUpsertPlayerInLocalAndRaw(
-                    window.ClubPlayerKitPersist
-                        ? window.ClubPlayerKitPersist.mergePlayerKitFields(
-                              window.ClubPlayerKitPersist.mergePlayerKitFields(saved, updated),
-                              base
-                          )
-                        : Object.assign({}, base, saved, updated)
-                );
-                if (
-                    data.kitItems.length &&
-                    window.ClubPlayerKitPersist &&
-                    !window.ClubPlayerKitPersist.hasKitDetail(finalPlayer)
-                ) {
-                    throw new Error('El pedido no quedó registrado. Comprueba la conexión e inténtalo de nuevo.');
-                }
-                closePlayerKitOrderEditor();
-                loadPlayersList();
-                const summaryLines = buildKitOrderSaveSummaryLines(data.kitItems, data.paidRows);
-                alert(
-                    '✅ Pedido de ropa guardado en la nube.\n\n' +
-                        (summaryLines.length ? summaryLines.join('\n') + '\n\n' : '') +
-                        data.kitItems.length +
-                        ' prenda(s) · Total ' +
-                        formatAdminEur(updated.chargeBreakdown.kit || 0) +
-                        '\nPagado: ' +
-                        formatAdminEur(updated.kitPaidEur || 0)
-                );
-            } catch (e) {
-                console.error('savePlayerKitOrderEditor:', e);
-                showAdminErrorDialog('Error guardando pedido de ropa', '❌ No se pudo guardar el pedido de ropa.', e);
+                console.error('❌ Error validando pago inscripción:', error);
+                alert('❌ Error al validar el pago: ' + (error.message || error));
             }
         }
 
@@ -7840,7 +1925,7 @@
 
         // Función para eliminar jugador
         async function deletePlayer(playerId) {
-            if (!confirm('¿Estás seguro de que quieres eliminar este jugador?\n\n⚠️ Esta acción no se puede deshacer.\n\nSe borrará también en la nube. Si solo se quita en este dispositivo, volverá al refrescar.')) {
+            if (!confirm('¿Estás seguro de que quieres eliminar este jugador?\n\n⚠️ Esta acción no se puede deshacer.\n\nSe borrará también en la nube (Firebase). Si solo se quita en este dispositivo, volverá al refrescar.')) {
                 return;
             }
             try {
@@ -7873,19 +1958,19 @@
                     await removePlayerFromCloudIfNeeded(playerToDelete.id, playerIdentity);
                     cloudDeleted = true;
                 } catch (syncErr) {
-                    console.error('❌ Error eliminando jugador en la nube:', syncErr);
+                    console.error('❌ Error eliminando jugador en Firebase:', syncErr);
                     if (!isTestRecord) {
                         showAdminCopyableDialog(
                             'Error al eliminar jugador en la nube',
                             '❌ No se pudo eliminar en el servidor (nube).\n\n' +
                                 'Jugador: ' + playerLabel.trim() + '\n' +
-                                'ID en la nube: ' + (playerToDelete.id || '—') + '\n\n' +
+                                'ID Firebase: ' + (playerToDelete.id || '—') + '\n\n' +
                                 'La lista se sincroniza en tiempo real: si no se borra en la nube, volverá al refrescar.\n\n' +
                                 'Comprueba:\n' +
-                                '1. Sesión Admin en la web principal (la nube)\n' +
+                                '1. Sesión Admin en la web principal (Firebase Auth)\n' +
                                 '2. Deploy con funciones Netlify (npm run deploy:prod)\n' +
-                                '3. O bórralo manualmente en la nube (ver abajo)\n\n' +
-                                'Panel de la nube → sanabria_players → buscar "' + playerLabel.trim() + '" → Eliminar documento\n' +
+                                '3. O bórralo manualmente en Firebase (ver abajo)\n\n' +
+                                'Firebase Console → Firestore → sanabria_players → buscar "' + playerLabel.trim() + '" → Eliminar documento\n' +
                                 'Proyecto: cdsanabriacf2026\n\n' +
                                 'Error técnico:\n' +
                                 (syncErr.message || String(syncErr))
@@ -8114,8 +2199,8 @@
                                 </div>
                                 
                                 <div style="text-align: center; margin-top: 20px;">
-                                    <button type="button" onclick="savePlayerStats(${jsPlayerIdArg(player.id)})" style="background: #059669; color: white; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer; margin-right: 10px;">💾 Guardar</button>
-                                    <button type="button" onclick="closeStatsModal()" style="background: #6c757d; color: white; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer;">❌ Cancelar</button>
+                                    <button onclick="savePlayerStats('${playerId}')" style="background: #059669; color: white; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer; margin-right: 10px;">💾 Guardar</button>
+                                    <button onclick="closeStatsModal()" style="background: #6c757d; color: white; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer;">❌ Cancelar</button>
                                 </div>
                             </div>
                         </div>
@@ -8168,27 +2253,6 @@
                 modal.remove();
             }
         }
-
-        function registerPlayerAdminGlobals() {
-            window.viewPlayerDetails = viewPlayerDetails;
-            window.updatePlayerStats = updatePlayerStats;
-            window.savePlayerStats = savePlayerStats;
-            window.closeStatsModal = closeStatsModal;
-            window.editPlayer = editPlayer;
-            window.changePlayerCategoryManual = changePlayerCategoryManual;
-            window.setPlayerPortalPasswordAdmin = setPlayerPortalPasswordAdmin;
-            window.validatePlayerPayment = validatePlayerPayment;
-            window.validatePlayerKitPayment = validatePlayerKitPayment;
-            window.editPlayerPayments = editPlayerPayments;
-            window.editPlayerKitOrder = editPlayerKitOrder;
-            window.validatePlayer = validatePlayer;
-            window.deletePlayer = deletePlayer;
-            window.filterPlayersByCategory = filterPlayersByCategory;
-            window.regularizeAdminPlayers = regularizeAdminPlayers;
-            window.loadPlayersList = loadPlayersList;
-            initPlayersListClickDelegation();
-        }
-        registerPlayerAdminGlobals();
 
         // Cargar listas al cargar la página
         document.addEventListener('DOMContentLoaded', function() {
@@ -8276,7 +2340,6 @@
             loadCoachesList();
             loadBoardMembersList();
             loadAdminMessagesHistory();
-            initPushMessagesHistoryDelegation();
             loadExportHistory();
             loadAdvertisementsList();
             loadCompetitionsList();
@@ -9239,11 +3302,11 @@
                     const reader = new FileReader();
                     reader.onload = function(e) {
                         eventData.image = e.target.result;
-                        saveEventToStorage(eventData).catch((err) => console.warn('No se pudo sincronizar evento en la nube:', err));
+                        saveEventToStorage(eventData).catch((err) => console.warn('No se pudo sincronizar evento en Firebase:', err));
                     };
                     reader.readAsDataURL(imageFile);
                 } else {
-                    saveEventToStorage(eventData).catch((err) => console.warn('No se pudo sincronizar evento en la nube:', err));
+                    saveEventToStorage(eventData).catch((err) => console.warn('No se pudo sincronizar evento en Firebase:', err));
                 }
 
             } catch (error) {
@@ -9365,7 +3428,6 @@
                                 <div style="display: flex; gap: 10px; margin-top: 15px;">
                                     <button onclick="viewEventDetails('${event.id}')" style="padding: 6px 12px; background: #6c757d; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 0.8rem;">👁️ Ver Detalles</button>
                                     <button onclick="manageEventParticipants('${event.id}')" style="padding: 6px 12px; background: #1e3a8a; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 0.8rem;">👥 Participantes</button>
-                                    <button onclick="openEventAttendanceQr('${event.id}')" style="padding: 6px 12px; background: #7c3aed; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 0.8rem;" title="Solo administradores: escanear QR y lista de asistencia">📷 Asistencia QR</button>
                                     ${pendingEventPayments > 0 ? `<button onclick="validateEventPaymentsMenu('${event.id}')" style="padding: 6px 12px; background: #059669; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 0.8rem;" title="Confirmar transferencia o efectivo recibido">✅ Validar pagos (${pendingEventPayments})</button>` : ''}
                                     <button onclick="exportEventParticipantsExcel('${event.id}')" style="padding: 6px 12px; background: #166534; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 0.8rem;">📊 Excel</button>
                                     <button onclick="exportEventParticipantsCSV('${event.id}')" style="padding: 6px 12px; background: #8b5cf6; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 0.8rem;">📄 CSV</button>
@@ -9752,7 +3814,7 @@
                     await persistRecordToFirebase('clubEvents', 'events', event);
                     firebaseSyncOk = true;
                 } catch (syncErr) {
-                    console.warn('Validación evento guardada en local; error de la nube:', syncErr);
+                    console.warn('Validación evento guardada en local; error Firebase:', syncErr);
                 }
 
                 if (typeof ClubAccounting !== 'undefined' && bundle.total > 0) {
@@ -10144,7 +4206,7 @@
                         try {
                             if (event.id) await deleteRecordFromFirebase('events', event.id);
                         } catch (error) {
-                            console.warn('No se pudo eliminar evento en la nube:', event.id, error);
+                            console.warn('No se pudo eliminar evento en Firebase:', event.id, error);
                         }
                     }
                 } else if (typeof window.syncLocalArrayKeyToFirebase === 'function') {
@@ -11347,44 +5409,12 @@
         async function saveCompetitionRecord(updatedCompetition) {
             if (!ensureCompetitionAdminAccess()) return false;
             updatedCompetition.appScope = 'cdsanabriacf';
-            if (
-                String(updatedCompetition.id || '') === 'TORNEO_F7_2026_PINAR' ||
-                String(updatedCompetition.officialCalendarId || '') === 'TORNEO_F7_2026_PINAR'
-            ) {
-                updatedCompetition.id = updatedCompetition.id || 'TORNEO_F7_2026_PINAR';
-                updatedCompetition.officialCalendarId = 'TORNEO_F7_2026_PINAR';
-            }
             const competitions = JSON.parse(localStorage.getItem('clubCompetitions') || '[]');
-            let ix = competitions.findIndex(c => c && c.id === updatedCompetition.id);
-            if (ix < 0 && updatedCompetition.officialCalendarId) {
-                ix = competitions.findIndex(c => c && c.officialCalendarId === updatedCompetition.officialCalendarId);
-            }
-            if (ix < 0) competitions.push(updatedCompetition);
-            else competitions[ix] = updatedCompetition;
+            const ix = competitions.findIndex(c => c.id === updatedCompetition.id);
+            if (ix < 0) return false;
+            competitions[ix] = updatedCompetition;
             localStorage.setItem('clubCompetitions', JSON.stringify(competitions));
-            const cloudPayload = Object.assign({}, updatedCompetition);
-            cloudPayload.matches = (updatedCompetition.matches || []).map(function (m) {
-                const x = Object.assign({}, m);
-                if (Array.isArray(x.changeLog) && x.changeLog.length) {
-                    x.changeLog = x.changeLog.slice(-5).map(function (e) {
-                        return { at: e && e.at, by: e && e.by, kind: e && e.kind };
-                    });
-                }
-                return x;
-            });
-            try {
-                if (typeof window.upsertDocument === 'function') {
-                    await window.upsertDocument('competitions', cloudPayload.id, cloudPayload);
-                } else {
-                    await persistRecordToFirebase('clubCompetitions', 'competitions', cloudPayload);
-                }
-            } catch (cloudErr) {
-                console.warn('saveCompetitionRecord nube:', cloudErr);
-                await persistRecordToFirebase('clubCompetitions', 'competitions', cloudPayload);
-            }
-            try {
-                window.dispatchEvent(new CustomEvent('competitionsUpdated', { detail: competitions }));
-            } catch (_) {}
+            await persistRecordToFirebase('clubCompetitions', 'competitions', updatedCompetition);
             return true;
         }
 
@@ -14640,27 +8670,23 @@
                         match.planMatchTime = uiTime;
                         match.planField = uiField;
                     }
-                    match.matchDate = uiDate || previousMatch.matchDate || '';
-                    match.matchTime = uiTime || previousMatch.matchTime || '';
-                    match.field = uiField || previousMatch.field || '';
+                    match.matchDate = uiDate;
+                    match.matchTime = uiTime;
+                    match.field = uiField;
                 } else {
-                    match.matchDate = uiDate || previousMatch.matchDate || '';
-                    match.matchTime = uiTime || previousMatch.matchTime || '';
-                    match.field = uiField || previousMatch.field || '';
-                    match.planMatchDate = match.matchDate;
-                    match.planMatchTime = match.matchTime;
-                    match.planField = match.field;
+                    match.matchDate = uiDate;
+                    match.matchTime = uiTime;
+                    match.field = uiField;
+                    match.planMatchDate = uiDate;
+                    match.planMatchTime = uiTime;
+                    match.planField = uiField;
                 }
                 match.actaMeta = {
                     updatedAt: new Date().toISOString(),
                     updatedBy: JSON.parse(localStorage.getItem('currentAdmin') || '{}').email || 'admin',
                     encounterRef: `${match.homeTeamName || '-'} vs ${match.awayTeamName || '-'} | ${match.matchDate || '-'} ${match.matchTime || ''}`
                 };
-                const scheduleChanged =
-                    (match.matchDate || '') !== (previousMatch.matchDate || '') ||
-                    (match.matchTime || '') !== (previousMatch.matchTime || '') ||
-                    (match.field || '') !== (previousMatch.field || '');
-                if (scheduleChanged && hasMatchFieldTimeConflict(competition, matchId, match.matchDate, match.matchTime, match.field)) {
+                if (hasMatchFieldTimeConflict(competition, matchId, match.matchDate, match.matchTime, match.field)) {
                     alert('❌ Conflicto de campo/hora: ya hay otro partido asignado en esa franja.');
                     return;
                 }
@@ -14669,16 +8695,8 @@
                     at: new Date().toISOString(),
                     by: JSON.parse(localStorage.getItem('currentAdmin') || '{}').email || 'admin',
                     kind: 'match_update',
-                    before: {
-                        homeScore: previousMatch.homeScore,
-                        awayScore: previousMatch.awayScore,
-                        status: previousMatch.status
-                    },
-                    after: {
-                        homeScore: match.homeScore,
-                        awayScore: match.awayScore,
-                        status: match.status
-                    }
+                    before: previousSnapshot,
+                    after: JSON.stringify(match)
                 });
                 if (match.changeLog.length > 50) match.changeLog = match.changeLog.slice(-50);
 
@@ -14694,12 +8712,7 @@
                 }
 
                 competition.updatedAt = new Date().toISOString();
-                const saved = await saveCompetitionRecord(competition);
-                if (!saved) {
-                    alert('❌ No se pudo guardar el resultado. Revisa que hayas iniciado sesión como administrador u organizador.');
-                    return;
-                }
-                alert('✅ Resultado guardado: ' + hs + ' - ' + as);
+                await saveCompetitionRecord(competition);
                 if ((match.matchDate || '') !== (previousMatch.matchDate || '') || (match.matchTime || '') !== (previousMatch.matchTime || '') || (match.field || '') !== (previousMatch.field || '')) {
                     await createCompetitionNotification(
                         competition,
@@ -15486,28 +9499,26 @@
         }
 
         async function saveMember() {
-            const tempLocalId = 'MEMBER_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
             try {
                 const name = document.getElementById('memberName').value.trim();
                 const surname = document.getElementById('memberSurname').value.trim();
                 const dni = document.getElementById('memberDNI').value.trim();
                 const phone = document.getElementById('memberPhone').value.trim();
                 const address = document.getElementById('memberAddress').value.trim();
-                const email = document.getElementById('memberEmail').value.trim().toLowerCase();
+                const email = document.getElementById('memberEmail').value.trim();
                 const password = document.getElementById('memberPassword').value.trim();
                 const sexo = document.getElementById('memberSexo').value;
 
-                if (!name || !surname || !sexo || !phone || !password || !email) {
-                    alert('❌ Error: Nombre, Apellidos, Sexo, Teléfono, Correo y Contraseña son obligatorios.\n\nSin correo el socio no se guarda en la nube.');
-                    return;
-                }
-                if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-                    alert('❌ Correo electrónico no válido.');
+                // Validar campos obligatorios
+                if (!name || !surname || !sexo || !phone || !password) {
+                    alert('❌ Error: Los campos Nombre, Apellidos, Sexo, Teléfono y Contraseña son obligatorios.');
                     return;
                 }
 
+                // Obtener socios existentes
                 const members = JSON.parse(localStorage.getItem('clubMembers') || '[]');
-
+                
+                // Verificar DNI único si se proporciona
                 if (dni) {
                     const existingMember = members.find(m => m.dni && m.dni.toLowerCase() === dni.toLowerCase());
                     if (existingMember) {
@@ -15515,14 +9526,10 @@
                         return;
                     }
                 }
-                const existingEmail = members.find(m => m.email && String(m.email).trim().toLowerCase() === email);
-                if (existingEmail) {
-                    alert('❌ Error: Ya existe un socio con ese correo.');
-                    return;
-                }
 
+                // Crear nuevo socio
                 const newMember = {
-                    id: tempLocalId,
+                    id: 'MEMBER_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9),
                     name: name,
                     surname: surname,
                     nombre: name,
@@ -15541,74 +9548,49 @@
                     validatedDate: null,
                     memberNumber: null,
                     appScope: 'cdsanabriacf',
-                    registrationSource: 'admin_panel',
-                    socioJugador: false,
-                    isJugador: false,
-                    playerId: null,
-                    memberKind: 'normal'
+                    registrationSource: 'admin_panel'
                 };
 
-                let authNote = '';
-                if (password && window.cdsanClubAuth && window.firebaseAuth && !window.firebaseAuth.isSimulation) {
+                if (email && password && window.cdsanClubAuth && window.firebaseAuth && !window.firebaseAuth.isSimulation) {
                     try {
-                        const reg = await window.cdsanClubAuth.registerEmail(email, password);
+                        const reg = await window.cdsanClubAuth.registerEmail(String(email).trim().toLowerCase(), password);
                         if (!reg.simulation && reg.uid) {
                             newMember.authUid = reg.uid;
                             newMember.uid = reg.uid;
                         }
                     } catch (e) {
-                        console.error('saveMember Auth:', e);
+                        console.error('saveMember Firebase Auth:', e);
                         if (e && e.code === 'auth/email-already-in-use') {
-                            authNote = '\n\n⚠️ Ese correo ya tenía cuenta: el socio puede entrar con su contraseña actual.';
-                            if (typeof window.hashClubAccessKey === 'function') {
-                                newMember.passwordHash = await window.hashClubAccessKey(password);
-                            }
+                            alert('❌ Ese correo ya tiene cuenta Firebase. El socio puede iniciar sesión con su contraseña.');
                         } else {
-                            alert('❌ No se pudo crear la cuenta de acceso del socio en la nube.\n\n' + (e && e.message ? e.message : ''));
-                            return;
+                            alert('❌ No se pudo crear la cuenta de acceso del socio en Firebase.');
                         }
+                        return;
                     }
                 } else if (password && typeof window.hashClubAccessKey === 'function') {
                     newMember.passwordHash = await window.hashClubAccessKey(password);
                 }
 
+                // Agregar a la lista
                 if (typeof window.applyClubRoleFlagsToMember === 'function') {
                     window.applyClubRoleFlagsToMember(newMember);
                 }
                 members.push(newMember);
                 syncMembersLocalStorage(members);
+                await persistMemberToFirebase(newMember);
 
-                try {
-                    await persistMemberToFirebase(newMember);
-                } catch (syncErr) {
-                    const cleaned = JSON.parse(localStorage.getItem('clubMembers') || '[]').filter(function (m) {
-                        return m && String(m.id) !== String(tempLocalId);
-                    });
-                    syncMembersLocalStorage(cleaned);
-                    throw syncErr;
-                }
-
+                // Cerrar formulario y recargar lista
                 cancelAddMember();
-                try {
-                    const filterEl = document.getElementById('memberStatusFilter');
-                    if (filterEl && filterEl.value === 'active') filterEl.value = 'pending_new';
-                } catch (_) {}
                 loadMembersList();
                 updateMemberCounts();
                 updateDashboardCounts();
 
-                alert(
-                    '✅ Socio registrado y guardado en la nube.\n\n' +
-                    '⚠️ Tiene 7 días para ingresar la cuota. Usa «Validar pago» cuando veas el abono (cdsanabriafc@gmail.com).' +
-                    authNote
-                );
+                alert('✅ Socio registrado.\n\n⚠️ Tiene 7 días para ingresar la cuota. Un administrador lo validará al ver el pago en la cuenta (cdsanabriafc@gmail.com).');
                 console.log('👤 Nuevo socio registrado:', newMember.name + ' ' + newMember.surname);
 
             } catch (error) {
                 console.error('❌ Error guardando socio:', error);
-                loadMembersList();
-                updateMemberCounts();
-                alert('❌ Error al guardar el socio en la nube.\n\n' + (error && error.message ? error.message : String(error)) + '\n\nComprueba sesión de administrador, correo y conexión.');
+                alert('❌ Error al guardar el socio. Inténtalo de nuevo.');
             }
         }
 
@@ -15642,30 +9624,17 @@
             const d = new Date(raw);
             return isNaN(d.getTime()) ? null : d.toISOString();
         }
-        function canonicalizeMemberStatus(rawStatus, estado) {
-            const s = String(rawStatus == null ? '' : rawStatus).trim().toLowerCase();
-            const e = String(estado == null ? '' : estado).trim().toLowerCase();
-            const v = s || e;
-            if (v === 'active' || v === 'activo') return 'active';
-            if (v === 'expired' || v === 'expirado' || v === 'caducado') return 'expired';
-            if (
-                v === 'pending_validation' ||
-                v === 'pendiente' ||
-                v === 'pending' ||
-                v === 'pending_new' ||
-                v === 'nueva_alta'
-            ) {
-                return 'pending_validation';
-            }
-            return v || 'pending_validation';
-        }
-
         function normalizeClubMember(m) {
             if (!m || typeof m !== 'object') return { name: '', surname: '', phone: '', registrationDate: null, status: 'pending_validation' };
             const regIso = registrationDateToIso(m) || (m.registrationDate || m.fechaRegistro || null);
-            const status = canonicalizeMemberStatus(m.status, m.estado);
-            const estado =
-                status === 'active' ? 'activo' : status === 'expired' ? 'caducado' : 'pendiente';
+            let status = m.status;
+            if (status == null || status === '') {
+                const e = String(m.estado || '').toLowerCase();
+                if (e === 'pendiente' || e === 'pending' || e === 'pending_validation') status = 'pending_validation';
+                else if (e === 'activo' || e === 'active') status = 'active';
+                else if (e === 'expirado' || e === 'expired' || e === 'caducado') status = 'expired';
+            }
+            if (!status) status = 'pending_validation';
             const name = cleanMemberStr(m.name) || cleanMemberStr(m.nombre) || cleanMemberStr(m.nombres) || cleanMemberStr(m.firstName);
             const surname = cleanMemberStr(m.surname) || cleanMemberStr(m.apellidos) || cleanMemberStr(m.apellido) || cleanMemberStr(m.lastName);
             const phone = cleanMemberStr(m.phone) || cleanMemberStr(m.telefono) || cleanMemberStr(m.movil);
@@ -15678,7 +9647,6 @@
                 address,
                 registrationDate: regIso,
                 status,
-                estado,
                 memberNumber: m.memberNumber != null && m.memberNumber !== '' ? m.memberNumber : m.numeroSocio,
                 birthDate: m.birthDate || m.fechaNacimiento,
                 sexo: normalizeSexoField(m) || ''
@@ -15794,71 +9762,6 @@
             return Array.from(byIdentity.values());
         }
 
-        /** Socio-jugador: ficha ligada a inscripción/jugador (persistido en nube como socioJugador / memberKind). */
-        function isMemberSocioJugador(member) {
-            if (!member || typeof member !== 'object') return false;
-            if (member.memberKind === 'jugador' || member.memberKind === 'player') return true;
-            if (member.memberKind === 'normal' || member.memberKind === 'socio') return false;
-            if (member.socioJugador === true || member.isJugador === true) return true;
-            if (member.playerId != null && String(member.playerId).trim()) return true;
-            const src = String(member.registrationSource || '').toLowerCase();
-            if (src.indexOf('player') >= 0 || src.indexOf('jugador') >= 0 || src.indexOf('inscription') >= 0) {
-                return true;
-            }
-            return false;
-        }
-
-        function getMemberKindLabel(member) {
-            return isMemberSocioJugador(member) ? 'Socio-jugador' : 'Socio';
-        }
-
-        function ensureMemberKindFlags(member) {
-            if (!member || typeof member !== 'object') return member;
-            const isJ = isMemberSocioJugador(member);
-            member.socioJugador = isJ;
-            if (isJ) member.isJugador = true;
-            member.memberKind = isJ ? 'jugador' : 'normal';
-            if (!isJ) {
-                if (!member.playerId) member.playerId = null;
-            }
-            return member;
-        }
-
-        function sortMembersByName(list) {
-            return (list || []).slice().sort(function (a, b) {
-                const na = [a.name || a.nombre || '', a.surname || a.apellidos || ''].join(' ').trim().toLowerCase();
-                const nb = [b.name || b.nombre || '', b.surname || b.apellidos || ''].join(' ').trim().toLowerCase();
-                return na.localeCompare(nb, 'es');
-            });
-        }
-
-        function memberMatchesKindFilter(member, kindFilter) {
-            const k = String(kindFilter || 'all');
-            if (k === 'normal') return !isMemberSocioJugador(member);
-            if (k === 'jugador') return isMemberSocioJugador(member);
-            return true;
-        }
-
-        function pickSocioExportKind() {
-            const el = document.getElementById('memberKindFilter');
-            const current = el ? el.value : 'all';
-            const hint =
-                current === 'normal' ? '2' : current === 'jugador' ? '3' : '1';
-            const choice = prompt(
-                'Exportar socios:\n\n' +
-                    '1 = Todos (normales + socios-jugadores)\n' +
-                    '2 = Solo socios normales\n' +
-                    '3 = Solo socios-jugadores\n\n' +
-                    'Escribe 1, 2 o 3:',
-                hint
-            );
-            if (choice == null) return null;
-            const c = String(choice).trim();
-            if (c === '2' || c === 'normal') return 'normal';
-            if (c === '3' || c === 'jugador') return 'jugador';
-            return 'all';
-        }
-
         function buildMemberFirebasePayload(m) {
             if (typeof window.applyClubRoleFlagsToMember === 'function') {
                 window.applyClubRoleFlagsToMember(m);
@@ -15906,19 +9809,8 @@
                 numeroSocioHonor: m.numeroSocioHonor != null ? m.numeroSocioHonor : null,
                 numeroSocioRegular: m.numeroSocioRegular != null ? m.numeroSocioRegular : null
             };
-            ensureMemberKindFlags(m);
-            const isJ = isMemberSocioJugador(m);
-            payload.socioJugador = isJ;
-            payload.isJugador = isJ ? true : !!m.isJugador;
-            payload.playerId = isJ ? m.playerId || null : null;
-            payload.memberKind = isJ ? 'jugador' : 'normal';
             if (typeof window.appendClubRoleFlagsToPayload === 'function') {
                 window.appendClubRoleFlagsToPayload(payload, m);
-            }
-            payload.socioJugador = isJ;
-            payload.memberKind = isJ ? 'jugador' : 'normal';
-            if (!isJ) {
-                payload.playerId = null;
             }
             return payload;
         }
@@ -15944,49 +9836,20 @@
                 }
                 const payload = buildMemberFirebasePayload(member);
                 const merged = { ...member, ...payload, appScope: 'cdsanabriacf', registrationSource: member.registrationSource || 'admin_panel' };
-                if (!merged.email && merged.guardianEmail) {
-                    merged.email = String(merged.guardianEmail).trim().toLowerCase();
-                }
-                if (!String(merged.email || '').trim()) {
-                    throw new Error('El socio necesita un correo para guardarlo en la nube.');
-                }
-
-                const requireCloud =
-                    window.AdminClubCloudPersist &&
-                    typeof window.AdminClubCloudPersist.cloudRequired === 'function' &&
-                    window.AdminClubCloudPersist.cloudRequired();
 
                 if (window.AdminClubCloudPersist && typeof window.AdminClubCloudPersist.persistMember === 'function') {
                     try {
                         return await window.AdminClubCloudPersist.persistMember(merged);
                     } catch (netlifyErr) {
                         console.warn('Netlify socio (admin):', netlifyErr);
-                        if (typeof window.updateDocument === 'function' && member.id && !String(member.id).startsWith('MEMBER_')) {
-                            try {
-                                await window.updateDocument('members', member.id, merged);
-                                return merged;
-                            } catch (directErr) {
-                                console.warn('Firestore directo socio:', directErr);
-                            }
+                        if (window.AdminClubCloudPersist.cloudRequired && window.AdminClubCloudPersist.cloudRequired()) {
+                            throw netlifyErr;
                         }
-                        if (!requireCloud && typeof persistRecordToFirebase === 'function') {
-                            return await persistRecordToFirebase('clubMembers', 'members', merged, { skipNetlify: true });
-                        }
-                        throw netlifyErr;
                     }
-                }
-
-                if (typeof persistRecordToFirebase === 'function') {
-                    return await persistRecordToFirebase('clubMembers', 'members', merged);
-                }
-
-                if (requireCloud) {
-                    throw new Error('No hay servicio de guardado en la nube disponible. Recarga el panel e inicia sesión como administrador.');
                 }
 
                 if (String(member.id).startsWith('MEMBER_') && typeof window.createDocument === 'function') {
                     const newId = await window.createDocument('members', merged);
-                    if (!newId) throw new Error('No se pudo crear el socio en la nube.');
                     const all = JSON.parse(localStorage.getItem('clubMembers') || '[]');
                     const ix = all.findIndex(m => m.id === member.id);
                     if (ix >= 0) {
@@ -15994,15 +9857,13 @@
                         syncMembersLocalStorage(all);
                     }
                     try { window.dispatchEvent(new CustomEvent('membersUpdated')); } catch (e2) {}
-                    return { ...merged, id: newId };
+                    return;
                 }
                 if (typeof window.updateDocument === 'function') {
                     await window.updateDocument('members', member.id, payload);
-                    return merged;
                 }
-                throw new Error('No se pudo sincronizar el socio con la nube.');
             } catch (e) {
-                console.warn('No se pudo sincronizar socio con la nube:', e);
+                console.warn('No se pudo sincronizar socio con Firebase:', e);
                 throw e;
             }
         }
@@ -16240,7 +10101,7 @@
                 equipos: (equipos || []).length,
                 eventos: (eventos || []).length
             };
-            console.log('🔄 Panel sincronizado desde la nube:', result);
+            console.log('🔄 Panel sincronizado desde Firebase:', result);
             return result;
         }
 
@@ -16380,7 +10241,7 @@
                 events,
                 sync: syncResult
             };
-            console.log('🧹 Regularización deportiva la nube:', result);
+            console.log('🧹 Regularización deportiva Firebase:', result);
             if (!dryRun) {
                 alert(
                     `✅ Regularización deportiva completada\n\n` +
@@ -16516,7 +10377,7 @@
                     await window.updateDocument('friends', friend.id, payload);
                 }
             } catch (e) {
-                console.warn('No se pudo sincronizar amigo con la nube:', e);
+                console.warn('No se pudo sincronizar amigo con Firebase:', e);
                 throw e;
             }
         }
@@ -16541,7 +10402,6 @@
             if (!v) return true;
             return (
                 v.startsWith('PLAYER_') ||
-                v.startsWith('MEMBER_') ||
                 v.startsWith('TEAM_') ||
                 v.startsWith('COMP_') ||
                 v.startsWith('GUEST_') ||
@@ -16552,53 +10412,8 @@
             );
         }
 
-        async function persistRecordToFirebase(localKey, collectionKey, record, opts) {
+        async function persistRecordToFirebase(localKey, collectionKey, record) {
             if (!record || typeof record !== 'object') return null;
-            const skipNetlify = !!(opts && opts.skipNetlify);
-            let payload = Object.assign({}, record);
-
-            if (collectionKey === 'notifications' && payload.id) {
-                const docId = String(payload.id).trim();
-                if (docId && typeof window.upsertDocument === 'function') {
-                    try {
-                        await window.upsertDocument('notifications', docId, payload);
-                        if (localKey) {
-                            const list = JSON.parse(localStorage.getItem(localKey) || '[]');
-                            const ix = list.findIndex(function (x) {
-                                return x && String(x.id) === docId;
-                            });
-                            if (ix >= 0) {
-                                list[ix] = Object.assign({}, list[ix], payload, { id: docId });
-                                localStorage.setItem(localKey, JSON.stringify(list));
-                            }
-                        }
-                        return payload;
-                    } catch (notifErr) {
-                        console.warn('upsert notification:', notifErr);
-                        return payload;
-                    }
-                }
-            }
-
-            if (collectionKey === 'players' && localKey && window.ClubPlayerKitPersist) {
-                try {
-                    const list = JSON.parse(localStorage.getItem(localKey) || '[]');
-                    const local = list.find(function (x) {
-                        return x && String(x.id) === String(record.id);
-                    });
-                    if (local) {
-                        const sentTs = record.kitOrderUpdatedAt ? new Date(record.kitOrderUpdatedAt).getTime() : 0;
-                        const localTs = local.kitOrderUpdatedAt ? new Date(local.kitOrderUpdatedAt).getTime() : 0;
-                        if (sentTs && sentTs >= localTs) {
-                            payload = window.ClubPlayerKitPersist.mergePlayerKitFields(payload, local);
-                        } else {
-                            payload = window.ClubPlayerKitPersist.mergePlayerKitFields(local, payload);
-                        }
-                    }
-                } catch (mergeErr) {
-                    console.warn('mergePlayerKitFields persist:', mergeErr);
-                }
-            }
 
             const netlifyMap = {
                 members: 'member',
@@ -16607,83 +10422,38 @@
                 coaches: 'coach'
             };
             const netlifyKind = netlifyMap[collectionKey];
-            if (
-                !skipNetlify &&
-                netlifyKind &&
-                window.AdminClubCloudPersist &&
-                typeof window.AdminClubCloudPersist.persist === 'function'
-            ) {
+            if (netlifyKind && window.AdminClubCloudPersist && typeof window.AdminClubCloudPersist.persist === 'function') {
                 try {
                     const saved = await window.AdminClubCloudPersist.persist(netlifyKind, {
-                        ...payload,
+                        ...record,
                         appScope: 'cdsanabriacf',
-                        registrationSource: payload.registrationSource || 'admin_panel'
+                        registrationSource: record.registrationSource || 'admin_panel'
                     });
                     if (saved && saved.id && localKey) {
                         const list = JSON.parse(localStorage.getItem(localKey) || '[]');
-                        const ix =
-                            collectionKey === 'players' &&
-                            window.ClubPlayerKitPersist &&
-                            window.ClubPlayerKitPersist.findPlayerIndexInList
-                                ? window.ClubPlayerKitPersist.findPlayerIndexInList(list, payload)
-                                : list.findIndex(function (x) {
-                                      return x && String(x.id) === String(payload.id);
-                                  });
+                        const ix = list.findIndex((x) => x && x.id === record.id);
                         if (ix >= 0) {
-                            let merged = { ...list[ix], ...saved, id: saved.id || list[ix].id };
-                            if (collectionKey === 'players' && window.ClubPlayerKitPersist) {
-                                merged = window.ClubPlayerKitPersist.mergePlayerKitFields(
-                                    window.ClubPlayerKitPersist.mergePlayerKitFields(merged, payload),
-                                    list[ix]
-                                );
-                                if (saved.id) merged.id = saved.id;
-                                if (window.ClubPlayerKitPersist.saveKitSnapshot) {
-                                    window.ClubPlayerKitPersist.saveKitSnapshot(merged);
-                                }
-                            }
-                            list[ix] = merged;
+                            list[ix] = { ...list[ix], ...saved };
                             localStorage.setItem(localKey, JSON.stringify(list));
-                            if (collectionKey === 'players' && typeof window.syncClubPlayersLocal === 'function') {
-                                window.syncClubPlayersLocal(list);
-                            }
-                        } else if (collectionKey === 'players' && window.ClubPlayerKitPersist) {
-                            const merged = window.ClubPlayerKitPersist.mergePlayerKitFields(saved, payload);
-                            list.push(merged);
-                            if (window.ClubPlayerKitPersist.saveKitSnapshot) {
-                                window.ClubPlayerKitPersist.saveKitSnapshot(merged);
-                            }
-                            localStorage.setItem(localKey, JSON.stringify(list));
-                            if (typeof window.syncClubPlayersLocal === 'function') {
-                                window.syncClubPlayersLocal(list);
-                            }
                         }
                     }
-                    return saved || payload;
+                    return saved || record;
                 } catch (netlifyErr) {
                     console.warn('Netlify persist (' + collectionKey + '):', netlifyErr);
-                    const requireCloud =
-                        window.AdminClubCloudPersist &&
-                        typeof window.AdminClubCloudPersist.cloudRequired === 'function' &&
-                        window.AdminClubCloudPersist.cloudRequired();
-                    if (requireCloud && (collectionKey === 'members' || collectionKey === 'friends' || collectionKey === 'players' || collectionKey === 'coaches')) {
+                    if (window.AdminClubCloudPersist.cloudRequired && window.AdminClubCloudPersist.cloudRequired()) {
                         throw netlifyErr;
                     }
                 }
             }
 
-            if (typeof window.createDocument !== 'function' || typeof window.updateDocument !== 'function') {
-                if (collectionKey === 'members' || collectionKey === 'friends' || collectionKey === 'players') {
-                    throw new Error('No hay conexión con la nube para guardar ' + collectionKey);
-                }
-                return payload;
-            }
+            if (typeof window.createDocument !== 'function' || typeof window.updateDocument !== 'function') return record;
 
-            const localId = payload.id;
+            const localId = record.id;
             const useCreate = isTemporaryLocalId(localId);
 
             try {
                 if (useCreate) {
-                    const newId = await window.createDocument(collectionKey, payload);
+                    const newId = await window.createDocument(collectionKey, record);
                     if (newId && localKey) {
                         const list = JSON.parse(localStorage.getItem(localKey) || '[]');
                         const ix = list.findIndex((x) => x && x.id === localId);
@@ -16693,20 +10463,16 @@
                             return list[ix];
                         }
                     }
-                    return { ...payload, id: newId || localId };
+                    return { ...record, id: newId || localId };
                 }
 
-                await window.updateDocument(collectionKey, localId, payload);
-                if (collectionKey === 'players' && window.ClubPlayerKitPersist && window.ClubPlayerKitPersist.saveKitSnapshot) {
-                    window.ClubPlayerKitPersist.saveKitSnapshot(payload);
-                }
-                return payload;
+                await window.updateDocument(collectionKey, localId, record);
+                return record;
             } catch (e) {
-                // Fallback: si update falla, intentar create.
+                // Fallback seguro: si update falla, intentar create.
                 try {
-                    const newId = await window.createDocument(collectionKey, payload);
-                    if (!newId) throw e;
-                    if (localKey) {
+                    const newId = await window.createDocument(collectionKey, record);
+                    if (newId && localKey) {
                         const list = JSON.parse(localStorage.getItem(localKey) || '[]');
                         const ix = list.findIndex((x) => x && x.id === localId);
                         if (ix >= 0) {
@@ -16717,9 +10483,8 @@
                     }
                     return { ...record, id: newId || localId };
                 } catch (e2) {
-                    console.warn(`No se pudo sincronizar ${collectionKey} con la nube:`, e2);
-                    const err = e2 || e;
-                    throw err instanceof Error ? err : new Error(String(err || 'No se pudo sincronizar con la nube'));
+                    console.warn(`No se pudo sincronizar ${collectionKey} con Firebase:`, e2);
+                    return record;
                 }
             }
         }
@@ -17266,61 +11031,6 @@
             loadContabilidadPanel();
         }
 
-        function renderMemberListCardHtml(member, visualIndex) {
-            const nm = normalizeClubMember(member);
-            const isExpired = isMemberExpired(nm);
-            const statusText = getMemberStatusText(nm, isExpired);
-            const statusColor = getMemberStatusColor(nm, isExpired);
-            const kindLabel = getMemberKindLabel(nm);
-            const kindBadge = isMemberSocioJugador(nm)
-                ? '<span style="background:#fef3c7;color:#92400e;padding:2px 8px;border-radius:12px;font-size:0.75rem;margin-left:6px;">⚽ ' + kindLabel + '</span>'
-                : '<span style="background:#e0e7ff;color:#3730a3;padding:2px 8px;border-radius:12px;font-size:0.75rem;margin-left:6px;">👤 ' + kindLabel + '</span>';
-            const safeId = String(nm.id || member.id || '').replace(/\\/g, '\\\\').replace(/'/g, "\\'");
-
-            return `
-                        <div style="background: white; padding: 15px; border-radius: 8px; margin-bottom: 10px; border-left: 4px solid ${statusColor};">
-                            <div style="display: flex; justify-content: space-between; align-items: flex-start;">
-                                <div>
-                                    <h4 style="margin: 0 0 5px 0; color: #1e3a8a;">#${visualIndex + 1} · ${([nm.name, nm.surname].filter(function (x) { return x && String(x).trim(); }).join(' ') || '—')}${kindBadge}</h4>
-                                    <div style="font-size: 0.9em; color: #666; margin-bottom: 8px;">
-                                        📞 ${nm.phone || '—'} | 📧 ${nm.email || 'No especificado'} | 📍 ${nm.address || 'No especificada'}
-                                    </div>
-                                    <div style="font-size: 0.9em; color: #666;">
-                                        🆔 DNI: ${nm.dni || 'No especificado'} | 📅 Registro: ${nm.registrationDate ? (() => { const d = new Date(nm.registrationDate); return isNaN(d.getTime()) ? '—' : d.toLocaleDateString('es-ES'); })() : '—'}
-                                        ${(function(){
-                                            const CMN = window.ClubMemberNumbers;
-                                            if (CMN && CMN.isSocioDeHonor(nm)) {
-                                                const h = CMN.getHonorNumber(nm);
-                                                return '| 🏅 SOCIO DE HONOR' + (h ? ' · N.º SOC. ' + CMN.padSocNum(h) : '');
-                                            }
-                                            if (!nm.memberNumber || String(nm.memberNumber).startsWith('SOC')) return '';
-                                            const label = CMN ? CMN.padSocNum(parseInt(nm.memberNumber)) : String(nm.memberNumber).padStart(6,'0');
-                                            return '| N.º SOC. ' + label;
-                                        })()}
-                                        ${nm.pendingReason === 'renovacion' ? ' | <span style="color:#0284c7;font-weight:600;">Renovación cuota</span>' : ''}
-                                        ${nm.cuota != null ? ` | 💶 Cuota: ${nm.cuota} €` : ''}
-                                    </div>
-                                    <div style="font-size: 0.9em; color: #059669; font-weight: bold; margin-top: 5px;">
-                                        🔐 Contraseña gestionada de forma segura (no visible en panel)
-                                    </div>
-                                    ${typeof formatClubRoleBadgesHtml === 'function' ? formatClubRoleBadgesHtml(nm) : ''}
-                                </div>
-                                <span style="background: ${statusColor}; color: white; padding: 4px 8px; border-radius: 12px; font-size: 0.8rem;">
-                                    ${statusText}
-                                </span>
-                            </div>
-                            <div style="display: flex; gap: 10px; margin-top: 15px; flex-wrap:wrap;">
-                                <button onclick="viewMemberDetails('${safeId}')" style="padding: 6px 12px; background: #6c757d; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 0.8rem;">👁️ Ver Detalles</button>
-                                ${nm.status === 'active' ? `<button onclick="previewMemberCard('${safeId}')" title="Vista previa del carnet (solo admin)" style="padding: 6px 12px; background: #1e3a8a; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 0.8rem;">🎫 Carnet</button>` : ''}
-                                ${nm.status === 'pending_validation' ? `<button onclick="validateMember('${safeId}')" title="Solo tras ver el ingreso en la cuenta bancaria" style="padding: 6px 12px; background: #059669; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 0.8rem;">✅ Validar pago</button>` : ''}
-                                ${nm.status === 'active' ? `<button type="button" onclick="contabilidadRegistrarCuotaSocioActivo('${safeId}')" title="Si validaste antes de tener contabilidad o falta el asiento en el libro" style="padding: 6px 12px; background: #1d4ed8; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 0.8rem;">💶 Cuota → contabilidad</button>` : ''}
-                                <button onclick="editMember('${safeId}')" style="padding: 6px 12px; background: #f59e0b; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 0.8rem;">✏️ Editar</button>
-                                <button onclick="deleteMember('${safeId}')" style="padding: 6px 12px; background: #dc2626; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 0.8rem;">🗑️ Eliminar</button>
-                            </div>
-                        </div>
-                    `;
-        }
-
         function loadMembersList() {
             try {
                 const membersRaw = JSON.parse(localStorage.getItem('clubMembers') || '[]');
@@ -17329,79 +11039,82 @@
                     if (typeof window.applyClubRoleFlagsToMember === 'function') {
                         window.applyClubRoleFlagsToMember(m);
                     }
-                    ensureMemberKindFlags(m);
                 });
                 const membersList = document.getElementById('membersList');
-                const statusFilter = document.getElementById('memberStatusFilter')
-                    ? document.getElementById('memberStatusFilter').value
-                    : 'all';
-                const kindFilter = document.getElementById('memberKindFilter')
-                    ? document.getElementById('memberKindFilter').value
-                    : 'all';
+                const statusFilter = document.getElementById('memberStatusFilter').value;
 
                 if (!membersList) return;
 
+                // Filtrar socios según el estado
                 let filteredMembers = members;
                 if (statusFilter !== 'all') {
                     filteredMembers = members.filter(member => {
-                        const st = normalizeClubMember(member).status;
-                        if (statusFilter === 'pending') return st === 'pending_validation';
+                        if (statusFilter === 'pending') return member.status === 'pending_validation';
                         if (statusFilter === 'pending_renewal') return isMemberPendingRenewal(member);
                         if (statusFilter === 'pending_new') return isMemberPendingNewAlta(member);
-                        if (statusFilter === 'active') return st === 'active';
+                        if (statusFilter === 'active') return member.status === 'active';
                         if (statusFilter === 'expired') return isMemberExpired(member);
                         return true;
                     });
                 }
-                filteredMembers = filteredMembers.filter(function (m) {
-                    return memberMatchesKindFilter(m, kindFilter);
-                });
 
                 if (filteredMembers.length === 0) {
                     membersList.innerHTML = '<div style="text-align: center; padding: 20px; color: #666;">No hay socios que mostrar con los filtros actuales.</div>';
                     return;
                 }
 
-                const normales = sortMembersByName(filteredMembers.filter(function (m) { return !isMemberSocioJugador(m); }));
-                const jugadores = sortMembersByName(filteredMembers.filter(function (m) { return isMemberSocioJugador(m); }));
-
                 let html = '';
-                let visualIndex = 0;
+                filteredMembers.forEach((member, visualIndex) => {
+                    const isExpired = isMemberExpired(member);
+                    const statusText = getMemberStatusText(member, isExpired);
+                    const statusColor = getMemberStatusColor(member, isExpired);
 
-                if (kindFilter !== 'jugador') {
-                    html +=
-                        '<div style="margin:8px 0 12px;padding:10px 14px;background:#eef2ff;border:1px solid #c7d2fe;border-radius:8px;">' +
-                        '<strong style="color:#1e3a8a;">👤 Socios normales</strong>' +
-                        '<span style="color:#64748b;margin-left:8px;">(' + normales.length + ')</span>' +
-                        '</div>';
-                    if (!normales.length) {
-                        html += '<div style="color:#94a3b8;padding:8px 4px 16px;font-size:0.9rem;">No hay socios normales con estos filtros.</div>';
-                    } else {
-                        normales.forEach(function (member) {
-                            visualIndex += 1;
-                            html += renderMemberListCardHtml(member, visualIndex);
-                        });
-                    }
-                }
-
-                if (kindFilter !== 'normal') {
-                    html +=
-                        '<div style="margin:20px 0 12px;padding:10px 14px;background:#fffbeb;border:1px solid #fcd34d;border-radius:8px;">' +
-                        '<strong style="color:#92400e;">⚽ Socios-jugadores</strong>' +
-                        '<span style="color:#64748b;margin-left:8px;">(' + jugadores.length + ')</span>' +
-                        '</div>';
-                    if (!jugadores.length) {
-                        html += '<div style="color:#94a3b8;padding:8px 4px 16px;font-size:0.9rem;">No hay socios-jugadores con estos filtros.</div>';
-                    } else {
-                        jugadores.forEach(function (member) {
-                            visualIndex += 1;
-                            html += renderMemberListCardHtml(member, visualIndex);
-                        });
-                    }
-                }
+                    html += `
+                        <div style="background: white; padding: 15px; border-radius: 8px; margin-bottom: 10px; border-left: 4px solid ${statusColor};">
+                            <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+                                <div>
+                                    <h4 style="margin: 0 0 5px 0; color: #1e3a8a;">#${visualIndex + 1} · ${([member.name, member.surname].filter(function (x) { return x && String(x).trim(); }).join(' ') || '—')}</h4>
+                                    <div style="font-size: 0.9em; color: #666; margin-bottom: 8px;">
+                                        📞 ${member.phone || '—'} | 📧 ${member.email || 'No especificado'} | 📍 ${member.address || 'No especificada'}
+                                    </div>
+                                    <div style="font-size: 0.9em; color: #666;">
+                                        🆔 DNI: ${member.dni || 'No especificado'} | 📅 Registro: ${member.registrationDate ? (() => { const d = new Date(member.registrationDate); return isNaN(d.getTime()) ? '—' : d.toLocaleDateString('es-ES'); })() : '—'}
+                                        ${(function(){
+                                            const CMN = window.ClubMemberNumbers;
+                                            if (CMN && CMN.isSocioDeHonor(member)) {
+                                                const h = CMN.getHonorNumber(member);
+                                                return '| 🏅 SOCIO DE HONOR' + (h ? ' · N.º SOC. ' + CMN.padSocNum(h) : '');
+                                            }
+                                            if (!member.memberNumber || String(member.memberNumber).startsWith('SOC')) return '';
+                                            const label = CMN ? CMN.padSocNum(parseInt(member.memberNumber)) : String(member.memberNumber).padStart(6,'0');
+                                            return '| N.º SOC. ' + label;
+                                        })()}
+                                        ${member.pendingReason === 'renovacion' ? ' | <span style="color:#0284c7;font-weight:600;">Renovación cuota</span>' : ''}
+                                        ${member.cuota != null ? ` | 💶 Cuota: ${member.cuota} €` : ''}
+                                    </div>
+                                    <div style="font-size: 0.9em; color: #059669; font-weight: bold; margin-top: 5px;">
+                                        🔐 Contraseña gestionada de forma segura (no visible en panel)
+                                    </div>
+                                    ${typeof formatClubRoleBadgesHtml === 'function' ? formatClubRoleBadgesHtml(member) : ''}
+                                </div>
+                                <span style="background: ${statusColor}; color: white; padding: 4px 8px; border-radius: 12px; font-size: 0.8rem;">
+                                    ${statusText}
+                                </span>
+                            </div>
+                            <div style="display: flex; gap: 10px; margin-top: 15px;">
+                                <button onclick="viewMemberDetails('${member.id}')" style="padding: 6px 12px; background: #6c757d; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 0.8rem;">👁️ Ver Detalles</button>
+                                ${member.status === 'active' ? `<button onclick="previewMemberCard('${member.id}')" title="Vista previa del carnet (solo admin)" style="padding: 6px 12px; background: #1e3a8a; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 0.8rem;">🎫 Carnet</button>` : ''}
+                                ${member.status === 'pending_validation' ? `<button onclick="validateMember('${member.id}')" title="Solo tras ver el ingreso en la cuenta bancaria" style="padding: 6px 12px; background: #059669; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 0.8rem;">✅ Validar pago</button>` : ''}
+                                ${member.status === 'active' ? `<button type="button" onclick="contabilidadRegistrarCuotaSocioActivo('${String(member.id).replace(/'/g, "\\'")}')" title="Si validaste antes de tener contabilidad o falta el asiento en el libro" style="padding: 6px 12px; background: #1d4ed8; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 0.8rem;">💶 Cuota → contabilidad</button>` : ''}
+                                <button onclick="editMember('${member.id}')" style="padding: 6px 12px; background: #f59e0b; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 0.8rem;">✏️ Editar</button>
+                                <button onclick="deleteMember('${member.id}')" style="padding: 6px 12px; background: #dc2626; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 0.8rem;">🗑️ Eliminar</button>
+                            </div>
+                        </div>
+                    `;
+                });
 
                 membersList.innerHTML = html;
-                console.log('👨‍👩‍👧‍👦 Lista de socios:', normales.length, 'normales +', jugadores.length, 'jugadores');
+                console.log('👨‍👩‍👧‍👦 Lista de socios cargada:', filteredMembers.length, 'socios');
 
             } catch (error) {
                 console.error('❌ Error cargando lista de socios:', error);
@@ -17540,8 +11253,8 @@
                     localPending > 0
                         ? 'Hay ' +
                           localPending +
-                          ' socio(s) activo(s) en este dispositivo sin número definitivo (≥ 51).\n\n¿Asignar números en la nube y sincronizar?'
-                        : '¿Buscar en la nube socios activos sin número definitivo y asignarles el siguiente disponible (≥ 51)?';
+                          ' socio(s) activo(s) en este dispositivo sin número definitivo (≥ 51).\n\n¿Asignar números en Firebase y sincronizar?'
+                        : '¿Buscar en Firebase socios activos sin número definitivo y asignarles el siguiente disponible (≥ 51)?';
                 if (!confirm(msg)) return;
                 const result = await window.AdminClubCloudPersist.assignPendingMemberNumbers();
                 const rows = result.members || [];
@@ -17565,291 +11278,7 @@
                 alert(
                     '✅ Números asignados: ' +
                         (result.assigned || 0) +
-                        '.\n\nGuardado en la nube (sanabria_members) y actualizado en este panel.'
-                );
-            } catch (e) {
-                console.error(e);
-                alert('❌ ' + (e.message || e));
-            }
-        }
-
-        function parseSocioFieldsFromEmailText(raw) {
-            const text = String(raw || '').replace(/\r/g, '');
-            const out = {};
-
-            // JSON adjunto del correo al club
-            try {
-                const trimmed = text.trim();
-                if (trimmed.startsWith('{')) {
-                    const j = JSON.parse(trimmed);
-                    const map = {
-                        Nombre: 'nombre',
-                        Apellidos: 'apellidos',
-                        'Nombre completo': 'nombreCompleto',
-                        Email: 'email',
-                        Correo: 'email',
-                        Teléfono: 'telefono',
-                        Telefono: 'telefono',
-                        DNI: 'dni',
-                        Dirección: 'direccion',
-                        'Dirección completa': 'direccion',
-                        Direccion: 'direccion',
-                        Sexo: 'sexo',
-                        'Fecha nacimiento': 'fechaNacimiento',
-                        'Cuota (€)': 'cuota',
-                        Cuota: 'cuota',
-                        'Método de pago': 'paymentMethod',
-                        'Forma de pago': 'paymentMethod',
-                        'Forma de pago elegida': 'paymentMethod'
-                    };
-                    Object.keys(j).forEach(function (k) {
-                        const key = map[k] || null;
-                        if (key && j[k] != null && String(j[k]).trim() && String(j[k]).trim() !== '—') {
-                            out[key] = String(j[k]).trim();
-                        }
-                    });
-                }
-            } catch (_) {}
-
-            function pick(labels) {
-                for (let i = 0; i < labels.length; i++) {
-                    const label = labels[i].replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-                    const re = new RegExp(
-                        '(?:^|\\n)\\s*' + label + '\\s*[:：]\\s*(.+?)\\s*(?=\\n|$)',
-                        'i'
-                    );
-                    const m = text.match(re);
-                    if (m && m[1] && String(m[1]).trim() && String(m[1]).trim() !== '—') {
-                        return String(m[1]).trim();
-                    }
-                }
-                return '';
-            }
-
-            if (!out.nombre) out.nombre = pick(['Nombre']);
-            if (!out.apellidos) out.apellidos = pick(['Apellidos']);
-            if (!out.nombreCompleto) out.nombreCompleto = pick(['Nombre completo', 'PERSONA']);
-            if (!out.email) out.email = pick(['Email', 'Correo', 'Correo del solicitante', 'Correo solicitante']);
-            if (!out.telefono) out.telefono = pick(['Teléfono', 'Telefono']);
-            if (!out.dni) out.dni = pick(['DNI', 'DNI/NIE']);
-            if (!out.direccion) out.direccion = pick(['Dirección completa', 'Dirección', 'Direccion']);
-            if (!out.sexo) out.sexo = pick(['Sexo']);
-            if (!out.fechaNacimiento) out.fechaNacimiento = pick(['Fecha nacimiento', 'Fecha de nacimiento']);
-            if (!out.cuota) out.cuota = pick(['Cuota (€)', 'Cuota']);
-            if (!out.paymentMethod) {
-                out.paymentMethod = pick(['Método de pago', 'Forma de pago elegida', 'Forma de pago']);
-            }
-
-            if ((!out.nombre || !out.apellidos) && out.nombreCompleto) {
-                const parts = String(out.nombreCompleto).trim().split(/\s+/);
-                if (parts.length >= 2) {
-                    out.nombre = out.nombre || parts[0];
-                    out.apellidos = out.apellidos || parts.slice(1).join(' ');
-                } else if (parts.length === 1) {
-                    out.nombre = out.nombre || parts[0];
-                }
-            }
-
-            const emMatch = text.match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i);
-            if (!out.email && emMatch) out.email = emMatch[0].toLowerCase();
-
-            out.email = String(out.email || '').trim().toLowerCase();
-            out.nombre = String(out.nombre || '').trim();
-            out.apellidos = String(out.apellidos || '').trim();
-            out.telefono = String(out.telefono || '').trim();
-            out.dni = String(out.dni || '').trim();
-            out.direccion = String(out.direccion || '').trim();
-            out.sexo = String(out.sexo || '').trim().toLowerCase();
-            if (out.sexo === 'hombre' || out.sexo === 'h' || out.sexo === 'm' || out.sexo === 'masculino') out.sexo = 'masculino';
-            if (out.sexo === 'mujer' || out.sexo === 'f' || out.sexo === 'femenino') out.sexo = 'femenino';
-            const cuotaNum = parseFloat(String(out.cuota || '').replace(',', '.'));
-            out.cuota = Number.isFinite(cuotaNum) ? cuotaNum : null;
-
-            const pay = String(out.paymentMethod || '').toLowerCase();
-            if (pay.indexOf('efectivo') >= 0 || pay.indexOf('cash') >= 0) {
-                out.offlinePaymentChannel = 'efectivo';
-                out.paymentMethod = 'cash';
-            } else if (pay.indexOf('tpv') >= 0) {
-                out.offlinePaymentChannel = 'tpv';
-                out.paymentMethod = 'tpv';
-            } else if (pay.indexOf('tarjeta') >= 0 || pay.indexOf('card') >= 0 || pay.indexOf('pasarela') >= 0) {
-                out.offlinePaymentChannel = null;
-                out.paymentMethod = 'card_pending';
-            } else {
-                out.offlinePaymentChannel = 'transferencia';
-                out.paymentMethod = 'transfer';
-            }
-            return out;
-        }
-
-        async function recoverMemberFromEmailPanel() {
-            try {
-                if (!window.AdminClubCloudPersist || !window.AdminClubCloudPersist.persistMember) {
-                    alert('❌ Guardado en la nube no disponible. Despliega Netlify e inicia sesión como administrador.');
-                    return;
-                }
-                const raw = prompt(
-                    'Pega aquí el texto del correo de «Nuevo registro de socio/a» (o el JSON adjunto).\n\n' +
-                        'Se creará el socio en pendientes para poder validar el pago.\n\n' +
-                        'Tip: en Gmail abre el correo → selecciona todo → copiar.'
-                );
-                if (!raw || !String(raw).trim()) return;
-
-                const parsed = parseSocioFieldsFromEmailText(raw);
-                if (!parsed.email || !parsed.email.includes('@')) {
-                    alert('❌ No se encontró un correo válido en el texto pegado.');
-                    return;
-                }
-                if (!parsed.nombre || !parsed.apellidos) {
-                    alert('❌ Faltan nombre o apellidos en el texto. Revisa el pegado o usa el JSON adjunto del correo.');
-                    return;
-                }
-
-                const members = JSON.parse(localStorage.getItem('clubMembers') || '[]');
-                const em = parsed.email;
-                const dup = members.find(function (m) {
-                    return m && String(m.email || '').trim().toLowerCase() === em;
-                });
-                if (dup) {
-                    alert(
-                        'ℹ️ Ya hay un socio con ese correo en el panel:\n' +
-                            (dup.nombre || dup.name || '') +
-                            ' ' +
-                            (dup.apellidos || dup.surname || '') +
-                            '\nEstado: ' +
-                            (dup.status || dup.estado || '—') +
-                            '\n\nNo se duplicará. Usa «Validar pago» si está pendiente.'
-                    );
-                    try {
-                        const filterEl = document.getElementById('memberStatusFilter');
-                        if (filterEl) filterEl.value = 'all';
-                    } catch (_) {}
-                    loadMembersList();
-                    return;
-                }
-
-                const summary =
-                    'Se creará este socio (pendiente de pago):\n\n' +
-                    parsed.nombre +
-                    ' ' +
-                    parsed.apellidos +
-                    '\n' +
-                    parsed.email +
-                    '\nTel: ' +
-                    (parsed.telefono || '—') +
-                    '\nDNI: ' +
-                    (parsed.dni || '—') +
-                    '\nPago: ' +
-                    (parsed.offlinePaymentChannel || parsed.paymentMethod || '—') +
-                    '\n\n¿Continuar?';
-                if (!confirm(summary)) return;
-
-                const now = new Date().toISOString();
-                const member = {
-                    id: 'MEMBER_RECOVER_' + Date.now(),
-                    name: parsed.nombre,
-                    surname: parsed.apellidos,
-                    nombre: parsed.nombre,
-                    apellidos: parsed.apellidos,
-                    email: parsed.email,
-                    phone: parsed.telefono,
-                    telefono: parsed.telefono,
-                    dni: parsed.dni,
-                    address: parsed.direccion,
-                    direccion: parsed.direccion,
-                    sexo: parsed.sexo || '',
-                    birthDate: parsed.fechaNacimiento || '',
-                    fechaNacimiento: parsed.fechaNacimiento || '',
-                    cuota: parsed.cuota,
-                    status: 'pending_validation',
-                    estado: 'pendiente',
-                    pagado: false,
-                    pendingReason: 'nueva_alta',
-                    paymentMethod: parsed.paymentMethod,
-                    offlinePaymentChannel: parsed.offlinePaymentChannel,
-                    registrationDate: now,
-                    fechaRegistro: now,
-                    fechaLimitePago: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
-                    registrationSource: 'admin_recover_from_email',
-                    appScope: 'cdsanabriacf',
-                    recoveredFromEmail: true,
-                    recoveredAt: now
-                };
-
-                const saved = await window.AdminClubCloudPersist.persistMember(member);
-                try {
-                    const filterEl = document.getElementById('memberStatusFilter');
-                    if (filterEl) filterEl.value = 'pending_new';
-                } catch (_) {}
-                loadMembersList();
-                updateMemberCounts();
-                updateDashboardCounts();
-                alert(
-                    '✅ Socio recuperado desde el correo y guardado en la nube.\n\n' +
-                        (saved && saved.id ? 'ID: ' + saved.id + '\n' : '') +
-                        'Aparece en pendientes. Cuando veas el ingreso, pulsa «Validar pago».'
-                );
-            } catch (e) {
-                console.error(e);
-                alert('❌ No se pudo recuperar el socio.\n\n' + (e && e.message ? e.message : String(e)));
-            }
-        }
-
-        async function repairMembershipRegistrationsFromPanel() {
-            try {
-                if (!window.AdminClubCloudPersist || !window.AdminClubCloudPersist.repairMembershipRegistrations) {
-                    alert('❌ Función no disponible. Despliega las funciones Netlify (SUBIR-NETLIFY.cmd).');
-                    return;
-                }
-                const raw = prompt(
-                    'Pedido(s) Redsys de cuota de socio (nº del correo «Pedido pasarela»), separados por coma:\n\nEjemplo: 173131153731,106631462066\n\nSi está pagado → socio activo. Si quedó a medias → socio pendiente en la lista.'
-                );
-                if (!raw || !String(raw).trim()) return;
-                const orderIds = String(raw)
-                    .split(/[,;\s]+/)
-                    .map(function (s) {
-                        return s.trim();
-                    })
-                    .filter(Boolean);
-                if (!orderIds.length) {
-                    alert('❌ Indica al menos un pedido.');
-                    return;
-                }
-                if (
-                    !confirm(
-                        'Se recuperarán/actualizarán en la nube las fichas de socio para ' +
-                            orderIds.length +
-                            ' pedido(s).\n\n¿Continuar?'
-                    )
-                ) {
-                    return;
-                }
-                const result = await window.AdminClubCloudPersist.repairMembershipRegistrations(orderIds);
-                const lines = (result.results || []).map(function (r) {
-                    if (!r.ok) return '❌ ' + (r.orderId || '') + ': ' + (r.error || 'error');
-                    return (
-                        '✅ ' +
-                        (r.nombre || '') +
-                        ' ' +
-                        (r.apellidos || '') +
-                        ' · ' +
-                        (r.email || '') +
-                        ' · ' +
-                        (r.memberStatus || '') +
-                        ' · id ' +
-                        (r.memberId || '—')
-                    );
-                });
-                if (typeof window.sincronizarPanelDesdeFirebase === 'function') {
-                    try {
-                        await window.sincronizarPanelDesdeFirebase();
-                    } catch (_) {}
-                }
-                loadMembersList();
-                updateMemberCounts();
-                showAdminCopyableDialog(
-                    'Reparación altas socio',
-                    'Reparados: ' + (result.repaired || 0) + '\n\n' + lines.join('\n')
+                        '.\n\nGuardado en Firebase (sanabria_members) y actualizado en este panel.'
                 );
             } catch (e) {
                 console.error(e);
@@ -17879,7 +11308,7 @@
                 }
                 if (
                     !confirm(
-                        'Se recrearán/actualizarán en la nube las fichas de jugador/a y socio para ' +
+                        'Se recrearán/actualizarán en Firebase las fichas de jugador/a y socio para ' +
                             orderIds.length +
                             ' pedido(s) pagado(s).\n\n¿Continuar?'
                     )
@@ -17917,158 +11346,129 @@
         async function validateMember(memberId) {
             try {
                 const members = JSON.parse(localStorage.getItem('clubMembers') || '[]');
-                const memberIndex = members.findIndex(m => String(m.id) === String(memberId));
-
-                if (memberIndex === -1) {
-                    alert('❌ Socio no encontrado en la lista.\n\nPulsa reconciliar / refresca el listado e inténtalo de nuevo.');
-                    loadMembersList();
-                    return;
-                }
-
-                if (!confirm('¿Has comprobado el ingreso de la cuota en la cuenta bancaria del club?\n\n(Solo pulsa Aceptar si ya has visto el abono.)')) {
-                    return;
-                }
-                const currentAdmin = JSON.parse(localStorage.getItem('currentAdmin') || '{}');
-                const nm = normalizeClubMember(members[memberIndex]);
-
-                if (!String(nm.email || members[memberIndex].email || '').trim()) {
-                    alert('❌ Este socio no tiene correo. Edítalo, añade un correo y vuelve a validar el pago.');
-                    return;
-                }
-
-                if (isPastMemberPaymentDeadline(members[memberIndex])) {
-                    alert('❌ No se puede validar: ha superado el plazo de 7 días para ingresar (alta nueva).\n\nEl registro puede eliminarse al limpiar pendientes caducados.');
-                    await deleteExpiredMembers();
-                    return;
-                }
-
-                const snapshotBefore = JSON.parse(JSON.stringify(members[memberIndex]));
-
-                // Número de socios activos con número real ≥ 51 (ignora provisionales "SOCxxxxx")
-                const CMN = window.ClubMemberNumbers;
-                const nextNumber = CMN ? CMN.nextRegularMemberNumber(members) : (Math.max(...members.filter(m => normalizeClubMember(m).status === 'active').map(m => parseInt(m.memberNumber) || 0), 50) + 1);
-                const hadNum = !!(members[memberIndex].memberNumber != null && members[memberIndex].memberNumber !== '' && !String(members[memberIndex].memberNumber).startsWith('SOC'))
-                    || !!(members[memberIndex].numeroSocio != null && String(members[memberIndex].numeroSocio).trim() !== '' && !String(members[memberIndex].numeroSocio).startsWith('SOC'));
-
-                members[memberIndex].status = 'active';
-                members[memberIndex].estado = 'activo';
-                members[memberIndex].pagado = true;
-                if (!hadNum) {
-                    members[memberIndex].memberNumber = nextNumber;
-                    members[memberIndex].numeroSocio = nextNumber;
-                    members[memberIndex].numeroSocioRegular = nextNumber;
-                    members[memberIndex].membershipTier = 'regular';
-                }
-                members[memberIndex].pendingReason = null;
-                members[memberIndex].fechaLimitePago = null;
-                members[memberIndex].renovacionDesde = null;
-                members[memberIndex].renovacionTemporada = null;
-                members[memberIndex].cuotaReferenciaEdad31Agosto = null;
-                members[memberIndex].diasLimiteRenovacion = null;
-                members[memberIndex].cuotaVigenteHasta = proximoCierreTemporada().toISOString();
-                members[memberIndex].validatedBy = currentAdmin.name || currentAdmin.email || 'Administrador';
-                members[memberIndex].validatedDate = new Date().toISOString();
-                members[memberIndex].lastModified = new Date().toISOString();
-
-                syncMembersLocalStorage(members);
-
-                let cuotaImporte = Number(nm.cuota);
-                if (!Number.isFinite(cuotaImporte) || cuotaImporte <= 0) {
-                    const refRaw = nm.cuotaReferenciaEdadCierre || nm.cuotaReferenciaEdad31Agosto;
-                    const yRef = refRaw != null ? parseInt(String(refRaw).slice(0, 4), 10) : NaN;
-                    const yDefault = (typeof ClubAccounting !== 'undefined' && ClubAccounting.getCuotaEdadReferenciaAnio)
-                        ? ClubAccounting.getCuotaEdadReferenciaAnio()
-                        : new Date().getFullYear();
-                    const y = !isNaN(yRef) ? yRef : yDefault;
-                    cuotaImporte = cuotaSegunEdadAl31Agosto(members[memberIndex], y);
-                }
-                if (typeof ClubAccounting !== 'undefined' && Number.isFinite(cuotaImporte) && cuotaImporte > 0) {
-                    const row = ClubAccounting.recordMemberCuotaToBankA(members[memberIndex], cuotaImporte);
-                    if (row) {
-                        try {
-                            await persistRecordToFirebase('clubAccountingLedger', 'ledger', row);
-                        } catch (accErr) {
-                            console.warn('Asiento contable en local; error de la nube:', accErr);
-                        }
+                const memberIndex = members.findIndex(m => m.id === memberId);
+                
+                if (memberIndex !== -1) {
+                    if (!confirm('¿Has comprobado el ingreso de la cuota en la cuenta bancaria del club?\n\n(Solo pulsa Aceptar si ya has visto el abono.)')) {
+                        return;
                     }
-                }
-
-                let firebaseSyncOk = false;
-                try {
-                    const saved = await persistMemberToFirebase(members[memberIndex]);
-                    if (saved && saved.id) {
-                        const latest = JSON.parse(localStorage.getItem('clubMembers') || '[]');
-                        const ixSaved = latest.findIndex(function (m) {
-                            return m && (String(m.id) === String(saved.id) || String(m.id) === String(memberId));
-                        });
-                        if (ixSaved >= 0) {
-                            members[memberIndex] = latest[ixSaved];
-                        } else {
-                            members[memberIndex] = { ...members[memberIndex], ...saved, id: saved.id };
-                        }
+                    const currentAdmin = JSON.parse(localStorage.getItem('currentAdmin') || '{}');
+                    const nm = normalizeClubMember(members[memberIndex]);
+                    
+                    if (isPastMemberPaymentDeadline(members[memberIndex])) {
+                        alert('❌ No se puede validar: ha superado el plazo de 7 días para ingresar (alta nueva).\n\nEl registro puede eliminarse al limpiar pendientes caducados.');
+                        await deleteExpiredMembers();
+                        return;
                     }
-                    firebaseSyncOk = true;
-                } catch (syncErr) {
-                    console.warn('Validación: error al sincronizar con la nube:', syncErr);
-                    members[memberIndex] = snapshotBefore;
+
+                    // Número de socios activos con número real ≥ 51 (ignora provisionales "SOCxxxxx")
+                    const CMN = window.ClubMemberNumbers;
+                    const nextNumber = CMN ? CMN.nextRegularMemberNumber(members) : (Math.max(...members.filter(m => normalizeClubMember(m).status === 'active').map(m => parseInt(m.memberNumber) || 0), 50) + 1);
+                    const hadNum = !!(members[memberIndex].memberNumber != null && members[memberIndex].memberNumber !== '' && !String(members[memberIndex].memberNumber).startsWith('SOC'))
+                        || !!(members[memberIndex].numeroSocio != null && String(members[memberIndex].numeroSocio).trim() !== '' && !String(members[memberIndex].numeroSocio).startsWith('SOC'));
+
+                    members[memberIndex].status = 'active';
+                    members[memberIndex].estado = 'activo';
+                    members[memberIndex].pagado = true;
+                    if (!hadNum) {
+                        members[memberIndex].memberNumber = nextNumber;
+                        members[memberIndex].numeroSocio = nextNumber;
+                        members[memberIndex].numeroSocioRegular = nextNumber;
+                        members[memberIndex].membershipTier = 'regular';
+                    }
+                    members[memberIndex].pendingReason = null;
+                    members[memberIndex].fechaLimitePago = null;
+                    members[memberIndex].renovacionDesde = null;
+                    members[memberIndex].renovacionTemporada = null;
+                    members[memberIndex].cuotaReferenciaEdad31Agosto = null;
+                    members[memberIndex].diasLimiteRenovacion = null;
+                    members[memberIndex].cuotaVigenteHasta = proximoCierreTemporada().toISOString();
+                    members[memberIndex].validatedBy = currentAdmin.name || currentAdmin.email || 'Administrador';
+                    members[memberIndex].validatedDate = new Date().toISOString();
+                    members[memberIndex].lastModified = new Date().toISOString();
+                    
                     syncMembersLocalStorage(members);
+
+                    let cuotaImporte = Number(nm.cuota);
+                    if (!Number.isFinite(cuotaImporte) || cuotaImporte <= 0) {
+                        const refRaw = nm.cuotaReferenciaEdadCierre || nm.cuotaReferenciaEdad31Agosto;
+                        const yRef = refRaw != null ? parseInt(String(refRaw).slice(0, 4), 10) : NaN;
+                        const yDefault = (typeof ClubAccounting !== 'undefined' && ClubAccounting.getCuotaEdadReferenciaAnio)
+                            ? ClubAccounting.getCuotaEdadReferenciaAnio()
+                            : new Date().getFullYear();
+                        const y = !isNaN(yRef) ? yRef : yDefault;
+                        cuotaImporte = cuotaSegunEdadAl31Agosto(members[memberIndex], y);
+                    }
+                    if (typeof ClubAccounting !== 'undefined' && Number.isFinite(cuotaImporte) && cuotaImporte > 0) {
+                        const row = ClubAccounting.recordMemberCuotaToBankA(members[memberIndex], cuotaImporte);
+                        if (row) {
+                            try {
+                                await persistRecordToFirebase('clubAccountingLedger', 'ledger', row);
+                            } catch (accErr) {
+                                console.warn('Asiento contable en local; error Firebase:', accErr);
+                            }
+                        }
+                    }
+
+                    let firebaseSyncOk = false;
+                    try {
+                        await persistMemberToFirebase(members[memberIndex]);
+                        firebaseSyncOk = true;
+                    } catch (syncErr) {
+                        console.warn('Validación guardada en local; error al sincronizar con Firebase:', syncErr);
+                        alert('⚠️ Validación guardada solo en este dispositivo.\n\nNo se pudo guardar en la nube. Comprueba conexión, sesión de administrador y vuelve a intentarlo.');
+                    }
+                    
                     loadMembersList();
                     updateMemberCounts();
                     updateDashboardCounts();
-                    alert(
-                        '❌ No se pudo validar en la nube.\n\n' +
-                        (syncErr && syncErr.message ? syncErr.message : String(syncErr)) +
-                        '\n\nEl socio sigue pendiente. Comprueba sesión de administrador y conexión, y vuelve a pulsar «Validar pago».'
-                    );
-                    return;
-                }
+                    
+                    const displayName = `${nm.name || ''} ${nm.surname || ''}`.trim() || 'Socio';
+                    const _mValido = members[memberIndex];
+                    const _rawNum = _mValido.memberNumber || _mValido.numeroSocio;
+                    const _CMN = window.ClubMemberNumbers;
+                    const numFinal = (_CMN && _rawNum && !String(_rawNum).startsWith('SOC'))
+                        ? (_CMN.isSocioDeHonor(_mValido) ? _CMN.formatMemberLabel(_mValido) : 'N.º SOC. ' + _CMN.padSocNum(parseInt(_rawNum)))
+                        : _rawNum;
+                    if (firebaseSyncOk) {
+                        alert(`✅ Socio "${displayName}" validado y sincronizado correctamente.\n\n🔢 ${numFinal}${hadNum ? ' (sin cambios)' : ' (asignado)'}\n\n📧 Se enviará un correo al socio con la confirmación del alta.`);
+                        console.log('✅ Socio validado y sincronizado:', displayName);
+                    } else {
+                        console.log('⚠️ Socio validado solo en local (sin Firebase):', displayName);
+                    }
 
-                loadMembersList();
-                updateMemberCounts();
-                updateDashboardCounts();
-
-                const displayName = `${nm.name || ''} ${nm.surname || ''}`.trim() || 'Socio';
-                const _mValido = members[memberIndex];
-                const _rawNum = _mValido.memberNumber || _mValido.numeroSocio;
-                const _CMN = window.ClubMemberNumbers;
-                const numFinal = (_CMN && _rawNum && !String(_rawNum).startsWith('SOC'))
-                    ? (_CMN.isSocioDeHonor(_mValido) ? _CMN.formatMemberLabel(_mValido) : 'N.º SOC. ' + _CMN.padSocNum(parseInt(_rawNum)))
-                    : _rawNum;
-                if (firebaseSyncOk) {
-                    alert(`✅ Socio "${displayName}" validado y sincronizado correctamente.\n\n🔢 ${numFinal}${hadNum ? ' (sin cambios)' : ' (asignado)'}\n\n📧 Se enviará un correo al socio con la confirmación del alta.`);
-                    console.log('✅ Socio validado y sincronizado:', displayName);
-                }
-
-                const memberValidado = members[memberIndex];
-                if (memberValidado.email) {
-                    (async function () {
-                        try {
-                            const headers = { 'Content-Type': 'application/json' };
-                            if (window.CdsanAdminApiAuth && window.CdsanAdminApiAuth.getAdminAuthHeaders) {
-                                Object.assign(headers, await window.CdsanAdminApiAuth.getAdminAuthHeaders());
+                    // Correo al socio: alta activa (transferencia/efectivo validado por admin)
+                    const memberValidado = members[memberIndex];
+                    if (memberValidado.email) {
+                        (async function () {
+                            try {
+                                const headers = { 'Content-Type': 'application/json' };
+                                if (window.CdsanAdminApiAuth && window.CdsanAdminApiAuth.getAdminAuthHeaders) {
+                                    Object.assign(headers, await window.CdsanAdminApiAuth.getAdminAuthHeaders());
+                                }
+                                const r = await fetch('/.netlify/functions/send-club-email', {
+                                    method: 'POST',
+                                    headers: headers,
+                                    body: JSON.stringify({
+                                        type: 'member_validated_manual',
+                                        email: memberValidado.email,
+                                        memberId: memberValidado.id,
+                                        nombre: memberValidado.nombre || memberValidado.name,
+                                        apellidos: memberValidado.apellidos || memberValidado.surname,
+                                        numeroSocio: memberValidado.numeroSocio || memberValidado.memberNumber
+                                    })
+                                });
+                                const data = await r.json().catch(function () { return {}; });
+                                if (!r.ok || !data.ok) console.warn('Email validación socio:', data.error || r.status);
+                            } catch (e) {
+                                console.warn('Email validación socio:', e);
                             }
-                            const r = await fetch('/.netlify/functions/send-club-email', {
-                                method: 'POST',
-                                headers: headers,
-                                body: JSON.stringify({
-                                    type: 'member_validated_manual',
-                                    email: memberValidado.email,
-                                    memberId: memberValidado.id,
-                                    nombre: memberValidado.nombre || memberValidado.name,
-                                    apellidos: memberValidado.apellidos || memberValidado.surname,
-                                    numeroSocio: memberValidado.numeroSocio || memberValidado.memberNumber
-                                })
-                            });
-                            const data = await r.json().catch(function () { return {}; });
-                            if (!r.ok || !data.ok) console.warn('Email validación socio:', data.error || r.status);
-                        } catch (e) {
-                            console.warn('Email validación socio:', e);
-                        }
-                    })();
+                        })();
+                    }
                 }
             } catch (error) {
                 console.error('❌ Error validando socio:', error);
-                alert('❌ Error al validar el socio.\n\n' + (error && error.message ? error.message : String(error)));
+                alert('❌ Error al validar el socio');
             }
         }
 
@@ -18147,7 +11547,7 @@
                     try {
                         await removeMemberFromCloudIfNeeded(r.id, { email: r.email, dni: r.dni });
                     } catch (e) {
-                        console.warn('Auto-limpieza caducados: la nube', r.id, e);
+                        console.warn('Auto-limpieza caducados: Firebase', r.id, e);
                         failed.push(r);
                     }
                 }
@@ -18165,7 +11565,7 @@
                     } catch (_) {}
                     console.log(`🗑️ Auto-limpieza: ${deletedCount} alta(s) fuera de plazo eliminada(s) en servidor.`);
                     if (failed.length > 0) {
-                        console.warn('Auto-limpieza: no eliminados en la nube (se mantienen en lista):', failed.length);
+                        console.warn('Auto-limpieza: no eliminados en Firebase (se mantienen en lista):', failed.length);
                     }
                 }
             } catch (error) {
@@ -18541,7 +11941,7 @@
                         await persistMemberToFirebase(members[i]);
                     } catch (e) {
                         syncFailed = true;
-                        console.warn('Renovación masiva — error de la nube:', e);
+                        console.warn('Renovación masiva — error Firebase:', e);
                     }
                 }
 
@@ -18626,10 +12026,6 @@
         function refreshCuotaRenewalBanner() {
             const el = document.getElementById('cuotaRenewalReminderBanner');
             if (!el) return;
-            if (window.AdminOrganizerAccess && window.AdminOrganizerAccess.isCompetitionOrganizer()) {
-                el.style.display = 'none';
-                return;
-            }
             const show = shouldShowCuotaRenewalBanner();
             el.style.display = show ? 'block' : 'none';
             const lbl = document.getElementById('cuotaRenewalCierreLabel');
@@ -18726,30 +12122,18 @@
                 const membersRaw = JSON.parse(localStorage.getItem('clubMembers') || '[]');
                 const members = dedupeMembersList(membersRaw);
                 
-                members.forEach(function (m) {
-                    if (typeof window.applyClubRoleFlagsToMember === 'function') {
-                        window.applyClubRoleFlagsToMember(m);
-                    }
-                    ensureMemberKindFlags(m);
-                });
-                const activeCount = members.filter(m => normalizeClubMember(m).status === 'active').length;
-                const pendingCount = members.filter(m => normalizeClubMember(m).status === 'pending_validation').length;
+                const activeCount = members.filter(m => m.status === 'active').length;
+                const pendingCount = members.filter(m => m.status === 'pending_validation').length;
                 const expiredCount = members.filter(m => isMemberExpired(m)).length;
-                const normalCount = members.filter(function (m) { return !isMemberSocioJugador(m); }).length;
-                const playerMemberCount = members.filter(function (m) { return isMemberSocioJugador(m); }).length;
                 
                 // Actualizar contadores en la interfaz
                 const activeElement = document.getElementById('activeMembersCount');
                 const pendingElement = document.getElementById('pendingMembersCount');
                 const expiredElement = document.getElementById('expiredMembersCount');
-                const normalElement = document.getElementById('normalMembersCount');
-                const playerMemberElement = document.getElementById('playerMembersCount');
                 
                 if (activeElement) activeElement.textContent = activeCount;
                 if (pendingElement) pendingElement.textContent = pendingCount;
                 if (expiredElement) expiredElement.textContent = expiredCount;
-                if (normalElement) normalElement.textContent = normalCount;
-                if (playerMemberElement) playerMemberElement.textContent = playerMemberCount;
                 
                 // Calcular próximo número de socio
                 const nextNumber = activeCount + 1;
@@ -18937,11 +12321,11 @@
                             newFriend.uid = reg.uid;
                         }
                     } catch (e) {
-                        console.error('saveFriend la nube:', e);
+                        console.error('saveFriend Firebase Auth:', e);
                         if (e && e.code === 'auth/email-already-in-use') {
                             alert('❌ Ese correo ya tiene cuenta. El amigo puede usar «Olvidé mi contraseña» o registrarse en la web.');
                         } else {
-                            alert('❌ No se pudo crear la cuenta de acceso del amigo en la nube.');
+                            alert('❌ No se pudo crear la cuenta de acceso del amigo en Firebase.');
                         }
                         return;
                     }
@@ -18949,18 +12333,9 @@
                     newFriend.passwordHash = await window.hashClubAccessKey(password);
                 }
 
-                const tempLocalId = newFriend.id;
                 friends.push(newFriend);
                 syncFriendsLocalStorage(friends);
-                try {
-                    await persistFriendToFirebase(newFriend);
-                } catch (syncErr) {
-                    const cleaned = JSON.parse(localStorage.getItem('clubFriends') || '[]').filter(function (f) {
-                        return f && String(f.id) !== String(tempLocalId);
-                    });
-                    syncFriendsLocalStorage(cleaned);
-                    throw syncErr;
-                }
+                await persistFriendToFirebase(newFriend);
 
                 cancelAddFriend();
                 loadFriendsList();
@@ -18978,10 +12353,7 @@
 
             } catch (error) {
                 console.error('❌ Error guardando amigo del club:', error);
-                alert(
-                    '❌ Error al guardar el amigo del club en la nube.\n\n' +
-                        (error && error.message ? error.message : 'Inténtalo de nuevo.')
-                );
+                alert('❌ Error al guardar el amigo del club. Inténtalo de nuevo.');
             }
         }
 
@@ -20127,163 +13499,9 @@
         }
 
         // ===== MÓDULO DE MENSAJES PUSH PARA ADMINISTRADORES =====
-        let __editingPushMessageId = null;
-        let __resendPushReminderSourceId = null;
-
-        function readPushMessagesLocal() {
-            try {
-                return JSON.parse(localStorage.getItem('pushMessages') || '[]');
-            } catch (_) {
-                return [];
-            }
-        }
-
-        function writePushMessagesLocal(messages) {
-            const list = Array.isArray(messages) ? messages : [];
-            localStorage.setItem('pushMessages', JSON.stringify(list));
-        }
-
-        function findPushMessageIndex(messages, messageId) {
-            const id = String(messageId || '');
-            return (messages || []).findIndex(function (m) {
-                return m && (String(m.id) === id || String(m.broadcastId) === id);
-            });
-        }
-
-        function pushMessageSortTime(message) {
-            const raw =
-                message.sentAt || message.timestamp || message.scheduledAt || message.updatedAt || message.createdAt;
-            const t = raw ? new Date(raw).getTime() : 0;
-            return isNaN(t) ? 0 : t;
-        }
-
-        function setMessageFormMode(mode) {
-            const titleEl = document.getElementById('addMessageFormTitle');
-            const submitBtn = document.getElementById('messageFormSubmitBtn');
-            if (mode === 'edit') {
-                if (titleEl) titleEl.textContent = '✏️ Editar mensaje';
-                if (submitBtn) submitBtn.textContent = '💾 Guardar cambios';
-            } else if (mode === 'resend') {
-                if (titleEl) titleEl.textContent = '🔁 Reenviar como recordatorio';
-                if (submitBtn) submitBtn.textContent = '📤 Enviar recordatorio';
-            } else {
-                if (titleEl) titleEl.textContent = '📝 Nuevo Mensaje Push';
-                if (submitBtn) submitBtn.textContent = '📤 Enviar Mensaje';
-            }
-        }
-
-        function fillMessageFormFromRecord(message) {
-            if (!message) return;
-            document.getElementById('messageTitle').value = message.title || '';
-            document.getElementById('messageContent').value = message.content || message.message || '';
-            document.getElementById('messageType').value = message.type || 'general';
-            resetMessageRecipientChecks();
-            resetMessageTeamChecks();
-            const recips = Array.isArray(message.recipients)
-                ? message.recipients
-                : String(message.recipients || 'all')
-                      .split(',')
-                      .map(function (s) {
-                          return s.trim();
-                      })
-                      .filter(Boolean);
-            if (recips.length && !(recips.length === 1 && recips[0] === 'all')) {
-                const allBox = document.querySelector('input[name="messageRecipient"][value="all"]');
-                if (allBox) allBox.checked = false;
-                recips.forEach(function (r) {
-                    const el = document.querySelector('input[name="messageRecipient"][value="' + r + '"]');
-                    if (el) el.checked = true;
-                });
-            }
-            const teams = Array.isArray(message.targetTeams) ? message.targetTeams : [];
-            if (teams.length) {
-                const allTeam = document.querySelector('input[name="messageTeam"][value="all"]');
-                if (allTeam) allTeam.checked = false;
-                teams.forEach(function (t) {
-                    const el = document.querySelector('input[name="messageTeam"][value="' + t + '"]');
-                    if (el) el.checked = true;
-                });
-            }
-            if (message.sendMode === 'scheduled' && message.scheduledAt) {
-                const schedRadio = document.querySelector('input[name="messageSendMode"][value="scheduled"]');
-                if (schedRadio) schedRadio.checked = true;
-                toggleMessageSendMode();
-                const schedInput = document.getElementById('messageScheduledAt');
-                if (schedInput) {
-                    const d = new Date(message.scheduledAt);
-                    if (!isNaN(d.getTime())) {
-                        const local = new Date(d.getTime() - d.getTimezoneOffset() * 60000);
-                        schedInput.value = local.toISOString().slice(0, 16);
-                    }
-                }
-            } else {
-                resetMessageSendMode();
-            }
-            clearMessageAttachmentInput();
-        }
-
-        function editAdminPushMessage(messageId) {
-            const messages = readPushMessagesLocal();
-            const ix = findPushMessageIndex(messages, messageId);
-            if (ix < 0) {
-                alert('❌ Mensaje no encontrado');
-                return;
-            }
-            __editingPushMessageId = messages[ix].id || messages[ix].broadcastId;
-            __resendPushReminderSourceId = null;
-            setMessageFormMode('edit');
-            document.getElementById('addMessageForm').style.display = 'block';
-            fillMessageFormFromRecord(messages[ix]);
-        }
-
-        function resendAdminPushReminder(messageId) {
-            const messages = readPushMessagesLocal();
-            const ix = findPushMessageIndex(messages, messageId);
-            if (ix < 0) {
-                alert('❌ Mensaje no encontrado');
-                return;
-            }
-            __editingPushMessageId = null;
-            __resendPushReminderSourceId = messages[ix].id || messages[ix].broadcastId;
-            setMessageFormMode('resend');
-            document.getElementById('addMessageForm').style.display = 'block';
-            fillMessageFormFromRecord(messages[ix]);
-            const typeSel = document.getElementById('messageType');
-            if (typeSel && typeSel.value === 'general') typeSel.value = 'reminder';
-            const manual = document.querySelector('input[name="messageSendMode"][value="manual"]');
-            if (manual) manual.checked = true;
-            toggleMessageSendMode();
-        }
-
-        async function deleteAdminPushMessage(messageId) {
-            const messages = readPushMessagesLocal();
-            const ix = findPushMessageIndex(messages, messageId);
-            if (ix < 0) {
-                alert('❌ Mensaje no encontrado');
-                return;
-            }
-            const msg = messages[ix];
-            if (!confirm('¿Eliminar este mensaje del historial?\n\n«' + (msg.title || '') + '»')) return;
-            messages.splice(ix, 1);
-            writePushMessagesLocal(messages);
-            const docId = String(msg.id || msg.broadcastId || '').trim();
-            if (docId && typeof window.deleteDocument === 'function') {
-                try {
-                    await window.deleteDocument('notifications', docId, 'admin');
-                } catch (delErr) {
-                    console.warn('delete notification cloud:', delErr);
-                }
-            }
-            loadAdminMessagesHistory();
-            updateMessageCounts();
-            alert('✅ Mensaje eliminado del historial.');
-        }
-
+        
         // Mostrar formulario para agregar mensaje
         function showAddMessageForm() {
-            __editingPushMessageId = null;
-            __resendPushReminderSourceId = null;
-            setMessageFormMode('new');
             document.getElementById('addMessageForm').style.display = 'block';
             clearMessageForm();
             if (window.ClubNotificationUpload && typeof window.ClubNotificationUpload.bindPreview === 'function') {
@@ -20293,9 +13511,6 @@
 
         // Cancelar agregar mensaje
         function cancelAddMessage() {
-            __editingPushMessageId = null;
-            __resendPushReminderSourceId = null;
-            setMessageFormMode('new');
             document.getElementById('addMessageForm').style.display = 'none';
             clearMessageForm();
         }
@@ -20423,15 +13638,8 @@
         async function dispatchClubPushNotification(message) {
             const fnUrl = '/.netlify/functions/send-club-push';
             const headers = { 'Content-Type': 'application/json' };
-            try {
-                if (window.CdsanAdminApiAuth && window.CdsanAdminApiAuth.getAdminAuthHeaders) {
-                    Object.assign(headers, await window.CdsanAdminApiAuth.getAdminAuthHeaders());
-                }
-            } catch (authErr) {
-                throw new Error(
-                    (authErr && authErr.message) ||
-                        'Inicia sesión como administrador en la nube (desde la web principal) para enviar push al móvil.'
-                );
+            if (window.CdsanAdminApiAuth && window.CdsanAdminApiAuth.getAdminAuthHeaders) {
+                Object.assign(headers, await window.CdsanAdminApiAuth.getAdminAuthHeaders());
             }
             const res = await fetch(fnUrl, {
                 method: 'POST',
@@ -20442,13 +13650,11 @@
                     targetRoles: message.targetRoles,
                     targetTeams: message.targetTeams || [],
                     urgent: message.priority === 'high' || message.type === 'urgent',
-                    broadcastId: message.broadcastId || message.id,
+                    broadcastId: message.broadcastId,
                     type: message.type
                 })
             });
-            const data = await res.json().catch(function () {
-                return {};
-            });
+            const data = await res.json().catch(() => ({}));
             if (!res.ok || !data.ok) {
                 throw new Error(data.error || 'No se pudo enviar el push al móvil');
             }
@@ -20467,7 +13673,6 @@
 
         // Enviar mensaje push desde administración
         async function sendAdminPushMessage() {
-            let cloudPersistWarning = '';
             try {
                 const title = document.getElementById('messageTitle').value.trim();
                 const content = document.getElementById('messageContent').value.trim();
@@ -20476,9 +13681,7 @@
                 const targetTeams = getSelectedMessageTeams();
                 const sendMode = getMessageSendMode();
                 const scheduledLocal = document.getElementById('messageScheduledAt')?.value || '';
-                const isEdit = !!__editingPushMessageId && !__resendPushReminderSourceId;
-                const isResend = !!__resendPushReminderSourceId;
-
+                
                 if (!title || !content) {
                     alert('❌ Por favor, completa el título y contenido del mensaje');
                     return;
@@ -20505,73 +13708,37 @@
                     }
                     scheduledAtIso = when.toISOString();
                 }
-
+                
                 const currentAdmin = JSON.parse(localStorage.getItem('currentAdmin') || '{}');
                 const sentAt = new Date().toISOString();
-                let messages = readPushMessagesLocal();
-                let message;
-                let listIndex = -1;
-
-                if (isEdit) {
-                    listIndex = findPushMessageIndex(messages, __editingPushMessageId);
-                    if (listIndex < 0) {
-                        alert('❌ No se encontró el mensaje a editar');
-                        return;
-                    }
-                    const prev = messages[listIndex];
-                    message = Object.assign({}, prev, {
-                        title: title,
-                        content: content,
-                        message: content,
-                        type: type,
-                        recipients: recipients,
-                        targetTeams: targetTeams,
-                        team: targetTeams.length ? targetTeams.join(',') : 'all',
-                        targetRoles: mapPushRecipientsToTargetRoles(recipients),
-                        sendMode: sendMode,
-                        scheduledAt: scheduledAtIso,
-                        deliveryStatus: sendMode === 'scheduled' ? 'pending' : prev.deliveryStatus || 'sent',
-                        status: sendMode === 'scheduled' ? 'scheduled' : prev.status || 'sent',
-                        priority: type === 'urgent' ? 'high' : 'medium',
-                        updatedAt: sentAt
-                    });
-                    if (sendMode === 'manual' && !isResend) {
-                        message.sentAt = sentAt;
-                        message.timestamp = sentAt;
-                    }
-                } else {
-                    const broadcastId = 'MSG_ADMIN_' + Date.now();
-                    message = {
-                        id: broadcastId,
-                        broadcastId: broadcastId,
-                        clientMessageId: broadcastId,
-                        title: title,
-                        content: content,
-                        message: content,
-                        type: isResend ? type || 'reminder' : type,
-                        recipients: recipients,
-                        targetTeams: targetTeams,
-                        team: targetTeams.length ? targetTeams.join(',') : 'all',
-                        targetRoles: mapPushRecipientsToTargetRoles(recipients),
-                        senderId: currentAdmin.id || 'ADMIN_CDSANABRIACF',
-                        senderName: currentAdmin.name || 'Administrador CDSANABRIACF',
-                        senderType: 'admin',
-                        sentAt: sendMode === 'scheduled' ? null : sentAt,
-                        timestamp: sendMode === 'scheduled' ? scheduledAtIso : sentAt,
-                        scheduledAt: scheduledAtIso,
-                        sendMode: sendMode,
-                        deliveryStatus: sendMode === 'scheduled' ? 'pending' : 'sent',
-                        category: 'announcement',
-                        priority: type === 'urgent' ? 'high' : 'medium',
-                        broadcast: true,
-                        status: sendMode === 'scheduled' ? 'scheduled' : 'sent',
-                        appScope: 'cdsanabriacf'
-                    };
-                    if (isResend) {
-                        message.resendOf = __resendPushReminderSourceId;
-                        message.resendAt = sentAt;
-                    }
-                }
+                const broadcastId = 'MSG_ADMIN_' + Date.now();
+                
+                const message = {
+                    id: broadcastId,
+                    broadcastId: broadcastId,
+                    clientMessageId: broadcastId,
+                    title: title,
+                    content: content,
+                    message: content,
+                    type: type,
+                    recipients: recipients,
+                    targetTeams: targetTeams,
+                    team: targetTeams.length ? targetTeams.join(',') : 'all',
+                    targetRoles: mapPushRecipientsToTargetRoles(recipients),
+                    senderId: currentAdmin.id || 'ADMIN_CDSANABRIACF',
+                    senderName: currentAdmin.name || 'Administrador CDSANABRIACF',
+                    senderType: 'admin',
+                    sentAt: sendMode === 'scheduled' ? null : sentAt,
+                    timestamp: sendMode === 'scheduled' ? scheduledAtIso : sentAt,
+                    scheduledAt: scheduledAtIso,
+                    sendMode: sendMode,
+                    deliveryStatus: sendMode === 'scheduled' ? 'pending' : 'sent',
+                    category: 'announcement',
+                    priority: type === 'urgent' ? 'high' : 'medium',
+                    broadcast: true,
+                    status: sendMode === 'scheduled' ? 'scheduled' : 'sent',
+                    appScope: 'cdsanabriacf'
+                };
 
                 const fileInput = document.getElementById('messageAttachmentFile');
                 if (fileInput && fileInput.files && fileInput.files[0]) {
@@ -20579,107 +13746,48 @@
                         alert('❌ Subida de archivos no disponible');
                         return;
                     }
-                    try {
-                        const attachment = await window.ClubNotificationUpload.upload(
-                            fileInput.files[0],
-                            message.broadcastId || message.id
-                        );
-                        message.attachmentUrl = attachment.url;
-                        message.attachmentType = attachment.contentType;
-                        message.attachmentName = attachment.name;
-                    } catch (uploadErr) {
-                        alert(
-                            '❌ No se pudo subir el adjunto.\n\n' +
-                                (uploadErr && uploadErr.message ? uploadErr.message : 'Revisa sesión admin en la nube.')
-                        );
-                        return;
-                    }
+                    const attachment = await window.ClubNotificationUpload.upload(fileInput.files[0], broadcastId);
+                    message.attachmentUrl = attachment.url;
+                    message.attachmentType = attachment.contentType;
+                    message.attachmentName = attachment.name;
                 }
-
-                if (isEdit && listIndex >= 0) {
-                    messages[listIndex] = message;
-                } else {
-                    messages.push(message);
-                }
-                writePushMessagesLocal(messages);
-
-                try {
-                    await persistRecordToFirebase('pushMessages', 'notifications', message);
-                } catch (persistErr) {
-                    cloudPersistWarning =
-                        persistErr && persistErr.message
-                            ? persistErr.message
-                            : 'No se pudo sincronizar con la nube (queda guardado en este navegador).';
-                    console.warn('Persist push message:', persistErr);
-                }
+                
+                const messages = JSON.parse(localStorage.getItem('pushMessages') || '[]');
+                messages.push(message);
+                localStorage.setItem('pushMessages', JSON.stringify(messages));
+                await persistRecordToFirebase('pushMessages', 'notifications', message);
 
                 let pushResult = null;
-                let pushErrMsg = '';
                 if (sendMode === 'manual') {
                     try {
                         pushResult = await dispatchClubPushNotification(message);
-                        message.lastPushAt = sentAt;
-                        message.lastPushSent = pushResult.sent || 0;
-                        message.lastPushDevices = pushResult.devices || 0;
-                        if (isEdit && listIndex >= 0) messages[listIndex] = message;
-                        else messages[messages.length - 1] = message;
-                        writePushMessagesLocal(messages);
-                        try {
-                            await persistRecordToFirebase('pushMessages', 'notifications', message);
-                        } catch (_) {}
                     } catch (pushErr) {
-                        pushErrMsg = pushErr && pushErr.message ? pushErr.message : String(pushErr);
                         console.warn('Push móvil:', pushErr);
                     }
                 }
-
-                __editingPushMessageId = null;
-                __resendPushReminderSourceId = null;
+                
                 clearMessageForm();
                 cancelAddMessage();
-
-                const pushInfo =
-                    sendMode === 'scheduled'
-                        ? '\n⏰ Programado para: ' + new Date(scheduledAtIso).toLocaleString('es-ES')
-                        : pushResult
-                          ? '\n📱 Push móvil: ' +
-                            (pushResult.sent || 0) +
-                            ' de ' +
-                            (pushResult.devices || 0) +
-                            ' dispositivo(s)' +
-                            (pushResult.devices === 0
-                                ? '\n⚠️ Ningún móvil registrado: instalar PWA, iniciar sesión y pulsar «Permitir avisos».'
-                                : '')
-                          : '\n📱 Push móvil: no enviado' + (pushErrMsg ? '\n⚠️ ' + pushErrMsg : '');
-
+                
+                const pushInfo = sendMode === 'scheduled'
+                    ? '\n⏰ Programado para: ' + new Date(scheduledAtIso).toLocaleString('es-ES')
+                    : (pushResult
+                        ? '\n📱 Push móvil: ' + (pushResult.sent || 0) + ' dispositivo(s)'
+                        : '\n📱 Push móvil: no enviado (revisa sesión admin o despliegue Netlify con funciones)');
                 alert(
-                    (isEdit
-                        ? '✅ Mensaje actualizado'
-                        : isResend
-                          ? '✅ Recordatorio enviado'
-                          : sendMode === 'scheduled'
-                            ? '✅ Recordatorio programado'
-                            : '✅ Mensaje guardado en la nube') +
-                        '\n\n📱 "' +
-                        title +
-                        '"\n👥 ' +
-                        formatRecipientsLabel(recipients) +
-                        '\n⚽ ' +
-                        formatTeamsLabel(targetTeams) +
-                        pushInfo +
-                        (cloudPersistWarning ? '\n⚠️ ' + cloudPersistWarning : '') +
-                        '\n⏰ ' +
-                        new Date().toLocaleString('es-ES')
+                    (sendMode === 'scheduled' ? '✅ Recordatorio programado\n\n' : '✅ Mensaje enviado exitosamente\n\n') +
+                    '📱 "' + title + '"\n👥 ' + formatRecipientsLabel(recipients) +
+                    '\n⚽ ' + formatTeamsLabel(targetTeams) + pushInfo +
+                    '\n⏰ ' + new Date().toLocaleString()
                 );
-
+                
+                // Actualizar historial y estadísticas
                 loadAdminMessagesHistory();
                 updateMessageCounts();
+                
             } catch (error) {
                 console.error('❌ Error enviando mensaje:', error);
-                alert(
-                    '❌ Error al enviar el mensaje.\n\n' +
-                        (error && error.message ? error.message : 'Inténtalo de nuevo.')
-                );
+                alert('❌ Error al enviar el mensaje. Inténtalo de nuevo.');
             }
         }
 
@@ -20714,118 +13822,47 @@
         // Cargar historial de mensajes de administración
         function loadAdminMessagesHistory() {
             try {
-                const messages = readPushMessagesLocal();
-                const adminMessages = messages.filter(function (m) {
-                    return m && m.senderType === 'admin';
-                });
-
+                const messages = JSON.parse(localStorage.getItem('pushMessages') || '[]');
+                const adminMessages = messages.filter(m => m.senderType === 'admin');
+                
                 const historyElement = document.getElementById('adminMessagesHistory');
-                if (!historyElement) return;
-
+                
                 if (adminMessages.length === 0) {
-                    historyElement.innerHTML =
-                        '<p style="text-align: center; color: #6c757d;">No hay mensajes enviados desde administración</p>';
+                    historyElement.innerHTML = '<p style="text-align: center; color: #6c757d;">No hay mensajes enviados desde administración</p>';
                     return;
                 }
 
                 let html = '<div style="display: grid; gap: 15px;">';
-
-                adminMessages
-                    .slice()
-                    .sort(function (a, b) {
-                        return pushMessageSortTime(b) - pushMessageSortTime(a);
-                    })
-                    .forEach(function (message) {
-                        const typeColors = {
-                            general: '#3b82f6',
-                            urgent: '#dc2626',
-                            reminder: '#f59e0b',
-                            announcement: '#059669'
-                        };
-                        const msgId = encodeURIComponent(String(message.id || message.broadcastId || ''));
-                        const whenRaw =
-                            message.sentAt || message.timestamp || message.scheduledAt || message.updatedAt;
-                        const whenLabel = whenRaw
-                            ? new Date(whenRaw).toLocaleString('es-ES')
-                            : '—';
-                        const statusLabel =
-                            message.status === 'scheduled' || message.deliveryStatus === 'pending'
-                                ? '⏰ Programado'
-                                : message.resendOf
-                                  ? '🔁 Recordatorio'
-                                  : '✅ Enviado';
-                        const recLabel = formatRecipientsLabel(
-                            Array.isArray(message.recipients) ? message.recipients : [message.recipients || 'all']
-                        );
-                        const teamLabel = formatTeamsLabel(message.targetTeams || []);
-
-                        html +=
-                            '<div style="background: #f8f9fa; padding: 20px; border-radius: 10px; border-left: 4px solid ' +
-                            (typeColors[message.type] || '#3b82f6') +
-                            ';">' +
-                            '<div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 10px; gap: 10px; flex-wrap: wrap;">' +
-                            '<h4 style="margin: 0; color: #1e3a8a;">' +
-                            escapeHtml(message.title || '') +
-                            '</h4>' +
-                            '<span style="background: ' +
-                            (typeColors[message.type] || '#3b82f6') +
-                            '; color: white; padding: 2px 8px; border-radius: 12px; font-size: 0.8rem;">' +
-                            escapeHtml(message.type || 'general') +
-                            '</span></div>' +
-                            '<p style="margin: 5px 0; color: #666; white-space: pre-wrap;">' +
-                            escapeHtml(message.content || message.message || '') +
-                            '</p>' +
-                            '<div style="font-size: 0.8rem; color: #888; margin-top: 10px;">' +
-                            statusLabel +
-                            ' · 👥 ' +
-                            escapeHtml(recLabel) +
-                            ' · ⚽ ' +
-                            escapeHtml(teamLabel) +
-                            ' · ⏰ ' +
-                            escapeHtml(whenLabel) +
-                            (message.lastPushSent != null
-                                ? ' · 📱 Push: ' + message.lastPushSent + '/' + (message.lastPushDevices || 0)
-                                : '') +
-                            '</div>' +
-                            '<div style="display:flex; flex-wrap:wrap; gap:8px; margin-top:12px;">' +
-                            '<button type="button" class="btn" style="padding:6px 12px;font-size:0.85rem;background:#2563eb;color:#fff;border:none;border-radius:6px;cursor:pointer;" data-push-action="edit" data-push-id="' +
-                            msgId +
-                            '">✏️ Editar</button>' +
-                            '<button type="button" class="btn" style="padding:6px 12px;font-size:0.85rem;background:#f59e0b;color:#fff;border:none;border-radius:6px;cursor:pointer;" data-push-action="resend" data-push-id="' +
-                            msgId +
-                            '">🔁 Reenviar recordatorio</button>' +
-                            '<button type="button" class="btn" style="padding:6px 12px;font-size:0.85rem;background:#dc2626;color:#fff;border:none;border-radius:6px;cursor:pointer;" data-push-action="delete" data-push-id="' +
-                            msgId +
-                            '">🗑️ Eliminar</button>' +
-                            '</div></div>';
-                    });
+                
+                adminMessages.sort((a, b) => new Date(b.sentAt) - new Date(a.sentAt)).forEach(message => {
+                    const typeColors = {
+                        'general': '#3b82f6',
+                        'urgent': '#dc2626',
+                        'reminder': '#f59e0b',
+                        'announcement': '#059669'
+                    };
+                    
+                    html += `
+                        <div style="background: #f8f9fa; padding: 20px; border-radius: 10px; border-left: 4px solid ${typeColors[message.type] || '#3b82f6'};">
+                            <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 10px;">
+                                <h4 style="margin: 0; color: #1e3a8a;">${message.title}</h4>
+                                <span style="background: ${typeColors[message.type] || '#3b82f6'}; color: white; padding: 2px 8px; border-radius: 12px; font-size: 0.8rem;">${message.type}</span>
+                            </div>
+                            <p style="margin: 5px 0; color: #666;">${message.content}</p>
+                            <div style="font-size: 0.8rem; color: #888; margin-top: 10px;">
+                                👥 ${message.recipients} | ⚽ ${message.team || 'Todos'} | ⏰ ${new Date(message.sentAt).toLocaleString()}
+                            </div>
+                        </div>
+                    `;
+                });
 
                 html += '</div>';
                 historyElement.innerHTML = html;
+
             } catch (error) {
                 console.error('❌ Error cargando historial de mensajes:', error);
-                const historyElement = document.getElementById('adminMessagesHistory');
-                if (historyElement) {
-                    historyElement.innerHTML =
-                        '<p style="text-align: center; color: #dc2626;">Error al cargar el historial</p>';
-                }
+                document.getElementById('adminMessagesHistory').innerHTML = '<p style="text-align: center; color: #dc2626;">Error al cargar el historial</p>';
             }
-        }
-
-        function initPushMessagesHistoryDelegation() {
-            const wrap = document.getElementById('adminMessagesHistory');
-            if (!wrap || wrap.__pushDelegationBound) return;
-            wrap.__pushDelegationBound = true;
-            wrap.addEventListener('click', function (e) {
-                const btn = e.target && e.target.closest ? e.target.closest('[data-push-action]') : null;
-                if (!btn) return;
-                const action = btn.getAttribute('data-push-action');
-                const id = decodeURIComponent(btn.getAttribute('data-push-id') || '');
-                if (!id) return;
-                if (action === 'edit') editAdminPushMessage(id);
-                else if (action === 'resend') resendAdminPushReminder(id);
-                else if (action === 'delete') deleteAdminPushMessage(id);
-            });
         }
 
         // Actualizar contadores de mensajes
@@ -20835,10 +13872,7 @@
                 const today = new Date().toDateString();
                 
                 const totalCount = messages.length;
-                const todayCount = messages.filter(function (m) {
-                    if (!m || !m.sentAt) return false;
-                    return new Date(m.sentAt).toDateString() === today;
-                }).length;
+                const todayCount = messages.filter(m => new Date(m.sentAt).toDateString() === today).length;
                 const urgentCount = messages.filter(m => m.type === 'urgent').length;
                 
                 // Actualizar contadores en la interfaz
@@ -21018,9 +14052,7 @@
                     ? window.ClubMemberNumbers.formatMemberLabel(m)
                     : m.memberNumber || m.numeroSocio || '';
             const dl = getMemberPaymentDeadline(m);
-            const isJ = typeof isMemberSocioJugador === 'function' ? isMemberSocioJugador(m) : !!(m.socioJugador || m.isJugador || m.playerId);
             return {
-                'Tipo socio': isJ ? 'Socio-jugador' : 'Socio normal',
                 'Nº socio': numDisplay,
                 Nombre: m.name || m.nombre || '',
                 Apellidos: m.surname || m.apellidos || '',
@@ -21038,8 +14070,7 @@
                 'Plazo pago': dl && !isNaN(dl.getTime()) ? dl.toLocaleString('es-ES') : '',
                 'Cuota vigente hasta': formatExportDate(m.cuotaVigenteHasta),
                 'Fecha registro': formatExportDate(m.registrationDate || m.fechaRegistro),
-                'Es jugador/a': isJ ? 'Sí' : 'No',
-                'ID ficha jugador': m.playerId || '',
+                'Es jugador/a': m.isJugador ? 'Sí' : '',
                 'Categoría juego': m.playerCategory || m.categoriaJugador || '',
                 'Es directiva': m.isDirectiva || m.isBoardMember ? 'Sí' : ''
             };
@@ -21107,9 +14138,6 @@
             if (listType === 'socios') {
                 const el = document.getElementById('memberStatusFilter');
                 if (el) opts.status = el.value;
-                const kind = pickSocioExportKind();
-                if (kind == null) return false;
-                opts.kind = kind;
             } else if (listType === 'amigos') {
                 const el = document.getElementById('friendStatusFilter');
                 if (el) opts.status = el.value;
@@ -21180,23 +14208,10 @@
             }
             if (listType === 'socios') {
                 let items = JSON.parse(localStorage.getItem('clubMembers') || '[]');
-                items = items.map(function (m) {
-                    if (typeof window.applyClubRoleFlagsToMember === 'function') {
-                        window.applyClubRoleFlagsToMember(m);
-                    }
-                    return ensureMemberKindFlags(m);
-                });
                 if (opts.status && opts.status !== 'all') {
                     items = items.filter((m) => memberMatchesExportStatusFilter(m, opts.status));
                 }
-                if (opts.kind && opts.kind !== 'all') {
-                    items = items.filter(function (m) {
-                        return memberMatchesKindFilter(m, opts.kind);
-                    });
-                }
-                const normales = sortMembersByName(items.filter(function (m) { return !isMemberSocioJugador(m); }));
-                const jugadores = sortMembersByName(items.filter(function (m) { return isMemberSocioJugador(m); }));
-                return normales.concat(jugadores).map(mapSocioExportRow);
+                return items.map(mapSocioExportRow);
             }
             if (listType === 'amigos') {
                 let items = JSON.parse(localStorage.getItem('clubFriends') || '[]');
@@ -21508,10 +14523,6 @@ th,td{border:1px solid #ccc;padding:5px 7px;text-align:left;white-space:nowrap;}
                         document.getElementById('exportMemberStatus') ||
                         document.getElementById('memberStatusFilter');
                     if (stEl && !opts.status) opts.status = stEl.value;
-                    if (!opts.kind) {
-                        const kindEl = document.getElementById('memberKindFilter');
-                        if (kindEl) opts.kind = kindEl.value;
-                    }
                 }
                 if (listType === 'amigos') {
                     const stEl = document.getElementById('friendStatusFilter');
@@ -21549,12 +14560,7 @@ th,td{border:1px solid #ccc;padding:5px 7px;text-align:left;white-space:nowrap;}
                         ? window.PlayerExport.getExportHeaders()
                         : getExportRowsHeaders(rows);
                 const date = new Date().toISOString().split('T')[0];
-                let filePrefix = meta.filePrefix;
-                if (listType === 'socios') {
-                    if (opts.kind === 'normal') filePrefix = 'CDSANABRIACF_Socios_Normales';
-                    else if (opts.kind === 'jugador') filePrefix = 'CDSANABRIACF_Socios_Jugadores';
-                }
-                const base = `${filePrefix}_${date}`;
+                const base = `${meta.filePrefix}_${date}`;
                 const fmt = String(format || 'xlsx').toLowerCase();
                 const formats = fmt === 'all' ? ['xlsx', 'word', 'pdf'] : [fmt];
                 const usePlayerCategoryGroups =
@@ -22830,7 +15836,7 @@ th,td{border:1px solid #ccc;padding:5px 7px;text-align:left;white-space:nowrap;}
             }
         }
 
-        // === FUNCIONES DE BASE DE DATOS (misma fuente que la nube / pestañas del panel) ===
+        // === FUNCIONES DE BASE DE DATOS (misma fuente que Firebase / pestañas del panel) ===
 
         function setDbStatElement(id, value) {
             const el = document.getElementById(id);
@@ -24160,7 +17166,7 @@ th,td{border:1px solid #ccc;padding:5px 7px;text-align:left;white-space:nowrap;}
                     return;
                 }
                 window.ColaboradorSolicitud.saveConfig(cfg);
-                alert('✅ Formulario de colaboradores guardado (web + nube).');
+                alert('✅ Formulario de colaboradores guardado (web + Firebase).');
                 loadColaboradorFormConfigAdmin();
             } catch (err) {
                 alert('❌ ' + (err.message || err));
@@ -24478,7 +17484,7 @@ th,td{border:1px solid #ccc;padding:5px 7px;text-align:left;white-space:nowrap;}
         }
 
         async function limpiarSocios() {
-            const msg = '⚠️ ELIMINAR TODOS LOS SOCIOS\n\nSe borrarán todos los socios en la nube y en este dispositivo.\nEl próximo número automático volverá a ser 000051.\n\n¿Continuar?';
+            const msg = '⚠️ ELIMINAR TODOS LOS SOCIOS\n\nSe borrarán todos los socios en Firebase y en este dispositivo.\nEl próximo número automático volverá a ser 000051.\n\n¿Continuar?';
             if (!confirm(msg)) return;
             const statusEl = document.getElementById('dbCleanStatus');
             if (statusEl) {
@@ -24489,7 +17495,7 @@ th,td{border:1px solid #ccc;padding:5px 7px;text-align:left;white-space:nowrap;}
                 const result = await purgeFirestoreCollection('members');
                 clearClubCollectionLocally('members');
                 refreshDbCountersAfterPurge();
-                const text = '✅ Socios eliminados: ' + (result.deleted || 0) + ' en la nube. Contadores a cero en el panel.';
+                const text = '✅ Socios eliminados: ' + (result.deleted || 0) + ' en Firebase. Contadores a cero en el panel.';
                 if (statusEl) statusEl.innerHTML = '<p style="color:#059669;">' + text + '</p>';
                 else alert(text);
             } catch (error) {
@@ -24502,7 +17508,7 @@ th,td{border:1px solid #ccc;padding:5px 7px;text-align:left;white-space:nowrap;}
         window.limpiarSocios = limpiarSocios;
 
         async function limpiarBaseDeDatos() {
-            const msg = '⚠️ RESETEAR SOCIOS Y JUGADORES\n\nSe borrarán PERMANENTEMENTE:\n• Todos los socios\n• Todos los jugadores\n• Solicitudes de nuevo jugador/a\n\nEn la nube y en este dispositivo.\n\n¿Continuar?';
+            const msg = '⚠️ RESETEAR SOCIOS Y JUGADORES\n\nSe borrarán PERMANENTEMENTE:\n• Todos los socios\n• Todos los jugadores\n• Solicitudes de nuevo jugador/a\n\nEn Firebase y en este dispositivo.\n\n¿Continuar?';
             if (!confirm(msg)) return;
             if (!confirm('Última confirmación: ¿Seguro que quieres dejar socios y jugadores a cero?')) return;
             const statusEl = document.getElementById('dbCleanStatus');
@@ -25032,17 +18038,17 @@ th,td{border:1px solid #ccc;padding:5px 7px;text-align:left;white-space:nowrap;}
         
         async function sincronizarSociosConBackend() {
             try {
-                console.log('🔄 Iniciando sincronización de socios con la nube...');
+                console.log('🔄 Iniciando sincronización de socios con Firebase...');
                 
                 // Obtener socios del localStorage
-                const socios = JSON.parse(localStorage.getItem('clubMembers') || localStorage.getItem('members') || '[]');
+                const socios = JSON.parse(localStorage.getItem('members') || '[]');
                 
                 if (socios.length === 0) {
                     alert('❌ No hay socios para sincronizar. Primero crea algunos socios.');
                     return;
                 }
                 
-                // Sincronizar cada socio con la nube
+                // Sincronizar cada socio con Firebase
                 let sincronizados = 0;
                 let errores = 0;
                 
@@ -25074,7 +18080,7 @@ th,td{border:1px solid #ccc;padding:5px 7px;text-align:left;white-space:nowrap;}
         
         async function obtenerSociosDelBackend() {
             try {
-                console.log('📥 Obteniendo socios desde la nube...');
+                console.log('📥 Obteniendo socios desde Firebase...');
                 
                 // Usar la función getDocuments de firebase-config.js
                 const socios = await window.getDocuments('members');
@@ -25087,7 +18093,7 @@ th,td{border:1px solid #ccc;padding:5px 7px;text-align:left;white-space:nowrap;}
                     loadMembers();
                     
                     alert(`✅ Se obtuvieron ${socios.length} socios desde la nube.\n\nLos datos se han actualizado en el panel de administración.`);
-                    console.log('📥 Socios obtenidos desde la nube:', socios.length);
+                    console.log('📥 Socios obtenidos desde Firebase:', socios.length);
                 } else {
                     alert('ℹ️ No se encontraron socios en la nube.\n\nPrimero sincroniza los socios usando el botón «Subir socios a la nube».');
                 }
@@ -25100,7 +18106,7 @@ th,td{border:1px solid #ccc;padding:5px 7px;text-align:left;white-space:nowrap;}
         
         async function verificarEstadoFirebase() {
             try {
-                console.log('🔍 Verificando estado de la nube...');
+                console.log('🔍 Verificando estado de Firebase...');
                 
                 const projectId = window.firebaseConfig?.projectId || 'cdsanabriacf2026';
                 const socios = await window.getDocuments('members');
@@ -25123,7 +18129,7 @@ th,td{border:1px solid #ccc;padding:5px 7px;text-align:left;white-space:nowrap;}
                     (sim ? '⚠️ La nube no responde; comprueba la conexión a internet.' : '✅ Todo funcionando correctamente');
                 
                 alert(mensaje);
-                console.log('🔍 Estado de la nube verificado:', estado);
+                console.log('🔍 Estado de Firebase verificado:', estado);
                 
             } catch (error) {
                 console.error('❌ Error verificando Firebase:', error);
@@ -25270,12 +18276,6 @@ th,td{border:1px solid #ccc;padding:5px 7px;text-align:left;white-space:nowrap;}
         async function reconciliarModulosConFirebase(options) {
             const opts = options || {};
             try {
-                if (window.AdminOrganizerAccess && window.AdminOrganizerAccess.isCompetitionOrganizer()) {
-                    if (!opts.fromAutoOpen) {
-                        alert('ℹ️ El organizador de competiciones no reconcilia socios, amigos ni jugadores del club.');
-                    }
-                    return;
-                }
                 if (typeof window.getDocuments !== 'function' || typeof window.syncLocalArrayKeyToFirebase !== 'function') {
                     if (!opts.fromAutoOpen) {
                         alert('❌ La nube no está disponible para reconciliación en este panel.');
@@ -25344,9 +18344,6 @@ th,td{border:1px solid #ccc;padding:5px 7px;text-align:left;white-space:nowrap;}
 
         async function intentarReconciliacionAutomaticaAlAbrir() {
             try {
-                if (window.AdminOrganizerAccess && window.AdminOrganizerAccess.isCompetitionOrganizer()) {
-                    return;
-                }
                 if (sessionStorage.getItem('cdsanabria_auto_reconcile_done') === '1') return;
                 sessionStorage.setItem('cdsanabria_auto_reconcile_done', '1');
                 await reconciliarModulosConFirebase({ fromAutoOpen: true });
@@ -25431,14 +18428,14 @@ th,td{border:1px solid #ccc;padding:5px 7px;text-align:left;white-space:nowrap;}
                     localStorage.setItem('socios', JSON.stringify(sociosLimpios));
                     localStorage.setItem('amigos', JSON.stringify(amigosLimpios));
                     
-                    // 2. Eliminar de la nube si está disponible
+                    // 2. Eliminar de Firebase si está disponible
                     if (window.getDocuments && window.createDocument) {
                         try {
-                            // Obtener todos los documentos de la nube
+                            // Obtener todos los documentos de Firebase
                             const sociosFirebase = await window.getDocuments('members');
                             const amigosFirebase = await window.getDocuments('friends');
                             
-                            console.log('🗑️ Limpiando la nube de datos de ejemplo...');
+                            console.log('🗑️ Limpiando Firebase de datos de ejemplo...');
                             
                             // Sobrescribir con datos limpios
                             if (sociosLimpios.length > 0) {
@@ -25530,7 +18527,6 @@ th,td{border:1px solid #ccc;padding:5px 7px;text-align:left;white-space:nowrap;}
                 if (typeof loadInscriptionAdminForm === 'function') loadInscriptionAdminForm();
                 if (typeof loadPlayerExportAdminForm === 'function') loadPlayerExportAdminForm();
                 if (typeof refreshPlayerExportSeasonSelects === 'function') refreshPlayerExportSeasonSelects();
-                if (typeof loadPlayersList === 'function') loadPlayersList();
             }
 
             try { if (typeof refreshCuotaRenewalBanner === 'function') refreshCuotaRenewalBanner(); } catch (_) {}
@@ -25554,11 +18550,6 @@ th,td{border:1px solid #ccc;padding:5px 7px;text-align:left;white-space:nowrap;}
 
             if (tabName === 'competiciones') {
                 if (typeof loadCompetitionsList === 'function') loadCompetitionsList();
-                if (window.TorneoF7CalendarioOficial && typeof window.TorneoF7CalendarioOficial.ensureInEngine === 'function') {
-                    window.TorneoF7CalendarioOficial.ensureInEngine().catch(function (err) {
-                        console.warn('Calendario oficial F7:', err);
-                    });
-                }
             }
 
             if (tabName === 'dashboard' && window.SiteUpdateMode && typeof window.SiteUpdateMode.refreshUi === 'function') {
@@ -25693,137 +18684,4 @@ th,td{border:1px solid #ccc;padding:5px 7px;text-align:left;white-space:nowrap;}
         limpiarDatosEjemploAutomatico();
         
         console.log('🚀 Panel de administración CDSANABRIACF cargado correctamente con sincronización en tiempo real');
-    </script>
-<script>
-// Doble persistencia global del panel: cuando se guarda en localStorage, sincronizar con la nube.
-(function () {
-    // Filtrado de avisos al arrancar: mostrar solo el primero y el último.
-    // Evita ráfagas de alertas al abrir el panel por inicializaciones múltiples.
-    try {
-        if (!window.__CDSAN_ALERT_FILTER_INSTALLED) {
-            window.__CDSAN_ALERT_FILTER_INSTALLED = true;
-            var nativeAlert = window.alert ? window.alert.bind(window) : function () {};
-            var startedAt = Date.now();
-            var firstMsg = null;
-            var lastMsg = null;
-            var flushTimer = null;
-            var STARTUP_WINDOW_MS = 4500;
-
-            function flushIfNeeded(force) {
-                if (!flushTimer) return;
-                clearTimeout(flushTimer);
-                flushTimer = null;
-                if (!force) return;
-                if (firstMsg != null && lastMsg != null && lastMsg !== firstMsg) {
-                    nativeAlert(lastMsg);
-                }
-                firstMsg = null;
-                lastMsg = null;
-            }
-
-            window.alert = function (msg) {
-                try {
-                    var now = Date.now();
-                    var inStartup = (now - startedAt) <= STARTUP_WINDOW_MS;
-                    if (!inStartup) {
-                        return nativeAlert(msg);
-                    }
-                    if (firstMsg == null) {
-                        firstMsg = String(msg);
-                        lastMsg = firstMsg;
-                        // Mostrar el primero inmediatamente
-                        nativeAlert(firstMsg);
-                        // Programar mostrar el último al final de la ventana de arranque
-                        flushTimer = setTimeout(function () { flushIfNeeded(true); }, STARTUP_WINDOW_MS + 50);
-                        return;
-                    }
-                    lastMsg = String(msg);
-                    return;
-                } catch (_) {
-                    return nativeAlert(msg);
-                }
-            };
-        }
-    } catch (_) {}
-})();
-
-(function () {
-    var keysToSync = {
-        clubMembers: true,
-        members: true,
-        socios: true,
-        clubFriends: true,
-        friends: true,
-        amigos: true,
-        clubPlayers: true,
-        players: true,
-        jugadores: true,
-        clubCoaches: true,
-        coaches: true,
-        entrenadores: true,
-        clubBoard: true,
-        board: true,
-        directiva: true,
-        clubTeams: true,
-        teams: true,
-        equipos: true,
-        clubEvents: true,
-        events: true,
-        encuentros: true,
-        clubCalendarEvents: true,
-        calendarEvents: true,
-        clubCompetitions: true,
-        competitions: true,
-        cdsanabriacfTeamAdmins: true,
-        clubNotifications: true,
-        notifications: true,
-        clubDocuments: true,
-        documents: true,
-        clubMedia: true,
-        media: true,
-        clubPublicidad: true,
-        clubAdvertisements: true,
-        publicidad: true,
-        ads: true,
-        anuncios: true,
-        pushMessages: true,
-        clubConfig: true,
-        settings: true,
-        config: true,
-        clubSettings: true,
-        clubThemeSettings: true,
-        clubContactInfo: true,
-        cdsanabriacfSettings: true,
-        teamSettings: true,
-        clubStats: true,
-        statistics: true,
-        clubPlayerInscriptionSettings: true,
-        clubPlayerExportSettings: true
-    };
-
-    var timers = {};
-    var nativeSetItem = Storage.prototype.setItem;
-    try {
-        window.__CDSAN_NATIVE_SET_ITEM = nativeSetItem;
-    } catch (_) {}
-    Storage.prototype.setItem = function (key, value) {
-        nativeSetItem.call(this, key, value);
-        if (!keysToSync[key]) return;
-        if (timers[key]) clearTimeout(timers[key]);
-        timers[key] = setTimeout(function () {
-            try {
-                if (typeof window.syncLocalSettingsBlobToFirebase === 'function') {
-                    window.syncLocalSettingsBlobToFirebase(key);
-                }
-            } catch (_) {}
-            try {
-                if (typeof window.syncLocalArrayKeyToFirebase === 'function') {
-                    window.syncLocalArrayKeyToFirebase(key);
-                }
-            } catch (_) {}
-        }, 350);
-    };
-})();
-</script>
-</body>
-</html>
+    

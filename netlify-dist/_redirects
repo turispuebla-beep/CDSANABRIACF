@@ -20,8 +20,11 @@
 /inscripcion-jugador-demo.html /inscripcion-jugador-demo.html 200
 /torneo-equipo.html      /torneo-equipo.html      200
 /torneo-jugador.html     /torneo-jugador.html     200
+/torneo-vista.html       /torneo-vista.html       200
+/carnet-asistencia.html  /carnet-asistencia.html  200
 /sw.js                    /sw.js                    200
 /manifest.json            /manifest.json            200
+/deploy-version.json      /deploy-version.json      200
 /js/*                     /js/:splat                200
 
 /*                        /index.html               200

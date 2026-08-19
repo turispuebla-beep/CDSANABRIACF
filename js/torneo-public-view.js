@@ -24,6 +24,10 @@
 
   function findTorneoCompetition(list) {
     var comps = Array.isArray(list) ? list : [];
+    var official = comps.find(function (c) {
+      return c && (c.id === 'TORNEO_F7_2026_PINAR' || c.officialCalendarId === 'TORNEO_F7_2026_PINAR');
+    });
+    if (official) return official;
     var active = comps.filter(function (c) {
       return ['active', 'activo'].includes(String(c.status || '').toLowerCase());
     });
@@ -56,7 +60,7 @@
       return (m.homeScore != null ? m.homeScore : 0) + ' - ' + (m.awayScore != null ? m.awayScore : 0);
     }
     if (String(m.status || '') === 'postponed') return 'Aplazado';
-    return 'Pendiente';
+    return '- -';
   }
 
   function formatDateEs(iso) {

@@ -40,6 +40,7 @@
 
   async function ensureResponsibleCodes(rows) {
     if (!global.updateDocument) return rows;
+    if (isOrganizerOnly()) return rows;
     const active = rows.filter(isActivePreinscripcion);
     let maxR = 0;
     active.forEach(function (r) {
@@ -94,6 +95,7 @@
 
   async function ensureAccessCodes(rows) {
     if (!global.updateDocument) return rows;
+    if (isOrganizerOnly()) return rows;
     const out = [];
     for (let i = 0; i < rows.length; i++) {
       const row = rows[i];
@@ -616,18 +618,16 @@
           '\')">💰 Validar pago</button>'
       );
     }
-    if (!isOrganizerOnly()) {
-      parts.push(
-        '<button type="button" class="btn" style="padding:4px 8px;font-size:0.78rem;background:#b45309;color:#fff;border:none;border-radius:4px;cursor:pointer;margin:0 0 4px 0;display:block;width:100%;" onclick="discardTorneoPreinscripcion(\'' +
-          safeId +
-          '\', \'duplicado\')">🗑️ Eliminar (duplicado)</button>'
-      );
-      parts.push(
-        '<button type="button" class="btn" style="padding:4px 8px;font-size:0.78rem;background:#dc2626;color:#fff;border:none;border-radius:4px;cursor:pointer;display:block;width:100%;" onclick="discardTorneoPreinscripcion(\'' +
-          safeId +
-          '\', \'no_juega\')">🗑️ Eliminar (no juega)</button>'
-      );
-    }
+    parts.push(
+      '<button type="button" class="btn" style="padding:4px 8px;font-size:0.78rem;background:#b45309;color:#fff;border:none;border-radius:4px;cursor:pointer;margin:0 0 4px 0;display:block;width:100%;" onclick="discardTorneoPreinscripcion(\'' +
+        safeId +
+        '\', \'duplicado\')">🗑️ Eliminar (duplicado)</button>'
+    );
+    parts.push(
+      '<button type="button" class="btn" style="padding:4px 8px;font-size:0.78rem;background:#dc2626;color:#fff;border:none;border-radius:4px;cursor:pointer;display:block;width:100%;" onclick="discardTorneoPreinscripcion(\'' +
+        safeId +
+        '\', \'no_juega\')">🗑️ Eliminar (no juega)</button>'
+    );
     return parts.join('');
   }
 
@@ -975,6 +975,9 @@
       if (listEl) listEl.innerHTML = '<p style="color:#64748b;margin:0;">Cargando preinscripciones…</p>';
     });
     try {
+      if (typeof global.waitForFirebaseReady === 'function') {
+        await global.waitForFirebaseReady(20000);
+      }
       if (!global.getDocuments) {
         global.__torneoPreinscripcionesCache = [];
         renderRows([]);

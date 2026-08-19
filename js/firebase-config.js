@@ -49,6 +49,7 @@ import {
   connectAuthEmulator,
   onAuthStateChanged,
   setPersistence,
+  indexedDBLocalPersistence,
   browserLocalPersistence,
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
@@ -422,46 +423,88 @@ function writeLocalCollection(collectionName, list) {
   }
 }
 
+function writeLocalJson(key, json) {
+  try {
+    localStorage.setItem(key, json);
+  } catch (e) {
+    if (typeof window !== 'undefined' && window.CdsanLocalStorageQuota) {
+      try {
+        window.CdsanLocalStorageQuota.freeSpace();
+        localStorage.setItem(key, json);
+      } catch (_) {}
+    }
+  }
+}
+
+function competitionMatchHasScores(m) {
+  if (!m) return false;
+  const hs = m.homeScore;
+  const as = m.awayScore;
+  if (hs == null || hs === '' || as == null || as === '') return false;
+  return !Number.isNaN(Number(hs)) && !Number.isNaN(Number(as));
+}
+
+/** Si la nube aún no tiene un resultado que sí está en local, no lo borres (carrera al guardar). */
+function mergeCompetitionsSnapshot(remoteList) {
+  let localList = [];
+  try {
+    localList = JSON.parse(localStorage.getItem('clubCompetitions') || '[]');
+  } catch (_) {
+    localList = [];
+  }
+  if (!Array.isArray(remoteList) || !Array.isArray(localList) || !localList.length) {
+    return Array.isArray(remoteList) ? remoteList : [];
+  }
+  const localById = {};
+  localList.forEach((c) => {
+    if (c && c.id) localById[String(c.id)] = c;
+  });
+  return remoteList.map((remote) => {
+    if (!remote || !remote.id || !Array.isArray(remote.matches)) return remote;
+    const local = localById[String(remote.id)];
+    if (!local || !Array.isArray(local.matches)) return remote;
+    let changed = false;
+    const matches = remote.matches.map((rm) => {
+      if (competitionMatchHasScores(rm)) return rm;
+      const lm = local.matches.find((m) => m && rm && String(m.id) === String(rm.id));
+      if (!competitionMatchHasScores(lm)) return rm;
+      changed = true;
+      return Object.assign({}, rm, {
+        homeScore: lm.homeScore,
+        awayScore: lm.awayScore,
+        status: 'completed',
+        playedAt: lm.playedAt || rm.playedAt
+      });
+    });
+    return changed ? Object.assign({}, remote, { matches: matches }) : remote;
+  });
+}
+
 /** Mantiene alineadas todas las claves locales de socios (web + panel + listeners). */
 function syncClubMembersLocal(members) {
   const list = Array.isArray(members) ? members : [];
-  const json = JSON.stringify(list);
-  ['clubMembers', 'members', 'socios', 'allMembers'].forEach((k) => {
-    try { localStorage.setItem(k, json); } catch (_) {}
-  });
+  writeLocalJson('clubMembers', JSON.stringify(list));
 }
 
 /** Mantiene alineadas todas las claves locales de amigos. */
 function syncClubFriendsLocal(friends) {
   const list = Array.isArray(friends) ? friends : [];
-  const json = JSON.stringify(list);
-  ['clubFriends', 'friends', 'amigos', 'allFriends'].forEach((k) => {
-    try { localStorage.setItem(k, json); } catch (_) {}
-  });
+  writeLocalJson('clubFriends', JSON.stringify(list));
 }
 
 function syncClubPlayersLocal(players) {
   const list = Array.isArray(players) ? players : [];
-  const json = JSON.stringify(list);
-  ['clubPlayers', 'players', 'jugadores'].forEach((k) => {
-    try { localStorage.setItem(k, json); } catch (_) {}
-  });
+  writeLocalJson('clubPlayers', JSON.stringify(list));
 }
 
 function syncClubCoachesLocal(coaches) {
   const list = Array.isArray(coaches) ? coaches : [];
-  const json = JSON.stringify(list);
-  ['clubCoaches', 'coaches', 'entrenadores'].forEach((k) => {
-    try { localStorage.setItem(k, json); } catch (_) {}
-  });
+  writeLocalJson('clubCoaches', JSON.stringify(list));
 }
 
 function syncClubBoardLocal(board) {
   const list = Array.isArray(board) ? board : [];
-  const json = JSON.stringify(list);
-  ['clubBoard', 'board', 'directiva'].forEach((k) => {
-    try { localStorage.setItem(k, json); } catch (_) {}
-  });
+  writeLocalJson('clubBoard', JSON.stringify(list));
 }
 
 function mirrorLocalUpsert(collectionName, docId, data) {
@@ -811,9 +854,19 @@ function setupAuth() {
     return;
   }
 
-  // Configurar persistencia
-  setPersistence(auth, browserLocalPersistence).catch((error) => {
-    console.warn('âš ï¸ No se pudo establecer persistencia local:', error);
+  // IndexedDB (no llena el cupo de localStorage: socios/fotos duplicados).
+  const persistAuth = function () {
+    return setPersistence(auth, indexedDBLocalPersistence).catch(function () {
+      if (typeof window !== 'undefined' && window.CdsanLocalStorageQuota) {
+        try {
+          window.CdsanLocalStorageQuota.freeSpace();
+        } catch (_) {}
+      }
+      return setPersistence(auth, browserLocalPersistence);
+    });
+  };
+  persistAuth().catch(function (error) {
+    console.warn('No se pudo establecer persistencia de sesión:', error);
   });
   
   // Escuchar cambios de autenticaciÃ³n
@@ -1100,14 +1153,15 @@ async function deleteDocument(collectionName, docId, userRole) {
     console.log('âœ… Documento eliminado:', docId);
     await maybeRemoveClubPlayerPublicMirror(resolvedCollection, docId);
     
-    // Log de auditorÃ­a
-    await createDocument(DB_COLLECTIONS.AUDIT_LOGS, {
-      action: 'DELETE_DOCUMENT',
-      collection: resolvedCollection,
-      documentId: docId,
-      userRole,
-      timestamp: new Date().toISOString()
-    });
+    try {
+      await createDocument(DB_COLLECTIONS.AUDIT_LOGS, {
+        action: 'DELETE_DOCUMENT',
+        collection: resolvedCollection,
+        documentId: docId,
+        userRole,
+        timestamp: new Date().toISOString()
+      });
+    } catch (_) {}
     
   } catch (error) {
     console.error('âŒ Error eliminando documento:', error);
@@ -1238,8 +1292,6 @@ function applyPlayersToLocalCache(players) {
       : merged;
 
   localStorage.setItem('clubPlayers', JSON.stringify(cached));
-  localStorage.setItem('players', JSON.stringify(cached));
-  localStorage.setItem('jugadores', JSON.stringify(cached));
 
   if (typeof window !== 'undefined') {
     window.__lastRawClubPlayers = merged;
@@ -1290,6 +1342,29 @@ async function setupRealtimeSync() {
           new Date().toISOString();
         const nombre = (data.nombre || data.name || '').toString().trim();
         const apellidos = (data.apellidos || data.surname || '').toString().trim();
+        const statusRaw = String(data.status || data.estado || '').trim().toLowerCase();
+        let status = 'pending_validation';
+        let estado = 'pendiente';
+        if (statusRaw === 'active' || statusRaw === 'activo') {
+          status = 'active';
+          estado = 'activo';
+        } else if (statusRaw === 'expired' || statusRaw === 'expirado' || statusRaw === 'caducado') {
+          status = 'expired';
+          estado = 'caducado';
+        } else if (
+          statusRaw === 'pending_validation' ||
+          statusRaw === 'pendiente' ||
+          statusRaw === 'pending' ||
+          statusRaw === 'pending_new' ||
+          statusRaw === 'nueva_alta' ||
+          !statusRaw
+        ) {
+          status = 'pending_validation';
+          estado = 'pendiente';
+        } else {
+          status = statusRaw;
+          estado = data.estado || statusRaw || 'pendiente';
+        }
         const row = {
           id: doc.id,
           ...data,
@@ -1301,7 +1376,8 @@ async function setupRealtimeSync() {
           telefono: (data.telefono || data.phone || '').toString(),
           dni: data.dni || '',
           numeroSocio: data.numeroSocio != null ? data.numeroSocio : data.memberNumber,
-          estado: data.estado || data.status || 'pendiente',
+          status,
+          estado,
           fechaRegistro: fechaIso,
           registrationDate: fechaIso
         };
@@ -1335,11 +1411,7 @@ async function setupRealtimeSync() {
       if (typeof window.syncClubMembersLocal === 'function') {
         window.syncClubMembersLocal(members);
       } else {
-      // Actualizar localStorage en TODAS las claves para compatibilidad
-      localStorage.setItem('clubMembers', JSON.stringify(members));
-      localStorage.setItem('members', JSON.stringify(members));
-      localStorage.setItem('socios', JSON.stringify(members));
-      localStorage.setItem('allMembers', JSON.stringify(members));
+        writeLocalJson('clubMembers', JSON.stringify(members));
       }
       
       console.log('ðŸ”„ Socios actualizados en tiempo real:', members.length);
@@ -1396,11 +1468,7 @@ async function setupRealtimeSync() {
         }
       } catch (_) {}
       
-      // Actualizar localStorage en TODAS las claves para compatibilidad
-      localStorage.setItem('clubFriends', JSON.stringify(friends));
-      localStorage.setItem('friends', JSON.stringify(friends));
-      localStorage.setItem('amigos', JSON.stringify(friends));
-      localStorage.setItem('allFriends', JSON.stringify(friends));
+      syncClubFriendsLocal(friends);
       
       console.log('ðŸ”„ Amigos actualizados en tiempo real:', friends.length);
       
@@ -1508,9 +1576,7 @@ async function setupRealtimeSync() {
         events.push(normalizeClubEventDocForLocal(doc.id, { id: doc.id, ...data }));
       });
       
-      localStorage.setItem('clubEvents', JSON.stringify(events));
-      localStorage.setItem('events', JSON.stringify(events));
-      localStorage.setItem('allEvents', JSON.stringify(events));
+      writeLocalJson('clubEvents', JSON.stringify(events));
       
       console.log('ðŸ”„ Eventos actualizados en tiempo real:', events.length);
       
@@ -1550,7 +1616,6 @@ async function setupRealtimeSync() {
       });
 
       localStorage.setItem('clubCalendarEvents', JSON.stringify(calendarEvents));
-      localStorage.setItem('calendarEvents', JSON.stringify(calendarEvents));
       window.dispatchEvent(new CustomEvent('calendarUpdated', { detail: calendarEvents }));
     });
     
@@ -1572,10 +1637,7 @@ async function setupRealtimeSync() {
         });
       });
       
-      localStorage.setItem('clubCoaches', JSON.stringify(coaches));
-      localStorage.setItem('coaches', JSON.stringify(coaches));
-      localStorage.setItem('entrenadores', JSON.stringify(coaches));
-      localStorage.setItem('allCoaches', JSON.stringify(coaches));
+      syncClubCoachesLocal(coaches);
       
       console.log('ðŸ”„ Entrenadores actualizados en tiempo real:', coaches.length);
       
@@ -1591,20 +1653,27 @@ async function setupRealtimeSync() {
     });
 
     // Listener para competiciones (competitions) - SANABRIA
-    const competitionsListener = onSnapshot(collection(db, 'sanabria_competitions'), (snapshot) => {
+    const competitionsListener = onSnapshot(
+      query(collection(db, 'sanabria_competitions'), where('appScope', '==', APP_SCOPE)),
+      (snapshot) => {
       const competitions = [];
-      snapshot.forEach((doc) => {
+      snapshot.forEach((docSnap) => {
+        const data = docSnap.data() || {};
         competitions.push({
-          ...doc.data(),
-          firebaseDocId: doc.id,
-          id: doc.id
+          ...data,
+          firebaseDocId: docSnap.id,
+          id: data.id || docSnap.id
         });
       });
 
-      localStorage.setItem('clubCompetitions', JSON.stringify(competitions));
-      localStorage.setItem('competitions', JSON.stringify(competitions));
-      window.dispatchEvent(new CustomEvent('competitionsUpdated', { detail: competitions }));
-    });
+      const mergedCompetitions = mergeCompetitionsSnapshot(competitions);
+      writeLocalJson('clubCompetitions', JSON.stringify(mergedCompetitions));
+      window.dispatchEvent(new CustomEvent('competitionsUpdated', { detail: mergedCompetitions }));
+    },
+      (err) => {
+        console.warn('Listener competiciones:', err && err.message ? err.message : err);
+      }
+    );
 
     // Directiva (board) — mismo flujo que socios/amigos para multi-dispositivo
     const boardListener = onSnapshot(collection(db, DB_COLLECTIONS.BOARD), (snapshot) => {
@@ -1616,8 +1685,7 @@ async function setupRealtimeSync() {
         });
       });
 
-      localStorage.setItem('clubBoard', JSON.stringify(board));
-      localStorage.setItem('board', JSON.stringify(board));
+      syncClubBoardLocal(board);
 
       console.log('ðŸ”„ Directiva actualizada en tiempo real:', board.length);
 

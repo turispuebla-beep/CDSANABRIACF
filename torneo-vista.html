@@ -62,6 +62,7 @@
     </div>
 
     <script src="js/torneo-responsable-access.js"></script>
+    <script src="js/torneo-f7-calendario-oficial.js"></script>
     <script src="js/torneo-public-view.js"></script>
     <script>
         (function () {
@@ -71,12 +72,20 @@
             var linkPlantilla = document.getElementById('linkPlantilla');
             var btnLogout = document.getElementById('btnLogout');
 
+            function renderTorneoBoard() {
+                if (window.TorneoF7CalendarioOficial && typeof window.TorneoF7CalendarioOficial.renderPublic === 'function') {
+                    root.innerHTML = '<div id="torneoF7PublicBoard">' + window.TorneoF7CalendarioOficial.renderPublic() + '</div>';
+                    return;
+                }
+                if (window.TorneoPublicView) window.TorneoPublicView.render(root);
+            }
+
             function showMain() {
                 loginView.hidden = true;
                 mainView.hidden = false;
                 linkPlantilla.hidden = false;
                 btnLogout.hidden = false;
-                if (window.TorneoPublicView) window.TorneoPublicView.render(root);
+                renderTorneoBoard();
             }
 
             function showLogin() {
@@ -117,7 +126,7 @@
             });
 
             window.addEventListener('competitionsUpdated', function () {
-                if (!mainView.hidden && window.TorneoPublicView) window.TorneoPublicView.render(root);
+                if (!mainView.hidden) renderTorneoBoard();
             });
 
             var params = new URLSearchParams(location.search || '');

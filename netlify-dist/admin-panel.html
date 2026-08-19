@@ -40,6 +40,7 @@
     <script src="js/rate-limiter.js"></script>
     <script src="js/permissionmanager.js"></script>
     <!-- Misma capa la nube que la web: sincroniza socios (sanabria_members → localStorage) para el panel -->
+    <script src="js/localstorage-quota.js"></script>
     <script src="js/club-password-hash.js"></script>
     <script src="js/protocol-guard.js"></script>
     <script src="js/admin-session.js"></script>
@@ -47,6 +48,7 @@
     <script src="js/club-member-numbers.js"></script>
     <script src="js/club-friend-numbers.js"></script>
     <script src="js/club-member-card.js"></script>
+    <script src="js/admin-event-attendance.js"></script>
     <script src="js/club-role-links.js"></script>
     <script src="js/club-inscription-config.js"></script>
     <script src="js/club-season.js"></script>
@@ -59,6 +61,7 @@
     <script src="js/admin-torneo-preinscripciones.js"></script>
     <script src="js/admin-torneo-competition-bridge.js"></script>
     <script src="js/admin-torneo-f7-wizard.js"></script>
+    <script src="js/torneo-f7-calendario-oficial.js"></script>
     <script src="js/admin-player-applications.js"></script>
     <script src="js/club-player-kit-persist.js"></script>
     <script src="js/player-inscription.js"></script>
@@ -622,7 +625,9 @@
             display: none !important;
         }
         html.admin-organizer-pending #cuotaRenewalBanner,
-        body.admin-organizer-mode #cuotaRenewalBanner {
+        body.admin-organizer-mode #cuotaRenewalBanner,
+        html.admin-organizer-pending #cuotaRenewalReminderBanner,
+        body.admin-organizer-mode #cuotaRenewalReminderBanner {
             display: none !important;
         }
 
@@ -2136,6 +2141,7 @@
                         </div>
                         <button type="button" class="btn btn-success" onclick="loadTorneoPreinscripcionesAdmin()">🔄 Actualizar listado</button>
                         <button type="button" class="btn btn-primary" onclick="openTorneoF7Wizard()" style="margin-left:6px;">🧙 Asistente torneo F7</button>
+                        <button type="button" class="btn" onclick="loadTorneoF7CalendarioOficial()" style="margin-left:6px;background:#0f766e;color:#fff;">📅 Cargar calendario oficial</button>
                     </div>
                     <p style="margin:0 0 12px;font-size:0.9rem;"><strong>Total:</strong> <span id="torneoPreinscripcionesCompCount">0</span></p>
                     <div id="torneoPreinscripcionesCompList">
@@ -4192,6 +4198,7 @@
                 <div class="section">
                     <h3>👨‍💼 Gestión de Administradores</h3>
                     <p><strong>Administradores del equipo CDSANABRIACF</strong></p>
+                    <p style="font-size:0.9rem;color:#334155;margin:8px 0 14px;">Los organizadores del campeonato entran con <strong>email + contraseña</strong> en 🔧 Admin. Al guardar, la clave se crea de verdad en la nube (si solo se guardaba en este navegador, no podían entrar).</p>
                     
                     <button class="btn" onclick="showAddAdminForm()" style="background: #059669;">➕ Añadir Administrador</button>
                     
@@ -4205,7 +4212,7 @@
                             </div>
                             <div>
                                 <label style="display: block; margin-bottom: 5px; font-weight: bold;">Email *</label>
-                                <input type="email" id="adminEmail" required style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
+                                <input type="text" id="adminEmail" inputmode="email" autocomplete="username" required style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;" placeholder="admite alias con +">
                             </div>
                         </div>
                         <div style="margin-bottom: 15px;">
@@ -4668,7 +4675,8 @@
                 }
             }
             if (!window.firebaseAuth || window.firebaseAuth.isSimulation) {
-                return true;
+                showAdminSessionGate('No se pudo conectar con la nube. Abre la web del club e inicia sesión como administrador u organizador.');
+                return false;
             }
 
             const waitAuth =
@@ -4692,16 +4700,6 @@
                 return false;
             }
 
-            if (
-                !window.AdminSession
-                || typeof window.AdminSession.isAdminAuthenticated !== 'function'
-                || !window.AdminSession.isAdminAuthenticated()
-            ) {
-                showAdminSessionGate(
-                    'Acceso al panel solo tras iniciar sesión con contraseña en la web principal (botón Admin).'
-                );
-                return false;
-            }
             try {
                 const { doc, getDoc } = await import('https://www.gstatic.com/firebasejs/10.12.3/firebase-firestore.js');
                 const col = (window.DB_COLLECTIONS && window.DB_COLLECTIONS.ADMINS) || 'sanabria_admins';
@@ -4711,27 +4709,49 @@
                     return false;
                 }
                 const d = snap.data() || {};
-                const isOrganizer = d.role === 'competition_organizer'
+                const isOrganizer = String(d.role || '').trim() === 'competition_organizer'
                     || (window.AdminOrganizerAccess && window.AdminOrganizerAccess.isOrganizerFirestoreDoc(d));
                 const isFullAdmin =
                     d.isAdmin === true
                     || d.isSuperAdmin === true
                     || d.role === 'admin'
-                    || d.role === 'super_admin';
+                    || d.role === 'super_admin'
+                    || d.role === 'team_admin'
+                    || d.role === 'assistant_admin';
                 const ok = d.appScope === 'cdsanabriacf' && (isFullAdmin || isOrganizer);
                 if (!ok) {
                     showAdminSessionGate('Sin permisos de administrador u organizador en la nube del club.');
                     return false;
                 }
-                if (isOrganizer) {
-                    try {
-                        const cur = JSON.parse(localStorage.getItem('currentAdmin') || '{}');
-                        cur.role = 'competition_organizer';
-                        cur.isAdmin = false;
+                try {
+                    let cur = {};
+                    if (window.AdminSession && typeof window.AdminSession.getStoredAdminSession === 'function') {
+                        cur = window.AdminSession.getStoredAdminSession() || {};
+                    }
+                    if (!cur.email) {
+                        try {
+                            cur = JSON.parse(localStorage.getItem('currentAdmin') || localStorage.getItem('adminUser') || '{}');
+                        } catch (_) {
+                            cur = {};
+                        }
+                    }
+                    cur.id = user.uid;
+                    cur.email = String(user.email || cur.email || '').toLowerCase();
+                    cur.name = cur.name || d.name || d.nombre || (isOrganizer ? 'Organizador/a' : 'Administrador/a');
+                    cur.role = isOrganizer ? 'competition_organizer' : (d.role || cur.role || 'admin');
+                    cur.isAdmin = !isOrganizer && (isFullAdmin || cur.isAdmin === true);
+                    cur.isSuperAdmin = d.isSuperAdmin === true;
+                    cur.loginTime = cur.loginTime || new Date().toISOString();
+                    if (window.AdminSession && typeof window.AdminSession.setStoredAdminSession === 'function') {
+                        window.AdminSession.setStoredAdminSession(cur);
+                    } else {
                         localStorage.setItem('currentAdmin', JSON.stringify(cur));
                         localStorage.setItem('adminUser', JSON.stringify(cur));
-                    } catch (_) {}
-                }
+                    }
+                    if (window.AdminSession && typeof window.AdminSession.markAdminAuthenticated === 'function') {
+                        window.AdminSession.markAdminAuthenticated();
+                    }
+                } catch (_) {}
                 return true;
             } catch (e) {
                 console.warn('verifyFirebaseAdminSession:', e);
@@ -4744,15 +4764,16 @@
             console.log('🔍 Cargando panel de administración CDSANABRIACF...');
             const firebaseOk = await verifyFirebaseAdminSession();
             if (!firebaseOk) return;
-            checkAdminSession();
+            if (!checkAdminSession()) return;
             checkAdminPermissions();
             if (window.AdminOrganizerAccess && window.AdminOrganizerAccess.isCompetitionOrganizer()) {
                 window.AdminOrganizerAccess.applyNavRestrictions();
                 window.AdminOrganizerAccess.applyCompetitionTabChrome();
+            } else {
+                checkExpiredMembers();
+                checkAutomaticSeasonRenewal();
+                cargarConfiguracionTienda();
             }
-            checkExpiredMembers(); // Verificar socios expirados al cargar
-            checkAutomaticSeasonRenewal(); // Renovación automática tras 31/05 (nube)
-            cargarConfiguracionTienda(); // Cargar configuración de tienda
             
             // Abrir pestaña si viene desde enlace de la web principal
             const savedTab = localStorage.getItem('adminActiveTab');
@@ -4765,6 +4786,9 @@
                     showTab('competiciones');
                 }
                 if (typeof loadCompetitionsList === 'function') loadCompetitionsList();
+                if (typeof loadTorneoPreinscripcionesAdmin === 'function') {
+                    loadTorneoPreinscripcionesAdmin();
+                }
             } else if (savedTab) {
                 console.log('📂 Abriendo pestaña desde enlace:', savedTab);
                 setTimeout(() => {
@@ -4782,12 +4806,14 @@
                 }, 500);
             }
 
-            // Reconciliación al abrir: solo el resumen final (sin otros avisos previos).
-            setTimeout(() => {
-                intentarReconciliacionAutomaticaAlAbrir().catch((err) => {
-                    console.warn('No se pudo ejecutar reconciliación automática al abrir:', err);
-                });
-            }, 1200);
+            // Reconciliación al abrir: solo administradores del club (el organizador no puede escribir socios/jugadores).
+            if (!(window.AdminOrganizerAccess && window.AdminOrganizerAccess.isCompetitionOrganizer())) {
+                setTimeout(() => {
+                    intentarReconciliacionAutomaticaAlAbrir().catch((err) => {
+                        console.warn('No se pudo ejecutar reconciliación automática al abrir:', err);
+                    });
+                }, 1200);
+            }
 
             window.addEventListener('clubMediaUpdated', function () {
                 try { if (typeof renderMultimediaAdminList === 'function') renderMultimediaAdminList(); } catch (_) {}
@@ -4800,9 +4826,35 @@
         // Función para verificar sesión de administrador
         function checkAdminSession() {
             try {
-                const currentAdmin = JSON.parse(localStorage.getItem('currentAdmin') || '{}');
-                
+                let currentAdmin = {};
+                if (window.AdminSession && typeof window.AdminSession.getStoredAdminSession === 'function') {
+                    currentAdmin = window.AdminSession.getStoredAdminSession() || {};
+                }
                 if (!currentAdmin.email) {
+                    currentAdmin = JSON.parse(
+                        localStorage.getItem('currentAdmin') ||
+                        localStorage.getItem('adminUser') ||
+                        sessionStorage.getItem('currentAdmin') ||
+                        '{}'
+                    );
+                }
+                const user = window.firebaseAuth && window.firebaseAuth.currentUser;
+                if ((!currentAdmin || !currentAdmin.email) && user && user.email) {
+                    currentAdmin = {
+                        id: user.uid,
+                        email: String(user.email).toLowerCase(),
+                        name: user.displayName || 'Administrador/a',
+                        role: 'admin',
+                        loginTime: new Date().toISOString()
+                    };
+                    if (window.AdminSession && typeof window.AdminSession.setStoredAdminSession === 'function') {
+                        window.AdminSession.setStoredAdminSession(currentAdmin);
+                    } else {
+                        localStorage.setItem('currentAdmin', JSON.stringify(currentAdmin));
+                    }
+                }
+                
+                if (!currentAdmin || !currentAdmin.email) {
                     showAdminSessionGate('Sesión de administrador no válida. Inicia sesión desde la web principal.');
                     return false;
                 }
@@ -4967,67 +5019,95 @@
             document.getElementById('adminRole').value = 'competition_organizer';
         }
 
-        function saveNewAdmin() {
-            // Verificar permisos
+        async function upsertClubAdminInCloud(payload) {
+            if (!window.CdsanAdminApiAuth || !window.CdsanAdminApiAuth.adminFetch) {
+                throw new Error('Sesión de administrador no disponible para escribir en la nube.');
+            }
+            const res = await window.CdsanAdminApiAuth.adminFetch('/.netlify/functions/manage-club-admin', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+            const data = await res.json().catch(function () { return {}; });
+            if (!res.ok || !data.ok) {
+                throw new Error(data.error || 'No se pudo guardar la cuenta en la nube.');
+            }
+            return data;
+        }
+
+        async function saveNewAdmin() {
             const currentAdmin = JSON.parse(localStorage.getItem('currentAdmin') || '{}');
             if (currentAdmin.email !== 'amco@gmx.es') {
                 alert('❌ Solo el administrador principal puede añadir otros administradores');
                 return;
             }
-            
+
             try {
                 const adminPasswordField = document.getElementById('adminPassword').value;
                 const adminData = {
                     id: 'ADMIN_' + Date.now(),
-                    name: document.getElementById('adminName').value,
-                    email: document.getElementById('adminEmail').value,
-                    role: document.getElementById('adminRole').value,
+                    name: String(document.getElementById('adminName').value || '').trim(),
+                    email: String(document.getElementById('adminEmail').value || '').trim().toLowerCase(),
+                    role: document.getElementById('adminRole').value || 'competition_organizer',
                     teamId: 'CDSANABRIACF',
                     createdAt: new Date().toISOString(),
                     createdBy: 'amco@gmx.es',
                     status: 'active'
                 };
 
-                // Validar campos obligatorios
                 if (!adminData.name || !adminData.email) {
-                    alert('❌ Por favor, completa todos los campos obligatorios marcados con *');
+                    alert('❌ Completa nombre y email.');
                     return;
                 }
-
-                // Validar que no sea el email principal
-                if (adminData.email.toLowerCase() === 'amco@gmx.es') {
+                if (!adminData.email.includes('@')) {
+                    alert('❌ El email no es válido.');
+                    return;
+                }
+                if (adminData.email === 'amco@gmx.es') {
                     alert('❌ No puedes crear otro administrador con el email principal');
                     return;
                 }
-
-                // Validar email único
-                const existingAdmins = JSON.parse(localStorage.getItem('cdsanabriacfTeamAdmins') || '[]');
-                if (existingAdmins.find(admin => admin.email.toLowerCase() === adminData.email.toLowerCase())) {
-                    alert('❌ Ya existe un administrador con este email');
+                if (!adminPasswordField || String(adminPasswordField).length < 8) {
+                    alert('❌ La contraseña de acceso es obligatoria (mínimo 8 caracteres). Se crea en la nube para que pueda entrar.');
                     return;
                 }
 
-                // Guardar en localStorage
-                existingAdmins.push(adminData);
+                const cloud = await upsertClubAdminInCloud({
+                    email: adminData.email,
+                    name: adminData.name,
+                    password: adminPasswordField,
+                    role: adminData.role
+                });
+                adminData.uid = cloud.uid || '';
+                adminData.cloudRole = cloud.role || adminData.role;
+
+                const existingAdmins = JSON.parse(localStorage.getItem('cdsanabriacfTeamAdmins') || '[]');
+                const already = existingAdmins.find(function (admin) {
+                    return String(admin.email || '').toLowerCase() === adminData.email;
+                });
+                if (already) {
+                    already.name = adminData.name;
+                    already.role = adminData.role;
+                    already.uid = adminData.uid;
+                    already.status = 'active';
+                    already.updatedAt = new Date().toISOString();
+                } else {
+                    existingAdmins.push(adminData);
+                }
                 localStorage.setItem('cdsanabriacfTeamAdmins', JSON.stringify(existingAdmins));
 
                 alert(
-                    '✅ Datos del administrador guardados (sin contraseña en este navegador).\n\n' +
-                    '📧 ' + adminData.email + '\n\n' +
-                    '🔐 Crea la cuenta de administrador en la nube del club (contacto con soporte técnico si hace falta).\n' +
-                    (adminPasswordField
-                        ? '\n⚠️ La contraseña escrita aquí no se almacena: configúrala con «Restablecer contraseña» o desde soporte técnico.'
-                        : '')
+                    '✅ Cuenta creada en la nube. Ya puede entrar.\n\n' +
+                    '📧 ' + adminData.email + '\n' +
+                    '🔑 Usa la contraseña que acabas de indicar (no se guarda en este navegador).\n\n' +
+                    'Entrada: web del club → 🔧 Admin → email y contraseña.'
                 );
                 document.getElementById('adminPassword').value = '';
-                
                 cancelAddAdmin();
                 loadAdminsList();
-
-                console.log('👨‍💼 Nuevo administrador añadido:', adminData.name, adminData.email);
             } catch (error) {
                 console.error('❌ Error añadiendo administrador:', error);
-                alert('❌ Error al añadir el administrador. Inténtalo de nuevo.');
+                alert('❌ No se pudo crear el acceso en la nube: ' + (error.message || error));
             }
         }
 
@@ -5042,6 +5122,14 @@
                     name: 'Administrador Secundario',
                     email: 'cdsanabriafc@gmail.com',
                     role: 'super_admin',
+                    status: 'active'
+                };
+
+                const defaultOrganizer = {
+                    id: 'ADMIN_ORGANIZER_F7',
+                    name: 'Organizador Torneo F7',
+                    email: 'cdsanabriafc+torneo@gmail.com',
+                    role: 'competition_organizer',
                     status: 'active'
                 };
 
@@ -5061,12 +5149,25 @@
                         </div>
                     </div>
                 `;
+                html += `
+                    <div style="display: flex; justify-content: space-between; align-items: center; padding: 15px; border-bottom: 1px solid #eee; background: #ecfdf5;">
+                        <div>
+                            <strong>🏆 ${defaultOrganizer.name}</strong><br>
+                            <small>📧 ${defaultOrganizer.email} | 🎯 Organizador/a competiciones</small><br>
+                            <small style="color: #0f766e; font-weight: bold;">🔐 Pulsa «Clave en la nube» para crear o restablecer su acceso</small>
+                        </div>
+                        <div>
+                            <button class="btn btn-small" onclick="resetAdminCloudPassword('${defaultOrganizer.id}')" style="padding: 5px 10px; font-size: 0.8rem; background:#0f766e; color:white;">🔑 Clave en la nube</button>
+                        </div>
+                    </div>
+                `;
 
                 // Mostrar administradores adicionales
                 if (admins.length === 0) {
                     html += '<div style="padding: 15px; text-align: center; color: #666;">No hay administradores adicionales registrados</div>';
                 } else {
                     admins.forEach(admin => {
+                        if (String(admin.email || '').toLowerCase() === 'cdsanabriafc+torneo@gmail.com') return;
                         const roleText =
                             admin.role === 'competition_organizer'
                                 ? 'Organizador/a competiciones'
@@ -5082,7 +5183,7 @@
                                     <small style="color: #059669; font-weight: bold;">🔐 Credenciales gestionadas en la cuenta del club (nube)</small>
                                 </div>
                                 <div>
-                                    <button class="btn btn-small" onclick="editAdmin('${admin.id}')" style="padding: 5px 10px; font-size: 0.8rem; margin-right: 5px;">✏️ Editar</button>
+                                    <button class="btn btn-small" onclick="resetAdminCloudPassword('${admin.id}')" style="padding: 5px 10px; font-size: 0.8rem; margin-right: 5px; background:#0f766e; color:white;">🔑 Clave en la nube</button>
                                     <button class="btn btn-small" onclick="deleteAdmin('${admin.id}')" style="padding: 5px 10px; font-size: 0.8rem; background: #dc2626;">🗑️ Eliminar</button>
                                 </div>
                             </div>
@@ -5099,14 +5200,47 @@
             }
         }
 
-        function editAdmin(adminId) {
-            // Verificar permisos
+        async function resetAdminCloudPassword(adminId) {
             const currentAdmin = JSON.parse(localStorage.getItem('currentAdmin') || '{}');
             if (currentAdmin.email !== 'amco@gmx.es') {
-                alert('❌ Solo el administrador principal puede editar otros administradores');
+                alert('❌ Solo el administrador principal puede cambiar claves de otros administradores');
                 return;
             }
-            alert('🔧 Función de edición en desarrollo. ID: ' + adminId);
+            const admins = JSON.parse(localStorage.getItem('cdsanabriacfTeamAdmins') || '[]');
+            const builtIn = {
+                ADMIN_ORGANIZER_F7: {
+                    id: 'ADMIN_ORGANIZER_F7',
+                    name: 'Organizador Torneo F7',
+                    email: 'cdsanabriafc+torneo@gmail.com',
+                    role: 'competition_organizer'
+                }
+            };
+            const admin = builtIn[adminId] || admins.find(function (row) { return row.id === adminId; });
+            if (!admin || !admin.email) {
+                alert('❌ No se encontró ese administrador.');
+                return;
+            }
+            const password = prompt(
+                'Nueva contraseña de acceso para ' + admin.email + ' (mínimo 8 caracteres).\nSe guarda en la nube para que pueda entrar con 🔧 Admin.',
+                ''
+            );
+            if (password == null) return;
+            if (String(password).length < 8) {
+                alert('❌ La contraseña debe tener al menos 8 caracteres.');
+                return;
+            }
+            try {
+                await upsertClubAdminInCloud({
+                    email: String(admin.email).trim().toLowerCase(),
+                    name: admin.name || '',
+                    password: String(password),
+                    role: admin.role || 'competition_organizer'
+                });
+                alert('✅ Clave actualizada en la nube.\n\n📧 ' + admin.email + '\nEntrada: web del club → 🔧 Admin.');
+            } catch (error) {
+                console.error('❌ Error actualizando clave admin:', error);
+                alert('❌ No se pudo actualizar la clave en la nube: ' + (error.message || error));
+            }
         }
 
         function deleteAdmin(adminId) {
@@ -9231,6 +9365,7 @@
                                 <div style="display: flex; gap: 10px; margin-top: 15px;">
                                     <button onclick="viewEventDetails('${event.id}')" style="padding: 6px 12px; background: #6c757d; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 0.8rem;">👁️ Ver Detalles</button>
                                     <button onclick="manageEventParticipants('${event.id}')" style="padding: 6px 12px; background: #1e3a8a; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 0.8rem;">👥 Participantes</button>
+                                    <button onclick="openEventAttendanceQr('${event.id}')" style="padding: 6px 12px; background: #7c3aed; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 0.8rem;" title="Solo administradores: escanear QR y lista de asistencia">📷 Asistencia QR</button>
                                     ${pendingEventPayments > 0 ? `<button onclick="validateEventPaymentsMenu('${event.id}')" style="padding: 6px 12px; background: #059669; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 0.8rem;" title="Confirmar transferencia o efectivo recibido">✅ Validar pagos (${pendingEventPayments})</button>` : ''}
                                     <button onclick="exportEventParticipantsExcel('${event.id}')" style="padding: 6px 12px; background: #166534; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 0.8rem;">📊 Excel</button>
                                     <button onclick="exportEventParticipantsCSV('${event.id}')" style="padding: 6px 12px; background: #8b5cf6; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 0.8rem;">📄 CSV</button>
@@ -11212,12 +11347,44 @@
         async function saveCompetitionRecord(updatedCompetition) {
             if (!ensureCompetitionAdminAccess()) return false;
             updatedCompetition.appScope = 'cdsanabriacf';
+            if (
+                String(updatedCompetition.id || '') === 'TORNEO_F7_2026_PINAR' ||
+                String(updatedCompetition.officialCalendarId || '') === 'TORNEO_F7_2026_PINAR'
+            ) {
+                updatedCompetition.id = updatedCompetition.id || 'TORNEO_F7_2026_PINAR';
+                updatedCompetition.officialCalendarId = 'TORNEO_F7_2026_PINAR';
+            }
             const competitions = JSON.parse(localStorage.getItem('clubCompetitions') || '[]');
-            const ix = competitions.findIndex(c => c.id === updatedCompetition.id);
-            if (ix < 0) return false;
-            competitions[ix] = updatedCompetition;
+            let ix = competitions.findIndex(c => c && c.id === updatedCompetition.id);
+            if (ix < 0 && updatedCompetition.officialCalendarId) {
+                ix = competitions.findIndex(c => c && c.officialCalendarId === updatedCompetition.officialCalendarId);
+            }
+            if (ix < 0) competitions.push(updatedCompetition);
+            else competitions[ix] = updatedCompetition;
             localStorage.setItem('clubCompetitions', JSON.stringify(competitions));
-            await persistRecordToFirebase('clubCompetitions', 'competitions', updatedCompetition);
+            const cloudPayload = Object.assign({}, updatedCompetition);
+            cloudPayload.matches = (updatedCompetition.matches || []).map(function (m) {
+                const x = Object.assign({}, m);
+                if (Array.isArray(x.changeLog) && x.changeLog.length) {
+                    x.changeLog = x.changeLog.slice(-5).map(function (e) {
+                        return { at: e && e.at, by: e && e.by, kind: e && e.kind };
+                    });
+                }
+                return x;
+            });
+            try {
+                if (typeof window.upsertDocument === 'function') {
+                    await window.upsertDocument('competitions', cloudPayload.id, cloudPayload);
+                } else {
+                    await persistRecordToFirebase('clubCompetitions', 'competitions', cloudPayload);
+                }
+            } catch (cloudErr) {
+                console.warn('saveCompetitionRecord nube:', cloudErr);
+                await persistRecordToFirebase('clubCompetitions', 'competitions', cloudPayload);
+            }
+            try {
+                window.dispatchEvent(new CustomEvent('competitionsUpdated', { detail: competitions }));
+            } catch (_) {}
             return true;
         }
 
@@ -14473,23 +14640,27 @@
                         match.planMatchTime = uiTime;
                         match.planField = uiField;
                     }
-                    match.matchDate = uiDate;
-                    match.matchTime = uiTime;
-                    match.field = uiField;
+                    match.matchDate = uiDate || previousMatch.matchDate || '';
+                    match.matchTime = uiTime || previousMatch.matchTime || '';
+                    match.field = uiField || previousMatch.field || '';
                 } else {
-                    match.matchDate = uiDate;
-                    match.matchTime = uiTime;
-                    match.field = uiField;
-                    match.planMatchDate = uiDate;
-                    match.planMatchTime = uiTime;
-                    match.planField = uiField;
+                    match.matchDate = uiDate || previousMatch.matchDate || '';
+                    match.matchTime = uiTime || previousMatch.matchTime || '';
+                    match.field = uiField || previousMatch.field || '';
+                    match.planMatchDate = match.matchDate;
+                    match.planMatchTime = match.matchTime;
+                    match.planField = match.field;
                 }
                 match.actaMeta = {
                     updatedAt: new Date().toISOString(),
                     updatedBy: JSON.parse(localStorage.getItem('currentAdmin') || '{}').email || 'admin',
                     encounterRef: `${match.homeTeamName || '-'} vs ${match.awayTeamName || '-'} | ${match.matchDate || '-'} ${match.matchTime || ''}`
                 };
-                if (hasMatchFieldTimeConflict(competition, matchId, match.matchDate, match.matchTime, match.field)) {
+                const scheduleChanged =
+                    (match.matchDate || '') !== (previousMatch.matchDate || '') ||
+                    (match.matchTime || '') !== (previousMatch.matchTime || '') ||
+                    (match.field || '') !== (previousMatch.field || '');
+                if (scheduleChanged && hasMatchFieldTimeConflict(competition, matchId, match.matchDate, match.matchTime, match.field)) {
                     alert('❌ Conflicto de campo/hora: ya hay otro partido asignado en esa franja.');
                     return;
                 }
@@ -14498,8 +14669,16 @@
                     at: new Date().toISOString(),
                     by: JSON.parse(localStorage.getItem('currentAdmin') || '{}').email || 'admin',
                     kind: 'match_update',
-                    before: previousSnapshot,
-                    after: JSON.stringify(match)
+                    before: {
+                        homeScore: previousMatch.homeScore,
+                        awayScore: previousMatch.awayScore,
+                        status: previousMatch.status
+                    },
+                    after: {
+                        homeScore: match.homeScore,
+                        awayScore: match.awayScore,
+                        status: match.status
+                    }
                 });
                 if (match.changeLog.length > 50) match.changeLog = match.changeLog.slice(-50);
 
@@ -14515,7 +14694,12 @@
                 }
 
                 competition.updatedAt = new Date().toISOString();
-                await saveCompetitionRecord(competition);
+                const saved = await saveCompetitionRecord(competition);
+                if (!saved) {
+                    alert('❌ No se pudo guardar el resultado. Revisa que hayas iniciado sesión como administrador u organizador.');
+                    return;
+                }
+                alert('✅ Resultado guardado: ' + hs + ' - ' + as);
                 if ((match.matchDate || '') !== (previousMatch.matchDate || '') || (match.matchTime || '') !== (previousMatch.matchTime || '') || (match.field || '') !== (previousMatch.field || '')) {
                     await createCompetitionNotification(
                         competition,
@@ -15458,17 +15642,30 @@
             const d = new Date(raw);
             return isNaN(d.getTime()) ? null : d.toISOString();
         }
+        function canonicalizeMemberStatus(rawStatus, estado) {
+            const s = String(rawStatus == null ? '' : rawStatus).trim().toLowerCase();
+            const e = String(estado == null ? '' : estado).trim().toLowerCase();
+            const v = s || e;
+            if (v === 'active' || v === 'activo') return 'active';
+            if (v === 'expired' || v === 'expirado' || v === 'caducado') return 'expired';
+            if (
+                v === 'pending_validation' ||
+                v === 'pendiente' ||
+                v === 'pending' ||
+                v === 'pending_new' ||
+                v === 'nueva_alta'
+            ) {
+                return 'pending_validation';
+            }
+            return v || 'pending_validation';
+        }
+
         function normalizeClubMember(m) {
             if (!m || typeof m !== 'object') return { name: '', surname: '', phone: '', registrationDate: null, status: 'pending_validation' };
             const regIso = registrationDateToIso(m) || (m.registrationDate || m.fechaRegistro || null);
-            let status = m.status;
-            if (status == null || status === '') {
-                const e = String(m.estado || '').toLowerCase();
-                if (e === 'pendiente' || e === 'pending' || e === 'pending_validation') status = 'pending_validation';
-                else if (e === 'activo' || e === 'active') status = 'active';
-                else if (e === 'expirado' || e === 'expired' || e === 'caducado') status = 'expired';
-            }
-            if (!status) status = 'pending_validation';
+            const status = canonicalizeMemberStatus(m.status, m.estado);
+            const estado =
+                status === 'active' ? 'activo' : status === 'expired' ? 'caducado' : 'pendiente';
             const name = cleanMemberStr(m.name) || cleanMemberStr(m.nombre) || cleanMemberStr(m.nombres) || cleanMemberStr(m.firstName);
             const surname = cleanMemberStr(m.surname) || cleanMemberStr(m.apellidos) || cleanMemberStr(m.apellido) || cleanMemberStr(m.lastName);
             const phone = cleanMemberStr(m.phone) || cleanMemberStr(m.telefono) || cleanMemberStr(m.movil);
@@ -15481,6 +15678,7 @@
                 address,
                 registrationDate: regIso,
                 status,
+                estado,
                 memberNumber: m.memberNumber != null && m.memberNumber !== '' ? m.memberNumber : m.numeroSocio,
                 birthDate: m.birthDate || m.fechaNacimiento,
                 sexo: normalizeSexoField(m) || ''
@@ -17069,42 +17267,43 @@
         }
 
         function renderMemberListCardHtml(member, visualIndex) {
-            const isExpired = isMemberExpired(member);
-            const statusText = getMemberStatusText(member, isExpired);
-            const statusColor = getMemberStatusColor(member, isExpired);
-            const kindLabel = getMemberKindLabel(member);
-            const kindBadge = isMemberSocioJugador(member)
+            const nm = normalizeClubMember(member);
+            const isExpired = isMemberExpired(nm);
+            const statusText = getMemberStatusText(nm, isExpired);
+            const statusColor = getMemberStatusColor(nm, isExpired);
+            const kindLabel = getMemberKindLabel(nm);
+            const kindBadge = isMemberSocioJugador(nm)
                 ? '<span style="background:#fef3c7;color:#92400e;padding:2px 8px;border-radius:12px;font-size:0.75rem;margin-left:6px;">⚽ ' + kindLabel + '</span>'
                 : '<span style="background:#e0e7ff;color:#3730a3;padding:2px 8px;border-radius:12px;font-size:0.75rem;margin-left:6px;">👤 ' + kindLabel + '</span>';
-            const safeId = String(member.id || '').replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+            const safeId = String(nm.id || member.id || '').replace(/\\/g, '\\\\').replace(/'/g, "\\'");
 
             return `
                         <div style="background: white; padding: 15px; border-radius: 8px; margin-bottom: 10px; border-left: 4px solid ${statusColor};">
                             <div style="display: flex; justify-content: space-between; align-items: flex-start;">
                                 <div>
-                                    <h4 style="margin: 0 0 5px 0; color: #1e3a8a;">#${visualIndex + 1} · ${([member.name, member.surname].filter(function (x) { return x && String(x).trim(); }).join(' ') || '—')}${kindBadge}</h4>
+                                    <h4 style="margin: 0 0 5px 0; color: #1e3a8a;">#${visualIndex + 1} · ${([nm.name, nm.surname].filter(function (x) { return x && String(x).trim(); }).join(' ') || '—')}${kindBadge}</h4>
                                     <div style="font-size: 0.9em; color: #666; margin-bottom: 8px;">
-                                        📞 ${member.phone || '—'} | 📧 ${member.email || 'No especificado'} | 📍 ${member.address || 'No especificada'}
+                                        📞 ${nm.phone || '—'} | 📧 ${nm.email || 'No especificado'} | 📍 ${nm.address || 'No especificada'}
                                     </div>
                                     <div style="font-size: 0.9em; color: #666;">
-                                        🆔 DNI: ${member.dni || 'No especificado'} | 📅 Registro: ${member.registrationDate ? (() => { const d = new Date(member.registrationDate); return isNaN(d.getTime()) ? '—' : d.toLocaleDateString('es-ES'); })() : '—'}
+                                        🆔 DNI: ${nm.dni || 'No especificado'} | 📅 Registro: ${nm.registrationDate ? (() => { const d = new Date(nm.registrationDate); return isNaN(d.getTime()) ? '—' : d.toLocaleDateString('es-ES'); })() : '—'}
                                         ${(function(){
                                             const CMN = window.ClubMemberNumbers;
-                                            if (CMN && CMN.isSocioDeHonor(member)) {
-                                                const h = CMN.getHonorNumber(member);
+                                            if (CMN && CMN.isSocioDeHonor(nm)) {
+                                                const h = CMN.getHonorNumber(nm);
                                                 return '| 🏅 SOCIO DE HONOR' + (h ? ' · N.º SOC. ' + CMN.padSocNum(h) : '');
                                             }
-                                            if (!member.memberNumber || String(member.memberNumber).startsWith('SOC')) return '';
-                                            const label = CMN ? CMN.padSocNum(parseInt(member.memberNumber)) : String(member.memberNumber).padStart(6,'0');
+                                            if (!nm.memberNumber || String(nm.memberNumber).startsWith('SOC')) return '';
+                                            const label = CMN ? CMN.padSocNum(parseInt(nm.memberNumber)) : String(nm.memberNumber).padStart(6,'0');
                                             return '| N.º SOC. ' + label;
                                         })()}
-                                        ${member.pendingReason === 'renovacion' ? ' | <span style="color:#0284c7;font-weight:600;">Renovación cuota</span>' : ''}
-                                        ${member.cuota != null ? ` | 💶 Cuota: ${member.cuota} €` : ''}
+                                        ${nm.pendingReason === 'renovacion' ? ' | <span style="color:#0284c7;font-weight:600;">Renovación cuota</span>' : ''}
+                                        ${nm.cuota != null ? ` | 💶 Cuota: ${nm.cuota} €` : ''}
                                     </div>
                                     <div style="font-size: 0.9em; color: #059669; font-weight: bold; margin-top: 5px;">
                                         🔐 Contraseña gestionada de forma segura (no visible en panel)
                                     </div>
-                                    ${typeof formatClubRoleBadgesHtml === 'function' ? formatClubRoleBadgesHtml(member) : ''}
+                                    ${typeof formatClubRoleBadgesHtml === 'function' ? formatClubRoleBadgesHtml(nm) : ''}
                                 </div>
                                 <span style="background: ${statusColor}; color: white; padding: 4px 8px; border-radius: 12px; font-size: 0.8rem;">
                                     ${statusText}
@@ -17112,9 +17311,9 @@
                             </div>
                             <div style="display: flex; gap: 10px; margin-top: 15px; flex-wrap:wrap;">
                                 <button onclick="viewMemberDetails('${safeId}')" style="padding: 6px 12px; background: #6c757d; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 0.8rem;">👁️ Ver Detalles</button>
-                                ${member.status === 'active' ? `<button onclick="previewMemberCard('${safeId}')" title="Vista previa del carnet (solo admin)" style="padding: 6px 12px; background: #1e3a8a; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 0.8rem;">🎫 Carnet</button>` : ''}
-                                ${member.status === 'pending_validation' ? `<button onclick="validateMember('${safeId}')" title="Solo tras ver el ingreso en la cuenta bancaria" style="padding: 6px 12px; background: #059669; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 0.8rem;">✅ Validar pago</button>` : ''}
-                                ${member.status === 'active' ? `<button type="button" onclick="contabilidadRegistrarCuotaSocioActivo('${safeId}')" title="Si validaste antes de tener contabilidad o falta el asiento en el libro" style="padding: 6px 12px; background: #1d4ed8; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 0.8rem;">💶 Cuota → contabilidad</button>` : ''}
+                                ${nm.status === 'active' ? `<button onclick="previewMemberCard('${safeId}')" title="Vista previa del carnet (solo admin)" style="padding: 6px 12px; background: #1e3a8a; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 0.8rem;">🎫 Carnet</button>` : ''}
+                                ${nm.status === 'pending_validation' ? `<button onclick="validateMember('${safeId}')" title="Solo tras ver el ingreso en la cuenta bancaria" style="padding: 6px 12px; background: #059669; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 0.8rem;">✅ Validar pago</button>` : ''}
+                                ${nm.status === 'active' ? `<button type="button" onclick="contabilidadRegistrarCuotaSocioActivo('${safeId}')" title="Si validaste antes de tener contabilidad o falta el asiento en el libro" style="padding: 6px 12px; background: #1d4ed8; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 0.8rem;">💶 Cuota → contabilidad</button>` : ''}
                                 <button onclick="editMember('${safeId}')" style="padding: 6px 12px; background: #f59e0b; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 0.8rem;">✏️ Editar</button>
                                 <button onclick="deleteMember('${safeId}')" style="padding: 6px 12px; background: #dc2626; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 0.8rem;">🗑️ Eliminar</button>
                             </div>
@@ -17145,10 +17344,11 @@
                 let filteredMembers = members;
                 if (statusFilter !== 'all') {
                     filteredMembers = members.filter(member => {
-                        if (statusFilter === 'pending') return member.status === 'pending_validation';
+                        const st = normalizeClubMember(member).status;
+                        if (statusFilter === 'pending') return st === 'pending_validation';
                         if (statusFilter === 'pending_renewal') return isMemberPendingRenewal(member);
                         if (statusFilter === 'pending_new') return isMemberPendingNewAlta(member);
-                        if (statusFilter === 'active') return member.status === 'active';
+                        if (statusFilter === 'active') return st === 'active';
                         if (statusFilter === 'expired') return isMemberExpired(member);
                         return true;
                     });
@@ -18426,6 +18626,10 @@
         function refreshCuotaRenewalBanner() {
             const el = document.getElementById('cuotaRenewalReminderBanner');
             if (!el) return;
+            if (window.AdminOrganizerAccess && window.AdminOrganizerAccess.isCompetitionOrganizer()) {
+                el.style.display = 'none';
+                return;
+            }
             const show = shouldShowCuotaRenewalBanner();
             el.style.display = show ? 'block' : 'none';
             const lbl = document.getElementById('cuotaRenewalCierreLabel');
@@ -18528,8 +18732,8 @@
                     }
                     ensureMemberKindFlags(m);
                 });
-                const activeCount = members.filter(m => m.status === 'active').length;
-                const pendingCount = members.filter(m => m.status === 'pending_validation').length;
+                const activeCount = members.filter(m => normalizeClubMember(m).status === 'active').length;
+                const pendingCount = members.filter(m => normalizeClubMember(m).status === 'pending_validation').length;
                 const expiredCount = members.filter(m => isMemberExpired(m)).length;
                 const normalCount = members.filter(function (m) { return !isMemberSocioJugador(m); }).length;
                 const playerMemberCount = members.filter(function (m) { return isMemberSocioJugador(m); }).length;
@@ -24831,7 +25035,7 @@ th,td{border:1px solid #ccc;padding:5px 7px;text-align:left;white-space:nowrap;}
                 console.log('🔄 Iniciando sincronización de socios con la nube...');
                 
                 // Obtener socios del localStorage
-                const socios = JSON.parse(localStorage.getItem('members') || '[]');
+                const socios = JSON.parse(localStorage.getItem('clubMembers') || localStorage.getItem('members') || '[]');
                 
                 if (socios.length === 0) {
                     alert('❌ No hay socios para sincronizar. Primero crea algunos socios.');
@@ -25066,6 +25270,12 @@ th,td{border:1px solid #ccc;padding:5px 7px;text-align:left;white-space:nowrap;}
         async function reconciliarModulosConFirebase(options) {
             const opts = options || {};
             try {
+                if (window.AdminOrganizerAccess && window.AdminOrganizerAccess.isCompetitionOrganizer()) {
+                    if (!opts.fromAutoOpen) {
+                        alert('ℹ️ El organizador de competiciones no reconcilia socios, amigos ni jugadores del club.');
+                    }
+                    return;
+                }
                 if (typeof window.getDocuments !== 'function' || typeof window.syncLocalArrayKeyToFirebase !== 'function') {
                     if (!opts.fromAutoOpen) {
                         alert('❌ La nube no está disponible para reconciliación en este panel.');
@@ -25134,6 +25344,9 @@ th,td{border:1px solid #ccc;padding:5px 7px;text-align:left;white-space:nowrap;}
 
         async function intentarReconciliacionAutomaticaAlAbrir() {
             try {
+                if (window.AdminOrganizerAccess && window.AdminOrganizerAccess.isCompetitionOrganizer()) {
+                    return;
+                }
                 if (sessionStorage.getItem('cdsanabria_auto_reconcile_done') === '1') return;
                 sessionStorage.setItem('cdsanabria_auto_reconcile_done', '1');
                 await reconciliarModulosConFirebase({ fromAutoOpen: true });
@@ -25341,6 +25554,11 @@ th,td{border:1px solid #ccc;padding:5px 7px;text-align:left;white-space:nowrap;}
 
             if (tabName === 'competiciones') {
                 if (typeof loadCompetitionsList === 'function') loadCompetitionsList();
+                if (window.TorneoF7CalendarioOficial && typeof window.TorneoF7CalendarioOficial.ensureInEngine === 'function') {
+                    window.TorneoF7CalendarioOficial.ensureInEngine().catch(function (err) {
+                        console.warn('Calendario oficial F7:', err);
+                    });
+                }
             }
 
             if (tabName === 'dashboard' && window.SiteUpdateMode && typeof window.SiteUpdateMode.refreshUi === 'function') {

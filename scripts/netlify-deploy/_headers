@@ -1,0 +1,21 @@
+# No cachear HTML, SW, JS ni versión: la PWA (iPhone y Android) debe ver el deploy al abrir.
+/sw.js
+  Cache-Control: no-cache, no-store, must-revalidate
+  Pragma: no-cache
+
+/index.html
+  Cache-Control: no-cache, no-store, must-revalidate
+  Pragma: no-cache
+
+/admin-panel.html
+  Cache-Control: no-cache, no-store, must-revalidate
+
+/manifest.json
+  Cache-Control: no-cache, no-store, must-revalidate
+
+/deploy-version.json
+  Cache-Control: no-cache, no-store, must-revalidate
+  Pragma: no-cache
+
+/js/*
+  Cache-Control: no-cache, no-store, must-revalidate

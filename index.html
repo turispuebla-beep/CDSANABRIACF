@@ -11,6 +11,7 @@
     <script src="https://www.gstatic.com/firebasejs/10.12.3/firebase-database.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.12.3/firebase-auth.js"></script>
     
+    <script src="js/localstorage-quota.js"></script>
     <script src="js/club-password-hash.js"></script>
     <script src="js/protocol-guard.js"></script>
     <script src="js/club-member-numbers.js"></script>
@@ -27,6 +28,7 @@
     <script src="js/site-update-mode.js"></script>
     <script src="js/player-application.js"></script>
     <script src="js/club-torneo-pricing.js"></script>
+    <script src="js/torneo-f7-calendario-oficial.js"></script>
     <script src="js/torneo-preinscripcion.js"></script>
     <script src="js/torneo-responsable-access.js"></script>
     <script src="js/colaborador-solicitud.js"></script>
@@ -1144,6 +1146,15 @@
             color: var(--primary-color);
         }
 
+        .feature-nuevos-horarios {
+            margin: 0 0 6px;
+            font-size: 0.95rem;
+            font-weight: 900;
+            letter-spacing: 0.08em;
+            color: #dc2626;
+            text-transform: uppercase;
+        }
+
         .feature-title {
             font-size: 1.5rem;
             margin-bottom: 15px;
@@ -1461,9 +1472,13 @@
             flex-direction: column;
             align-items: center;
             justify-content: center;
-            padding: 24px 16px 20px;
+            padding: 56px 16px 24px;
+            overflow: hidden;
             background: rgba(15, 23, 42, 0.93);
             backdrop-filter: blur(6px);
+            cursor: pointer;
+            -webkit-tap-highlight-color: transparent;
+            touch-action: manipulation;
         }
 
         .campeonato-splash-overlay:not([hidden]) {
@@ -1471,31 +1486,27 @@
         }
 
         .campeonato-splash-close {
-            position: absolute;
-            top: 14px;
-            right: 14px;
-            width: 44px;
-            height: 44px;
+            position: fixed;
+            top: 10px;
+            right: 10px;
+            z-index: 10110;
+            width: 46px;
+            height: 46px;
             border: none;
             border-radius: 50%;
             background: #fff;
             color: #1e3a8a;
-            font-size: 1.6rem;
+            font-size: 1.75rem;
             line-height: 1;
             cursor: pointer;
-            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
-            opacity: 0;
-            pointer-events: none;
-            transition: opacity 0.35s ease, background 0.2s ease;
+            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
+            opacity: 1;
+            pointer-events: auto;
+            transition: background 0.2s ease;
         }
 
         .campeonato-splash-close:hover {
             background: #f1f5f9;
-        }
-
-        .campeonato-splash-overlay.is-settled .campeonato-splash-close {
-            opacity: 1;
-            pointer-events: auto;
         }
 
         .campeonato-splash-top,
@@ -1530,33 +1541,155 @@
         }
 
         .campeonato-splash-card {
-            max-width: min(88vw, 340px);
-        }
-
-        .campeonato-splash-img {
             display: block;
-            width: 100%;
-            height: auto;
-            border-radius: 14px;
+            width: min(92vw, 420px);
+            max-width: 420px;
+            flex-shrink: 0;
+            margin: 0;
+            padding: 36px 22px 28px;
+            border: none;
+            border-radius: 22px;
+            cursor: pointer;
+            pointer-events: auto;
+            -webkit-tap-highlight-color: rgba(253, 224, 71, 0.35);
+            touch-action: manipulation;
+            -webkit-user-select: none;
+            user-select: none;
+            -webkit-touch-callout: none;
+            text-align: center;
+            color: #fff;
+            background: linear-gradient(165deg, #1e3a8a 0%, #0f172a 55%, #14532d 100%);
             box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5);
-            transform: scale(0.68);
+            transform: scale(0.86);
+            appearance: none;
+            -webkit-appearance: none;
         }
 
-        .campeonato-splash-img.is-pulsing {
+        .campeonato-splash-card.is-pulsing {
             animation: campeonato-splash-pulse 2.1s ease-in-out 1 forwards;
         }
 
+        .campeonato-splash-overlay.is-settled .campeonato-splash-card {
+            animation: none;
+            transform: scale(1);
+        }
+
+        .campeonato-splash-newtimes {
+            display: block;
+            margin: 0 0 10px;
+            font-size: clamp(1.15rem, 5vw, 1.45rem);
+            font-weight: 900;
+            letter-spacing: 0.1em;
+            line-height: 1.1;
+            color: #ef4444;
+            text-transform: uppercase;
+            text-shadow: 0 2px 0 #7f1d1d, 0 0 14px rgba(239, 68, 68, 0.55);
+        }
+
+        .campeonato-splash-cup {
+            display: block;
+            font-size: clamp(4.2rem, 16vw, 6.2rem);
+            line-height: 1;
+            margin: 0 0 10px;
+            filter: drop-shadow(0 8px 18px rgba(253, 224, 71, 0.35));
+        }
+
+        .campeonato-splash-title {
+            display: block;
+            margin: 0;
+            font-size: clamp(1.55rem, 6.4vw, 2.15rem);
+            font-weight: 900;
+            letter-spacing: 0.04em;
+            line-height: 1.15;
+            color: #fde68a;
+        }
+
+        .campeonato-splash-hint {
+            display: block;
+            margin: 14px 0 0;
+            font-size: 0.95rem;
+            font-weight: 700;
+            color: #e2e8f0;
+        }
+
+        .campeonato-splash-motto {
+            display: block;
+            margin: 12px 0 0;
+            font-size: 0.78rem;
+            font-weight: 600;
+            line-height: 1.45;
+            color: #cbd5e1;
+            letter-spacing: 0.01em;
+        }
+
         @keyframes campeonato-splash-pulse {
-            0% { transform: scale(0.62); }
-            18% { transform: scale(1.1); }
-            36% { transform: scale(0.7); }
-            54% { transform: scale(1.1); }
+            0% { transform: scale(0.72); }
+            18% { transform: scale(1.06); }
+            36% { transform: scale(0.86); }
+            54% { transform: scale(1.05); }
             72%, 100% { transform: scale(1); }
         }
 
-        .campeonato-splash-overlay.is-settled .campeonato-splash-img {
-            animation: none;
-            transform: scale(1);
+        html.f7-public-open,
+        body.f7-public-open {
+            overflow: hidden;
+            height: 100%;
+            overscroll-behavior: none;
+        }
+
+        #f7PublicOverlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            width: 100%;
+            height: 100%;
+            min-height: 100%;
+            min-height: -webkit-fill-available;
+            min-height: 100dvh;
+            z-index: 2147483000;
+            background: #f1f5f9;
+            flex-direction: column;
+            -webkit-overflow-scrolling: touch;
+            -webkit-transform: translateZ(0);
+            transform: translateZ(0);
+        }
+
+        #f7PublicOverlay.is-open {
+            display: flex !important;
+        }
+
+        .f7-public-close {
+            position: fixed;
+            top: max(10px, env(safe-area-inset-top));
+            right: 10px;
+            z-index: 2147483001;
+            width: 46px;
+            height: 46px;
+            border: none;
+            border-radius: 50%;
+            background: #fff;
+            color: #1e3a8a;
+            font-size: 1.75rem;
+            line-height: 1;
+            cursor: pointer;
+            -webkit-tap-highlight-color: transparent;
+            touch-action: manipulation;
+        }
+
+        .f7-public-sheet {
+            flex: 1 1 auto;
+            min-height: 0;
+            overflow-y: auto;
+            -webkit-overflow-scrolling: touch;
+            padding: 56px 16px 28px;
+            padding-top: calc(56px + env(safe-area-inset-top));
+            width: 100%;
+            max-width: 720px;
+            margin: 0 auto;
+            box-sizing: border-box;
         }
 
         .proximo-evento-club {
@@ -1580,22 +1713,27 @@
         }
 
         .proximo-evento-col {
-            flex: 1 1 200px;
-            max-width: 240px;
+            flex: 1 1 240px;
+            max-width: 320px;
             display: flex;
             flex-direction: column;
             align-items: center;
             text-align: center;
         }
 
-        .proximo-evento-col--inscrip {
-            justify-content: center;
-            align-self: stretch;
-        }
-
-        .proximo-evento-col--inscrip .proximo-evento-poster-wrap {
-            margin-top: auto;
-            margin-bottom: auto;
+        .proximo-evento-poster-wrap {
+            margin: 0;
+            width: 100%;
+            max-width: 320px;
+            flex: 0 0 auto;
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 6px 18px rgba(0, 0, 0, 0.12);
+            background: #fff;
+            border: none;
+            padding: 0;
+            cursor: pointer;
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
         }
 
         .proximo-evento-kicker {
@@ -1614,20 +1752,6 @@
             line-height: 1.25;
         }
 
-        .proximo-evento-poster-wrap {
-            margin: 0;
-            max-width: 200px;
-            flex: 1 1 160px;
-            border-radius: 12px;
-            overflow: hidden;
-            box-shadow: 0 6px 18px rgba(0, 0, 0, 0.12);
-            background: #fff;
-            border: none;
-            padding: 0;
-            cursor: pointer;
-            transition: transform 0.2s ease, box-shadow 0.2s ease;
-        }
-
         .proximo-evento-poster-wrap:hover {
             transform: scale(1.02);
             box-shadow: 0 8px 22px rgba(0, 0, 0, 0.18);
@@ -1643,6 +1767,20 @@
             width: 100%;
             height: auto;
             object-fit: contain;
+        }
+
+        .proximo-evento-col--bases {
+            flex-basis: 100%;
+            max-width: 280px;
+        }
+
+        .proximo-evento-caption {
+            margin: 8px 0 0;
+            font-size: 0.82rem;
+            font-weight: 800;
+            letter-spacing: 0.04em;
+            text-transform: uppercase;
+            color: #1e3a8a;
         }
 
         .proximo-evento-zoom-hint {
@@ -1669,8 +1807,8 @@
 
         .proximo-evento-lightbox-inner {
             position: relative;
-            max-width: min(96vw, 520px);
-            max-height: 92vh;
+            max-width: min(96vw, 920px);
+            max-height: 94vh;
         }
 
         .proximo-evento-lightbox-img {
@@ -1940,6 +2078,12 @@
             }
             .proximo-evento-poster-wrap {
                 max-width: 140px;
+            }
+            .proximo-evento-col--bases {
+                max-width: 220px;
+            }
+            .proximo-evento-col--bases .proximo-evento-poster-wrap {
+                max-width: 220px;
             }
         }
 
@@ -2755,43 +2899,102 @@
         class="campeonato-splash-overlay"
         role="dialog"
         aria-modal="true"
-        aria-label="Cartel Torneo Fútbol 7 2026"
+        aria-label="Torneo Fútbol 7"
         hidden
+        onclick="if (!event.target.closest('.campeonato-splash-close')) abrirTorneoF7Publico()"
+        ontouchend="if (event.target.closest && event.target.closest('.campeonato-splash-close')) return; event.preventDefault(); abrirTorneoF7Publico();"
     >
         <button
             type="button"
             class="campeonato-splash-close"
-            onclick="cerrarCampeonatoSplash()"
-            aria-label="Cerrar cartel"
+            onclick="event.stopPropagation(); cerrarCampeonatoSplash()"
+            aria-label="Cerrar"
         >&times;</button>
         <p class="campeonato-splash-top">WWW.CDSANABRIACF.COM</p>
-        <div class="campeonato-splash-card">
-            <img
-                src="assets/CAMPEONATO.jpg"
-                alt="Cartel Torneo Fútbol 7 — 2026 — CD Sanabria CF"
-                class="campeonato-splash-img is-pulsing"
-                width="480"
-                height="680"
-            >
+        <button
+            type="button"
+            class="campeonato-splash-card is-pulsing"
+            id="campeonatoSplashCard"
+            onclick="abrirTorneoF7Publico(); return false;"
+            ontouchend="if (event.target.closest && event.target.closest('.campeonato-splash-close')) return; event.preventDefault(); abrirTorneoF7Publico();"
+            aria-label="Pulsa para ver calendario y clasificación"
+        >
+            <span class="campeonato-splash-newtimes">NUEVOS HORARIOS</span>
+            <span class="campeonato-splash-cup" aria-hidden="true">🏆</span>
+            <span class="campeonato-splash-title">TORNEO FÚTBOL 7</span>
+            <span class="campeonato-splash-hint">Pulsa para ver calendario y clasificación</span>
+            <span class="campeonato-splash-motto">CDSANABRIACF, más de 50 años, haciendo que el deporte sea un referente en Sanabria y Carballeda.</span>
+        </button>
+        <p class="campeonato-splash-bottom">17 AL 23 DE AGOSTO</p>
+    </div>
+    <div
+        id="f7PublicOverlay"
+        hidden
+        role="dialog"
+        aria-modal="true"
+        aria-label="Calendario y clasificación Torneo Fútbol 7"
+    >
+        <button type="button" class="f7-public-close" onclick="if (window.TorneoF7CalendarioOficial) TorneoF7CalendarioOficial.closePublicBoard();" ontouchend="event.preventDefault(); if (window.TorneoF7CalendarioOficial) TorneoF7CalendarioOficial.closePublicBoard();" aria-label="Cerrar">&times;</button>
+        <div class="f7-public-sheet">
+            <div id="torneoF7PublicBoard"></div>
         </div>
-        <p class="campeonato-splash-bottom">FECHA LÍMITE HASTA EL 15 DE AGOSTO</p>
     </div>
     <script>
         (function () {
-            window.CAMPEONATO_PROMO_UNTIL_MS = Date.parse('2026-08-15T23:59:59.999+02:00');
+            window.CAMPEONATO_PROMO_UNTIL_MS = Date.parse('2026-08-24T23:59:59.999+02:00');
             window.isCampeonatoPromoActive = function () {
                 return Date.now() <= window.CAMPEONATO_PROMO_UNTIL_MS;
             };
-            var splashKey = 'cdsan_campeonato_splash_dismissed';
             try {
-                if (window.isCampeonatoPromoActive() && !sessionStorage.getItem(splashKey)) {
+                if (window.isCampeonatoPromoActive()) {
                     var splash = document.getElementById('campeonatoSplash');
                     if (splash) {
                         splash.hidden = false;
+                        splash.removeAttribute('hidden');
+                        splash.style.display = '';
                         document.body.classList.add('campeonato-splash-open');
                     }
                 }
             } catch (e) {}
+            document.addEventListener('touchend', function (e) {
+                var t = e.target;
+                if (!t || !t.closest) return;
+                if (t.closest('.campeonato-splash-close')) return;
+                var splash = document.getElementById('campeonatoSplash');
+                if (!splash || splash.hidden || splash.style.display === 'none') return;
+                if (!t.closest('#campeonatoSplash')) return;
+                e.preventDefault();
+                if (typeof window.abrirTorneoF7Publico === 'function') window.abrirTorneoF7Publico();
+            }, { capture: true, passive: false });
+            window.abrirTorneoF7Publico = function () {
+                if (window._cdsanF7Opening) return;
+                window._cdsanF7Opening = true;
+                setTimeout(function () { window._cdsanF7Opening = false; }, 900);
+                var splash = document.getElementById('campeonatoSplash');
+                if (splash) {
+                    splash.hidden = true;
+                    splash.setAttribute('hidden', '');
+                    splash.style.display = 'none';
+                    splash.classList.remove('is-settled');
+                    document.body.classList.remove('campeonato-splash-open');
+                }
+                var tries = 0;
+                (function waitOpen() {
+                    try {
+                        if (window.TorneoF7CalendarioOficial && typeof window.TorneoF7CalendarioOficial.openPublicBoard === 'function') {
+                            window.TorneoF7CalendarioOficial.openPublicBoard();
+                            return;
+                        }
+                        if (typeof showCompetitionsInfo === 'function') {
+                            showCompetitionsInfo();
+                            return;
+                        }
+                    } catch (err) {
+                        console.error('No se pudo abrir Competiciones', err);
+                    }
+                    if (tries++ < 80) setTimeout(waitOpen, 50);
+                })();
+            };
         })();
     </script>
     <script>
@@ -2898,49 +3101,62 @@
         </section>
 
         <section id="proximoEventoClub" class="proximo-evento-club" aria-labelledby="proximoEventoTitulo">
-            <p class="proximo-evento-kicker">Próximo evento del club</p>
+            <p class="proximo-evento-kicker">Torneo Fútbol 7</p>
+            <h2 id="proximoEventoTitulo" class="proximo-evento-titulo">Carteles del torneo</h2>
             <div class="proximo-evento-posters">
-                <div class="proximo-evento-col proximo-evento-col--torneo">
-                    <h2 id="proximoEventoTitulo" class="proximo-evento-titulo">Torneo Fútbol 7 — 2026</h2>
+                <div class="proximo-evento-col">
                     <button
                         type="button"
                         class="proximo-evento-poster-wrap"
-                        onclick="abrirCartelProximoEvento('assets/CAMPEONATO.jpg')"
-                        aria-label="Ampliar cartel del Torneo Fútbol 7 2026"
+                        onclick="abrirCartelProximoEvento('assets/torneo-1.jpg?v=1')"
+                        aria-label="Ampliar cartel Torneo 1 Sénior"
                     >
                         <img
-                            src="assets/CAMPEONATO.jpg"
-                            alt=""
+                            src="assets/torneo-1.jpg?v=1"
+                            alt="Torneo 1: calendario sénior"
                             class="proximo-evento-poster"
                             width="480"
                             height="680"
                             loading="eager"
-                            aria-hidden="true"
                         >
                     </button>
-                    <p class="proximo-evento-zoom-hint">Toca el cartel para verlo en grande</p>
-                    <div class="proximo-evento-actions">
-                        <button type="button" class="proximo-evento-cta" onclick="openTorneoPreinscripcionModal()">
-                            Inscríbete
-                        </button>
-                    </div>
-                    <p class="proximo-evento-hint"><strong>INSCRIPCIÓN</strong> abierta a todos. Fecha límite hasta el 15 de agosto. Si ya tienes código de equipo, entra como responsable desde la tarjeta <strong>Competiciones</strong> más abajo.</p>
+                    <p class="proximo-evento-caption">TORNEO 1</p>
                 </div>
-                <div class="proximo-evento-col proximo-evento-col--inscrip">
+                <div class="proximo-evento-col">
                     <button
                         type="button"
                         class="proximo-evento-poster-wrap"
-                        onclick="abrirCartelProximoEvento('assets/torneo-inscripciones-2026.jpg')"
-                        aria-label="Ampliar cartel de inscripciones"
+                        onclick="abrirCartelProximoEvento('assets/torneo-2.jpg?v=1')"
+                        aria-label="Ampliar cartel Torneo 2 Alevín, Infantil y Cadete"
                     >
                         <img
-                            src="assets/torneo-inscripciones-2026.jpg"
-                            alt=""
+                            src="assets/torneo-2.jpg?v=1"
+                            alt="Torneo 2: calendario alevín, infantil y cadete"
                             class="proximo-evento-poster"
-                            loading="lazy"
-                            aria-hidden="true"
+                            width="480"
+                            height="680"
+                            loading="eager"
                         >
                     </button>
+                    <p class="proximo-evento-caption">TORNEO 2</p>
+                </div>
+                <div class="proximo-evento-col proximo-evento-col--bases">
+                    <button
+                        type="button"
+                        class="proximo-evento-poster-wrap"
+                        onclick="abrirCartelProximoEvento('assets/bases-torneo.jpg')"
+                        aria-label="Ampliar bases del torneo"
+                    >
+                        <img
+                            src="assets/bases-torneo.jpg"
+                            alt="Bases del torneo"
+                            class="proximo-evento-poster"
+                            width="480"
+                            height="680"
+                            loading="lazy"
+                        >
+                    </button>
+                    <p class="proximo-evento-caption">BASES DEL TORNEO</p>
                 </div>
             </div>
         </section>
@@ -2963,7 +3179,7 @@
                 <img
                     id="proximoEventoLightboxImg"
                     class="proximo-evento-lightbox-img"
-                    src="assets/CAMPEONATO.jpg"
+                    src="assets/torneo-1.jpg?v=1"
                     alt=""
                 >
             </div>
@@ -3002,17 +3218,18 @@
                 <button class="feature-btn" style="background: var(--primary-color); color: white; border: none; padding: 8px 16px; border-radius: 20px; margin-top: 15px; cursor: pointer;">Ver Eventos</button>
             </div>
 
-            <div class="feature-card feature-card--competiciones" data-feature="competiciones" style="position: relative;">
+            <div class="feature-card feature-card--competiciones" data-feature="competiciones" onclick="openFeature('competiciones')" style="cursor: pointer; position: relative;">
                 <span id="badge-competiciones" class="feature-badge" style="display: none;"></span>
+                <p class="feature-nuevos-horarios">NUEVOS HORARIOS</p>
                 <div class="feature-icon">🏆</div>
                 <h3 class="feature-title">Competiciones</h3>
                 <p class="feature-description">
-                    Participamos en ligas, torneos y competiciones.
-                    Gestión de clasificaciones y resultados del club.
+                    Calendario oficial del Torneo Fútbol 7 (17–23 de agosto): El Pinar. Torneo 1 sénior y Torneo 2 alevín, infantil y cadete.
+                    Visible para todos. Los resultados los publican organizadores y administradores.
                 </p>
                 <div class="feature-actions feature-actions--compact">
-                    <button type="button" class="feature-btn feature-btn--sm" style="background: var(--primary-color); color: white; border: none; border-radius: 20px; cursor: pointer;" onclick="openFeature('competiciones')">Ver Competiciones</button>
-                    <button type="button" id="treResponsableEntryBtn" class="feature-btn feature-btn--sm feature-btn--secondary" style="color: white; border: none; border-radius: 20px; cursor: pointer;" onclick="openTorneoResponsableAccessModal()">Soy responsable del equipo</button>
+                    <button type="button" class="feature-btn feature-btn--sm" style="background: var(--primary-color); color: white; border: none; border-radius: 20px; cursor: pointer;" onclick="event.stopPropagation(); openFeature('competiciones')">Ver Competiciones</button>
+                    <button type="button" id="treResponsableEntryBtn" class="feature-btn feature-btn--sm feature-btn--secondary" style="color: white; border: none; border-radius: 20px; cursor: pointer;" onclick="event.stopPropagation(); openTorneoResponsableAccessModal()">Soy responsable del equipo</button>
                 </div>
             </div>
 
@@ -3707,15 +3924,19 @@
             <div class="modal-content">
                 <span class="close" onclick="closeAdminModal()">&times;</span>
                 <h2 style="color: var(--primary-color); margin-bottom: 20px; text-align: center;">🔧 Acceso Administración</h2>
-                <p style="color: #059669; font-weight: bold; margin-bottom: 20px; text-align: center;">✅ Introduce tus credenciales de administrador</p>
+                <p style="color: #059669; font-weight: bold; margin-bottom: 20px; text-align: center;">✅ Administrador del club u organizador/a de competiciones</p>
                 <form id="adminForm" onsubmit="validateAdmin(event)">
                     <div class="form-group">
-                        <label for="adminEmail">Email de Administrador *</label>
-                        <input type="email" id="adminEmail" placeholder="ejemplo@cdsanabriacf.com" required>
+                        <label for="adminEmail">Email de administrador u organizador *</label>
+                        <input type="text" id="adminEmail" inputmode="email" autocomplete="username" placeholder="email@dominio.com (admite alias con +)" required>
                     </div>
                     <div class="form-group">
                         <label for="adminPassword">Contraseña *</label>
                         <input type="password" id="adminPassword" placeholder="Tu contraseña" required>
+                    </div>
+                    <div class="form-group" style="display: flex; align-items: flex-start; gap: 8px; margin: 12px 0;">
+                        <input type="checkbox" id="adminRememberSession" style="width: auto; margin: 4px 0 0;">
+                        <label for="adminRememberSession" style="margin: 0; font-size: 0.9rem; color: #666; line-height: 1.4;">🔐 Recordar sesión dentro del panel si recargas. Al pulsar Admin siempre hay que poner email y contraseña.</label>
                     </div>
                     <div id="adminMessage" style="display: none; padding: 10px; margin: 10px 0; border-radius: 5px; text-align: center; font-weight: bold;"></div>
                     <div class="form-buttons">
@@ -4912,8 +5133,26 @@
                     return;
                 }
 
-                const { signInWithEmailAndPassword, signOut } = await import('https://www.gstatic.com/firebasejs/10.12.3/firebase-auth.js');
+                if (window.CdsanLocalStorageQuota && typeof window.CdsanLocalStorageQuota.freeSpace === 'function') {
+                    window.CdsanLocalStorageQuota.freeSpace();
+                }
+
+                const { signInWithEmailAndPassword, signOut, setPersistence, browserLocalPersistence, browserSessionPersistence } = await import('https://www.gstatic.com/firebasejs/10.12.3/firebase-auth.js');
                 const { doc, getDoc } = await import('https://www.gstatic.com/firebasejs/10.12.3/firebase-firestore.js');
+
+                const rememberEl = document.getElementById('adminRememberSession');
+                const remember = !!(rememberEl && rememberEl.checked);
+                if (window.AdminSession && typeof window.AdminSession.setRememberPreference === 'function') {
+                    window.AdminSession.setRememberPreference(remember);
+                }
+                try {
+                    await setPersistence(
+                        window.firebaseAuth,
+                        remember ? browserLocalPersistence : browserSessionPersistence
+                    );
+                } catch (persistErr) {
+                    console.warn('Persistencia de sesión admin:', persistErr);
+                }
 
                 const cred = await signInWithEmailAndPassword(window.firebaseAuth, email, password);
                 const uid = cred.user.uid;
@@ -4922,12 +5161,25 @@
 
                 if (!adminSnap.exists()) {
                     await signOut(window.firebaseAuth);
-                    throw new Error('Sin perfil admin en la nube. Crea sanabria_admins/' + uid + ' con appScope y isAdmin (ver docs/ACCESO-LOCAL-Y-ADMIN.md)');
+                    throw new Error(
+                        'La cuenta existe, pero no tiene perfil de administrador/organizador en la nube (sanabria_admins/' +
+                            uid +
+                            '). Un administrador del club debe pulsar «Añadir Administrador» o «Clave en la nube» en el panel.'
+                    );
                 }
 
                 const adminData = adminSnap.data() || {};
-                const isOrganizer = adminData.role === 'competition_organizer';
-                const isFullAdmin = adminData.isAdmin === true || adminData.isSuperAdmin === true || adminData.role === 'admin' || adminData.role === 'super_admin';
+                const role = String(adminData.role || '').trim();
+                const isOrganizer =
+                    role === 'competition_organizer' ||
+                    (window.AdminOrganizerAccess && window.AdminOrganizerAccess.isOrganizerFirestoreDoc(adminData));
+                const isFullAdmin =
+                    adminData.isAdmin === true ||
+                    adminData.isSuperAdmin === true ||
+                    role === 'admin' ||
+                    role === 'super_admin' ||
+                    role === 'team_admin' ||
+                    role === 'assistant_admin';
                 const validScope = adminData.appScope === 'cdsanabriacf';
 
                 if ((!isFullAdmin && !isOrganizer) || !validScope) {
@@ -4939,7 +5191,7 @@
                     id: uid,
                     name: adminData.name || adminData.nombre || (isOrganizer ? 'Organizador/a' : 'Administrador'),
                     email: (cred.user.email || email).toLowerCase(),
-                    role: adminData.role || (adminData.isSuperAdmin ? 'super_admin' : 'admin'),
+                    role: role || (adminData.isSuperAdmin ? 'super_admin' : 'admin'),
                     isSuperAdmin: adminData.isSuperAdmin === true,
                     isAdmin: isFullAdmin,
                     teamId: adminData.teamId || 'CDSANABRIACF',
@@ -4949,7 +5201,12 @@
                     window.AdminSession.setStoredAdminSession(adminSession);
                 } else {
                     localStorage.setItem('currentAdmin', JSON.stringify(adminSession));
-                    localStorage.setItem('isAdmin', 'true');
+                    if (isOrganizer) {
+                        localStorage.removeItem('isAdmin');
+                        localStorage.removeItem('isSuperAdmin');
+                    } else {
+                        localStorage.setItem('isAdmin', 'true');
+                    }
                 }
                 if (window.AdminSession && window.AdminSession.markAdminAuthenticated) {
                     window.AdminSession.markAdminAuthenticated();
@@ -4983,6 +5240,9 @@
                         '2. Comprueba internet y desactiva bloqueadores de anuncios / VPN.\n' +
                         '3. Prueba otro navegador o ventana de incógnito.\n' +
                         '4. Si sigue fallando: F12 → Red → intenta entrar y mira si falla identitytoolkit.googleapis.com';
+                } else if (window.CdsanLocalStorageQuota && window.CdsanLocalStorageQuota.isQuotaError(error)) {
+                    hint =
+                        'El navegador está lleno y no pudo guardar la sesión. Recarga con Ctrl+F5 e inténtalo de nuevo. Si sigue, borra datos de este sitio (candado junto a la URL).';
                 } else if (error && error.message) {
                     hint = String(error.message).replace(/\bFirebase\b/gi, 'nube').replace(/\bFirestore\b/gi, 'nube');
                 }
@@ -5168,14 +5428,13 @@
 
         function cerrarCampeonatoSplash() {
             const splash = document.getElementById('campeonatoSplash');
-            if (!splash || splash.hidden) return;
-            try {
-                sessionStorage.setItem('cdsan_campeonato_splash_dismissed', '1');
-            } catch (e) {}
+            if (!splash) return;
             splash.hidden = true;
+            splash.setAttribute('hidden', '');
+            splash.style.display = 'none';
             splash.classList.remove('is-settled');
-            const img = splash.querySelector('.campeonato-splash-img');
-            if (img) img.classList.add('is-pulsing');
+            const card = splash.querySelector('.campeonato-splash-card');
+            if (card) card.classList.add('is-pulsing');
             document.body.classList.remove('campeonato-splash-open');
             const lb = document.getElementById('proximoEventoLightbox');
             if (!lb || !lb.classList.contains('is-open')) {
@@ -5183,12 +5442,37 @@
             }
         }
 
+        function abrirTorneoF7Publico() {
+            if (window._cdsanF7Opening) return;
+            window._cdsanF7Opening = true;
+            setTimeout(function () { window._cdsanF7Opening = false; }, 900);
+            try { cerrarCampeonatoSplash(); } catch (e) {}
+            const openBoard = function () {
+                try {
+                    if (window.TorneoF7CalendarioOficial && typeof window.TorneoF7CalendarioOficial.openPublicBoard === 'function') {
+                        window.TorneoF7CalendarioOficial.openPublicBoard();
+                        return;
+                    }
+                    if (typeof showCompetitionsInfo === 'function') {
+                        showCompetitionsInfo();
+                    }
+                } catch (err) {
+                    console.error('No se pudo abrir el calendario F7', err);
+                    if (typeof showCompetitionsInfo === 'function') showCompetitionsInfo();
+                }
+            };
+            setTimeout(openBoard, 60);
+        }
+        window.abrirTorneoF7Publico = abrirTorneoF7Publico;
+
         function applyCampeonatoPromoVisibility() {
             const active = typeof window.isCampeonatoPromoActive === 'function' && window.isCampeonatoPromoActive();
             const splash = document.getElementById('campeonatoSplash');
             if (!active) {
                 if (splash) {
                     splash.hidden = true;
+                    splash.setAttribute('hidden', '');
+                    splash.style.display = 'none';
                     splash.classList.remove('is-settled');
                 }
                 document.body.classList.remove('campeonato-splash-open');
@@ -5199,16 +5483,34 @@
             applyCampeonatoPromoVisibility();
             const splash = document.getElementById('campeonatoSplash');
             if (!splash || splash.hidden) return;
-            const img = splash.querySelector('.campeonato-splash-img');
-            if (!img) return;
+            const card = splash.querySelector('.campeonato-splash-card');
+            if (!card) return;
 
             function settleSplash() {
-                img.classList.remove('is-pulsing');
+                card.classList.remove('is-pulsing');
                 splash.classList.add('is-settled');
             }
 
-            img.addEventListener('animationend', settleSplash, { once: true });
+            card.addEventListener('animationend', settleSplash, { once: true });
             setTimeout(settleSplash, 2400);
+            function tapOpenSplash(e) {
+                if (e && e.target && e.target.closest && e.target.closest('.campeonato-splash-close')) return;
+                if (e) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                }
+                abrirTorneoF7Publico();
+            }
+            card.addEventListener('click', tapOpenSplash);
+            card.addEventListener('touchend', tapOpenSplash, { passive: false });
+            splash.addEventListener('click', tapOpenSplash);
+            splash.addEventListener('touchend', tapOpenSplash, { passive: false });
+            card.addEventListener('keydown', function (e) {
+                if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    abrirTorneoF7Publico();
+                }
+            });
         })();
 
         document.addEventListener('keydown', function (e) {
@@ -6419,7 +6721,6 @@
                 'equipos': ['socio', 'entrenador'],
                 'calendario': ['socio', 'entrenador', 'amigo'],
                 'eventos': ['socio', 'entrenador'],
-                'competiciones': ['socio', 'amigo'],
                 'encuentros': ['socio', 'entrenador'],
                 'documentos': ['socio', 'entrenador']
             };
@@ -6629,7 +6930,7 @@
                 
                 // Competiciones
                 const competitions = JSON.parse(localStorage.getItem('clubCompetitions') || '[]');
-                const activeCompetitions = competitions.filter(c => c.status === 'active');
+                const activeCompetitions = competitions.filter(c => ['active', 'activo', 'inscripcion'].includes(String(c.status || '').toLowerCase()));
                 updateBadge('competiciones', activeCompetitions.length, 'activas');
                 
                 // Encuentros (misma fuente que el listado público)
@@ -7540,21 +7841,49 @@
         window.formatRegistrantTierLabel = formatRegistrantTierLabel;
         window.showEventsInfo = showEventsInfo;
 
-        // Mostrar información de competiciones
+        // Mostrar información de competiciones (visible para todos)
         function showCompetitionsInfo() {
-            const role = getCurrentUserRole();
-            if (!['socio', 'amigo'].includes(role)) {
-                showRestrictedAccessModal('competiciones');
+            if (window.TorneoF7CalendarioOficial && typeof window.TorneoF7CalendarioOficial.openPublicBoard === 'function') {
+                window.TorneoF7CalendarioOficial.openPublicBoard();
                 return;
             }
-            const competitions = JSON.parse(localStorage.getItem('clubCompetitions') || '[]');
-            const activeCompetitions = competitions.filter(c => ['active', 'activo'].includes(String(c.status || '').toLowerCase()));
+            let competitions = [];
+            try {
+                competitions = JSON.parse(localStorage.getItem('clubCompetitions') || '[]');
+                if (!Array.isArray(competitions)) competitions = [];
+            } catch (e) {
+                competitions = [];
+            }
+            let f7 = null;
+            let f7Html = '';
+            try {
+                f7 = window.TorneoF7CalendarioOficial
+                    ? (typeof window.TorneoF7CalendarioOficial.getPublicCompetition === 'function'
+                        ? window.TorneoF7CalendarioOficial.getPublicCompetition(competitions)
+                        : window.TorneoF7CalendarioOficial.find(competitions))
+                    : null;
+                f7Html = window.TorneoF7CalendarioOficial && typeof window.TorneoF7CalendarioOficial.renderPublic === 'function'
+                    ? window.TorneoF7CalendarioOficial.renderPublic(f7)
+                    : '';
+            } catch (err) {
+                console.error('Calendario F7 público:', err);
+                f7Html = '<p style="color:#b91c1c;">No se pudo cargar el calendario. Recarga la página.</p>';
+            }
+            const f7Id = (window.TorneoF7CalendarioOficial && window.TorneoF7CalendarioOficial.COMP_ID) || (f7 && f7.id) || '';
+            const otherCompetitions = competitions.filter((c) => {
+                if (f7Id && c && c.id === f7Id) return false;
+                if (f7 && c && c.id === f7.id) return false;
+                return ['active', 'activo', 'inscripcion'].includes(String(c.status || '').toLowerCase());
+            });
 
             let html = '<h3>🏆 Competiciones del Club</h3>';
-            
-            if (activeCompetitions.length > 0) {
+            html += '<div id="torneoF7PublicBoard">';
+            html += f7Html;
+            html += '</div>';
+
+            if (otherCompetitions.length > 0) {
                 const todayKey = new Date().toISOString().slice(0, 10);
-                activeCompetitions.forEach(comp => {
+                otherCompetitions.forEach(comp => {
                     const startDate = new Date(comp.startDate).toLocaleDateString('es-ES');
                     const endDate = new Date(comp.endDate).toLocaleDateString('es-ES');
                     const categoriesText = (Array.isArray(comp.categories) && comp.categories.length ? comp.categories : [comp.category]).filter(Boolean).join(', ');
@@ -7569,8 +7898,8 @@
 
                     const renderMatchLine = (m) => {
                         const score = m.status === 'completed'
-                            ? `${m.homeScore ?? 0}-${m.awayScore ?? 0}`
-                            : (m.status === 'postponed' ? 'Aplazado' : 'Pendiente');
+                            ? `${m.homeScore ?? 0} - ${m.awayScore ?? 0}`
+                            : (m.status === 'postponed' ? 'Aplazado' : '- -');
                         return `
                             <div style="border:1px solid #dbeafe; border-radius:10px; background:#fff; padding:10px; margin:8px 0;">
                                 <div style="display:flex; justify-content:space-between; gap:10px; flex-wrap:wrap;">
@@ -7598,7 +7927,7 @@
                                     `).join('')}
                                 </div>
                             ` : ''}
-                            <p><strong>Descripción:</strong> ${comp.description}</p>
+                            <p><strong>Descripción:</strong> ${comp.description || ''}</p>
                             <div style="margin-top:10px; padding:10px; border-radius:8px; background:#eff6ff; border:1px solid #bfdbfe;">
                                 <h5 style="margin:0 0 6px; color:#1d4ed8;">Resultados / partidos de hoy</h5>
                                 ${todayMatches.length ? todayMatches.map(renderMatchLine).join('') : '<p style="margin:4px 0; color:#64748b;">Sin partidos hoy.</p>'}
@@ -7610,12 +7939,18 @@
                         </div>
                     `;
                 });
-            } else {
+            } else if (!f7 && !window.TorneoF7CalendarioOficial) {
                 html += '<p>No hay competiciones activas en este momento</p>';
             }
 
-            showModal('Competiciones del Club', html, 'competiciones');
+            showModal('Competiciones del Club', '<div id="competicionesPublicBoard">' + html + '</div>', 'competiciones', { maxWidth: '920px', maxHeight: '92vh', zIndex: 10250 });
         }
+
+        document.addEventListener('competitionsUpdated', function () {
+            if (window.TorneoF7CalendarioOficial && window.TorneoF7CalendarioOficial.refreshPublicBoard) {
+                window.TorneoF7CalendarioOficial.refreshPublicBoard();
+            }
+        });
 
         function showMultimediaInfo() {
             mostrarGaleriaMultimedia();
@@ -8453,6 +8788,7 @@
          */
         function showModal(title, content, adminTab = null, modalOptions = null) {
             const modal = document.createElement('div');
+            const z = (modalOptions && modalOptions.zIndex) || 10000;
             modal.style.cssText = `
                 position: fixed;
                 top: 0;
@@ -8463,48 +8799,22 @@
                 display: flex;
                 align-items: center;
                 justify-content: center;
-                z-index: 10000;
+                z-index: ${z};
             `;
             
             const modalContent = document.createElement('div');
             const maxW = modalOptions && modalOptions.maxWidth ? modalOptions.maxWidth : '600px';
+            const maxH = modalOptions && modalOptions.maxHeight ? modalOptions.maxHeight : '80vh';
             modalContent.style.cssText = `
                 background: white;
                 padding: 30px;
                 border-radius: 15px;
                 max-width: ${maxW};
-                max-height: 80vh;
+                max-height: ${maxH};
                 overflow-y: auto;
                 position: relative;
                 width: 90%;
             `;
-            
-            // Verificar si el usuario es admin para mostrar botón de administración
-            const isAdmin = localStorage.getItem('isAdmin') === 'true' || localStorage.getItem('isSuperAdmin') === 'true';
-            let adminButton = '';
-            
-            if (isAdmin && adminTab) {
-                adminButton = `
-                    <div style="margin-top: 20px; text-align: center; padding-top: 15px; border-top: 1px solid #e5e7eb;">
-                        <a href="admin-panel.html#${adminTab}" 
-                           onclick="localStorage.setItem('adminActiveTab', '${adminTab}')"
-                           style="
-                               display: inline-block;
-                               background: linear-gradient(135deg, #1e3a8a 0%, #3b82f6 100%);
-                               color: white;
-                               padding: 10px 20px;
-                               border-radius: 25px;
-                               text-decoration: none;
-                               font-weight: bold;
-                               transition: transform 0.3s, box-shadow 0.3s;
-                           "
-                           onmouseover="this.style.transform='translateY(-2px)'; this.style.boxShadow='0 6px 20px rgba(0,0,0,0.3)';"
-                           onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='none';">
-                            ⚙️ Administrar en Panel
-                        </a>
-                    </div>
-                `;
-            }
             
             modalContent.innerHTML = `
                 <div style="text-align: right; margin-bottom: 20px;">
@@ -8514,7 +8824,6 @@
                 <div style="color: var(--text-color); line-height: 1.6;">
                     ${content}
                 </div>
-                ${adminButton}
             `;
             
             modal.className = 'modal';
@@ -10480,13 +10789,13 @@
             const emailEl = document.getElementById('adminEmail');
             const passwordEl = document.getElementById('adminPassword');
             if (passwordEl) passwordEl.value = '';
-            const session =
-                window.AdminSession && window.AdminSession.getStoredAdminSession
-                    ? window.AdminSession.getStoredAdminSession()
-                    : null;
             if (emailEl) {
-                emailEl.value = session && session.email ? session.email : '';
+                emailEl.value = '';
                 emailEl.focus();
+            }
+            const rememberEl = document.getElementById('adminRememberSession');
+            if (rememberEl) {
+                rememberEl.checked = false;
             }
         }
 
@@ -10535,20 +10844,9 @@
         function updateAdminButton() {
             const adminButton = document.querySelector('.admin-button');
             if (!adminButton) return;
-            const userData =
-                window.AdminSession && window.AdminSession.getStoredAdminSession
-                    ? window.AdminSession.getStoredAdminSession()
-                    : null;
             adminButton.innerHTML = '🔧 Admin';
             adminButton.style.background = 'var(--primary-color)';
-            if (userData) {
-                adminButton.title =
-                    'Sesión activa (' +
-                    (userData.email || 'admin') +
-                    '). Clic para abrir el panel.';
-            } else {
-                adminButton.title = 'Acceder al panel de administración';
-            }
+            adminButton.title = 'Acceder al panel (email y contraseña)';
         }
 
         async function validateAdmin(event) {
@@ -12121,7 +12419,7 @@
             if (document.getElementById('clubNotifyPromptModal')) return;
 
             const wants = clubNotificationSystem.userWantsPushNotifications();
-            const loggedIn = typeof getUserStatus === 'function' && getUserStatus() !== 'guest';
+            const loggedIn = typeof getUserStatus === 'function' && ['socio', 'amigo', 'entrenador'].includes(getUserStatus());
             const denied = Notification.permission === 'denied';
             const title = wants
                 ? '🔔 Activa los avisos del club en este móvil'
@@ -12182,29 +12480,30 @@
                     btn.textContent = 'Activando…';
                 }
                 try {
-                    if (!loggedIn) {
-                        cerrarAvisoNotificacionesClub();
-                        alert('Inicia sesión como socio/a o amigo/a del club para recibir los avisos en tu móvil.');
-                        if (typeof showLoginModal === 'function') showLoginModal();
-                        return;
-                    }
-                    let result = 'default';
                     if (
                         window.clubNotificationSystem &&
                         typeof window.clubNotificationSystem.activatePushFromUserConsent === 'function'
                     ) {
-                        result = await window.clubNotificationSystem.activatePushFromUserConsent();
-                    }
-                    cerrarAvisoNotificacionesClub();
-                    if (result === 'granted') {
-                        alert('✅ Avisos activados. Recibirás partidos, eventos y novedades del club.');
-                    } else if (result === 'denied') {
-                        alert('Las notificaciones están bloqueadas. Actívalas en Ajustes del móvil para esta app o navegador.');
+                        const result = await Promise.race([
+                            window.clubNotificationSystem.activatePushFromUserConsent(),
+                            new Promise(function (resolve) {
+                                setTimeout(function () {
+                                    resolve(
+                                        typeof Notification !== 'undefined' && Notification.permission === 'granted'
+                                            ? 'granted'
+                                            : 'timeout'
+                                    );
+                                }, 25000);
+                            })
+                        ]);
+                        if (result === 'granted' && window.clubNotificationSystem) {
+                            clubNotificationSystem.markNotificationPromptAccepted();
+                        }
                     }
                 } catch (err) {
                     console.warn('Activar avisos:', err);
-                    cerrarAvisoNotificacionesClub();
                 }
+                cerrarAvisoNotificacionesClub();
             });
 
             modal.querySelector('.club-notify-prompt-backdrop')?.addEventListener('click', function (e) {
@@ -13500,7 +13799,9 @@
         // ===== INSTALACION PWA EN MOVILES =====
         let deferredInstallPrompt = null;
         let ultimoRefrescoDatos = 0;
-        let swActualizando = false;
+        let ultimoCheckPwa = 0;
+        let pwaRecargando = false;
+        const PWA_VERSION_KEY = 'cdsanPwaDeployVersion';
 
         function esDispositivoMovil() {
             return /Android|iPhone|iPad|iPod|Mobile|HarmonyOS|HUAWEI/i.test(navigator.userAgent);
@@ -13677,6 +13978,9 @@
                         if (r === 'denied') {
                             alert('Las notificaciones están bloqueadas. Puedes activarlas en Ajustes del navegador para este sitio.');
                         } else if (r === 'granted') {
+                            if (window.clubNotificationSystem && typeof window.clubNotificationSystem.markNotificationPromptAccepted === 'function') {
+                                window.clubNotificationSystem.markNotificationPromptAccepted();
+                            }
                             notifyBtn.textContent = '✅ Avisos activados';
                             setTimeout(function () { notifyBtn.remove(); }, 1500);
                         }
@@ -13694,6 +13998,50 @@
             });
         }
 
+        function recargarPwaFresco() {
+            if (pwaRecargando) return;
+            pwaRecargando = true;
+            try {
+                if (navigator.serviceWorker && navigator.serviceWorker.controller) {
+                    navigator.serviceWorker.controller.postMessage({ type: 'PURGE_CACHES' });
+                }
+            } catch (_) {}
+            setTimeout(function () {
+                window.location.reload();
+            }, 120);
+        }
+
+        async function comprobarActualizacionPwa() {
+            const ahora = Date.now();
+            if (ahora - ultimoCheckPwa < 2000) return;
+            ultimoCheckPwa = ahora;
+            try {
+                if ('serviceWorker' in navigator) {
+                    const reg = await navigator.serviceWorker.getRegistration();
+                    if (reg) {
+                        if (reg.waiting) {
+                            reg.waiting.postMessage({ type: 'SKIP_WAITING' });
+                        }
+                        await reg.update();
+                    }
+                }
+            } catch (_) {}
+            try {
+                const res = await fetch('/deploy-version.json?t=' + Date.now(), { cache: 'no-store' });
+                if (!res.ok) return;
+                const data = await res.json();
+                const remote = String((data && data.cacheVersion) || '').trim();
+                if (!remote) return;
+                const local = localStorage.getItem(PWA_VERSION_KEY) || '';
+                if (local && local !== remote) {
+                    localStorage.setItem(PWA_VERSION_KEY, remote);
+                    recargarPwaFresco();
+                    return;
+                }
+                if (!local) localStorage.setItem(PWA_VERSION_KEY, remote);
+            } catch (_) {}
+        }
+
         function registrarServiceWorker() {
             if (!('serviceWorker' in navigator)) return;
             if (location.protocol === 'file:' || !location.origin || location.origin === 'null') {
@@ -13702,16 +14050,14 @@
             window.addEventListener('load', () => {
                 const swPath = (location.pathname || '/').replace(/[^/]*$/, '') + 'sw.js';
                 navigator.serviceWorker.register(swPath, { updateViaCache: 'none' }).then((registration) => {
-                    // Comprobar si hay nueva version al abrir la app/navegador.
                     registration.update().catch(() => {});
+                    comprobarActualizacionPwa();
 
                     registration.addEventListener('updatefound', () => {
                         const newWorker = registration.installing;
                         if (!newWorker) return;
-
                         newWorker.addEventListener('statechange', () => {
                             if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-                                swActualizando = true;
                                 if (registration.waiting) {
                                     registration.waiting.postMessage({ type: 'SKIP_WAITING' });
                                 }
@@ -13767,27 +14113,36 @@
 
         document.addEventListener('visibilitychange', () => {
             if (document.visibilityState === 'visible') {
+                comprobarActualizacionPwa();
                 refrescarDatosAlAbrir('visible');
             }
         });
 
-        window.addEventListener('pageshow', () => {
+        window.addEventListener('pageshow', (event) => {
+            comprobarActualizacionPwa();
             refrescarDatosAlAbrir('pageshow');
+            if (event && event.persisted) {
+                comprobarActualizacionPwa();
+            }
         });
 
         window.addEventListener('focus', () => {
+            comprobarActualizacionPwa();
             refrescarDatosAlAbrir('focus');
         });
 
         window.addEventListener('online', () => {
+            comprobarActualizacionPwa();
             refrescarDatosAlAbrir('online');
         });
 
         if ('serviceWorker' in navigator) {
             navigator.serviceWorker.addEventListener('controllerchange', () => {
-                if (swActualizando && !sessionStorage.getItem('cdsanabria_sw_reloaded')) {
-                    sessionStorage.setItem('cdsanabria_sw_reloaded', '1');
-                    window.location.reload();
+                recargarPwaFresco();
+            });
+            navigator.serviceWorker.addEventListener('message', (event) => {
+                if (event.data && event.data.type === 'SW_UPDATED') {
+                    recargarPwaFresco();
                 }
             });
         }

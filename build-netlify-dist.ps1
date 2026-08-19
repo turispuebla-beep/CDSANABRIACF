@@ -16,6 +16,61 @@ if (-not (Test-Path $dist)) {
     New-Item -ItemType Directory -Path $dist | Out-Null
 }
 
+function Copy-ItemRetry {
+    param(
+        [Parameter(Mandatory = $true)][string]$Path,
+        [Parameter(Mandatory = $true)][string]$Destination,
+        [switch]$Recurse
+    )
+    $max = 8
+    for ($i = 1; $i -le $max; $i++) {
+        try {
+            if ($Recurse) {
+                Copy-Item -Path $Path -Destination $Destination -Recurse -Force -ErrorAction Stop
+            } else {
+                Copy-Item -Path $Path -Destination $Destination -Force -ErrorAction Stop
+            }
+            return
+        } catch {
+            if ($i -eq $max) { throw }
+            Start-Sleep -Milliseconds (250 * $i)
+        }
+    }
+}
+
+function Write-TextRetry {
+    param(
+        [Parameter(Mandatory = $true)][string]$Path,
+        [Parameter(Mandatory = $true)][string]$Value,
+        [switch]$NoNewline
+    )
+    $max = 12
+    $dir = Split-Path $Path -Parent
+    $tmp = Join-Path $dir ([IO.Path]::GetFileName($Path) + '.tmp')
+    for ($i = 1; $i -le $max; $i++) {
+        try {
+            if ($NoNewline) {
+                [IO.File]::WriteAllText($tmp, $Value, [Text.UTF8Encoding]::new($false))
+            } else {
+                Set-Content -Path $tmp -Value $Value -Encoding UTF8 -ErrorAction Stop
+            }
+            Copy-Item -Path $tmp -Destination $Path -Force -ErrorAction Stop
+            Remove-Item $tmp -Force -ErrorAction SilentlyContinue
+            return
+        } catch {
+            Start-Sleep -Milliseconds (300 * $i)
+            if ($i -eq $max) {
+                Write-Host "No se pudo escribir $Path (cierra sw.js / Cursor / antivirus y reintenta)." -ForegroundColor Red
+                throw
+            }
+        } finally {
+            if (Test-Path $tmp) {
+                Remove-Item $tmp -Force -ErrorAction SilentlyContinue
+            }
+        }
+    }
+}
+
 # --- 1. Copiar fuentes de produccion desde la raiz ---
 Write-Host '[1/4] Sincronizando HTML, JS, PWA...' -ForegroundColor Cyan
 $copyItems = @(
@@ -28,13 +83,14 @@ $copyItems = @(
     'torneo-equipo.html',
     'torneo-vista.html',
     'torneo-jugador.html',
+    'carnet-asistencia.html',
     'sw.js',
     'manifest.json'
 )
 foreach ($item in $copyItems) {
     $src = Join-Path $root $item
     if (Test-Path $src) {
-        Copy-Item $src (Join-Path $dist $item) -Force
+        Copy-ItemRetry -Path $src -Destination (Join-Path $dist $item)
         Write-Host "      + $item" -ForegroundColor Gray
     } else {
         Write-Host "      ! falta en raiz: $item" -ForegroundColor Yellow
@@ -45,7 +101,7 @@ $jsSrc = Join-Path $root 'js'
 $jsDest = Join-Path $dist 'js'
 if (Test-Path $jsSrc) {
     if (-not (Test-Path $jsDest)) { New-Item -ItemType Directory -Path $jsDest | Out-Null }
-    Copy-Item (Join-Path $jsSrc '*') $jsDest -Recurse -Force
+    Copy-ItemRetry -Path (Join-Path $jsSrc '*') -Destination $jsDest -Recurse
     Write-Host '      + js/' -ForegroundColor Gray
 }
 
@@ -120,8 +176,8 @@ if (Test-Path (Join-Path $root 'favicon.ico')) {
 }
 
 # --- 2. Plantillas obligatorias Netlify (SIEMPRE) ---
-Write-Host '[2/4] Copiando _redirects, .netlifyignore, 404.html (obligatorios)...' -ForegroundColor Cyan
-$required = @('_redirects', '.netlifyignore', '404.html')
+Write-Host '[2/4] Copiando _redirects, _headers, .netlifyignore, 404.html (obligatorios)...' -ForegroundColor Cyan
+$required = @('_redirects', '_headers', '.netlifyignore', '404.html')
 foreach ($name in $required) {
     $src = Join-Path $templates $name
     if (-not (Test-Path $src)) {
@@ -177,7 +233,7 @@ $keepRoot = @(
     'index.html', 'admin-panel.html', 'pago-resultado.html', 'pago-cuota-socio.html',
     'inscripcion-jugador.html', 'inscripcion-jugador-demo.html', 'torneo-equipo.html', 'torneo-vista.html', 'torneo-jugador.html',
     'sw.js', 'manifest.json', 'favicon.ico',
-    '_redirects', '.netlifyignore', '404.html', 'deploy-version.json'
+    '_redirects', '_headers', '.netlifyignore', '404.html', 'deploy-version.json'
 )
 Get-ChildItem $dist -File -ErrorAction SilentlyContinue | ForEach-Object {
     if ($keepRoot -notcontains $_.Name) {
@@ -200,7 +256,7 @@ $version = @{
     appScope = 'cdsanabriacf'
     cacheVersion = "cdsanabriacf-v$builtAt"
 } | ConvertTo-Json
-Set-Content (Join-Path $dist 'deploy-version.json') $version -Encoding UTF8
+Write-TextRetry -Path (Join-Path $dist 'deploy-version.json') -Value $version
 
 # --- 3b. Actualizar version de cache en sw.js (deploy) ---
 $swPath = Join-Path $dist 'sw.js'
@@ -210,7 +266,7 @@ if (Test-Path $swPath) {
     $sw = $sw -replace "const CACHE_NAME = '[^']+'", "const CACHE_NAME = '$cacheVer'"
     $sw = $sw -replace "const STATIC_CACHE = '[^']+'", "const STATIC_CACHE = '$cacheVer-static'"
     $sw = $sw -replace "const DYNAMIC_CACHE = '[^']+'", "const DYNAMIC_CACHE = '$cacheVer-dynamic'"
-    Set-Content $swPath $sw -Encoding UTF8 -NoNewline
+    Write-TextRetry -Path $swPath -Value $sw -NoNewline
     Write-Host "      OK sw.js cache -> $cacheVer" -ForegroundColor Green
 }
 

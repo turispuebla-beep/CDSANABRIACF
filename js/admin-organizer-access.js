@@ -10,6 +10,10 @@
 
   function getStoredSession() {
     try {
+      if (global.AdminSession && typeof global.AdminSession.getStoredAdminSession === 'function') {
+        const stored = global.AdminSession.getStoredAdminSession();
+        if (stored && stored.email) return stored;
+      }
       return JSON.parse(global.localStorage.getItem('currentAdmin') || global.localStorage.getItem('adminUser') || '{}');
     } catch (_) {
       return {};
@@ -91,6 +95,8 @@
     if (notifWrap) notifWrap.style.display = 'none';
     const renewalBanner = global.document && global.document.getElementById('cuotaRenewalBanner');
     if (renewalBanner) renewalBanner.style.display = 'none';
+    const renewalReminder = global.document && global.document.getElementById('cuotaRenewalReminderBanner');
+    if (renewalReminder) renewalReminder.style.display = 'none';
     activateOrganizerCompeticionesTab();
     const info = global.document && global.document.getElementById('currentAdminInfo');
     if (info) {

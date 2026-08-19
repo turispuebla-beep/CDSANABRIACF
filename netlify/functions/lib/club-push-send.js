@@ -71,15 +71,18 @@ async function sendPushBatch(messaging, tokens, payload) {
     },
     webpush: {
       headers: {
-        Urgency: payload.urgent ? 'high' : 'normal'
+        Urgency: payload.urgent ? 'high' : 'normal',
+        TTL: '86400'
       },
       notification: {
         title: payload.title,
         body: payload.body,
         icon: payload.icon,
         badge: payload.icon,
+        tag: payload.tag,
         vibrate: [200, 100, 200],
-        requireInteraction: payload.urgent
+        requireInteraction: !!payload.urgent,
+        renotify: true
       },
       fcmOptions: {
         link: payload.url
@@ -114,7 +117,7 @@ async function collectTokensForMessage(message) {
 
 async function deliverClubPushNotification(message, options) {
   const opts = options || {};
-  const siteUrl = String(opts.siteUrl || process.env.SITE_URL || 'https://cdsanabriacf.netlify.app').replace(/\/$/, '');
+  const siteUrl = String(opts.siteUrl || process.env.SITE_URL || 'https://www.cdsanabriacf.com').replace(/\/$/, '');
   const title = String(message.title || '').trim();
   const body = String(message.content || message.message || message.body || '').trim();
   const broadcastId = String(message.broadcastId || message.clientMessageId || message.id || '').trim();
