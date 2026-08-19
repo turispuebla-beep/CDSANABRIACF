@@ -259,9 +259,9 @@ $version = @{
 Write-TextRetry -Path (Join-Path $dist 'deploy-version.json') -Value $version
 
 # --- 3b. Actualizar version de cache en sw.js (deploy) ---
+$cacheVer = "cdsanabriacf-v$builtAt"
 $swPath = Join-Path $dist 'sw.js'
 if (Test-Path $swPath) {
-    $cacheVer = "cdsanabriacf-v$builtAt"
     $sw = Get-Content $swPath -Raw -Encoding UTF8
     $sw = $sw -replace "const CACHE_NAME = '[^']+'", "const CACHE_NAME = '$cacheVer'"
     $sw = $sw -replace "const STATIC_CACHE = '[^']+'", "const STATIC_CACHE = '$cacheVer-static'"
@@ -269,6 +269,14 @@ if (Test-Path $swPath) {
     Write-TextRetry -Path $swPath -Value $sw -NoNewline
     Write-Host "      OK sw.js cache -> $cacheVer" -ForegroundColor Green
 }
+
+# iPhone/PWA: cache-bust de JS en HTML para no servir el calendario/resultados viejos
+Get-ChildItem $dist -Filter '*.html' -ErrorAction SilentlyContinue | ForEach-Object {
+    $html = Get-Content $_.FullName -Raw -Encoding UTF8
+    $html = [regex]::Replace($html, 'src="(js/[^"?]+\.js)(?:\?v=[^"]*)?"', "src=`"`$1?v=$cacheVer`"")
+    Write-TextRetry -Path $_.FullName -Value $html -NoNewline
+}
+Write-Host "      OK HTML JS cache-bust -> $cacheVer" -ForegroundColor Green
 
 # --- 4. Verificacion ---
 Write-Host '[4/4] Verificacion...' -ForegroundColor Cyan

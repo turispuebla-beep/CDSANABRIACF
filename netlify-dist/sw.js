@@ -68,37 +68,13 @@ fcmMessaging.onBackgroundMessage(function (payload) {
   });
 });
 
-const CACHE_NAME = 'cdsanabriacf-v20260819-1910';
-const STATIC_CACHE = 'cdsanabriacf-v20260819-1910-static';
-const DYNAMIC_CACHE = 'cdsanabriacf-v20260819-1910-dynamic';
+const CACHE_NAME = 'cdsanabriacf-v20260819-2316';
+const STATIC_CACHE = 'cdsanabriacf-v20260819-2316-static';
+const DYNAMIC_CACHE = 'cdsanabriacf-v20260819-2316-dynamic';
 
 // Archivos críticos para cache (solo rutas que existen en el despliegue)
 const STATIC_ASSETS = [
   '/',
-  '/index.html',
-  '/admin-panel.html',
-  '/torneo-equipo.html',
-  '/torneo-vista.html',
-  '/torneo-jugador.html',
-  '/js/club-torneo-config.js',
-  '/js/torneo-equipo-manage-client.js',
-  '/js/torneo-jugador-ficha-ui.js',
-  '/js/localstorage-quota.js',
-  '/js/firebase-config.js',
-  '/js/site-update-mode.js',
-  '/js/admin-session.js',
-  '/js/club-contact-defaults.js',
-  '/js/torneo-preinscripcion.js',
-  '/js/torneo-f7-calendario-oficial.js',
-  '/js/torneo-responsable-access.js',
-  '/js/torneo-public-view.js',
-  '/js/torneo-equipo-panel.js',
-  '/js/player-application.js',
-  '/js/protocol-guard.js',
-  '/js/notification-system.js',
-  '/js/club-accounting.js',
-  '/js/support-mode.js',
-  '/js/permissionmanager.js',
   '/manifest.json',
   '/assets/escudo-cdsanabriacf.png',
   '/assets/escudo-192.png',
@@ -412,7 +388,16 @@ async function networkFirst(request) {
     if (networkResponse.status === 200) {
       try {
         const p = new URL(request.url).pathname;
-        if (p !== '/deploy-version.json' && p !== '/sw.js') {
+        const skipCache =
+          p === '/deploy-version.json' ||
+          p === '/sw.js' ||
+          p === '/index.html' ||
+          p === '/' ||
+          p.endsWith('.html') ||
+          p.endsWith('.js') ||
+          p.endsWith('.css') ||
+          p.endsWith('.json');
+        if (!skipCache) {
           const cache = await caches.open(DYNAMIC_CACHE);
           cache.put(request, networkResponse.clone());
         }

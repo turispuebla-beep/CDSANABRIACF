@@ -16,6 +16,9 @@ class ClubNotificationSystem {
         this.fcmToken = null;
         this._fcmForegroundListenerAttached = false;
         this._fcmSetupComplete = false;
+        this._fcmTokenSaved = false;
+        this._fcmRetryTimer = null;
+        this._fcmRetryAttempts = 0;
         this._notificationsListenerActive = false;
         
         this.init();
@@ -55,7 +58,7 @@ class ClubNotificationSystem {
             if (existing && (existing.active || existing.waiting || existing.installing)) {
                 return existing;
             }
-            return await this.withTimeout(navigator.serviceWorker.ready, 3500, existing || null);
+            return await this.withTimeout(navigator.serviceWorker.ready, 8000, existing || null);
         } catch (_) {
             return null;
         }
@@ -199,8 +202,21 @@ class ClubNotificationSystem {
             localStorage.setItem('notificationPreferences', JSON.stringify(prefs));
         }
         const result = await this.registerPushAfterLogin();
-        if (result === 'granted') {
+        if (result === 'granted' || result === 'granted_no_token') {
             this.markNotificationPromptAccepted();
+        }
+        if (typeof Notification !== 'undefined' && Notification.permission === 'granted' && !this.fcmToken) {
+            this.scheduleFcmTokenRetry();
+            try {
+                if (!sessionStorage.getItem('cdsan_fcm_missing_told')) {
+                    sessionStorage.setItem('cdsan_fcm_missing_told', '1');
+                    alert(
+                        'Los avisos están permitidos en este móvil, pero el aparato aún no está en la lista de envío.\n\n' +
+                            'En iPhone: instala la app en la pantalla de inicio, ciérrala del todo y ábrela otra vez.'
+                    );
+                }
+            } catch (_) {}
+            return 'granted_no_token';
         }
         return result;
     }
@@ -342,16 +358,22 @@ class ClubNotificationSystem {
     /** Solo obtiene token si ya hay permiso (sin diálogo). */
     async setupCloudMessagingSilent() {
         try {
-            if (this._fcmSetupComplete) return;
-            if (!window.firebaseMessaging || window.firebaseMessaging.isSimulation) return;
+            if (this._fcmSetupComplete && this.fcmToken && this._fcmTokenSaved) return;
             if (!('Notification' in window) || Notification.permission !== 'granted') return;
+            if (!window.firebaseMessaging || window.firebaseMessaging.isSimulation) {
+                this.scheduleFcmTokenRetry();
+                return;
+            }
 
             const messagingMod = await this.withTimeout(
                 import('https://www.gstatic.com/firebasejs/10.12.3/firebase-messaging.js'),
-                6000,
+                8000,
                 null
             );
-            if (!messagingMod || !messagingMod.getToken) return;
+            if (!messagingMod || !messagingMod.getToken) {
+                this.scheduleFcmTokenRetry();
+                return;
+            }
             const getToken = messagingMod.getToken;
             const onMessage = messagingMod.onMessage;
 
@@ -361,27 +383,66 @@ class ClubNotificationSystem {
             };
             if (swReg) tokenOpts.serviceWorkerRegistration = swReg;
 
-            const token = await this.withTimeout(getToken(window.firebaseMessaging, tokenOpts), 8000, null);
-            if (!token) return;
+            let token = null;
+            for (let i = 0; i < 3 && !token; i++) {
+                if (i > 0) {
+                    await new Promise(function (resolve) {
+                        setTimeout(resolve, 1200 * i);
+                    });
+                }
+                token = await this.withTimeout(getToken(window.firebaseMessaging, tokenOpts), 12000, null);
+            }
+            if (!token) {
+                this.scheduleFcmTokenRetry();
+                return;
+            }
 
             this.fcmToken = token;
+            try {
+                localStorage.setItem('cdsanabria_fcm_token', token);
+            } catch (_) {}
             console.log('🔔 Token FCM registrado para push del club');
-            await this.saveUserToken(token);
+            const saved = await this.saveUserToken(token);
+            this._fcmTokenSaved = !!saved;
 
-            if (!this._fcmForegroundListenerAttached) {
+            if (!this._fcmForegroundListenerAttached && onMessage) {
                 onMessage(window.firebaseMessaging, (payload) => {
                     this.handleFirebaseMessage(payload);
                 });
                 this._fcmForegroundListenerAttached = true;
             }
-            this._fcmSetupComplete = true;
+            if (saved) {
+                this._fcmSetupComplete = true;
+                this._fcmRetryAttempts = 0;
+            } else {
+                this.scheduleFcmTokenRetry();
+            }
         } catch (error) {
             console.error('Error registrando token FCM:', error);
+            this.scheduleFcmTokenRetry();
         }
+    }
+
+    scheduleFcmTokenRetry() {
+        if (this._fcmRetryTimer) return;
+        if (typeof Notification === 'undefined' || Notification.permission !== 'granted') return;
+        const self = this;
+        this._fcmRetryTimer = setTimeout(function () {
+            self._fcmRetryTimer = null;
+            self._fcmRetryAttempts = (self._fcmRetryAttempts || 0) + 1;
+            if (self.fcmToken && self._fcmTokenSaved) return;
+            if (self._fcmRetryAttempts > 6) return;
+            self._fcmSetupComplete = false;
+            self.setupCloudMessagingSilent().catch(function () {});
+        }, Math.min(2500 * Math.max(1, this._fcmRetryAttempts || 1), 45000));
     }
 
     async refreshFcmTokenIfPermitted() {
         if (!('Notification' in window) || Notification.permission !== 'granted') return;
+        if (this.fcmToken && this._fcmTokenSaved) {
+            await this.saveUserToken(this.fcmToken);
+            return;
+        }
         this._fcmSetupComplete = false;
         await this.setupCloudMessagingSilent();
     }
@@ -493,8 +554,7 @@ class ClubNotificationSystem {
         return permission;
     }
 
-    async fcmTokenDocId(token, uid) {
-        if (uid) return uid;
+    async fcmTokenDocId(token) {
         try {
             if (globalThis.crypto && crypto.subtle && typeof TextEncoder === 'function') {
                 const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(String(token)));
@@ -517,19 +577,15 @@ class ClubNotificationSystem {
     }
 
     async saveUserToken(token) {
+        if (!token) return false;
         try {
-            if (!token || !window.firebaseDb || window.firebaseDb.isSimulation) return;
+            const uid = await this.waitForFirebaseAuth(1500);
+            const docId = await this.fcmTokenDocId(token);
+            if (!docId) return false;
 
-            const uid = await this.waitForFirebaseAuth(2500);
-            const docId = await this.fcmTokenDocId(token, uid);
-            if (!docId) return;
-
-            const { doc, setDoc, serverTimestamp } = await import('https://www.gstatic.com/firebasejs/10.12.3/firebase-firestore.js');
-            const collectionName = window.DB_COLLECTIONS?.FCM_TOKENS || 'sanabria_fcm_tokens';
             const userRoles = this.resolveUserRoles();
             const permissionGranted =
                 typeof Notification !== 'undefined' && Notification.permission === 'granted';
-
             const payload = {
                 appScope: window.APP_SCOPE || 'cdsanabriacf',
                 fcmToken: token,
@@ -542,27 +598,43 @@ class ClubNotificationSystem {
                 lastTokenUpdate: new Date().toISOString()
             };
 
-            let savedViaFunction = false;
-            try {
-                const res = await fetch('/.netlify/functions/register-fcm-token', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(Object.assign({ docId: docId }, payload))
+            for (let i = 0; i < 3; i++) {
+                try {
+                    const res = await fetch('/.netlify/functions/register-fcm-token', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(Object.assign({ docId: docId }, payload))
+                    });
+                    if (res && res.ok) {
+                        try {
+                            localStorage.setItem('cdsanabria_fcm_saved', '1');
+                        } catch (_) {}
+                        console.log('Token FCM guardado en la nube para push del club');
+                        return true;
+                    }
+                } catch (_) {}
+                await new Promise(function (resolve) {
+                    setTimeout(resolve, 700 * (i + 1));
                 });
-                savedViaFunction = !!(res && res.ok);
-            } catch (_) {}
+            }
 
-            if (!savedViaFunction) {
+            if (window.firebaseDb && !window.firebaseDb.isSimulation) {
+                const { doc, setDoc, serverTimestamp } = await import(
+                    'https://www.gstatic.com/firebasejs/10.12.3/firebase-firestore.js'
+                );
+                const collectionName = window.DB_COLLECTIONS?.FCM_TOKENS || 'sanabria_fcm_tokens';
                 await setDoc(
                     doc(window.firebaseDb, collectionName, docId),
                     Object.assign({}, payload, { updatedAt: serverTimestamp() }),
                     { merge: true }
                 );
+                console.log('Token FCM guardado en Firestore (respaldo)');
+                return true;
             }
-
-            console.log('Token FCM guardado en la nube para push del club');
+            return false;
         } catch (error) {
             console.error('Error guardando token FCM:', error);
+            return false;
         }
     }
 
@@ -607,7 +679,24 @@ class ClubNotificationSystem {
                 this._notificationsListenerActive = true;
 
                 snapshot.docChanges().forEach((change) => {
-                    if (change.type === 'removed') return;
+                    if (change.type === 'removed') {
+                        const data = change.doc.data() || {};
+                        const keys = [change.doc.id, data.broadcastId, data.clientMessageId, data.id]
+                            .filter(Boolean)
+                            .map(function (v) { return String(v); });
+                        const before = this.notifications.length;
+                        this.notifications = this.notifications.filter(function (n) {
+                            if (!n) return false;
+                            return keys.indexOf(String(n.id || '')) < 0
+                                && keys.indexOf(String(n.broadcastId || '')) < 0
+                                && keys.indexOf(String(n.firebaseDocId || '')) < 0;
+                        });
+                        if (this.notifications.length !== before) {
+                            this.saveAllNotificationsLocally();
+                            this.updateUI();
+                        }
+                        return;
+                    }
                     const normalized = this.normalizeRemoteNotification({
                         id: change.doc.id,
                         ...change.doc.data()

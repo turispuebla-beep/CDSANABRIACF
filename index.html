@@ -14006,14 +14006,27 @@
                     navigator.serviceWorker.controller.postMessage({ type: 'PURGE_CACHES' });
                 }
             } catch (_) {}
-            setTimeout(function () {
-                window.location.reload();
-            }, 120);
+            var go = function () {
+                var u = new URL(window.location.href);
+                u.searchParams.set('_cv', String(Date.now()));
+                window.location.replace(u.pathname + u.search + u.hash);
+            };
+            var purge = Promise.resolve();
+            try {
+                if (window.caches && caches.keys) {
+                    purge = caches.keys().then(function (keys) {
+                        return Promise.all(keys.map(function (k) { return caches.delete(k); }));
+                    });
+                }
+            } catch (_) {}
+            Promise.resolve(purge).then(function () {
+                setTimeout(go, 250);
+            }).catch(go);
         }
 
         async function comprobarActualizacionPwa() {
             const ahora = Date.now();
-            if (ahora - ultimoCheckPwa < 2000) return;
+            if (ahora - ultimoCheckPwa < 1500) return;
             ultimoCheckPwa = ahora;
             try {
                 if ('serviceWorker' in navigator) {
@@ -14035,6 +14048,12 @@
                 const local = localStorage.getItem(PWA_VERSION_KEY) || '';
                 if (local && local !== remote) {
                     localStorage.setItem(PWA_VERSION_KEY, remote);
+                    try {
+                        if (navigator.serviceWorker && navigator.serviceWorker.getRegistrations) {
+                            const regs = await navigator.serviceWorker.getRegistrations();
+                            await Promise.all(regs.map(function (r) { return r.unregister(); }));
+                        }
+                    } catch (_) {}
                     recargarPwaFresco();
                     return;
                 }
@@ -14082,6 +14101,11 @@
             try { if (typeof diagnosticarSociosAmigos === 'function') diagnosticarSociosAmigos(); } catch (_) {}
             try { if (typeof verificarPersistenciaCompleta === 'function') verificarPersistenciaCompleta(); } catch (_) {}
             try { if (typeof verificarSincronizacionAPK === 'function') verificarSincronizacionAPK(); } catch (_) {}
+            try {
+                if (window.TorneoF7CalendarioOficial && typeof window.TorneoF7CalendarioOficial.refreshPublicBoard === 'function') {
+                    window.TorneoF7CalendarioOficial.refreshPublicBoard();
+                }
+            } catch (_) {}
             try {
                 if (
                     window.clubNotificationSystem &&

@@ -15,22 +15,27 @@ function normalizeTeamKey(value) {
 }
 
 function tokenMatchesAudience(tokenDoc, targetRoles, targetTeams) {
-  const role = String(tokenDoc.userRole || 'guest').toLowerCase();
-  const tokenRoles = Array.isArray(tokenDoc.userRoles)
+  const role = String(tokenDoc.userRole || 'guest').toLowerCase() || 'guest';
+  let tokenRoles = Array.isArray(tokenDoc.userRoles)
     ? tokenDoc.userRoles.map(function (r) {
         return String(r || '').toLowerCase();
       }).filter(Boolean)
-    : [role];
+    : [];
+  if (!tokenRoles.length) tokenRoles = [role];
+  if (tokenRoles.indexOf('guest') < 0 && !tokenDoc.email && !tokenDoc.authUid) {
+    tokenRoles.push('guest');
+  }
   const roles = Array.isArray(targetRoles) && targetRoles.length ? targetRoles : ['all'];
+  const wantsEveryone = roles.indexOf('all') >= 0;
   const roleOk =
-    roles.includes('all') ||
+    wantsEveryone ||
     tokenRoles.some(function (r) {
-      return roles.includes(r);
+      return roles.indexOf(r) >= 0;
     });
   if (!roleOk) return false;
 
   const teams = Array.isArray(targetTeams) ? targetTeams.filter(Boolean) : [];
-  if (!teams.length || teams.includes('all')) return true;
+  if (!teams.length || teams.indexOf('all') >= 0) return true;
 
   const userTeams = Array.isArray(tokenDoc.teams) ? tokenDoc.teams.map(normalizeTeamKey) : [];
   if (!userTeams.length) return false;
@@ -102,9 +107,11 @@ async function collectTokensForMessage(message) {
   const targetRoles = Array.isArray(message.targetRoles) ? message.targetRoles : ['all'];
   const targetTeams = Array.isArray(message.targetTeams) ? message.targetTeams : [];
   const tokens = [];
+  let registered = 0;
 
   snap.forEach((doc) => {
     const data = doc.data() || {};
+    registered += 1;
     const token = String(data.fcmToken || '').trim();
     if (!token) return;
     if (data.wantsPush === false) return;
@@ -112,7 +119,7 @@ async function collectTokensForMessage(message) {
     tokens.push(token);
   });
 
-  return [...new Set(tokens)];
+  return { tokens: [...new Set(tokens)], registered: registered };
 }
 
 async function deliverClubPushNotification(message, options) {
@@ -130,9 +137,16 @@ async function deliverClubPushNotification(message, options) {
     throw new Error('Título y contenido obligatorios para push');
   }
 
-  const tokens = await collectTokensForMessage(message);
+  const collected = await collectTokensForMessage(message);
+  const tokens = collected.tokens || [];
   if (!tokens.length) {
-    return { sent: 0, failed: 0, devices: 0, message: 'Sin dispositivos con notificaciones activas para este filtro.' };
+    return {
+      sent: 0,
+      failed: 0,
+      devices: 0,
+      registered: collected.registered || 0,
+      message: 'Sin dispositivos con notificaciones activas para este filtro.'
+    };
   }
 
   const icon = buildAbsoluteAssetUrl(siteUrl, CLUB_ESCUDO_PATH);
@@ -162,6 +176,7 @@ async function deliverClubPushNotification(message, options) {
     sent,
     failed,
     devices: tokens.length,
+    registered: collected.registered || tokens.length,
     message: 'Push enviado a ' + sent + ' dispositivo(s).'
   };
 }

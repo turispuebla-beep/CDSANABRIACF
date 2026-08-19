@@ -631,6 +631,7 @@ function mirrorResolvedFirestoreListToLegacyKeys(resolvedCollection, documents) 
   const json = JSON.stringify(list);
   try {
     Object.keys(LOCAL_KEY_TO_COLLECTION).forEach((clubKey) => {
+      if (clubKey === 'pushMessages') return;
       if (LOCAL_KEY_TO_COLLECTION[clubKey] === resolvedCollection) {
         localStorage.setItem(clubKey, json);
       }
@@ -1007,7 +1008,8 @@ async function createDocument(collectionKey, data) {
 }
 
 // Obtener documentos de una colecciÃ³n (modo simulaciÃ³n)
-async function getDocuments(collectionName, filters = []) {
+async function getDocuments(collectionName, filters = [], opts) {
+  const options = opts && typeof opts === 'object' && !Array.isArray(opts) ? opts : {};
   try {
     const resolvedCollection = normalizeCollectionName(collectionName);
     if (db.isSimulation) {
@@ -1061,8 +1063,10 @@ async function getDocuments(collectionName, filters = []) {
       });
       // Mantener cache local del mismo Ã¡mbito para respaldo.
       const scopedDocs = documents.filter(d => !d.appScope || d.appScope === APP_SCOPE);
-      writeLocalCollection(resolvedCollection, scopedDocs);
-      mirrorResolvedFirestoreListToLegacyKeys(resolvedCollection, scopedDocs);
+      if (!options.skipLocalMirror) {
+        writeLocalCollection(resolvedCollection, scopedDocs);
+        mirrorResolvedFirestoreListToLegacyKeys(resolvedCollection, scopedDocs);
+      }
 
       console.log(`âœ… Obtenidos ${documents.length} documentos de ${resolvedCollection} (Firebase CDSANABRIACF2026)`);
       return documents;
