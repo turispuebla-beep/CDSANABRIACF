@@ -1,5 +1,14 @@
-# No cachear HTML, SW, JS ni versión: la PWA (iPhone y Android) debe ver el deploy al abrir.
+# No cachear HTML, SW, JS ni versión: iPhone, Android y Huawei deben ver el deploy al abrir.
+# La PWA arranca en / (no en /index.html): si / se cachea, iOS no actualiza.
+/
+  Cache-Control: no-cache, no-store, must-revalidate
+  Pragma: no-cache
+
 /sw.js
+  Cache-Control: no-cache, no-store, must-revalidate
+  Pragma: no-cache
+
+/*.html
   Cache-Control: no-cache, no-store, must-revalidate
   Pragma: no-cache
 

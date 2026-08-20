@@ -6,7 +6,7 @@
   'use strict';
 
   var COMP_ID = 'TORNEO_F7_2026_PINAR';
-  var VERSION = '2026-j1-resultados-17-v1';
+  var VERSION = '2026-j3-nombres-v1';
   var FIELD = 'Campo El Pinar';
   var CATS = ['Alevín', 'Infantil', 'Cadete', 'Sénior'];
   var NAME_HINT = /torneo\s*f[uú]tbol\s*7|f[uú]tbol\s*7\s*[-—]?\s*2026|torneo\s*f7/i;
@@ -17,7 +17,7 @@
     { id: 'F7_ALEVIN_ESCUELA_FS', name: 'Escuela Fútbol Sala Sanabria', category: 'Alevín' },
     { id: 'F7_INF_COBREROS', name: 'Cóbreros', category: 'Infantil' },
     { id: 'F7_INF_EL_BRONX', name: 'El Bronx', category: 'Infantil' },
-    { id: 'F7_INF_SANABRIA_2', name: 'Sanabria 2', category: 'Infantil' },
+    { id: 'F7_INF_SANABRIA_2', name: 'Sanabria 2 / St. Colomba', category: 'Infantil', aliases: ['Sanabria 2'] },
     { id: 'F7_INF_CDI', name: 'CDI', category: 'Infantil' },
     { id: 'F7_CAD_ENGRIPADOS', name: 'Los Engripados', category: 'Cadete' },
     { id: 'F7_CAD_SANABRIA_UNITED', name: 'Sanabria United', category: 'Cadete' },
@@ -26,7 +26,7 @@
     { id: 'F7_SEN_MONTELUENO', name: 'Montelueño', category: 'Sénior', group: 'A', crest: 'assets/escudos-senior/montelueno.png' },
     { id: 'F7_SEN_LA_TOSTA', name: 'La Tosta Sanabresa', category: 'Sénior', group: 'A', crest: 'assets/escudos-senior/la-tosta-sanabresa.png' },
     { id: 'F7_SEN_CAPARROTA', name: 'Caparrota', category: 'Sénior', group: 'A', crest: 'assets/escudos-senior/caparrota.png' },
-    { id: 'F7_SEN_JOPOS', name: 'Jopos de Sanabria', category: 'Sénior', group: 'A', crest: 'assets/escudos-senior/jopos-de-sanabria.png' },
+    { id: 'F7_SEN_JOPOS', name: 'Jopos de Quintana', category: 'Sénior', group: 'A', crest: 'assets/escudos-senior/jopos-de-sanabria.png', aliases: ['Jopos de Sanabria'] },
     { id: 'F7_SEN_SIKARIONES_A', name: 'Sikariones Ecotera A', category: 'Sénior', group: 'B', crest: 'assets/escudos-senior/sikariones-ecotera-a.png' },
     { id: 'F7_SEN_SIKARIONES_B', name: 'Sikariones Ecotera B', category: 'Sénior', group: 'B', crest: 'assets/escudos-senior/sikariones-ecotera-b.png' },
     { id: 'F7_SEN_CAR_ROSINOS', name: 'C.A.R. Rosinos', category: 'Sénior', group: 'B', crest: 'assets/escudos-senior/car-rosinos.png' },
@@ -37,29 +37,29 @@
   var FIXTURES = [
     { id: 'F7OFF_ALEV_0817_1700', cat: 'Alevín', date: '2026-08-17', time: '18:00', home: 'Sanabria Roots', away: 'Sanabria 1', round: 1, stage: 'Jornada 1', homeScore: 6, awayScore: 4 },
     { id: 'F7OFF_ALEV_0818_1700', cat: 'Alevín', date: '2026-08-18', time: '18:00', home: 'Sanabria 1', away: 'Escuela Fútbol Sala Sanabria', round: 2, stage: 'Jornada 2', homeScore: 0, awayScore: 7 },
-    { id: 'F7OFF_ALEV_0819_1700', cat: 'Alevín', date: '2026-08-19', time: '18:00', home: 'Escuela Fútbol Sala Sanabria', away: 'Sanabria Roots', round: 3, stage: 'Jornada 3' },
+    { id: 'F7OFF_ALEV_0819_1700', cat: 'Alevín', date: '2026-08-19', time: '18:00', home: 'Escuela Fútbol Sala Sanabria', away: 'Sanabria Roots', round: 3, stage: 'Jornada 3', homeScore: 6, awayScore: 0 },
     { id: 'F7OFF_ALEV_0820_1700', cat: 'Alevín', date: '2026-08-20', time: '18:00', home: 'Sanabria Roots', away: 'Sanabria 1', round: 4, stage: 'Jornada 4' },
     { id: 'F7OFF_ALEV_0821_1700', cat: 'Alevín', date: '2026-08-21', time: '18:00', home: 'Escuela Fútbol Sala Sanabria', away: 'Sanabria 1', round: 5, stage: 'Jornada 5' },
     { id: 'F7OFF_ALEV_0822_1700', cat: 'Alevín', date: '2026-08-22', time: '18:00', home: 'Sanabria Roots', away: 'Escuela Fútbol Sala Sanabria', round: 6, stage: 'Jornada 6' },
     { id: 'F7OFF_ALEV_0823_1700', cat: 'Alevín', date: '2026-08-23', time: '17:00', home: '1º clasificado', away: '2º clasificado', round: 7, stage: 'Final', isFinal: true },
 
     { id: 'F7OFF_INF_0817_1745', cat: 'Infantil', date: '2026-08-17', time: '18:00', home: 'Cóbreros', away: 'El Bronx', round: 1, stage: 'Jornada 1', homeScore: 4, awayScore: 4 },
-    { id: 'F7OFF_INF_0817_1830', cat: 'Infantil', date: '2026-08-17', time: '18:45', home: 'Sanabria 2', away: 'CDI', round: 1, stage: 'Jornada 1', homeScore: 3, awayScore: 4 },
-    { id: 'F7OFF_INF_0818_1745', cat: 'Infantil', date: '2026-08-18', time: '18:00', home: 'El Bronx', away: 'Sanabria 2', round: 2, stage: 'Jornada 2', homeScore: 0, awayScore: 2 },
+    { id: 'F7OFF_INF_0817_1830', cat: 'Infantil', date: '2026-08-17', time: '18:45', home: 'Sanabria 2 / St. Colomba', away: 'CDI', round: 1, stage: 'Jornada 1', homeScore: 3, awayScore: 4 },
+    { id: 'F7OFF_INF_0818_1745', cat: 'Infantil', date: '2026-08-18', time: '18:00', home: 'El Bronx', away: 'Sanabria 2 / St. Colomba', round: 2, stage: 'Jornada 2', homeScore: 0, awayScore: 2 },
     { id: 'F7OFF_INF_0818_1830', cat: 'Infantil', date: '2026-08-18', time: '18:45', home: 'CDI', away: 'Cóbreros', round: 2, stage: 'Jornada 2', homeScore: 4, awayScore: 4 },
-    { id: 'F7OFF_INF_0819_1745', cat: 'Infantil', date: '2026-08-19', time: '18:00', home: 'Sanabria 2', away: 'Cóbreros', round: 3, stage: 'Jornada 3' },
-    { id: 'F7OFF_INF_0819_1830', cat: 'Infantil', date: '2026-08-19', time: '18:45', home: 'CDI', away: 'El Bronx', round: 3, stage: 'Jornada 3' },
+    { id: 'F7OFF_INF_0819_1745', cat: 'Infantil', date: '2026-08-19', time: '18:00', home: 'Sanabria 2 / St. Colomba', away: 'Cóbreros', round: 3, stage: 'Jornada 3', homeScore: 3, awayScore: 3 },
+    { id: 'F7OFF_INF_0819_1830', cat: 'Infantil', date: '2026-08-19', time: '18:45', home: 'CDI', away: 'El Bronx', round: 3, stage: 'Jornada 3', homeScore: 10, awayScore: 2 },
     { id: 'F7OFF_INF_0820_1745', cat: 'Infantil', date: '2026-08-20', time: '18:00', home: 'El Bronx', away: 'Cóbreros', round: 4, stage: 'Jornada 4' },
-    { id: 'F7OFF_INF_0820_1830', cat: 'Infantil', date: '2026-08-20', time: '18:45', home: 'CDI', away: 'Sanabria 2', round: 4, stage: 'Jornada 4' },
-    { id: 'F7OFF_INF_0821_1745', cat: 'Infantil', date: '2026-08-21', time: '18:00', home: 'Sanabria 2', away: 'El Bronx', round: 5, stage: 'Jornada 5' },
+    { id: 'F7OFF_INF_0820_1830', cat: 'Infantil', date: '2026-08-20', time: '18:45', home: 'CDI', away: 'Sanabria 2 / St. Colomba', round: 4, stage: 'Jornada 4' },
+    { id: 'F7OFF_INF_0821_1745', cat: 'Infantil', date: '2026-08-21', time: '18:00', home: 'Sanabria 2 / St. Colomba', away: 'El Bronx', round: 5, stage: 'Jornada 5' },
     { id: 'F7OFF_INF_0821_1830', cat: 'Infantil', date: '2026-08-21', time: '18:45', home: 'Cóbreros', away: 'CDI', round: 5, stage: 'Jornada 5' },
-    { id: 'F7OFF_INF_0822_1745', cat: 'Infantil', date: '2026-08-22', time: '18:00', home: 'Cóbreros', away: 'Sanabria 2', round: 6, stage: 'Jornada 6' },
+    { id: 'F7OFF_INF_0822_1745', cat: 'Infantil', date: '2026-08-22', time: '18:00', home: 'Cóbreros', away: 'Sanabria 2 / St. Colomba', round: 6, stage: 'Jornada 6' },
     { id: 'F7OFF_INF_0822_1830', cat: 'Infantil', date: '2026-08-22', time: '18:45', home: 'El Bronx', away: 'CDI', round: 6, stage: 'Jornada 6' },
     { id: 'F7OFF_INF_0823_1745', cat: 'Infantil', date: '2026-08-23', time: '18:00', home: '1º clasificado', away: '2º clasificado', round: 7, stage: 'Final', isFinal: true },
 
     { id: 'F7OFF_CAD_0817_1915', cat: 'Cadete', date: '2026-08-17', time: '19:30', home: 'Los Engripados', away: 'Sanabria United', round: 1, stage: 'Jornada 1', homeScore: 0, awayScore: 3 },
     { id: 'F7OFF_CAD_0818_1915', cat: 'Cadete', date: '2026-08-18', time: '19:30', home: 'Sanabria United', away: 'La Escudineta', round: 2, stage: 'Jornada 2', homeScore: 0, awayScore: 4 },
-    { id: 'F7OFF_CAD_0819_1915', cat: 'Cadete', date: '2026-08-19', time: '19:30', home: 'La Escudineta', away: 'Los Engripados', round: 3, stage: 'Jornada 3' },
+    { id: 'F7OFF_CAD_0819_1915', cat: 'Cadete', date: '2026-08-19', time: '19:30', home: 'La Escudineta', away: 'Los Engripados', round: 3, stage: 'Jornada 3', homeScore: 5, awayScore: 0 },
     { id: 'F7OFF_CAD_0820_1915', cat: 'Cadete', date: '2026-08-20', time: '19:30', home: 'Los Engripados', away: 'Sanabria United', round: 4, stage: 'Jornada 4' },
     { id: 'F7OFF_CAD_0821_1915', cat: 'Cadete', date: '2026-08-21', time: '19:30', home: 'Sanabria United', away: 'La Escudineta', round: 5, stage: 'Jornada 5' },
     { id: 'F7OFF_CAD_0822_1915', cat: 'Cadete', date: '2026-08-22', time: '19:30', home: 'Los Engripados', away: 'La Escudineta', round: 6, stage: 'Jornada 6' },
@@ -70,23 +70,23 @@
     { id: 'F7OFF_SEN_0817_2130', cat: 'Sénior', group: 'B', date: '2026-08-17', time: '21:45', home: 'San Francisco/Castellanos', away: 'Sikariones Ecotera B', round: 1, stage: 'Grupo B · Jornada 1', field: '', homeScore: 2, awayScore: 2 },
     { id: 'F7OFF_SEN_0817_2215', cat: 'Sénior', group: 'B', date: '2026-08-17', time: '22:30', home: 'C.A.R. Rosinos', away: 'Olek FC', round: 1, stage: 'Grupo B · Jornada 1', field: '', homeScore: 3, awayScore: 0 },
 
-    { id: 'F7OFF_SEN_0818_2000', cat: 'Sénior', group: 'A', date: '2026-08-18', time: '20:15', home: 'Jopos de Sanabria', away: 'Bar Mirador', round: 2, stage: 'Grupo A · Jornada 2', field: '', homeScore: 1, awayScore: 3 },
+    { id: 'F7OFF_SEN_0818_2000', cat: 'Sénior', group: 'A', date: '2026-08-18', time: '20:15', home: 'Jopos de Quintana', away: 'Bar Mirador', round: 2, stage: 'Grupo A · Jornada 2', field: '', homeScore: 1, awayScore: 3 },
     { id: 'F7OFF_SEN_0818_2045', cat: 'Sénior', group: 'A', date: '2026-08-18', time: '21:00', home: 'Montelueño', away: 'La Tosta Sanabresa', round: 2, stage: 'Grupo A · Jornada 2', field: '', homeScore: 6, awayScore: 1 },
     { id: 'F7OFF_SEN_0818_2130', cat: 'Sénior', group: 'B', date: '2026-08-18', time: '21:45', home: 'Sikariones Ecotera B', away: 'C.A.R. Rosinos', round: 2, stage: 'Grupo B · Jornada 2', field: '', homeScore: 3, awayScore: 0 },
     { id: 'F7OFF_SEN_0818_2215', cat: 'Sénior', group: 'B', date: '2026-08-18', time: '22:30', home: 'Sikariones Ecotera A', away: 'San Francisco/Castellanos', round: 2, stage: 'Grupo B · Jornada 2', field: '', homeScore: 0, awayScore: 1 },
 
-    { id: 'F7OFF_SEN_0819_2000', cat: 'Sénior', group: 'A', date: '2026-08-19', time: '20:15', home: 'Caparrota', away: 'Jopos de Sanabria', round: 3, stage: 'Grupo A · Jornada 3', field: '' },
-    { id: 'F7OFF_SEN_0819_2045', cat: 'Sénior', group: 'A', date: '2026-08-19', time: '21:00', home: 'Bar Mirador', away: 'La Tosta Sanabresa', round: 3, stage: 'Grupo A · Jornada 3', field: '' },
-    { id: 'F7OFF_SEN_0819_2130', cat: 'Sénior', group: 'B', date: '2026-08-19', time: '21:45', home: 'San Francisco/Castellanos', away: 'C.A.R. Rosinos', round: 3, stage: 'Grupo B · Jornada 3', field: '' },
-    { id: 'F7OFF_SEN_0819_2215', cat: 'Sénior', group: 'B', date: '2026-08-19', time: '22:30', home: 'Sikariones Ecotera A', away: 'Olek FC', round: 3, stage: 'Grupo B · Jornada 3', field: '' },
+    { id: 'F7OFF_SEN_0819_2000', cat: 'Sénior', group: 'A', date: '2026-08-19', time: '20:15', home: 'Caparrota', away: 'Jopos de Quintana', round: 3, stage: 'Grupo A · Jornada 3', field: '', homeScore: 3, awayScore: 4 },
+    { id: 'F7OFF_SEN_0819_2045', cat: 'Sénior', group: 'A', date: '2026-08-19', time: '21:00', home: 'Bar Mirador', away: 'La Tosta Sanabresa', round: 3, stage: 'Grupo A · Jornada 3', field: '', homeScore: 5, awayScore: 0 },
+    { id: 'F7OFF_SEN_0819_2130', cat: 'Sénior', group: 'B', date: '2026-08-19', time: '21:45', home: 'San Francisco/Castellanos', away: 'C.A.R. Rosinos', round: 3, stage: 'Grupo B · Jornada 3', field: '', homeScore: 2, awayScore: 2 },
+    { id: 'F7OFF_SEN_0819_2215', cat: 'Sénior', group: 'B', date: '2026-08-19', time: '22:30', home: 'Sikariones Ecotera A', away: 'Olek FC', round: 3, stage: 'Grupo B · Jornada 3', field: '', homeScore: 10, awayScore: 1 },
 
     { id: 'F7OFF_SEN_0820_2000', cat: 'Sénior', group: 'A', date: '2026-08-20', time: '20:15', home: 'Montelueño', away: 'Caparrota', round: 4, stage: 'Grupo A · Jornada 4', field: '' },
-    { id: 'F7OFF_SEN_0820_2045', cat: 'Sénior', group: 'A', date: '2026-08-20', time: '21:00', home: 'Jopos de Sanabria', away: 'La Tosta Sanabresa', round: 4, stage: 'Grupo A · Jornada 4', field: '' },
+    { id: 'F7OFF_SEN_0820_2045', cat: 'Sénior', group: 'A', date: '2026-08-20', time: '21:00', home: 'Jopos de Quintana', away: 'La Tosta Sanabresa', round: 4, stage: 'Grupo A · Jornada 4', field: '' },
     { id: 'F7OFF_SEN_0820_2130', cat: 'Sénior', group: 'B', date: '2026-08-20', time: '21:45', home: 'Olek FC', away: 'Sikariones Ecotera B', round: 4, stage: 'Grupo B · Jornada 4', field: '' },
     { id: 'F7OFF_SEN_0820_2215', cat: 'Sénior', group: 'B', date: '2026-08-20', time: '22:30', home: 'Sikariones Ecotera A', away: 'C.A.R. Rosinos', round: 4, stage: 'Grupo B · Jornada 4', field: '' },
 
     { id: 'F7OFF_SEN_0821_2000', cat: 'Sénior', group: 'A', date: '2026-08-21', time: '20:15', home: 'Bar Mirador', away: 'Caparrota', round: 5, stage: 'Grupo A · Jornada 5', field: '' },
-    { id: 'F7OFF_SEN_0821_2045', cat: 'Sénior', group: 'A', date: '2026-08-21', time: '21:00', home: 'Montelueño', away: 'Jopos de Sanabria', round: 5, stage: 'Grupo A · Jornada 5', field: '' },
+    { id: 'F7OFF_SEN_0821_2045', cat: 'Sénior', group: 'A', date: '2026-08-21', time: '21:00', home: 'Montelueño', away: 'Jopos de Quintana', round: 5, stage: 'Grupo A · Jornada 5', field: '' },
     { id: 'F7OFF_SEN_0821_2130', cat: 'Sénior', group: 'B', date: '2026-08-21', time: '21:45', home: 'Olek FC', away: 'San Francisco/Castellanos', round: 5, stage: 'Grupo B · Jornada 5', field: '' },
     { id: 'F7OFF_SEN_0821_2215', cat: 'Sénior', group: 'B', date: '2026-08-21', time: '22:30', home: 'Sikariones Ecotera A', away: 'Sikariones Ecotera B', round: 5, stage: 'Grupo B · Jornada 5', field: '' },
 
@@ -140,24 +140,46 @@
     return candidates[0];
   }
 
-  function findTeam(teams, name, category) {
+  function teamNameKeys(team, extraName) {
+    var keys = [];
+    function add(v) {
+      var n = normName(v);
+      if (n && keys.indexOf(n) < 0) keys.push(n);
+    }
+    add(extraName);
+    if (team) {
+      add(team.name);
+      (team.aliases || []).forEach(add);
+    }
+    return keys;
+  }
+
+  function findTeam(teams, name, category, preferredId) {
     var n = normName(name);
     var cat = normName(category);
     var list = Array.isArray(teams) ? teams : [];
+    if (preferredId) {
+      var byId = list.find(function (t) {
+        return t && String(t.id) === String(preferredId);
+      });
+      if (byId) return byId;
+    }
     var exact = list.find(function (t) {
-      return normName(t.name) === n && (!cat || normName(t.category) === cat);
+      return teamNameKeys(t).indexOf(n) >= 0 && (!cat || normName(t.category) === cat);
     });
     if (exact) return exact;
     return list.find(function (t) {
-      return normName(t.name) === n;
+      return teamNameKeys(t).indexOf(n) >= 0;
     }) || null;
   }
 
-  function ensureTeam(teams, name, category, preferredId, group) {
-    var existing = findTeam(teams, name, category);
+  function ensureTeam(teams, name, category, preferredId, group, aliases) {
+    var existing = findTeam(teams, name, category, preferredId);
     if (existing) {
+      existing.name = name;
       if (!existing.category && category) existing.category = category;
       if (group && !existing.group) existing.group = group;
+      if (aliases && aliases.length) existing.aliases = aliases;
       return existing;
     }
     var team = {
@@ -168,6 +190,7 @@
       isGuestTeam: true
     };
     if (group) team.group = group;
+    if (aliases && aliases.length) team.aliases = aliases;
     teams.push(team);
     return team;
   }
@@ -294,7 +317,8 @@
     if (!Array.isArray(competition.matches)) competition.matches = [];
 
     TEAMS.forEach(function (t) {
-      var team = ensureTeam(competition.teams, t.name, t.category, t.id, t.group);
+      var team = ensureTeam(competition.teams, t.name, t.category, t.id, t.group, t.aliases);
+      team.name = t.name;
       if (t.crest) team.crest = t.crest;
       if (t.group) team.group = t.group;
     });
@@ -347,6 +371,10 @@
         prev.field = FIELD;
         prev.categoryHint = prev.categoryHint || fx.cat;
         prev.groupHint = prev.groupHint || fx.group || '';
+        prev.homeTeamId = home.id;
+        prev.homeTeamName = home.name;
+        prev.awayTeamId = away.id;
+        prev.awayTeamName = away.name;
         prev.officialFixture = true;
       }
       if (hasNumericScore(fx.homeScore) && hasNumericScore(fx.awayScore)) {

@@ -68,13 +68,12 @@ fcmMessaging.onBackgroundMessage(function (payload) {
   });
 });
 
-const CACHE_NAME = 'cdsanabriacf-v2.2.1';
-const STATIC_CACHE = 'cdsanabriacf-static-v2.2.0';
-const DYNAMIC_CACHE = 'cdsanabriacf-dynamic-v2.2.0';
+const CACHE_NAME = 'cdsanabriacf-v2.3.0';
+const STATIC_CACHE = 'cdsanabriacf-static-v2.3.0';
+const DYNAMIC_CACHE = 'cdsanabriacf-dynamic-v2.3.0';
 
-// Archivos críticos para cache (solo rutas que existen en el despliegue)
+// No precachear HTML (/): iOS y Huawei se quedan con la portada vieja.
 const STATIC_ASSETS = [
-  '/',
   '/manifest.json',
   '/assets/escudo-cdsanabriacf.png',
   '/assets/escudo-192.png',
@@ -208,6 +207,17 @@ self.addEventListener('fetch', (event) => {
   if (request.method !== 'GET') {
     return;
   }
+
+  try {
+    const u = new URL(request.url);
+    if (u.origin === self.location.origin) {
+      const path = u.pathname || '/';
+      if (path === '/deploy-version.json' || path === '/sw.js') {
+        event.respondWith(fetch(request, { cache: 'no-store' }));
+        return;
+      }
+    }
+  } catch (_) {}
 
   // Firebase Storage / streaming: sin interceptar (evita fallos con Range)
   try {
@@ -442,9 +452,8 @@ async function staleWhileRevalidate(request) {
 
 function isStaticAsset(request) {
   const url = new URL(request.url);
-  return STATIC_ASSETS.some(asset => url.pathname.endsWith(asset)) ||
+  return STATIC_ASSETS.some(asset => url.pathname === asset || (asset !== '/' && url.pathname.endsWith(asset))) ||
          url.pathname.includes('/css/') ||
-         url.pathname.includes('/js/') ||
          url.pathname.includes('/images/') ||
          url.pathname.includes('/fonts/');
 }
