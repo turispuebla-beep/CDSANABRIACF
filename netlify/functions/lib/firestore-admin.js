@@ -85,6 +85,80 @@ function settingsRef() {
   return initAdmin().collection('sanabria_config');
 }
 
+function ledgerRef() {
+  return initAdmin().collection('sanabria_accounting_ledger');
+}
+
+function displayPersonName(obj) {
+  if (!obj || typeof obj !== 'object') return '';
+  return [obj.nombre || obj.name, obj.apellidos || obj.surname].filter(Boolean).join(' ').trim();
+}
+
+function newLedgerId() {
+  return 'L' + String(Date.now()) + String(Math.floor(Math.random() * 1e6)).padStart(6, '0');
+}
+
+function ledgerIdFromDedupe(key) {
+  const s = String(key || '').replace(/[^a-zA-Z0-9_-]/g, '_').slice(0, 110);
+  return s ? 'led_' + s : newLedgerId();
+}
+
+async function findExistingLedgerRow(entry) {
+  const key = String((entry && entry.dedupeKey) || '').trim();
+  if (key) {
+    const q = await ledgerRef().where('dedupeKey', '==', key).limit(1).get();
+    if (!q.empty) {
+      const doc = q.docs[0];
+      return { id: doc.id, ...doc.data() };
+    }
+  }
+  const orderId = String((entry && entry.paymentOrderId) || '').trim();
+  const category = String((entry && entry.category) || '').trim();
+  if (orderId) {
+    const q2 = await ledgerRef().where('paymentOrderId', '==', orderId).limit(20).get();
+    for (const doc of q2.docs) {
+      const d = doc.data() || {};
+      if (category && String(d.category || '') !== category) continue;
+      return { id: doc.id, ...d };
+    }
+  }
+  return null;
+}
+
+/**
+ * Ingreso/gasto en el libro (caja A banco / B efectivo). No duplica si ya hay dedupeKey o pedido.
+ */
+async function recordClubLedgerIncome(entry) {
+  try {
+    const amount = Number(entry && entry.signedAmount);
+    if (!Number.isFinite(amount) || amount === 0) return { skipped: true, reason: 'importe' };
+    const existing = await findExistingLedgerRow(entry);
+    if (existing) return { skipped: true, row: existing };
+    const id = String((entry && entry.id) || (entry && entry.dedupeKey ? ledgerIdFromDedupe(entry.dedupeKey) : newLedgerId()));
+    const row = {
+      id,
+      createdAt: (entry && entry.createdAt) || new Date().toISOString(),
+      bucket: entry && entry.bucket === 'B' ? 'B' : 'A',
+      signedAmount: Math.round(amount * 100) / 100,
+      concept: String((entry && entry.concept) || '').slice(0, 500),
+      category: String((entry && entry.category) || 'otro').slice(0, 80),
+      refType: (entry && entry.refType) || null,
+      refId: entry && entry.refId != null ? String(entry.refId) : null,
+      transferPairId: (entry && entry.transferPairId) || null,
+      paymentOrderId: entry && entry.paymentOrderId ? String(entry.paymentOrderId) : null,
+      paymentChannel: entry && entry.paymentChannel ? String(entry.paymentChannel).slice(0, 40) : null,
+      dedupeKey: entry && entry.dedupeKey ? String(entry.dedupeKey).slice(0, 180) : null,
+      source: (entry && entry.source) || 'auto',
+      appScope: APP_SCOPE
+    };
+    await ledgerRef().doc(id).set(row, { merge: true });
+    return { skipped: false, row };
+  } catch (err) {
+    console.warn('recordClubLedgerIncome:', err && err.message ? err.message : err);
+    return { skipped: true, error: err && err.message ? err.message : String(err) };
+  }
+}
+
 const DEFAULT_MEMBERSHIP_PRICING = { cuotaMenor: 10, cuotaMayor: 25, edadMaxMenor: 17 };
 
 function parseMembershipPricingDoc(d) {
@@ -407,6 +481,26 @@ async function completeMembershipPayment(payment, redsysParams) {
   await resolved.ref.set(patch, { merge: true });
 
   try {
+    const memberId = String(resolved.ref.id);
+    const name = displayPersonName(merged) || 'Socio';
+    const cuotaAmt = Number(payment.amountEur != null ? payment.amountEur : merged.cuota);
+    await recordClubLedgerIncome({
+      bucket: 'A',
+      signedAmount: cuotaAmt,
+      concept: 'Cuota socio (pasarela): ' + name,
+      category: 'cuota_socio',
+      refType: 'member',
+      refId: memberId,
+      paymentOrderId: payment.orderId,
+      paymentChannel: payment.payMethod === 'bizum' ? 'bizum' : 'tarjeta',
+      dedupeKey: 'member:cuota_socio:' + memberId,
+      source: 'redsys'
+    });
+  } catch (ledErr) {
+    console.warn('Ledger cuota socio pasarela:', ledErr && ledErr.message ? ledErr.message : ledErr);
+  }
+
+  try {
     const { sendMemberPaymentConfirmedEmail } = require('./member-email');
     const { sendClubAdminNotification } = require('./club-admin-notify-email');
     const d = merged;
@@ -515,6 +609,23 @@ async function completePayGoldPayment(payment, redsysParams) {
     { label: 'Canal', value: payment.paygoldChannel || payment.delivery || 'paygold' }
   ];
 
+  const paygoldAmt = Number(payment.amountEur);
+  if (Number.isFinite(paygoldAmt) && paygoldAmt > 0) {
+    const isKit = category === 'kit' || category === 'ropa' || category === 'equipacion';
+    await recordClubLedgerIncome({
+      bucket: 'A',
+      signedAmount: paygoldAmt,
+      concept: 'PayGold: ' + concept,
+      category: isKit ? 'equipacion' : 'paygold',
+      refType: isKit ? 'player_kit' : 'paygold',
+      refId: String(payment.playerId || payment.orderId || ''),
+      paymentOrderId: payment.orderId,
+      paymentChannel: 'paygold',
+      dedupeKey: 'pay:' + String(payment.orderId) + ':' + (isKit ? 'equipacion' : 'paygold'),
+      source: 'paygold'
+    });
+  }
+
   if (category === 'kit' || category === 'ropa' || category === 'equipacion') {
     await sendClubAdminNotification({
       kind: 'paygold_kit_paid',
@@ -591,6 +702,33 @@ async function completeEventPayment(payment) {
     { participants, registeredMembers: participants, updatedAt: now },
     { merge: true }
   );
+
+  const holderForLedger = toAdd[0] || {};
+  const eventTitleForLedger = event.title || event.name || 'Evento';
+  const totalEurLedger =
+    payment.amountEur != null
+      ? payment.amountEur
+      : registrationBundle && registrationBundle.totalEur != null
+        ? registrationBundle.totalEur
+        : toAdd.reduce(function (s, r) {
+            return s + Number(r.appliedPrice || 0);
+          }, 0);
+  await recordClubLedgerIncome({
+    bucket: event.revenueDestination === 'B' ? 'B' : 'A',
+    signedAmount: totalEurLedger,
+    concept:
+      'Evento "' +
+      eventTitleForLedger +
+      '": ' +
+      (displayPersonName(holderForLedger) || payment.customerEmail || holderForLedger.email || 'inscripción'),
+    category: 'evento',
+    refType: 'event',
+    refId: String(eventId),
+    paymentOrderId: payment.orderId,
+    paymentChannel: payment.payMethod === 'bizum' ? 'bizum' : 'tarjeta',
+    dedupeKey: 'event:' + String(eventId) + ':pay:' + String(payment.orderId || ''),
+    source: 'redsys'
+  });
 
   try {
     const { sendClubAdminNotification } = require('./club-admin-notify-email');
@@ -875,6 +1013,75 @@ async function completePlayerInscription(payment, opts) {
     : { ...reg, id: playerId };
 
   try {
+    const cb = (reg && reg.chargeBreakdown) || {};
+    const name = displayPersonName(reg) || displayPersonName(savedPlayerNotify) || 'Jugador/a';
+    const ch = payment.payMethod === 'bizum' ? 'bizum' : 'tarjeta';
+    const socioAmt = Number(cb.socio) > 0 ? Number(cb.socio) : 0;
+    const fichaAmt = Number(cb.ficha) > 0 ? Number(cb.ficha) : 0;
+    const kitAmt = Number(cb.kit) > 0 ? Number(cb.kit) : 0;
+    const fallbackAmt = Number(cb.total != null ? cb.total : payment.amountEur);
+    if (socioAmt > 0) {
+      const socioRef = memberId ? String(memberId) : String(playerId);
+      await recordClubLedgerIncome({
+        bucket: 'A',
+        signedAmount: socioAmt,
+        concept: 'Cuota socio (inscripción jugador, pasarela): ' + name,
+        category: 'cuota_socio',
+        refType: memberId ? 'member' : 'player',
+        refId: socioRef,
+        paymentOrderId: payment.orderId,
+        paymentChannel: ch,
+        dedupeKey: (memberId ? 'member:cuota_socio:' : 'player:cuota_socio:') + socioRef,
+        source: 'redsys'
+      });
+    }
+    if (fichaAmt > 0) {
+      await recordClubLedgerIncome({
+        bucket: 'A',
+        signedAmount: fichaAmt,
+        concept: 'Ficha jugador (pasarela): ' + name,
+        category: 'ficha_jugador',
+        refType: 'player',
+        refId: String(playerId),
+        paymentOrderId: payment.orderId,
+        paymentChannel: ch,
+        dedupeKey: 'player:ficha_jugador:' + String(playerId),
+        source: 'redsys'
+      });
+    }
+    if (kitAmt > 0) {
+      await recordClubLedgerIncome({
+        bucket: 'A',
+        signedAmount: kitAmt,
+        concept: 'Equipación (inscripción, pasarela): ' + name,
+        category: 'equipacion',
+        refType: 'player_kit',
+        refId: String(playerId),
+        paymentOrderId: payment.orderId,
+        paymentChannel: ch,
+        dedupeKey: 'player:equipacion:' + String(playerId) + ':' + String(payment.orderId || ''),
+        source: 'redsys'
+      });
+    }
+    if (socioAmt <= 0 && fichaAmt <= 0 && kitAmt <= 0 && Number.isFinite(fallbackAmt) && fallbackAmt > 0) {
+      await recordClubLedgerIncome({
+        bucket: 'A',
+        signedAmount: fallbackAmt,
+        concept: 'Inscripción jugador (pasarela): ' + name,
+        category: 'ficha_jugador',
+        refType: 'player',
+        refId: String(playerId),
+        paymentOrderId: payment.orderId,
+        paymentChannel: ch,
+        dedupeKey: 'player:ficha_jugador:' + String(playerId),
+        source: 'redsys'
+      });
+    }
+  } catch (ledErr) {
+    console.warn('Ledger inscripción jugador pasarela:', ledErr && ledErr.message ? ledErr.message : ledErr);
+  }
+
+  try {
     if (skipNotify) return;
     const { sendClubAdminNotification } = require('./club-admin-notify-email');
     const { buildPlayerInscriptionNotifyFields, formatKitSummary } = require('./player-inscription-notify-fields');
@@ -983,6 +1190,24 @@ async function completePlayerKitPurchase(payment) {
     },
     { merge: true }
   );
+
+  try {
+    const kitName = displayPersonName(existing) || displayPersonName(kitPayload) || 'Jugador/a';
+    await recordClubLedgerIncome({
+      bucket: 'A',
+      signedAmount: totalEur,
+      concept: 'Equipación (pasarela): ' + kitName,
+      category: 'equipacion',
+      refType: 'player_kit',
+      refId: String(playerId),
+      paymentOrderId: payment.orderId,
+      paymentChannel: payment.payMethod === 'bizum' ? 'bizum' : 'tarjeta',
+      dedupeKey: 'player:equipacion:' + String(playerId) + ':' + String(payment.orderId || ''),
+      source: 'redsys'
+    });
+  } catch (ledErr) {
+    console.warn('Ledger equipación pasarela:', ledErr && ledErr.message ? ledErr.message : ledErr);
+  }
 
   const regForNotify = {
     id: playerId,
@@ -3018,5 +3243,6 @@ module.exports = {
   deleteCoachRecord,
   deleteMemberRecord,
   deleteFriendRecord,
-  deletePlayerRecord
+  deletePlayerRecord,
+  recordClubLedgerIncome
 };

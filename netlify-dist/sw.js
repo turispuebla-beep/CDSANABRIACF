@@ -68,9 +68,9 @@ fcmMessaging.onBackgroundMessage(function (payload) {
   });
 });
 
-const CACHE_NAME = 'cdsanabriacf-v20260820-1256';
-const STATIC_CACHE = 'cdsanabriacf-v20260820-1256-static';
-const DYNAMIC_CACHE = 'cdsanabriacf-v20260820-1256-dynamic';
+const CACHE_NAME = 'cdsanabriacf-v20260829-0206';
+const STATIC_CACHE = 'cdsanabriacf-v20260829-0206-static';
+const DYNAMIC_CACHE = 'cdsanabriacf-v20260829-0206-dynamic';
 
 // No precachear HTML (/): iOS y Huawei se quedan con la portada vieja.
 const STATIC_ASSETS = [

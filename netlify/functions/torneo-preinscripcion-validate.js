@@ -1,7 +1,8 @@
 'use strict';
 
 const { verifyAdminRequest } = require('./lib/admin-auth');
-const { torneoPreinscripcionesRef } = require('./lib/firestore-admin');
+const { torneoPreinscripcionesRef, recordClubLedgerIncome } = require('./lib/firestore-admin');
+const { getTorneoFeeForRecord } = require('./lib/torneo-pricing');
 const {
   sendTorneoEquipoValidadoEmails,
   sendTorneoPagoValidadoEmails
@@ -106,6 +107,25 @@ exports.handler = async (event) => {
       };
       await ref.set(patch, { merge: true });
       const merged = Object.assign({}, record, patch);
+      try {
+        const amt = Number(
+          record.inscriptionFeeEur != null ? record.inscriptionFeeEur : getTorneoFeeForRecord(record)
+        );
+        const ch = String(record.paymentMethod || record.offlinePaymentChannel || '').toLowerCase();
+        await recordClubLedgerIncome({
+          bucket: ch === 'efectivo' ? 'B' : 'A',
+          signedAmount: amt,
+          concept: 'Torneo F7 validado: ' + (record.teamName || preinscripcionId),
+          category: 'torneo',
+          refType: 'torneo',
+          refId: String(preinscripcionId),
+          paymentChannel: ch || 'transferencia',
+          dedupeKey: 'torneo:' + String(preinscripcionId),
+          source: 'admin'
+        });
+      } catch (ledErr) {
+        console.warn('Ledger torneo validación admin:', ledErr && ledErr.message ? ledErr.message : ledErr);
+      }
       let mail = { sent: false };
       try {
         mail = await sendTorneoPagoValidadoEmails(merged);

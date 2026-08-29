@@ -8,7 +8,8 @@ const {
   normalizeTorneoTeamName,
   isActiveTorneoPreinscripcion,
   findTorneoPreinscripcionByAccessCode,
-  ensureTorneoAccessCode
+  ensureTorneoAccessCode,
+  recordClubLedgerIncome
 } = require('./firestore-admin');
 const { isResponsibleOnlyCode } = require('./torneo-codes');
 
@@ -725,6 +726,27 @@ async function completeTorneoPlantilla(recordId, paymentMeta) {
   if (paymentMeta && paymentMeta.paidByName) patch.paidByName = paymentMeta.paidByName;
   await ref.set(patch, { merge: true });
   const merged = { ...record, ...patch };
+  if (String(patch.paymentStatus || '').toLowerCase() === 'paid') {
+    const amt = Number(
+      patch.inscriptionFeeEur != null ? patch.inscriptionFeeEur : getTorneoInscriptionFeeEur(merged)
+    );
+    const pm = String(patch.paymentMethod || (paymentMeta && paymentMeta.payMethod) || '').toLowerCase();
+    const isBizum = pm.indexOf('bizum') >= 0;
+    await recordClubLedgerIncome({
+      bucket: 'A',
+      signedAmount: amt,
+      concept: 'Torneo F7: ' + (merged.teamName || recordId),
+      category: 'torneo',
+      refType: 'torneo',
+      refId: String(recordId),
+      paymentOrderId: patch.paymentOrderId || (paymentMeta && paymentMeta.orderId) || null,
+      paymentChannel: isBizum ? 'bizum' : 'tarjeta',
+      dedupeKey: 'torneo:' + String(recordId),
+      source: 'redsys'
+    }).catch(function (ledErr) {
+      console.warn('Ledger torneo pasarela:', ledErr && ledErr.message ? ledErr.message : ledErr);
+    });
+  }
 
   const skipPlantillaEmail =
     !!(paymentMeta && paymentMeta.skipPlantillaEmail) ||

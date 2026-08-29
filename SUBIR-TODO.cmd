@@ -5,52 +5,46 @@ cd /d "%~dp0"
 echo.
 echo ============================================================
 echo   CD Sanabria CF — SUBIR TODO A PRODUCCION
-echo   1. Netlify (web + funciones)
-echo   2. Reglas Firebase (privacidad jugadores)
-echo   3. Activar preinscripcion torneo (modo actualizacion OFF)
 echo ============================================================
 echo.
 echo   Carpeta: %CD%
 echo.
-echo   Requisitos:
-echo   - Node.js + Netlify CLI (scripts\netlify-cli-setup.ps1 si falta)
-echo   - Firebase CLI (firebase login)
-echo   - Para paso 3: FIREBASE_SERVICE_ACCOUNT_JSON o GOOGLE_APPLICATION_CREDENTIALS
+echo   Sube:
+echo   1. Web + panel (netlify-dist)
+echo   2. Funciones Netlify (tarjeta/Bizum, contabilidad, correos)
+echo   3. Reglas Firebase (Firestore + Storage)
+echo.
+echo   Requisitos: Node.js, Netlify CLI y Firebase CLI ya logueados.
+echo   Si falta Netlify CLI: scripts\netlify-cli-setup.ps1
 echo.
 pause
 
 echo.
-echo [1/3] Netlify — build + deploy produccion...
+echo [1/2] Netlify — build + web + funciones...
 echo.
-powershell -NoProfile -ExecutionPolicy Bypass -File ".\scripts\deploy-netlify-prod.ps1"
+powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0scripts\deploy-netlify-prod.ps1"
 if errorlevel 1 goto :fail
 
 echo.
-echo [2/3] Firebase — reglas Firestore...
+echo [2/2] Firebase — reglas...
 echo.
-firebase deploy --only firestore:rules --project cdsanabriacf2026
-if errorlevel 1 goto :fail
-
-echo.
-echo [3/3] Firebase — activar preinscripciones publicas...
-echo.
-node scripts/enable-public-registrations.js
+where firebase >nul 2>&1
 if errorlevel 1 (
-    echo.
-    echo AVISO: No se pudo activar por script.
-    echo En la web, entra como admin y pulsa "Actualizacion: OFF" en el banner.
-    echo.
-) else (
-    echo.
-    echo Preinscripcion torneo ACTIVADA.
-    echo.
+  echo AVISO: no esta Firebase CLI. La web ya esta en Netlify.
+  echo Para reglas: npm i -g firebase-tools  y  firebase login
+  echo Luego: SUBIR-FIREBASE-RULES.cmd
+  goto :ok
 )
 
+firebase deploy --only firestore:rules,storage --project cdsanabriacf2026
+if errorlevel 1 goto :fail
+
+:ok
 echo.
 echo ============================================================
 echo   LISTO
-echo   Comprueba: https://www.cdsanabriacf.com/deploy-version.json
-echo   Prueba torneo: Inscribete en la home
+echo   https://www.cdsanabriacf.com
+echo   https://www.cdsanabriacf.com/deploy-version.json
 echo ============================================================
 echo.
 pause

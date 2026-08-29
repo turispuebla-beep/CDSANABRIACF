@@ -75,14 +75,48 @@
   }
 
   function newLedgerId() {
-    return String(Date.now()) + String(Math.floor(Math.random() * 1e6)).padStart(6, '0');
+    return 'L' + String(Date.now()) + String(Math.floor(Math.random() * 1e6)).padStart(6, '0');
+  }
+
+  function ledgerIdFromDedupe(key) {
+    var s = String(key || '').replace(/[^a-zA-Z0-9_-]/g, '_').slice(0, 110);
+    return s ? 'led_' + s : newLedgerId();
+  }
+
+  function createdAtToIso(val) {
+    if (val == null || val === '') return new Date().toISOString();
+    if (typeof val === 'string') return val;
+    try {
+      if (typeof val.toDate === 'function') {
+        var d0 = val.toDate();
+        if (!isNaN(d0.getTime())) return d0.toISOString();
+      }
+    } catch (e0) {}
+    if (typeof val === 'object' && typeof val.seconds === 'number') {
+      var d1 = new Date(val.seconds * 1000);
+      if (!isNaN(d1.getTime())) return d1.toISOString();
+    }
+    var d2 = new Date(val);
+    return isNaN(d2.getTime()) ? new Date().toISOString() : d2.toISOString();
+  }
+
+  function normalizeLedgerEntry(e) {
+    if (!e || typeof e !== 'object') return null;
+    var copy = Object.assign({}, e);
+    copy.id = String(e.id || newLedgerId());
+    copy.createdAt = createdAtToIso(e.createdAt);
+    copy.bucket = e.bucket === 'B' ? 'B' : 'A';
+    copy.signedAmount = Math.round(Number(e.signedAmount || 0) * 100) / 100;
+    copy.appScope = 'cdsanabriacf';
+    return copy;
   }
 
   function readLedger() {
     try {
       var raw = localStorage.getItem(LEDGER_KEY);
       var list = raw ? JSON.parse(raw) : [];
-      return Array.isArray(list) ? list : [];
+      if (!Array.isArray(list)) return [];
+      return list.map(normalizeLedgerEntry).filter(Boolean);
     } catch (e) {
       return [];
     }
@@ -149,8 +183,8 @@
     var signed = Number(entry.signedAmount);
     if (!Number.isFinite(signed) || signed === 0) return null;
     var row = {
-      id: entry.id || newLedgerId(),
-      createdAt: entry.createdAt || new Date().toISOString(),
+      id: entry.id || (entry.dedupeKey ? ledgerIdFromDedupe(entry.dedupeKey) : newLedgerId()),
+      createdAt: createdAtToIso(entry.createdAt),
       bucket: entry.bucket === 'B' ? 'B' : 'A',
       signedAmount: Math.round(signed * 100) / 100,
       concept: String(entry.concept || '').slice(0, 500),
@@ -158,15 +192,45 @@
       refType: entry.refType || null,
       refId: entry.refId != null ? String(entry.refId) : null,
       transferPairId: entry.transferPairId || null,
+      paymentOrderId: entry.paymentOrderId ? String(entry.paymentOrderId) : null,
+      paymentChannel: entry.paymentChannel ? String(entry.paymentChannel).slice(0, 40) : null,
+      dedupeKey: entry.dedupeKey ? String(entry.dedupeKey).slice(0, 180) : null,
+      source: entry.source ? String(entry.source).slice(0, 40) : 'manual',
       appScope: 'cdsanabriacf'
     };
+    var ix = -1;
+    for (var i = 0; i < list.length; i++) {
+      if (String(list[i].id) === String(row.id)) {
+        ix = i;
+        break;
+      }
+    }
+    if (ix >= 0) {
+      row.createdAt = list[ix].createdAt || row.createdAt;
+      list[ix] = Object.assign({}, list[ix], row);
+      writeLedger(list);
+      return list[ix];
+    }
     list.push(row);
     writeLedger(list);
     return row;
   }
 
   function trySyncLedgerRow(row) {
-    if (!row || typeof global.createDocument !== 'function') return Promise.resolve(row);
+    if (!row) return Promise.resolve(row);
+    var id = String(row.id || '');
+    if (typeof global.upsertDocument === 'function' && id) {
+      return global
+        .upsertDocument('ledger', id, row)
+        .then(function () {
+          return row;
+        })
+        .catch(function (e) {
+          console.warn('ClubAccounting: no se sincronizó asiento en Firebase:', e);
+          return row;
+        });
+    }
+    if (typeof global.createDocument !== 'function') return Promise.resolve(row);
     return global
       .createDocument('ledger', row)
       .then(function (newId) {
@@ -188,19 +252,51 @@
       });
   }
 
+  function findByDedupeKey(key) {
+    var k = String(key || '');
+    if (!k) return null;
+    var list = readLedger();
+    for (var i = 0; i < list.length; i++) {
+      if (String(list[i].dedupeKey || '') === k) return list[i];
+    }
+    return null;
+  }
+
+  /**
+   * Crea un ingreso/gasto si no existe ya (mismo dedupeKey o cuota de socio del mismo id).
+   * @returns {{ skipped: boolean, existing?: object, row?: object|null }}
+   */
+  function recordIncomeIfMissing(entry) {
+    var key = entry && entry.dedupeKey ? String(entry.dedupeKey) : '';
+    if (key) {
+      var byKey = findByDedupeKey(key);
+      if (byKey) return { skipped: true, existing: byKey };
+    }
+    if (entry && entry.category === 'cuota_socio' && entry.refId) {
+      var byMember = findLedgerCuotaSocioByMemberId(entry.refId);
+      if (byMember) return { skipped: true, existing: byMember };
+    }
+    var row = appendEntry(entry);
+    return { skipped: false, row: row };
+  }
+
   function recordMemberCuotaToBankA(member, amount) {
     var cuota = Number(amount);
     if (!Number.isFinite(cuota) || cuota <= 0) return null;
     var name = [member && member.name, member && member.surname].filter(Boolean).join(' ').trim()
       || [member && member.nombre, member && member.apellidos].filter(Boolean).join(' ').trim()
       || 'Socio';
+    var memberId = String((member && member.id) || '');
     return appendEntry({
       bucket: 'A',
       signedAmount: cuota,
       concept: 'Cuota socio validada (banco): ' + name,
       category: 'cuota_socio',
       refType: 'member',
-      refId: String((member && member.id) || '')
+      refId: memberId,
+      paymentChannel: 'validacion_admin',
+      dedupeKey: memberId ? 'member:cuota_socio:' + memberId : null,
+      source: 'admin'
     });
   }
 
@@ -229,16 +325,23 @@
     return { skipped: false, row: row };
   }
 
-  function recordEventIncome(bucket, amount, eventId, eventName, participantHint) {
+  function recordEventIncome(bucket, amount, eventId, eventName, participantHint, extra) {
     var a = Number(amount);
     if (!Number.isFinite(a) || a <= 0) return null;
+    extra = extra && typeof extra === 'object' ? extra : {};
+    var hint = participantHint || 'inscripción';
+    var eid = String(eventId || '');
     return appendEntry({
       bucket: bucket === 'B' ? 'B' : 'A',
       signedAmount: a,
-      concept: 'Evento "' + (eventName || eventId) + '": ' + (participantHint || 'inscripción'),
+      concept: 'Evento "' + (eventName || eventId) + '": ' + hint,
       category: 'evento',
       refType: 'event',
-      refId: String(eventId || '')
+      refId: eid,
+      paymentOrderId: extra.paymentOrderId || null,
+      paymentChannel: extra.paymentChannel || null,
+      dedupeKey: extra.dedupeKey || (eid && hint ? 'event:' + eid + ':' + String(hint).toLowerCase() + ':' + a : null),
+      source: extra.source || 'evento'
     });
   }
 
@@ -381,6 +484,11 @@
     getBalances: getBalances,
     appendEntry: appendEntry,
     trySyncLedgerRow: trySyncLedgerRow,
+    persistLedgerRow: trySyncLedgerRow,
+    findByDedupeKey: findByDedupeKey,
+    recordIncomeIfMissing: recordIncomeIfMissing,
+    createdAtToIso: createdAtToIso,
+    normalizeLedgerEntry: normalizeLedgerEntry,
     getMembershipPricing: getMembershipPricing,
     saveMembershipPricing: saveMembershipPricing,
     recordMemberCuotaToBankA: recordMemberCuotaToBankA,

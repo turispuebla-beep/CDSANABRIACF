@@ -507,6 +507,62 @@ function syncClubBoardLocal(board) {
   writeLocalJson('clubBoard', JSON.stringify(list));
 }
 
+function normalizeRemoteLedgerRow(doc) {
+  if (!doc || typeof doc !== 'object') return null;
+  const createdAt =
+    firestoreDateToIso(doc.createdAt) ||
+    (typeof doc.createdAt === 'string' ? doc.createdAt : null) ||
+    new Date().toISOString();
+  return {
+    ...doc,
+    id: String(doc.id || ''),
+    createdAt,
+    bucket: doc.bucket === 'B' ? 'B' : 'A',
+    signedAmount: Math.round(Number(doc.signedAmount || 0) * 100) / 100,
+    appScope: APP_SCOPE
+  };
+}
+
+/**
+ * Espejo del libro contable. Si la nube llega vacía y hay asientos locales, no los borra.
+ * Une filas locales aún no subidas (otro id / otro dedupeKey).
+ */
+function syncClubAccountingLedgerLocal(remoteDocs) {
+  const remote = (Array.isArray(remoteDocs) ? remoteDocs : [])
+    .filter((d) => d && (!d.appScope || d.appScope === APP_SCOPE))
+    .map(normalizeRemoteLedgerRow)
+    .filter((d) => d && d.id);
+  let local = [];
+  try {
+    local = JSON.parse(localStorage.getItem('clubAccountingLedger') || '[]');
+    if (!Array.isArray(local)) local = [];
+  } catch (_) {
+    local = [];
+  }
+  if (!remote.length && local.length) {
+    return local;
+  }
+  const byId = {};
+  const remoteDedupe = {};
+  remote.forEach((r) => {
+    byId[String(r.id)] = r;
+    if (r.dedupeKey) remoteDedupe[String(r.dedupeKey)] = true;
+  });
+  local.forEach((l) => {
+    if (!l || !l.id) return;
+    const id = String(l.id);
+    if (byId[id]) return;
+    if (l.dedupeKey && remoteDedupe[String(l.dedupeKey)]) return;
+    byId[id] = l;
+  });
+  const merged = Object.keys(byId).map((k) => byId[k]);
+  writeLocalJson('clubAccountingLedger', JSON.stringify(merged));
+  try {
+    window.dispatchEvent(new CustomEvent('accountingLedgerUpdated', { detail: merged }));
+  } catch (_) {}
+  return merged;
+}
+
 function mirrorLocalUpsert(collectionName, docId, data) {
   const scoped = withScopeForCollection(collectionName, data || {});
   const current = readLocalCollection(collectionName);
@@ -618,11 +674,11 @@ const LOCAL_KEY_TO_COLLECTION = {
 
 /** Tras leer Firestore, copia la lista a las claves localStorage que usa el panel (clubMembers, clubBoard, …). */
 function mirrorResolvedFirestoreListToLegacyKeys(resolvedCollection, documents) {
-  if (
-    resolvedCollection === DB_COLLECTIONS.LEDGER
-    || resolvedCollection === DB_COLLECTIONS.SETTINGS
-    || resolvedCollection === DB_COLLECTIONS.STATS
-  ) {
+  if (resolvedCollection === DB_COLLECTIONS.LEDGER) {
+    syncClubAccountingLedgerLocal(documents);
+    return;
+  }
+  if (resolvedCollection === DB_COLLECTIONS.SETTINGS || resolvedCollection === DB_COLLECTIONS.STATS) {
     return;
   }
   const list = Array.isArray(documents)
@@ -1221,7 +1277,8 @@ async function syncFromFirebase() {
       DB_COLLECTIONS.MATCHES,
       DB_COLLECTIONS.CALENDAR,
       DB_COLLECTIONS.BOARD,
-      DB_COLLECTIONS.COMPETITIONS
+      DB_COLLECTIONS.COMPETITIONS,
+      DB_COLLECTIONS.LEDGER
     ];
     
     for (const collectionName of collections) {
@@ -1334,6 +1391,7 @@ async function setupRealtimeSync() {
     const isAdminUser = await firebaseUserIsClubAdmin();
     let membersListener = null;
     let friendsListener = null;
+    let ledgerListener = null;
     if (isAdminUser) {
     membersListener = onSnapshot(collection(db, 'sanabria_members'), (snapshot) => {
       const members = [];
@@ -1528,6 +1586,18 @@ async function setupRealtimeSync() {
         }
         window.dispatchEvent(new CustomEvent('playerApplicationsUpdated', { detail: applications }));
       }, (err) => console.warn('Listener solicitudes jugador:', err && err.message ? err.message : err));
+
+      ledgerListener = onSnapshot(
+        collection(db, DB_COLLECTIONS.LEDGER),
+        (snapshot) => {
+          const rows = [];
+          snapshot.forEach((docSnap) => {
+            rows.push({ id: docSnap.id, ...docSnap.data() });
+          });
+          syncClubAccountingLedgerLocal(rows);
+        },
+        (err) => console.warn('Listener contabilidad:', err && err.message ? err.message : err)
+      );
     } else {
       console.log('Jugadores completos (sanabria_players): solo con sesión admin en la nube');
     }
@@ -1756,7 +1826,8 @@ async function setupRealtimeSync() {
       board: boardListener,
       settingsBlobs: settingsBlobListener,
       statsBlobs: statsBlobListener,
-      media: mediaListener
+      media: mediaListener,
+      ledger: ledgerListener
     };
     
     console.log('âœ… SincronizaciÃ³n en tiempo real configurada correctamente');
@@ -2089,6 +2160,7 @@ window.syncClubFriendsLocal = syncClubFriendsLocal;
 window.syncClubPlayersLocal = syncClubPlayersLocal;
 window.syncClubCoachesLocal = syncClubCoachesLocal;
 window.syncClubBoardLocal = syncClubBoardLocal;
+window.syncClubAccountingLedgerLocal = syncClubAccountingLedgerLocal;
 
 // Compatibilidad con index.html legado (usa window.cdsanabriacfFirebase.*)
 window.cdsanabriacfFirebase = {

@@ -129,7 +129,13 @@
       currentAdmin: true,
       adminUser: true,
       cdsanAdminAuthAt: true,
-      isAdmin: true
+      isAdmin: true,
+      cdsanabria_cookies_aceptadas: true,
+      cdsanabria_cookies_fecha: true,
+      cdsanabria_cookies_config: true,
+      cdsanPwaDeployVersion: true,
+      clubAccountingLedger: true,
+      clubMembershipPricing: true
     };
     if (keepKey) keep[keepKey] = true;
     const keys = [];
