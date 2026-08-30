@@ -3007,7 +3007,7 @@
         >&times;</button>
         <img
             class="campeonato-splash-poster"
-            src="assets/amistoso-aficionados.jpg?v=1"
+            src="assets/amistoso-aficionados.jpg?v=2"
             alt="Partido amistoso aficionados: CD Sanabria CF vs C.D. Santa Croya. Sábado 29 de agosto, 19:30, Campo El Pinar"
             width="540"
             height="760"
@@ -3034,7 +3034,7 @@
     </div>
     <script>
         (function () {
-            window.CAMPEONATO_PROMO_UNTIL_MS = Date.parse('2026-08-30T23:59:59.999+02:00');
+            window.CAMPEONATO_PROMO_UNTIL_MS = Date.parse('2026-08-29T23:59:59.999+02:00');
             window.isCampeonatoPromoActive = function () {
                 return Date.now() <= window.CAMPEONATO_PROMO_UNTIL_MS;
             };
@@ -3056,6 +3056,26 @@
                 splash.style.display = 'none';
                 document.body.classList.remove('campeonato-splash-open');
             };
+            window.startAmistosoSplash = function () {
+                if (typeof window.isCampeonatoPromoActive === 'function' && !window.isCampeonatoPromoActive()) return;
+                var splash = document.getElementById('campeonatoSplash');
+                if (!splash) return;
+                if (window._campeonatoSplashTimer) {
+                    clearTimeout(window._campeonatoSplashTimer);
+                    window._campeonatoSplashTimer = null;
+                }
+                splash.hidden = false;
+                splash.removeAttribute('hidden');
+                splash.style.display = '';
+                splash.classList.add('is-poster');
+                splash.classList.remove('is-link', 'is-settled');
+                window.CAMPEONATO_SPLASH_PHASE = 'poster';
+                document.body.classList.add('campeonato-splash-open');
+                window._campeonatoSplashTimer = setTimeout(function () {
+                    window._campeonatoSplashTimer = null;
+                    window.dismissCampeonatoSplash();
+                }, 5000);
+            };
             window.showCampeonatoSplashLink = function () {
                 window.dismissCampeonatoSplash();
             };
@@ -3064,29 +3084,16 @@
                 window.dismissCampeonatoSplash();
             };
             window.scheduleCampeonatoPosterThenLink = function () {
-                if (window._campeonatoSplashTimer) return;
-                window._campeonatoSplashTimer = setTimeout(function () {
-                    window._campeonatoSplashTimer = null;
-                    window.dismissCampeonatoSplash();
-                }, 5000);
+                window.startAmistosoSplash();
             };
             try {
-                if (window.isCampeonatoPromoActive()) {
-                    var splashOn = document.getElementById('campeonatoSplash');
-                    if (splashOn) {
-                        splashOn.hidden = false;
-                        splashOn.removeAttribute('hidden');
-                        splashOn.style.display = '';
-                        splashOn.classList.add('is-poster');
-                        splashOn.classList.remove('is-link', 'is-settled');
-                        window.CAMPEONATO_SPLASH_PHASE = 'poster';
-                        document.body.classList.add('campeonato-splash-open');
-                        if (typeof window.scheduleCampeonatoPosterThenLink === 'function') {
-                            window.scheduleCampeonatoPosterThenLink();
-                        }
-                    }
-                }
+                window.startAmistosoSplash();
             } catch (e) {}
+            window.addEventListener('pageshow', function () {
+                try {
+                    window.startAmistosoSplash();
+                } catch (err) {}
+            });
             document.addEventListener('touchend', function (e) {
                 var t = e.target;
                 if (!t || !t.closest) return;
@@ -3238,24 +3245,6 @@
                     <button
                         type="button"
                         class="proximo-evento-poster-wrap"
-                        onclick="abrirCartelProximoEvento('assets/amistoso-aficionados.jpg?v=1')"
-                        aria-label="Ampliar cartel partido amistoso aficionados"
-                    >
-                        <img
-                            src="assets/amistoso-aficionados.jpg?v=1"
-                            alt="Partido amistoso aficionados: Sanabria CF vs Santa Croya. 29 de agosto, 19:30, Campo El Pinar"
-                            class="proximo-evento-poster"
-                            width="480"
-                            height="680"
-                            loading="eager"
-                        >
-                    </button>
-                    <p class="proximo-evento-caption">AMISTOSO AFICIONADOS · 29 AGO · 19:30</p>
-                </div>
-                <div class="proximo-evento-col">
-                    <button
-                        type="button"
-                        class="proximo-evento-poster-wrap"
                         onclick="abrirCartelProximoEvento('assets/web-y-app.jpeg?v=1')"
                         aria-label="Ampliar foto Web y app"
                     >
@@ -3278,7 +3267,7 @@
             class="proximo-evento-lightbox"
             role="dialog"
             aria-modal="true"
-            aria-label="Cartel ampliado del torneo"
+            aria-label="Cartel ampliado"
             onclick="if (event.target === this) cerrarCartelProximoEvento()"
         >
             <div class="proximo-evento-lightbox-inner">
@@ -3291,7 +3280,7 @@
                 <img
                     id="proximoEventoLightboxImg"
                     class="proximo-evento-lightbox-img"
-                    src="assets/torneo-1.jpg?v=1"
+                    src="assets/web-y-app.jpeg?v=1"
                     alt=""
                 >
             </div>
@@ -3343,12 +3332,10 @@
 
             <div class="feature-card feature-card--competiciones" data-feature="competiciones" onclick="openFeature('competiciones')" style="cursor: pointer; position: relative;">
                 <span id="badge-competiciones" class="feature-badge" style="display: none;"></span>
-                <p class="feature-nuevos-horarios">NUEVOS HORARIOS</p>
                 <div class="feature-icon">🏆</div>
                 <h3 class="feature-title">Competiciones</h3>
                 <p class="feature-description">
-                    Calendario oficial del Torneo Fútbol 7 (17–23 de agosto): El Pinar. Torneo 1 sénior y Torneo 2 alevín, infantil y cadete.
-                    Visible para todos. Los resultados los publican organizadores y administradores.
+                    Resultados, clasificación y calendario. Visible para todos. Los organizadores y administradores publican los datos.
                 </p>
                 <div class="feature-actions feature-actions--compact">
                     <button type="button" class="feature-btn feature-btn--sm" style="background:#b45309; color: white; border: none; border-radius: 20px; cursor: pointer;" onclick="event.stopPropagation(); openTorneoFotoGallery('resultados')">📊 Resultados</button>
@@ -5643,14 +5630,8 @@
 
         (function initCampeonatoSplash() {
             applyCampeonatoPromoVisibility();
-            const splash = document.getElementById('campeonatoSplash');
-            if (!splash || splash.hidden) return;
-            if (window.CAMPEONATO_SPLASH_PHASE === 'closed') return;
-            window.CAMPEONATO_SPLASH_PHASE = 'poster';
-            splash.classList.add('is-poster');
-            splash.classList.remove('is-link');
-            if (typeof window.scheduleCampeonatoPosterThenLink === 'function') {
-                window.scheduleCampeonatoPosterThenLink();
+            if (typeof window.startAmistosoSplash === 'function') {
+                window.startAmistosoSplash();
             }
         })();
 
@@ -7198,8 +7179,7 @@
         const PUBLIC_SEEDED_CLUB_EVENT_ID = 'EVENT_AMISTOSO_AFICIONADOS_20260829';
 
         function isPublicClubEventSeedActive() {
-            const until = window.CAMPEONATO_PROMO_UNTIL_MS || Date.parse('2026-08-30T23:59:59.999+02:00');
-            return Date.now() <= until;
+            return false;
         }
 
         function getAmistosoAficionadosSeedEvent() {
@@ -7212,8 +7192,8 @@
                 endTime: '21:00',
                 location: 'Campo El Pinar, Puebla de Sanabria',
                 description: 'CD Sanabria CF vs C.D. Santa Croya. Categoría aficionado. Sábado 29 de agosto, 19:30 h, Campo El Pinar.',
-                image: 'assets/amistoso-aficionados.jpg?v=1',
-                poster: 'assets/amistoso-aficionados.jpg?v=1',
+                image: 'assets/amistoso-aficionados.jpg?v=2',
+                poster: 'assets/amistoso-aficionados.jpg?v=2',
                 price: 0,
                 pricesByType: {
                     socios: 0,
@@ -7263,7 +7243,6 @@
         }
 
         function readClubEventsWithPublicSeeds() {
-            ensurePublicSeededClubEventsInStorage();
             let events = [];
             try {
                 events = JSON.parse(localStorage.getItem('clubEvents') || '[]');
@@ -7271,10 +7250,25 @@
                 events = [];
             }
             if (!Array.isArray(events)) events = [];
-            if (!isPublicClubEventSeedActive()) return events;
-            const seed = getAmistosoAficionadosSeedEvent();
-            if (events.some((e) => String(e.id) === seed.id)) return events;
-            return [seed, ...events];
+            if (isPublicClubEventSeedActive()) {
+                ensurePublicSeededClubEventsInStorage();
+                try {
+                    events = JSON.parse(localStorage.getItem('clubEvents') || '[]');
+                } catch (e) {
+                    events = [];
+                }
+                if (!Array.isArray(events)) events = [];
+                const seed = getAmistosoAficionadosSeedEvent();
+                if (events.some((e) => String(e.id) === seed.id)) return events;
+                return [seed, ...events];
+            }
+            const filtered = events.filter((e) => String(e.id) !== PUBLIC_SEEDED_CLUB_EVENT_ID);
+            if (filtered.length !== events.length) {
+                try {
+                    localStorage.setItem('clubEvents', JSON.stringify(filtered));
+                } catch (e) {}
+            }
+            return filtered;
         }
         window.readClubEventsWithPublicSeeds = readClubEventsWithPublicSeeds;
         window.ensurePublicSeededClubEventsInStorage = ensurePublicSeededClubEventsInStorage;
@@ -10561,6 +10555,18 @@
         let carouselSlides = [];
         let carouselInterval;
 
+        function isRetiredTorneoCartelAd(ad) {
+            const blob = [
+                ad.title,
+                ad.company,
+                ad.description,
+                ad.image,
+                ad.mediaName,
+                ad.mediaData
+            ].join(' ').toLowerCase();
+            return /torneo\s*f[uú]tbol\s*7|hoy\s*co[im]enza|nuevos\s*horarios|torneo-1\.jpg|torneo-2\.jpg|bases-torneo|calendario-torneo|campeonato\.jpg/.test(blob);
+        }
+
         // Cargar anuncios del carrusel
         function loadCarouselAds() {
             try {
@@ -10569,7 +10575,8 @@
                     ad.type === 'carrusel' && 
                     ad.status === 'active' && 
                     (!ad.startDate || new Date(ad.startDate) <= new Date()) &&
-                    (!ad.endDate || new Date(ad.endDate) >= new Date())
+                    (!ad.endDate || new Date(ad.endDate) >= new Date()) &&
+                    !isRetiredTorneoCartelAd(ad)
                 );
                 
                 if (carouselAds.length === 0) {

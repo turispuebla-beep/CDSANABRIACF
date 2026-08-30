@@ -294,7 +294,7 @@ foreach ($name in @('index.html', 'admin-panel.html', 'sw.js', 'manifest.json'))
         $ok = $false
     }
 }
-foreach ($name in @('escudo-192.png', 'escudo-512.png', 'escudo-cdsanabriacf.png', 'torneo-futbol-7-2026.jpeg')) {
+foreach ($name in @('escudo-192.png', 'escudo-512.png', 'escudo-cdsanabriacf.png', 'web-y-app.jpeg')) {
     $p = Join-Path $dist "assets\$name"
     if (-not (Test-Path $p)) {
         Write-Host "      FALTA: assets/$name" -ForegroundColor Red

@@ -6,7 +6,7 @@
   'use strict';
 
   var COMP_ID = 'TORNEO_F7_2026_PINAR';
-  var VERSION = '2026-finales-23-v1';
+  var VERSION = '2026-amistoso-splash-v1';
   var FIELD = 'Campo El Pinar';
   var CATS = ['Alevín', 'Infantil', 'Cadete', 'Sénior'];
   var NAME_HINT = /torneo\s*f[uú]tbol\s*7|f[uú]tbol\s*7\s*[-—]?\s*2026|torneo\s*f7/i;
@@ -1337,8 +1337,7 @@
       '<h3 style="margin:0 0 4px;color:#1e3a8a;">🏆 ' +
       escapeHtml(viewComp.title || viewComp.name || 'Torneo Fútbol 7') +
       '</h3>' +
-      '<p style="margin:0 0 8px;font-size:1rem;font-weight:900;letter-spacing:0.08em;color:#dc2626;">NUEVOS HORARIOS</p>' +
-      '<p style="margin:0 0 8px;color:#b91c1c;font-size:0.9rem;font-weight:700;">Torneo 2: alevín 18:00 · infantil 18:00 y 18:45 · cadete 19:30. Torneo 1 sénior: 20:15, 21:00, 21:45 y 22:30. Campo El Pinar, 17–23 de agosto.</p>' +
+      '<p style="margin:0 0 8px;color:#334155;font-size:0.9rem;">Campo El Pinar. Resultados, clasificación y cuadro de finales.</p>' +
       '<div style="display:flex;gap:8px;flex-wrap:wrap;margin:0 0 12px;">' +
       '<button type="button" onclick="if (window.openTorneoFotoGallery) openTorneoFotoGallery(\'resultados\')" style="flex:1;min-width:140px;padding:10px 12px;border:none;border-radius:10px;cursor:pointer;font-weight:800;background:#b45309;color:#fff;">📊 Resultados</button>' +
       '<button type="button" onclick="if (window.openTorneoFotoGallery) openTorneoFotoGallery(\'premios\')" style="flex:1;min-width:140px;padding:10px 12px;border:none;border-radius:10px;cursor:pointer;font-weight:800;background:#7c3aed;color:#fff;">🏆 Premios</button>' +

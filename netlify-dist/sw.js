@@ -68,18 +68,16 @@ fcmMessaging.onBackgroundMessage(function (payload) {
   });
 });
 
-const CACHE_NAME = 'cdsanabriacf-v20260829-0206';
-const STATIC_CACHE = 'cdsanabriacf-v20260829-0206-static';
-const DYNAMIC_CACHE = 'cdsanabriacf-v20260829-0206-dynamic';
+const CACHE_NAME = 'cdsanabriacf-v20260830-1156';
+const STATIC_CACHE = 'cdsanabriacf-v20260830-1156-static';
+const DYNAMIC_CACHE = 'cdsanabriacf-v20260830-1156-dynamic';
 
 // No precachear HTML (/): iOS y Huawei se quedan con la portada vieja.
 const STATIC_ASSETS = [
   '/manifest.json',
   '/assets/escudo-cdsanabriacf.png',
   '/assets/escudo-192.png',
-  '/assets/torneo-1.jpg',
-  '/assets/torneo-2.jpg',
-  '/assets/bases-torneo.jpg',
+  '/assets/web-y-app.jpeg',
   '/assets/escudos-senior/bar-mirador.png',
   '/assets/escudos-senior/montelueno.png',
   '/assets/escudos-senior/la-tosta-sanabresa.png',
